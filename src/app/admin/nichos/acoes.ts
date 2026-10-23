@@ -7,6 +7,7 @@ import { contagemElegivelSemFala, type EfeitoVideoSemFala } from "@/jobs/extrair
 import { FILAS } from "@/jobs/fila";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirSessaoAdmin } from "@/servicos/clientes";
+import { tirarContaDoSetor, voltarContaParaOSetor } from "@/servicos/contas-fora-do-setor";
 import {
   aceitarTermoSugerido,
   adicionarContasSemente,
@@ -230,5 +231,39 @@ export async function virarContaDoSetorAction(perfilAnalisadoId: number, slug: s
     return { ok: true };
   } catch (erro) {
     return { ok: false, mensagem: erro instanceof Error ? erro.message : "nao foi possivel virar conta agora. Tente de novo." };
+  }
+}
+
+/** "Conferir as contas agora" (faxina das contas fora do setor): enfileira a conferência por conta só para este ramo. */
+export async function conferirContasAgoraAction(nichoId: number): Promise<Resultado & { duplicado?: boolean }> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  const resultado = await dispararJobAction(FILAS.faxinaDeContas, { nichoId });
+  return { ok: resultado.ok, mensagem: resultado.mensagem, duplicado: resultado.duplicado };
+}
+
+/** "Tirar do setor" à mão: a conta sai da vigilância e dos vídeos que valem neste ramo, sem apagar nada (vale também para conta semente). */
+export async function tirarContaDoSetorAction(contaId: number, nichoId: number, slug: string): Promise<Resultado> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  try {
+    await tirarContaDoSetor(contaId, nichoId);
+    revalidatePath(`/admin/nichos/${slug}`);
+    return { ok: true };
+  } catch {
+    return { ok: false, mensagem: "nao foi possivel tirar a conta do setor agora." };
+  }
+}
+
+/** "Voltar para o setor": desfaz a marca (da rotina ou à mão); a rotina não marca a conta de novo. */
+export async function voltarContaParaOSetorAction(contaId: number, nichoId: number, slug: string): Promise<Resultado> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  try {
+    await voltarContaParaOSetor(contaId, nichoId);
+    revalidatePath(`/admin/nichos/${slug}`);
+    return { ok: true };
+  } catch {
+    return { ok: false, mensagem: "nao foi possivel voltar a conta para o setor agora." };
   }
 }

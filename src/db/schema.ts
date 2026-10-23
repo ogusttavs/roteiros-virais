@@ -969,6 +969,37 @@ export const contas = pgTable(
 );
 
 /**
+ * A faxina das contas fora do setor (22/10/2026, achado do Gustavo: 9 dos 30 vídeos mais vistos do ramo "Empreendedorismo" eram de UMA conta de curiosidades e ciência, que a coleta por termo
+ * e hashtag trouxe para o ramo). Uma conta marcada aqui, para um ramo, sai da lista de vigilância desse ramo e os vídeos dela naquele ramo deixam de ser referência, tema, evidência e
+ * voz do público (`CONTA_FORA_DO_SETOR`, `servicos/pesquisa.ts`). A marca é por (conta, ramo): a mesma conta continua valendo em outro ramo em que seja do setor. NADA é apagado: o vídeo
+ * e a conta continuam no banco, e "Voltar para o setor" só preenche `desfeitaEm`. Uma conta desfeita pelo admin nunca é marcada de novo pela rotina (a decisão da pessoa vale mais).
+ * "automatica" é a conferência por conta (`jobs/faxina-de-contas.ts`); "manual" é o "Tirar do setor" do admin.
+ */
+export const contasForaDoSetor = pgTable(
+  "contas_fora_do_setor",
+  {
+    id: id(),
+    contaId: integer("conta_id")
+      .notNull()
+      .references(() => contas.id, { onDelete: "cascade" }),
+    nichoId: integer("nicho_id")
+      .notNull()
+      .references(() => nichos.id, { onDelete: "cascade" }),
+    origem: text("origem").$type<"automatica" | "manual">().notNull(),
+    /** Em língua de gente, para o admin: "6 de 8 vídeos conferidos são de outro assunto (ex.: ...)" ou "tirada à mão". */
+    motivo: text("motivo").notNull(),
+    /** Quantos vídeos da conta nesse ramo entraram na decisão e quantos deles eram de outro assunto (nulos na marca manual). */
+    videosConferidos: integer("videos_conferidos"),
+    videosForaDoSetor: integer("videos_fora_do_setor"),
+    marcadaEm: timestamp("marcada_em", { withTimezone: true }).notNull().defaultNow(),
+    /** Preenchido por "Voltar para o setor": a marca deixa de valer (a linha fica, para a rotina não marcar de novo). */
+    desfeitaEm: timestamp("desfeita_em", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("contas_fora_do_setor_conta_nicho").on(t.contaId, t.nichoId)],
+);
+export type ContaForaDoSetor = typeof contasForaDoSetor.$inferSelect;
+
+/**
  * Uma linha por rodada do job `pesquisa-de-setor` (M2): quando o setor nasce
  * pesquisado, quando o admin pede "Pesquisar o mercado de novo", e uma vez
  * por mês para os setores ativos. `resumo` é a prestação de contas que a

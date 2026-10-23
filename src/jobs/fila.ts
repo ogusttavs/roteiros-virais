@@ -40,6 +40,8 @@ export const FILAS = {
   guardarCapas: "guardar-capas",
   pontuar: "pontuar",
   vigilancia: "vigilancia",
+  /** A faxina das contas fora do setor, por ramo (22/10/2026): semanal, domingo antes da vigilancia e dos comentarios; `{ nichoId }` roda so aquele ramo. */
+  faxinaDeContas: "faxina-de-contas",
   transcrever: "transcrever",
   extrair: "extrair",
   extrairColeta: "extrair-coleta",
@@ -114,6 +116,7 @@ export const FILAS_POR_RAMO = new Set<string>([
   FILAS.extrairAgora,
   FILAS.extrairSemFala,
   FILAS.comentariosSemana,
+  FILAS.faxinaDeContas,
   FILAS.lerLongos,
   FILAS.temasDoDia,
   FILAS.pesquisaDeSetor,

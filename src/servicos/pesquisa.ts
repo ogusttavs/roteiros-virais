@@ -133,6 +133,16 @@ function condicaoDeSetores(setores: SetorDaBusca[]): SQL[] {
 }
 
 /**
+ * A faxina das contas fora do setor (22/10/2026): o vídeo cuja conta está marcada como fora do setor DAQUELE RAMO (`contas_fora_do_setor`, marca ativa, sem `desfeita_em`) não é
+ * referência, tema, evidência nem voz do público. A chave é o par (conta, ramo do vídeo), então a mesma conta segue valendo no outro ramo em que ela é do setor. Vídeo sem conta passa.
+ * Parte de `PERTENCE_AO_NICHO` (que todas as consultas de pesquisa já usam, sem aliás de tabela: `videos`).
+ */
+export const CONTA_DO_SETOR = sql`not exists (
+  select 1 from contas_fora_do_setor cfs
+  where cfs.conta_id = ${videos.contaId} and cfs.nicho_id = ${videos.nichoId} and cfs.desfeita_em is null
+)`;
+
+/**
  * A vigilância (etapa 7) escolhe conta, não assunto: tudo que a conta posta
  * entra na coleta. `extrairVideo` (etapa 10, ajuste da revisão da etapa 9)
  * marca `pertenceAoNicho` na análise; aqui exclui só o que foi marcado como
@@ -141,7 +151,7 @@ function condicaoDeSetores(setores: SetorDaBusca[]): SQL[] {
  * não-falso sem precisar de um OR à parte. Exportada para `analisarVisual` e
  * `modeloNicho` (etapa 9) aplicarem o mesmo filtro nas próprias consultas.
  */
-export const PERTENCE_AO_NICHO = sql`(${videos.analise} ->> 'pertenceAoNicho') is distinct from 'false'`;
+export const PERTENCE_AO_NICHO = sql`((${videos.analise} ->> 'pertenceAoNicho') is distinct from 'false' and ${CONTA_DO_SETOR})`;
 
 /**
  * O teto de duração (hotfix de 30/09/2026, achado do Gustavo na Overtake Pro: das três
@@ -1004,6 +1014,8 @@ export async function evidenciaPorIds(ids: number[], formatos?: FiltroDeFormatos
     .where(
       and(
         inArray(videos.id, ids),
+        // Faxina das contas fora do setor: um tema já gerado cuja evidência é de uma conta marcada depois não leva essa evidência para o roteiro.
+        CONTA_DO_SETOR,
         condicaoDeFormato(formatos, true) ?? sql`true`,
       ),
     );
