@@ -47,6 +47,52 @@ export const JARGAO: { proibido: RegExp; usar: string; palavra: string }[] = [
   { proibido: /\bonboarding\b/i, usar: "comecar, o seu briefing", palavra: "onboarding" },
 ];
 
+/**
+ * As palavras que o MOTOR usa por dentro e o dono do negocio nao entende (achado da prova com chave de
+ * 23/10/2026: a nota do tema saiu com "banco do setor", "fora da curva", "nicho", "gancho" e "elemento que
+ * prende", e o verificador reprovou duas vezes, cada uma uma chamada paga a mais). Fica separada de `JARGAO`
+ * de proposito: `JARGAO` vale em todo arquivo de texto e em todo prompt (`checar-texto`) e tem "gancho" e
+ * "fora da curva" como palavras permitidas ou como a propria troca de "viral"; esta so vale para o TEXTO QUE A
+ * IA ESCREVE para o cliente na nota do tema (`encontrarJargaoDoMotor`, ligado por `semJargaoDoMotor` no
+ * verificador) e para montar a instrucao do prompt `avaliarTema` (uma fonte so, as duas nunca divergem).
+ * "banco" e "base" sao palavras comuns; so reprovam nas formas em que o motor fala dos proprios dados.
+ * `palavra` e a forma escrita normal; `usar` e a troca em lingua de gente.
+ */
+export const JARGAO_DO_MOTOR: { proibido: RegExp; usar: string; palavra: string }[] = [
+  {
+    proibido: /\bbanco (?:de v[ií]deos|de dados|de refer[eê]ncias|d[oa]s? (?:seu |sua )?(?:setor|nicho|ramo))\b|\bnosso banco\b/i,
+    usar: "os vídeos que foram muito bem no seu ramo",
+    palavra: "banco do setor",
+  },
+  {
+    proibido: /\bbase (?:de dados|d[oa]s? (?:seu |sua )?(?:setor|nicho|ramo))\b|\bnossa base\b/i,
+    usar: "o que a gente acompanha do seu ramo",
+    palavra: "base",
+  },
+  { proibido: /\bda curva\b/i, usar: "muito acima do normal da conta", palavra: "fora da curva" },
+  { proibido: /\bmediana\b/i, usar: "o normal da conta", palavra: "mediana" },
+  { proibido: /\bnichos?\b/i, usar: "o seu ramo", palavra: "nicho" },
+  { proibido: /\bganchos?\b/i, usar: "o começo do vídeo", palavra: "gancho" },
+  {
+    proibido: /\belementos? que prende(?:m)?\b/i,
+    usar: "o que faz a pessoa continuar assistindo",
+    palavra: "elemento que prende",
+  },
+  { proibido: /\bevid(?:ê|e)ncias?\b/i, usar: "os vídeos que mostram isso", palavra: "evidência" },
+];
+
+/** Os motivos de jargao do motor num texto da nota do tema (mesmo formato dos de `encontrarProblemas`). */
+export function encontrarJargaoDoMotor(texto: string): string[] {
+  const motivos: string[] = [];
+  for (const { proibido, usar } of JARGAO_DO_MOTOR) {
+    const achado = texto.match(proibido)?.[0];
+    if (achado) {
+      motivos.push(`jargao "${achado}" (palavra interna do motor, o cliente nao entende), escreva algo como "${usar}"`);
+    }
+  }
+  return motivos;
+}
+
 /** Motivos de reprovacao encontrados num texto (uma linha ou um bloco inteiro). */
 export function encontrarProblemas(texto: string): string[] {
   const motivos: string[] = [];

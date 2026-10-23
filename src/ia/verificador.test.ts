@@ -34,6 +34,15 @@ describe("verificarLocalmente", () => {
     expect(r.aprovado).toBe(false);
   });
 
+  it("com semJargaoDoMotor, reprova o banco do setor, fora da curva e nicho no campo; sem a opcao, passa como antes", () => {
+    const campos = { justificativaViralizar: "o banco do seu setor tem tres videos fora da curva no seu nicho" };
+    expect(verificarLocalmente(campos).aprovado).toBe(true);
+    const r = verificarLocalmente(campos, { semJargaoDoMotor: true });
+    expect(r.aprovado).toBe(false);
+    expect(r.motivos.filter((m) => m.startsWith("justificativaViralizar: jargao"))).toHaveLength(3);
+    expect(verificarLocalmente({ recomendacao: "Grave o vídeo mostrando o antes e o depois." }, { semJargaoDoMotor: true }).aprovado).toBe(true);
+  });
+
   it("aceita gancho, que e permitido", () => {
     const r = verificarLocalmente({ corpo: "o gancho do video e forte" });
     expect(r.aprovado).toBe(true);

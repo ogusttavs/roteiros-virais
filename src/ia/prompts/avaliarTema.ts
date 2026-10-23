@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { Persona } from "@/db/schema";
+import { JARGAO, JARGAO_DO_MOTOR } from "@/lib/regras-de-texto";
 import { LIMITE_DO_TITULO, LIMITE_DO_VEICULO, limparParaPrompt, limparParaPromptSemAspas } from "@/servicos/noticias-assuntos";
 
 import type { EsforcoIA, NivelIA } from "../tipos";
@@ -87,7 +88,15 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * de abertura, duração e horário, quanto rendeu em relação ao normal da própria conta. Serve de desempate no encaixe e na chance de gerar cliente; nunca baixa a nota de um tema só porque aquele tipo de vídeo rendeu menos. Sem o
  * bloco (hoje, todas as contas) o sistema é idêntico ao da 1.12.0.
  */
-export const versao = "1.13.0";
+/**
+ * 1.14.0 (23/10/2026, prova com chave): a nota saiu com "banco do setor", "fora da curva", "nicho", "gancho" e "elemento que prende", num tom de briefing para uma equipe, e o verificador reprovou
+ * com razão (cada reprovação é uma chamada paga a mais e, nas duas, o dono do negócio via erro). O cliente é dono de pequeno negócio (regra 6). Quatro mudanças: (1) um bloco "Palavras que o
+ * dono do negócio não entende" lista, com a troca de cada uma, as da lista de jargão de sempre (`JARGAO`) e as que o motor usa por dentro (`JARGAO_DO_MOTOR`: banco, base, fora da curva, mediana,
+ * nicho, gancho, elemento que prende, evidência), montado das duas listas para o prompt e a conferência local (`semJargaoDoMotor`) nunca divergirem; (2) os exemplos de frase do próprio prompt
+ * ("o banco do seu setor cobre esse assunto...") eram a fonte da cópia e foram reescritos em língua de gente; (3) a entrada deixa de chamar o vídeo de "gancho" e de "fora da curva N,Nx" e
+ * passa a dizer "começo do vídeo" e "rendeu N,Nx o normal da conta"; (4) o tom pedido é o de uma conversa com o dono, nunca o de um relatório. O schema de saída não muda.
+ */
+export const versao = "1.14.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -125,6 +134,21 @@ function textoPersona(persona: Persona): string {
   }
 }
 
+/**
+ * O bloco "palavras que o dono do negócio não entende": uma linha por palavra, com a troca, das duas listas que a conferência local usa (`JARGAO` e `JARGAO_DO_MOTOR`), mais o tom e o que fazer
+ * com o nome das listas de dados da entrada. Montado em tempo de execução para as palavras não aparecerem escritas no arquivo (`checar-texto` reprova as de `JARGAO` em todo prompt) e para a
+ * instrução e a conferência nunca divergirem. Em `JARGAO`, a troca da palavra do vídeo que explode mandava para "fora da curva", agora proibida aqui; neste prompt ela vira "muito acima do normal da conta".
+ */
+export function blocoDoJargao(): string {
+  const trocas = [...JARGAO, ...JARGAO_DO_MOTOR]
+    .map((item) => ({ palavra: item.palavra, usar: item.usar.includes("fora da curva") ? "muito acima do normal da conta" : item.usar }))
+    .map((item) => `- Nunca escreva "${item.palavra}", diga "${item.usar}".`)
+    .join("\n");
+  return `Palavras que o dono do negócio não entende. Elas aparecem nas regras e nos dados que você recebe porque é assim que o nosso sistema chama as coisas por dentro, mas ele nunca as leu. Na justificativa, na recomendação e no ângulo, nem elas nem variações (plural, "o nicho", "no banco") entram; troque sempre:
+${trocas}
+Também não fale de "lista", "relatório", "assuntos em alta" ou "tendências" como se fossem uma ferramenta: diga o fato com a fonte ("muita gente está procurando isso no Google hoje", "o G1 deu isso hoje"). Escreva como quem conversa com o dono do negócio e explica o porquê da nota, nunca como um briefing para uma equipe.`;
+}
+
 export function montarSistemaEstavel(dados: {
   perfilCompilado: string;
   modeloNicho: string;
@@ -150,8 +174,8 @@ ${dados.desempenhoDaConta}`
   return `Você avalia um tema de vídeo proposto por um dono de pequeno negócio, em cinco
 pilares de 0 a 10, cada um com uma frase de justificativa (a nota final é a média dos cinco,
 calculada por código, não por você). Abaixo de 9,0 recomende ajustar e sugira o ângulo mais
-próximo que tem evidência no banco. Só cite evidência (ids de vídeo) que estiver na lista que
-você recebeu; sem evidência, diga isso com clareza e sugira o vizinho mais perto.
+próximo que já tem vídeos que provem. Só cite evidência (ids de vídeo) que estiver na lista que
+você recebeu; sem vídeo que prove, diga isso com clareza e sugira o vizinho mais perto.
 
 Os cinco pilares:
 - Chance de viralizar: três ou mais vídeos fora da curva (3x a mediana da conta ou mais)
@@ -162,9 +186,9 @@ Os cinco pilares:
   (a) O tema é do assunto do setor da pessoa (o que o modelo do nicho e o perfil descrevem: o
   produto, o serviço, o cliente, os medos e as dúvidas dela). O banco cobre esse assunto há 90
   dias, então nenhum vídeo fora da curva sobre ele É sinal de que não pega no setor: nota 4 ou
-  menos, e diga isso ("o banco do seu setor cobre esse assunto e nenhum vídeo passou da curva").
+  menos, e diga isso ("olhei vários vídeos do seu ramo sobre esse assunto e nenhum foi muito além do normal da conta").
   (b) O tema é de fora do assunto do setor (política, um acontecimento do país, outro mercado).
-  Aí o banco não diz nada: é só um fato ("o banco do seu setor ainda não tem vídeo sobre
+  Aí o banco não diz nada: é só um fato ("ainda não vi nenhum vídeo do seu ramo sobre
   isso"), nunca conclua que o assunto não está em alta e nunca baixe a nota por causa disso.
   Julgue o momento pelas notícias de hoje e pelos assuntos em alta no Brasil que vêm na entrada:
   uma notícia que toca o tema (do setor ou de um assunto que a pessoa acompanha) mostra que o
@@ -201,8 +225,10 @@ seguir com ele (por exemplo: não cite candidato nem partido, não tome lado, fi
 seu dia a dia). Se existir um jeito de contar a mesma ideia sem esse ponto, sugira como
 alternativa, sem mandar trocar. Nunca recuse o tema nem baixe a nota a 3 por isso.
 
-Regras duras que valem aqui também: todo tema cita a evidência que sustenta ele; sem
+Regras duras que valem aqui também: todo tema cita os vídeos que sustentam ele; sem
 travessão, sem emoji, sem jargão na justificativa nem na recomendação.
+
+${blocoDoJargao()}
 
 Você escreve para a própria pessoa ler: fale sempre com ela em segunda pessoa ("você", "seu",
 "sua"), nunca em terceira ("ele", "dele", "o cliente", "a pessoa"). Nunca escreva um número de
@@ -271,7 +297,7 @@ export function montarEntrada(dados: {
       ? dados.evidencias
           .map(
             (v) =>
-              `id ${v.id}: ${v.assunto}${v.conta ? `, da conta @${v.conta.replace(/^@/, "")}` : ""}, gancho "${v.gancho}" (fora da curva ${v.foraDaCurva.toFixed(1)}x${v.ramo ? `, ramo alternativo: ${v.ramo}` : ""})`,
+              `id ${v.id}: ${v.assunto}${v.conta ? `, da conta @${v.conta.replace(/^@/, "")}` : ""}, começo do vídeo "${v.gancho}" (rendeu ${v.foraDaCurva.toFixed(1)}x o normal da conta${v.ramo ? `, ramo alternativo: ${v.ramo}` : ""})`,
           )
           .join("\n")
       : "nenhuma evidencia encontrada nos ultimos 90 dias";
