@@ -6,6 +6,8 @@ import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { pedirFiltroDeNoticias } from "@/servicos/filtro-de-noticias";
 import { capaDoDia, type CapaDoDia, type NoticiaDaCapa } from "@/servicos/noticias-do-dia";
+import { assuntosEmAltaParaAcompanhar, type AssuntoEmAltaParaAcompanhar } from "@/servicos/palavras-do-assunto";
+import { listaDeTendenciasDeAgora } from "@/servicos/tendencias";
 import { textosNoticias } from "@/textos/noticias";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
@@ -71,6 +73,14 @@ export default async function Noticias() {
     falha = true;
   }
 
+  // O que está em alta no Brasil agora (E55) vira sugestão no campo do assunto. Leitura do banco, sem custo; se falhar, o campo sugere só pela nossa lista.
+  let emAlta: AssuntoEmAltaParaAcompanhar[] = [];
+  try {
+    emAlta = assuntosEmAltaParaAcompanhar(await listaDeTendenciasDeAgora(agora));
+  } catch {
+    emAlta = [];
+  }
+
   // Tela magra (poucas notícias nos últimos dias): pede o filtro do ramo agora, em vez de a pessoa esperar a próxima coleta. No máximo um pedido por ramo a cada 30 minutos, e o ver como nunca pede.
   if (!falha && sessao.verComo === null && capa.deHoje.length + capa.deOntem.length < NOTICIAS_PARA_TELA_CHEIA) void pedirFiltroDeNoticias(cliente.nichoId, 1800);
 
@@ -81,6 +91,7 @@ export default async function Noticias() {
       deHoje={capa.deHoje.map((n) => paraATela(n, agora))}
       deOntem={capa.deOntem.map((n) => paraATela(n, agora))}
       assuntos={capa.assuntos}
+      emAlta={emAlta}
       novasDesdeOntem={capa.novasDesdeOntem}
       falha={falha}
       somenteLeitura={sessao.verComo !== null}

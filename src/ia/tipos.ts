@@ -71,7 +71,9 @@ export type TarefaIA =
   /** E54: a pesquisa na hora, pela ferramenta de busca na web da Anthropic (só fontes da lista curada), para um vídeo. */
   | "pesquisaNaHora"
   /** E54: confere a premissa que a pessoa escreveu contra os dados achados e, se falta a posição dela, pergunta em uma frase. */
-  | "conferirPremissa";
+  | "conferirPremissa"
+  /** Melhoria da E53 (23/10/2026): de 3 a 6 palavras de busca para um assunto de notícias que a pessoa escreveu e o catálogo não tem. */
+  | "sugerirPalavrasDoAssunto";
 
 export type ImagemEntrada = {
   base64: string;
