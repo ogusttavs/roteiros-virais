@@ -105,6 +105,28 @@ describe("resumirDesempenho", () => {
     expect([...distancias].sort((a, b) => b - a)).toEqual(distancias);
   });
 
+  it("sem a dimensão pedida (o roteiro longo tira a duração), nenhuma linha dela sai, e a vaga vai para a próxima", () => {
+    const videos: VideoMedido[] = [
+      ...varios(4, { duracaoS: 15, multiplicador: 3, objetivo: "alcance", gancho: "cena", hora: 19 }),
+      ...varios(4, { duracaoS: 55, multiplicador: 1, objetivo: "alcance", gancho: "cena", hora: 19 }),
+    ];
+    expect(resumirDesempenho(videos).map((g) => g.dimensao)).toContain("duracao");
+    const sem = resumirDesempenho(videos, { semDimensoes: ["duracao"] });
+    expect(sem.map((g) => g.dimensao)).not.toContain("duracao");
+    expect(formatarDesempenhoDaConta(sem)).not.toContain("segundos");
+  });
+
+  it("sem a duração, quatro linhas das outras dimensões ainda cabem (a duração não gasta vaga)", () => {
+    const videos: VideoMedido[] = [
+      ...varios(3, { objetivo: "conversao", gancho: "numero", duracaoS: 15, hora: 7, multiplicador: 3 }),
+      ...varios(3, { objetivo: "engajamento", gancho: "pergunta", duracaoS: 35, hora: 13, multiplicador: 0.4 }),
+      ...varios(3, { objetivo: "alcance", gancho: "cena", duracaoS: 55, hora: 21, multiplicador: 1.6 }),
+    ];
+    const grupos = resumirDesempenho(videos, { semDimensoes: ["duracao"] });
+    expect(grupos).toHaveLength(MAXIMO_DE_LINHAS);
+    expect(grupos.every((g) => g.dimensao !== "duracao")).toBe(true);
+  });
+
   it("o texto nunca leva tema, gancho ou frase de roteiro: só rótulo e número", () => {
     const videos = [...varios(4, { objetivo: "conversao", gancho: "numero", multiplicador: 2.5 }), ...varios(4, { objetivo: "alcance", gancho: "cena", multiplicador: 1 })];
     const texto = formatarDesempenhoDaConta(resumirDesempenho(videos));

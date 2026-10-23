@@ -53,7 +53,12 @@ import {
 /**
  * 1.3.0 (22/10/2026, decisão do Gustavo): o tema da própria pessoa (Tema livre) leva as proibições do briefing como aviso, não barreira (`blocoDasProibicoesComoAviso`, de `roteiro.ts`). Só a entrada muda.
  */
-export const versao = "1.3.0";
+/**
+ * 1.4.0 (E16 PR 3, nível conta): o sistema estável ganha, quando a marca já tem pelo menos 8 vídeos postados e medidos, o bloco "O que funcionou nos vídeos que este cliente já postou" (`desempenhoDaConta`,
+ * `servicos/desempenho-da-conta.ts`), o mesmo do roteiro curto (2.22.0), sem a linha de duração: a duração do longo vem da medida dos longos do ramo, não do que rendeu nos Reels. É tendência de uma marca só,
+ * só rótulo e número (nunca tema ou texto de roteiro), calculada por código. Sem o bloco (a conta sem dado suficiente, hoje todas) o sistema é idêntico ao da 1.3.0. O schema de saída não muda.
+ */
+export const versao = "1.4.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -116,6 +121,8 @@ export function montarSistemaEstavel(dados: {
   modeloNicho: string;
   camadaExclusiva: string;
   regrasCliente: { regra: string; contagem: number }[];
+  /** E16, nível conta: o que rendeu mais ou menos nos vídeos já postados DESTA marca (`desempenhoDaConta`, sem a duração). Vazio ou ausente sem dado suficiente. */
+  desempenhoDaConta?: string;
   /** "negocio" fala como a marca; "pessoa" fala em primeira pessoa do singular. */
   tipo: "negocio" | "pessoa";
   persona?: string | null;
@@ -127,6 +134,12 @@ export function montarSistemaEstavel(dados: {
           .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
           .join("\n")}`
       : "";
+  const blocoDesempenhoDaConta = dados.desempenhoDaConta
+    ? `
+
+O que funcionou nos vídeos que este cliente já postou (medido contra o normal da própria conta dele). É tendência dele, não regra: use para pesar o jeito de abrir o vídeo, o objetivo e o horário, sem repetir um roteiro que já deu certo e sem prometer que o próximo vai render igual. A duração e a estrutura deste vídeo vêm da entrada, não destes números. Nunca cite estes números, nem "o normal da conta", no texto do roteiro:
+${dados.desempenhoDaConta}`
+    : "";
   const regraVoz =
     dados.tipo === "pessoa"
       ? `Este cliente é uma pessoa falando de si, não um negócio: escreva sempre em primeira pessoa do singular ("eu", "meu", "minha"), nunca "a gente" ou "nosso".`
@@ -220,7 +233,7 @@ ${textoRegrasCopyRoteiro("longo")}
 ${pedidoPorQueDosBlocos("longo")}
 
 Perfil do cliente:
-${dados.perfilCompilado}${blocoRegrasCliente}
+${dados.perfilCompilado}${blocoRegrasCliente}${blocoDesempenhoDaConta}
 
 O que só este cliente tem (cidade, concorrentes, perfis que admira; use quando fizer sentido, nunca force):
 ${dados.camadaExclusiva}

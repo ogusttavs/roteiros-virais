@@ -285,6 +285,8 @@ export type DadosDoRoteiroLongo = {
   camadaExclusiva: string;
   modeloNicho: string;
   regrasCliente: { regra: string; contagem: number }[];
+  /** E16, nível conta: o bloco do que rendeu nos vídeos já postados DESTA marca (`desempenhoDaConta`, sem a duração); vazio sem dado suficiente. */
+  desempenhoDaConta?: string;
   proibicoes: string[];
   /** 22/10/2026: o tema é da própria pessoa (Tema livre): as proibições do briefing viram aviso, nunca bloqueio. */
   temaDaPessoa?: boolean;
@@ -345,6 +347,7 @@ export async function gerarConteudoLongo(dados: DadosDoRoteiroLongo): Promise<Co
       modeloNicho: dados.modeloNicho,
       camadaExclusiva: dados.camadaExclusiva,
       regrasCliente: dados.regrasCliente,
+      desempenhoDaConta: dados.desempenhoDaConta,
       tipo: dados.tipo,
       persona: dados.persona,
       quemAparece: dados.quemAparece,

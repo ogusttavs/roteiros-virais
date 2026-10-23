@@ -1077,8 +1077,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     modeloNichoAtual(nichoId),
     historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
     regrasAtivasDoCliente(dados.clienteId),
-    // E16, nível conta: o que rendeu nos vídeos já postados DESTA marca (vazio sem dado suficiente; o roteiro longo não recebe).
-    ehLongo ? Promise.resolve("") : desempenhoDaConta(dados.clienteId),
+    // E16, nível conta: o que rendeu nos vídeos já postados DESTA marca (vazio sem dado suficiente). O longo recebe o mesmo bloco sem a linha de duração (a dele vem da medida dos longos do ramo).
+    desempenhoDaConta(dados.clienteId, new Date(), ehLongo ? { semDimensoes: ["duracao"] } : {}),
     ultimosRoteirosParaAbertura(dados.clienteId),
     marcaCitadaPorId(dados.momento?.marcaId, dados.clienteId),
     // E28: o que o público do setor perguntou nos comentários de vídeos do YouTube (sem leitura, com a leitura velha e no roteiro do momento: nada; a cena é a única fonte).
@@ -1253,6 +1253,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         // O modelo do nicho é dos vídeos CURTOS: a duração típica e as estruturas dele contradiriam a duração e a estrutura do longo, que vêm da medida dos longos (na entrada).
         modeloNicho: formatarModeloNicho(modeloNichoLinha ? { ...modeloNichoLinha.modelo, duracaoTipicaS: null, estruturas: [] } : null),
         regrasCliente,
+        desempenhoDaConta: desempenhoMedido,
         proibicoes: perfil.fatos.proibicoes,
         temaDaPessoa: dados.temaDaPessoa,
         tema: dados.tema,
