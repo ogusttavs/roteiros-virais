@@ -1,6 +1,7 @@
 import { config } from "@/lib/config";
 
 import { envolverEmail, linkEmail } from "./casca-email";
+import { textosDatas } from "./datas";
 
 /**
  * Lembrete diário do tema pronto (etapa 12, decisão 5 do `PROXIMO.md`). Sem
@@ -32,6 +33,8 @@ export type MarcaPendente = {
   nome: string;
   /** E55 PR 2c: o assunto do momento do ramo da marca hoje e o título do tema trazido para o ramo; ausente quando o ramo não tem tema do momento. */
   emAlta?: { assunto: string; tituloDoTema: string } | null;
+  /** E60: a data que chega daqui a 7 ou a 2 dias e vale para a marca (geral ou do ramo); ausente quando não há. */
+  dataProxima?: { nome: string; dias: number } | null;
   atrasados: string[];
   planoHoje: { lugar: string; situacao: string }[];
   agendaHoje: ItemAgendaPendente[];
@@ -58,6 +61,19 @@ function blocoPlano(marcas: MarcaPendente[]): string {
       const itens = marca.planoHoje.map((item) => `${escaparHtml(item.lugar)}: ${escaparHtml(item.situacao)}`).join("<br>");
       const titulo = marcas.length > 1 ? `<p><strong>${escaparHtml(marca.nome)}</strong></p>` : "";
       return `${titulo}<p>${itens}</p>`;
+    })
+    .join("");
+}
+
+/** E60: uma linha por marca que tem uma data chegando; com mais de uma marca, a linha diz de qual é. */
+function blocoData(marcas: MarcaPendente[]): string {
+  const comData = marcas.filter((marca) => marca.dataProxima);
+  if (comData.length === 0) return "";
+  return comData
+    .map((marca) => {
+      const data = marca.dataProxima!;
+      const marcaDita = marcas.length > 1 ? textosDatas.aviso.nomeDaMarca(escaparHtml(marca.nome)) : "";
+      return `<p><strong>${escaparHtml(textosDatas.aviso.linha(data.nome, data.dias))}${marcaDita}</strong> ${textosDatas.aviso.ajuda}</p>`;
     })
     .join("");
 }
@@ -124,7 +140,7 @@ export const textosEmail = {
           ? `<p>O tema de <strong>${nomes[0]}</strong> está pronto para gravar.</p>`
           : `<p>O tema está pronto para gravar em ${listaMarcas(nomes)}.</p>`;
     return envolverEmail(
-      `${blocoEmAlta}${blocoAtrasado(marcas)}${blocoPlano(marcas)}${blocoAgenda(marcas)}${textoDeSempre}<p>${linkEmail(`${config.appUrl}/hoje`, "abrir o painel")}</p>`,
+      `${blocoEmAlta}${blocoData(marcas)}${blocoAtrasado(marcas)}${blocoPlano(marcas)}${blocoAgenda(marcas)}${textoDeSempre}<p>${linkEmail(`${config.appUrl}/hoje`, "abrir o painel")}</p>`,
     );
   },
 };

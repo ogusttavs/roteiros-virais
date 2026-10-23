@@ -40,6 +40,7 @@
  */
 import { eq } from "drizzle-orm";
 
+import { datasParaOAviso } from "@/config/datas";
 import { db } from "@/db";
 import { clientes, membrosMarca, preferenciasUsuario, user } from "@/db/schema";
 import { config, hojeISO, horaAtualISO } from "@/lib/config";
@@ -48,6 +49,7 @@ import { logger } from "@/lib/log";
 import { enviarPush } from "@/lib/push";
 import { registrarMarcasPuladas, resumoDasMarcasPuladas, separarMarcasPorAssinatura } from "@/servicos/assinatura-tarefas";
 import { acessouHoje } from "@/servicos/clientes";
+import { ramosDaMarcaParaDatasSemFalha } from "@/servicos/datas";
 import { planoDoDia } from "@/servicos/plano";
 import {
   apagarInscricao,
@@ -58,6 +60,7 @@ import {
 } from "@/servicos/push";
 import { agendaDoDia, atrasados } from "@/servicos/roteiro";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
+import { textosDatas } from "@/textos/datas";
 import { marcasComAssuntoDoMomento, textosEmail, type ItemAgendaPendente, type MarcaPendente } from "@/textos/email";
 import { textosPush } from "@/textos/push";
 
@@ -129,8 +132,11 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
         titulo: item.titulo,
         status: item.status,
       }));
+      // E60: a data que chega daqui a 7 ou a 2 dias (a mais perto primeiro) entra no aviso com uma linha; sem data do ramo ou geral nesses dias, nada muda.
+      const [dataProxima] = datasParaOAviso(hoje, await ramosDaMarcaParaDatasSemFalha({ id: marca.id, nichoId: marca.nichoId })).sort((a, b) => a.dias - b.dias);
       nomesPendentes.push({
         nome: marca.nome,
+        dataProxima: dataProxima ? { nome: dataProxima.nome, dias: dataProxima.dias } : null,
         emAlta: temaDoMomento?.doMomento ? { assunto: assuntoSemQuebra(temaDoMomento.doMomento.assunto), tituloDoTema: temaDoMomento.titulo } : null,
         atrasados: atrasadosDaMarca.map((item) => item.titulo),
         planoHoje: planoHoje.map((item) => ({ lugar: item.lugar, situacao: item.situacao })),
@@ -192,6 +198,11 @@ function assuntoSemQuebra(assunto: string): string {
   return assunto.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** O texto de sempre do aviso (sem ponto final) e, quando há, a linha da data: "Os temas de hoje chegaram. Daqui a 7 dias é Dia das Mães."; sem data, o texto de antes, igual. */
+function juntarComAData(textoDeSempre: string, linhaDaData: string): string {
+  return linhaDaData ? `${textoDeSempre}. ${linhaDaData}` : textoDeSempre;
+}
+
 /**
  * O push do lembrete para os aparelhos inscritos da pessoa (E48 PR 2). O texto: "O seu roteiro de hoje está pronto" quando alguma marca dela tem roteiro marcado
  * na agenda do dia, senão "Os temas de hoje chegaram"; o toque abre `/hoje`. 404 e 410 apagam a inscrição na hora; outra falha conta uma vez e a segunda seguida
@@ -204,11 +215,14 @@ async function mandarPush(usuarioId: string, marcas: MarcaPendente[], agora: Dat
   // E55 PR 2c: o assunto do momento vem na frente do que estiver marcado: o título é o assunto (a notícia do dia, não o nome do app) e o toque abre o Hoje, com o cartão no alto.
   // Quem cuida de mais de uma marca abre o Hoje da marca ativa, que pode não ser a do assunto: o corpo diz de qual marca é.
   const [comAlta] = marcasComAssuntoDoMomento(marcas);
+  // E60: sem assunto em alta, a data que chega (daqui a 7 ou 2 dias) entra no fim do texto do aviso, com o nome da marca se a pessoa cuida de mais de uma.
+  const comData = marcas.find((marca) => marca.dataProxima);
+  const linhaDaData = comData?.dataProxima ? `${textosDatas.aviso.linha(comData.dataProxima.nome, comData.dataProxima.dias)}${variasMarcas ? textosDatas.aviso.nomeDaMarca(comData.nome) : ""}` : "";
   const aviso = comAlta
     ? { titulo: textosPush.emAlta.titulo(comAlta.emAlta.assunto), corpo: variasMarcas ? textosPush.emAlta.corpoDaMarca(comAlta.nome) : textosPush.emAlta.corpo, url: "/hoje" }
     : {
         titulo: config.appName,
-        corpo: temRoteiroNaAgenda ? textosPush.roteiroPronto : textosPush.temasChegaram,
+        corpo: temRoteiroNaAgenda ? juntarComAData(textosPush.roteiroPronto, linhaDaData) : juntarComAData(textosPush.temasChegaram, linhaDaData),
         url: "/hoje",
       };
   let algumAceitou = false;
