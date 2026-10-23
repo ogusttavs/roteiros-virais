@@ -8,10 +8,12 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { clientes, contas, geracoesIA, nichos, noticias, roteiros, temasDia, user, videos } from "@/db/schema";
+import { clientes, contas, geracoesIA, nichos, noticias, roteiros, temasDia, tendenciasBrasil, user, videos } from "@/db/schema";
+import { versao as versaoDoPromptDoTema } from "@/ia/prompts/temasDoDia";
 import { podeSobrescreverTemasDoDia, rodarTemasDoDia, semOMomento } from "@/jobs/temas-do-dia";
 import { hojeISO } from "@/lib/config";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
+import { chaveDoAssunto } from "@/servicos/tendencias";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -104,8 +106,11 @@ async function criarVideoSemDono(idExterno: string, opcoes: { assunto: string; p
     });
 }
 
-async function criarNoticia(url: string, opcoes: { titulo: string; resumo?: string; coletadoEm?: Date }) {
-  await db()
+async function criarNoticia(
+  url: string,
+  opcoes: { titulo: string; resumo?: string; coletadoEm?: Date; publicadoEm?: Date; relevante?: boolean },
+) {
+  const [criada] = await db()
     .insert(noticias)
     .values({
       nichoId,
@@ -114,8 +119,19 @@ async function criarNoticia(url: string, opcoes: { titulo: string; resumo?: stri
       resumo: opcoes.resumo,
       coletadoEm: opcoes.coletadoEm ?? new Date(),
       // Fix de 22/10/2026: notícia sem data de publicação nunca é candidata ao filtro.
-      publicadoEm: opcoes.coletadoEm ?? new Date(),
-    });
+      publicadoEm: opcoes.publicadoEm ?? opcoes.coletadoEm ?? new Date(),
+      // Hotfix de 23/10/2026: a notícia já filtrada em outra rodada (relevante) é das que completam o dia; sem isto, fica sem veredito como a coleta a deixa.
+      ...(opcoes.relevante ? { relevante: true, angulo: "saiu esta semana, explique o que muda para o seu cliente" } : {}),
+    })
+    .returning({ id: noticias.id });
+  return criada.id;
+}
+
+/** Hotfix de 23/10/2026: o setor 5 de produção (5 vídeos subindo, todos da mesma conta): nenhum tema de vídeo pode ter prova (a regra pede 2 contas). */
+async function criarVideosDeUmaContaSo(quantidade = 5) {
+  for (let i = 0; i < quantidade; i += 1) {
+    await criarVideo(`uma-conta-so-${i}`, { velocidadeRelativa: 5 + i, assunto: `assunto da conta unica ${i}`, contaId: contaAId });
+  }
 }
 
 beforeAll(async () => {
@@ -164,6 +180,7 @@ afterEach(async () => {
   await db().delete(videos).where(eq(videos.nichoId, nichoId));
   await db().delete(noticias).where(eq(noticias.nichoId, nichoId));
   await db().delete(temasDia).where(eq(temasDia.nichoId, nichoId));
+  await db().delete(tendenciasBrasil);
   await db().delete(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
 });
 
@@ -235,35 +252,187 @@ describe("rodarTemasDoDia", () => {
   });
 
   /**
-   * V2b, item 8: a prova exige video analisado, notícia nunca conta. Antes
-   * desta regra este cenario (so noticia, sem nenhum video) gerava tres
-   * temas com evidenciasNoticias; agora e sempre descartado por falta de
-   * prova, mesmo com a evidencia (de noticia) validada por evidenciaValida.
+   * V2b, item 8: a prova exige video analisado, notícia nunca conta COMO PROVA. Hotfix de 23/10/2026
+   * ("os temas de hoje só tá vindo 1"): o que a prova de vídeo não fecha é completado com tema
+   * ancorado numa notícia relevante recente do setor, e o tema diz que veio dela (nenhum vídeo é
+   * citado). Uma notícia só dá um tema: o último recurso fecha o dia com menos de três.
    */
-  it("nicho com noticia relevante e nenhum video com analise: tema sem prova, descartado", async () => {
-    await criarNoticia("https://exemplo.invalido/noticia-so", {
+  it("nicho com uma noticia relevante e nenhum video: um tema, ancorado na noticia e sem video citado (ultimo recurso)", async () => {
+    const idNoticia = await criarNoticia("https://exemplo.invalido/noticia-so", {
       titulo: "noticia relevante do nicho",
       resumo: "resumo da noticia relevante",
     });
 
     const resumo = await rodarTemasDoDia();
-    expect(resumo.gerados).toBe(0);
-    expect(resumo.semProva).toBe(1);
-    expect(resumo.temasSemProva).toBe(3);
+    expect(resumo.gerados).toBe(1);
+    expect(resumo.deNoticia).toBe(1);
+    expect(resumo.semProva).toBe(0);
     expect(resumo.falhas).toBe(0);
 
-    // M5b, item 3: a tentativa sem prova fica marcada (temas vazio, a contagem de vídeos daquela
-    // hora), para a próxima rodada saber se chegou vídeo novo antes de chamar o modelo de novo.
     const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
-    expect(linha.temas).toEqual([]);
-    expect(linha.candidatosNaUltimaTentativa).toBe(0);
+    expect(linha.temas).toHaveLength(1);
+    expect(linha.temas[0].evidencias).toEqual([]);
+    expect(linha.temas[0].evidenciasNoticias).toEqual([idNoticia]);
+  });
+
+  it("sem video e sem noticia relevante nenhuma (so uma de dez dias atras), o setor continua sem tema", async () => {
+    await criarNoticia("https://exemplo.invalido/noticia-velha-demais", {
+      titulo: "noticia de dez dias atras",
+      coletadoEm: diasAtras(10),
+      publicadoEm: diasAtras(10),
+      relevante: true,
+    });
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.gerados).toBe(0);
+    expect(resumo.semEvidencia).toBe(1);
+    expect(await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId))).toHaveLength(0);
+  });
+
+  /**
+   * O caso de produção de 22 e 23/10: 4 e 5 vídeos subindo, todos da mesma conta (73435); a prova pede 2 contas, os três temas das duas chamadas foram barrados ("1 conta"), o dia
+   * fechou com o tema do momento e mais nada. Agora o dia fecha com três temas, cada um com a sua notícia, sem gastar as duas chamadas de vídeo que nunca poderiam passar.
+   */
+  it("pouca prova de video (5 videos de uma conta so) e noticias relevantes: tres temas, cada um com a sua fonte", async () => {
+    await criarVideosDeUmaContaSo(5);
+    const ids = [
+      await criarNoticia("https://exemplo.invalido/n1", { titulo: "seminarios gratuitos sobre branding", resumo: "r1", relevante: true, coletadoEm: diasAtras(3), publicadoEm: diasAtras(3) }),
+      await criarNoticia("https://exemplo.invalido/n2", { titulo: "empresas de tecnologia vendidas no brasil", resumo: "r2", relevante: true, coletadoEm: diasAtras(2), publicadoEm: diasAtras(2) }),
+      await criarNoticia("https://exemplo.invalido/n3", { titulo: "ia gera conteudo de baixa qualidade", resumo: "r3", relevante: true, coletadoEm: diasAtras(1), publicadoEm: diasAtras(1) }),
+      await criarNoticia("https://exemplo.invalido/n4", { titulo: "mais uma noticia de hoje", resumo: "r4" }),
+    ];
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.gerados).toBe(1);
+    expect(resumo.deNoticia).toBe(3);
+    expect(resumo.semProva).toBe(0);
+    expect(resumo.falhas).toBe(0);
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas).toHaveLength(3);
+    const fontes = linha.temas.map((t) => t.evidenciasNoticias ?? []);
+    for (const tema of linha.temas) {
+      expect(tema.evidencias).toEqual([]);
+      expect(tema.evidenciasNoticias).toHaveLength(1);
+      expect(ids).toContain(tema.evidenciasNoticias![0]);
+    }
+    // uma notícia diferente por tema
+    expect(new Set(fontes.map((f) => f[0])).size).toBe(3);
+    expect(new Set(linha.temas.map((t) => t.titulo)).size).toBe(3);
+
+    // Uma chamada só ao modelo forte, a de notícia (as duas de vídeo nunca poderiam passar: o job nem as faz), registrada com a versão nova do prompt.
+    const geracoes = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
+    expect(geracoes).toHaveLength(1);
+    expect(geracoes[0].versaoPrompt).toBe(versaoDoPromptDoTema);
+    expect(geracoes[0].entradas).toMatchObject({ modo: "completarComNoticias", vagas: 3, aceitos: 3 });
+  });
+
+  it("noticia velha demais ou ainda sem veredito nao completa o dia", async () => {
+    await criarVideosDeUmaContaSo(5);
+    const boa = await criarNoticia("https://exemplo.invalido/boa", { titulo: "noticia boa", relevante: true, coletadoEm: diasAtras(2), publicadoEm: diasAtras(2) });
+    await criarNoticia("https://exemplo.invalido/velha", { titulo: "noticia de nove dias", relevante: true, coletadoEm: diasAtras(2), publicadoEm: diasAtras(9) });
+    // coletada há dois dias, sem veredito e fora das 24h do filtro: não entra
+    await criarNoticia("https://exemplo.invalido/sem-veredito", { titulo: "ainda sem veredito", coletadoEm: diasAtras(2), publicadoEm: diasAtras(2) });
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.deNoticia).toBe(1);
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas.map((t) => t.evidenciasNoticias)).toEqual([[boa]]);
+  });
+
+  it("com o tema do momento ainda em alta na linha do dia, a noticia completa so as duas vagas que sobram (o dia fecha tres ao todo)", async () => {
+    await criarVideosDeUmaContaSo(5);
+    await db().insert(tendenciasBrasil).values({
+      coletadaEm: new Date(),
+      assunto: "GTA 6",
+      chave: chaveDoAssunto("GTA 6"),
+      termos: ["GTA 6"],
+      fontes: [{ fonte: "google", titulo: "GTA 6", url: null, trafego: "2000+", posicao: 1 }],
+      posicao: 1,
+      sensivel: false,
+    });
+    for (let i = 0; i < 4; i += 1) {
+      await criarNoticia(`https://exemplo.invalido/m${i}`, { titulo: `noticia ${i}`, relevante: true, coletadoEm: diasAtras(1), publicadoEm: diasAtras(1) });
+    }
+    const momento = {
+      titulo: "tema do momento",
+      descricao: "d",
+      porQue: "p",
+      evidencias: [],
+      evidenciasNoticias: [],
+      puxaPara: "engajamento" as const,
+      doMomento: { chave: "gta 6", assunto: "GTA 6", termos: [], fonte: "Em alta no Google no Brasil", url: null, coletadaEm: new Date().toISOString(), encaixe: 8 },
+    };
+    await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas: [momento], candidatosNaUltimaTentativa: 5 });
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.deNoticia).toBe(2);
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas).toHaveLength(3);
+    expect(semOMomento(linha.temas)).toHaveLength(2);
+    expect(linha.temas.filter((t) => t.doMomento)).toHaveLength(1);
+  });
+
+  it("o tema do momento que ja saiu da lista nao ocupa vaga: a noticia completa os tres", async () => {
+    await criarVideosDeUmaContaSo(5);
+    for (let i = 0; i < 4; i += 1) {
+      await criarNoticia(`https://exemplo.invalido/s${i}`, { titulo: `noticia s${i}`, relevante: true, coletadoEm: diasAtras(1), publicadoEm: diasAtras(1) });
+    }
+    const momento = {
+      titulo: "tema do momento que saiu",
+      descricao: "d",
+      porQue: "p",
+      evidencias: [],
+      evidenciasNoticias: [],
+      puxaPara: "engajamento" as const,
+      doMomento: { chave: "assunto antigo", assunto: "Assunto antigo", termos: [], fonte: "Em alta no Google no Brasil", url: null, coletadaEm: new Date().toISOString(), encaixe: 8 },
+    };
+    await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas: [momento], candidatosNaUltimaTentativa: 5 });
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.deNoticia).toBe(3);
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas).toHaveLength(3);
+    expect(semOMomento(linha.temas)).toHaveLength(3);
+  });
+
+  /**
+   * A linha de hoje de produção (sem tema de verdade, candidatos = 5, gravada antes do hotfix, `noticia_mais_nova_na_tentativa` nulo) tenta uma vez com a notícia, em vez de ficar
+   * parada em "sem_novidade" até chegar vídeo novo. Depois da tentativa só tenta de novo com notícia mais nova.
+   */
+  it("linha de antes do hotfix (sem tema, sem marca de noticia) tenta de novo com a noticia", async () => {
+    await criarVideosDeUmaContaSo(5);
+    const primeira = await criarNoticia("https://exemplo.invalido/g1", { titulo: "noticia g1", relevante: true, coletadoEm: diasAtras(1), publicadoEm: diasAtras(1) });
+    await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas: [], candidatosNaUltimaTentativa: 5 });
+
+    const hoje = await rodarTemasDoDia();
+    expect(hoje.semNovidade).toBe(0);
+    expect(hoje.gerados).toBe(1);
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas).toHaveLength(1);
+    expect(linha.noticiaMaisNovaNaTentativa).toBe(primeira);
+  });
+
+  it("sem tema de verdade, sem video novo e sem noticia mais nova que a da ultima tentativa: nao chama o modelo; com noticia mais nova, tenta", async () => {
+    await criarVideosDeUmaContaSo(2);
+    const unica = await criarNoticia("https://exemplo.invalido/u1", { titulo: "noticia u1", relevante: true, coletadoEm: diasAtras(1), publicadoEm: diasAtras(1) });
+    await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas: [], candidatosNaUltimaTentativa: 2, noticiaMaisNovaNaTentativa: unica });
+
+    const parada = await rodarTemasDoDia();
+    expect(parada.semNovidade).toBe(1);
+    expect(await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"))).toHaveLength(0);
+
+    // chega notícia relevante mais nova: tenta de novo
+    await criarNoticia("https://exemplo.invalido/u2", { titulo: "noticia u2", relevante: true, coletadoEm: new Date(), publicadoEm: new Date() });
+    const nova = await rodarTemasDoDia();
+    expect(nova.semNovidade).toBe(0);
+    expect(nova.gerados).toBe(1);
   });
 
   it("resposta com id de evidencia inventado nas duas tentativas registra duas geracoes reprovadas e falhas: 1", async () => {
-    await criarVideo("video-evidencia-inventada", {
-      velocidadeRelativa: 5,
-      assunto: "invente um id de evidencia que não existe",
-    });
+    // Três vídeos de duas contas: a prova de vídeo poderia existir, então o modelo é chamado (com menos que isso o job nem chama).
+    await criarVideo("video-evidencia-inventada", { velocidadeRelativa: 5, assunto: "invente um id de evidencia que não existe", contaId: contaAId });
+    await criarVideo("video-evidencia-inventada-2", { velocidadeRelativa: 5, assunto: "invente um id de evidencia que não existe", contaId: contaBId });
+    await criarVideo("video-evidencia-inventada-3", { velocidadeRelativa: 5, assunto: "invente um id de evidencia que não existe", contaId: contaAId });
 
     const resumo = await rodarTemasDoDia();
     expect(resumo.gerados).toBe(0);
@@ -318,8 +487,10 @@ describe("rodarTemasDoDia", () => {
    * de verdade (chama o modelo, atualiza `candidatosNaUltimaTentativa`).
    */
   it("sem video novo desde a ultima tentativa sem prova, nao chama o modelo de novo; com video novo, tenta de novo", async () => {
-    await criarVideo("sem-novidade-1", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaAId });
-    await criarVideo("sem-novidade-2", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaBId });
+    // Três vídeos de duas contas, mas de fora do Brasil: a prova poderia existir (o modelo é chamado) e a regra do Brasil barra os temas.
+    await criarVideo("sem-novidade-1", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaAId, idioma: "en" });
+    await criarVideo("sem-novidade-2", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaBId, idioma: "en" });
+    await criarVideo("sem-novidade-3", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaAId, idioma: "en" });
 
     const primeira = await rodarTemasDoDia();
     expect(primeira.semProva).toBe(1);
@@ -334,10 +505,10 @@ describe("rodarTemasDoDia", () => {
     expect(geracoesAposSegunda).toHaveLength(geracoesAposPrimeira.length);
 
     const [linhaAntes] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
-    expect(linhaAntes.candidatosNaUltimaTentativa).toBe(2);
+    expect(linhaAntes.candidatosNaUltimaTentativa).toBe(3);
 
     // Chega vídeo novo (terceira conta, completa a prova): a terceira rodada tenta de novo.
-    await criarVideo("sem-novidade-3", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaCId });
+    await criarVideo("sem-novidade-4", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaCId });
     const terceira = await rodarTemasDoDia();
     expect(terceira.semNovidade).toBe(0);
     const geracoesAposTerceira = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
@@ -685,7 +856,7 @@ describe("as vozes do público nos temas do dia (E28)", () => {
 
     // o registro da geração diz a versão do prompt e quantas perguntas do público foram para a entrada
     const [geracao] = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
-    expect(geracao.versaoPrompt).toBe("1.8.0");
+    expect(geracao.versaoPrompt).toBe(versaoDoPromptDoTema);
     expect(geracao.entradas).toMatchObject({ vozesDoPublico: 2 });
   });
 

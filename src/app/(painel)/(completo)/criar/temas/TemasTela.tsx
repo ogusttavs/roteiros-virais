@@ -16,7 +16,7 @@ import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 import { Chips } from "@/ui/componentes/Chips";
 import { ClaqueteAnimada } from "@/ui/componentes/ClaqueteAnimada";
 import { BlocoDePerguntas } from "@/ui/componentes/PerguntasDoPublico";
-import { TemaCartao, type EvidenciaTema } from "@/ui/componentes/TemaCartao";
+import { TemaCartao, type EvidenciaTema, type FonteNoticiaTema } from "@/ui/componentes/TemaCartao";
 
 import { salvarRedePrincipalAction } from "../../hoje/acoes";
 
@@ -33,6 +33,8 @@ const REDES_PRINCIPAIS: { valor: Plataforma; rotulo: string }[] = [
 type Props = {
   temas: TemaDoDia[];
   evidenciasTemas: (EvidenciaTema | null)[];
+  /** Hotfix de 23/10/2026: de qual notícia nasceu cada tema que nenhum vídeo sustenta (na ordem de `temas`); nulo nos demais. */
+  fontesNoticias?: (FonteNoticiaTema | null)[];
   avisoLinhaEditorial: string | null;
   aviso: AvisoSemTema | null;
   /** O tema de hoje está sendo escolhido agora (o ramo não estava em uso de madrugada): mostra a espera e se atualiza sozinha. */
@@ -52,7 +54,10 @@ type Props = {
  * portas de Criar (assunto seu, contar o momento, planejar) viraram rotas à parte: esta tela cuida
  * só de escolher um tema.
  */
-export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, gerando = false, redePrincipal, dataInicial, emAlta = null, perguntas = null }: Props) {
+/** Quantos temas o dia fecha (os "três temas" do produto). */
+const TEMAS_POR_DIA = 3;
+
+export function TemasTela({ temas, evidenciasTemas, fontesNoticias = [], avisoLinhaEditorial, aviso, gerando = false, redePrincipal, dataInicial, emAlta = null, perguntas = null }: Props) {
   const router = useRouter();
 
   // Enquanto o tema é escolhido, a página pergunta ao servidor de novo a cada poucos segundos; o servidor só devolve "gerando" enquanto há pedido em andamento, então isto para sozinho.
@@ -64,6 +69,9 @@ export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, 
   const [redeAtual, setRedeAtual] = useState(redePrincipal);
   const [destino, setDestino] = useState<string | null>(null);
   const [abrindo, iniciarTransicao] = useTransition();
+
+  // Os temas que a pessoa vê: os da lista comum e o cartão do assunto em alta (ele sai da lista e vem à parte).
+  const temasVisiveis = temas.filter((tema) => !tema.doMomento).length + (emAlta ? 1 : 0);
 
   const comData = (url: string) => (dataInicial ? `${url}${url.includes("?") ? "&" : "?"}data=${dataInicial}` : url);
 
@@ -154,6 +162,7 @@ export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, 
                     tema={tema.titulo}
                     porque={tema.porQue}
                     evidencia={evidenciasTemas[indice] ?? null}
+                    fonteNoticia={fontesNoticias[indice] ?? null}
                     primario={posicao === 0}
                     rotuloBotao={textosHoje.queroEsse}
                     abrindo={destino === `tema-${indice}` && abrindo}
@@ -163,6 +172,21 @@ export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, 
                   />
                 ))}
             </div>
+            {/* Hotfix de 23/10/2026: o último recurso (nem vídeo de prova, nem notícia, nem assunto em alta deram três temas): a frase calma e o caminho do assunto próprio. */}
+            {temasVisiveis < TEMAS_POR_DIA ? (
+              <div className={styles.poucosTemas} data-poucos-temas>
+                <p className={styles.aviso}>{textosHoje.poucosTemas(temasVisiveis)}</p>
+                <button
+                  type="button"
+                  className={styles.botaoSecundario}
+                  disabled={abrindo}
+                  aria-busy={destino === "tema-livre" || undefined}
+                  onClick={() => abrir("tema-livre", comData("/criar/tema-livre"))}
+                >
+                  {destino === "tema-livre" && abrindo ? textosHoje.abrindo : textosHoje.escreverMeuAssunto}
+                </button>
+              </div>
+            ) : null}
             {/* E28 (passo 25, estado `reels`): o que o público do setor pergunta nos comentários, depois dos três temas; cada pergunta leva ao Tema livre com ela presa. */}
             {perguntas ? (
               <BlocoDePerguntas
