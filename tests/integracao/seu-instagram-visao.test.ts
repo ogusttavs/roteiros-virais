@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { montarVisaoSeuInstagram } from "@/app/(painel)/(completo)/conta/seu-instagram-visao";
 import { db, getPool } from "@/db";
 import { clientes, contasConectadas, membrosMarca, nichos, user } from "@/db/schema";
+import { config } from "@/lib/config";
 import { cifrarToken, contextoDoToken } from "@/lib/meta-token";
 import { candidatasDaMarca, contaLigadaDaMarca, ehDonoDaMarca, VALIDADE_DA_ESCOLHA_MS } from "@/servicos/conta-conectada";
 import { textosLigacao } from "@/textos/conta-conectada";
@@ -52,6 +53,8 @@ async function visaoPara(usuarioId: string, clienteId: number, verComo = false) 
 }
 
 beforeAll(async () => {
+  // A chave de cifra do acesso ligado: na CI o ambiente não a tem; a mesma de teste da suíte da conta ligada.
+  config.metaConexao.tokenChave = Buffer.alloc(32, 11).toString("base64");
   await resetarSchema(db());
   const [nicho] = await db().insert(nichos).values({ slug: "seu-instagram-teste", nome: "Seu Instagram teste", termos: [] }).returning();
   await db().insert(user).values([
