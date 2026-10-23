@@ -6,7 +6,7 @@ import { montarEntrada as entradaDoResumo, montarSistemaEstavel as sistemaDoResu
 import { blocoDasNoticiasDoAssunto, montarEntrada as montarEntradaDoRoteiro, montarFontesDosFatos, montarSistemaEstavel as sistemaDoRoteiro } from "@/ia/prompts/roteiro";
 import { desembrulharLink, enderecoHttpsSeguro, limparParaPrompt } from "@/servicos/noticias-assuntos";
 
-import { ErroBuscaSegura, lerComGuarda, validarEnderecoDeBusca } from "./busca-segura";
+import { buscarComAgenteSeguro, ErroBuscaSegura, lerComGuarda, validarEnderecoDeBusca } from "./busca-segura";
 import type { BuscarLeitor } from "./site-api";
 
 const permitido = hostEhDeVeiculoCurado;
@@ -65,6 +65,18 @@ describe("a guarda de rede da coleta dos assuntos (SSRF)", () => {
     await expect(lerComGuarda("https://g1.globo.com/http", opcoes)).rejects.toBeInstanceOf(ErroBuscaSegura);
     expect(pedidos).not.toContain("https://roteiros-app:3000/");
     expect(pedidos).not.toContain("http://g1.globo.com/c");
+  });
+
+  it("devolve o endereço de onde os bytes vieram, depois dos redirecionamentos (para resolver endereço relativo)", async () => {
+    const buscar: BuscarLeitor = (url) => (url === "https://g1.globo.com/a" ? resposta(301, "", { location: "https://www.folha.uol.com.br/b/c.html" }) : resposta(200, "ok"));
+    const lido = await lerComGuarda("https://g1.globo.com/a", { aceita: "*/*", limiteBytes: 100, tempoMs: 5000, hostPermitido: permitido, buscar });
+    expect(lido.enderecoFinal).toBe("https://www.folha.uol.com.br/b/c.html");
+    const direto = await lerComGuarda("https://g1.globo.com/x", { aceita: "*/*", limiteBytes: 100, tempoMs: 5000, hostPermitido: permitido, buscar: () => resposta(200, "ok") });
+    expect(direto.enderecoFinal).toBe("https://g1.globo.com/x");
+  });
+
+  it("o fetch com agente seguro (capa do vídeo) recusa um nome que resolve para a máquina local, sem tocar a rede", async () => {
+    await expect(buscarComAgenteSeguro("https://localhost/x.jpg", { redirect: "manual" })).rejects.toThrow();
   });
 
   it("muitos redirecionamentos param, e o corpo é lido só até o teto de bytes", async () => {

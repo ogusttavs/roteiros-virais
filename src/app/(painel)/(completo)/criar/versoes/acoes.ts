@@ -2,6 +2,7 @@
 
 import { ErroIA } from "@/ia/erro";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual, ErroAcessoNegado, garantirMembroDaMarca } from "@/servicos/clientes";
@@ -20,6 +21,7 @@ const GRUPO_VALIDO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export async function gerarOutraVersaoAction(grupo: string): Promise<ResultadoAcao<{ versao: VersaoParaTela }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   if (!GRUPO_VALIDO.test(grupo)) return { ok: false, erro: textosRoteiro.versoes.naoEncontrada };
@@ -43,6 +45,7 @@ export async function gerarOutraVersaoAction(grupo: string): Promise<ResultadoAc
 export async function ficarComVersaoAction(versaoId: number): Promise<ResultadoAcao<{ id: number }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   if (!Number.isSafeInteger(versaoId) || versaoId <= 0 || versaoId > ID_MAXIMO) return { ok: false, erro: textosRoteiro.versoes.naoEncontrada };

@@ -13,12 +13,13 @@ import { and, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { clientes, imagensNoticia, nichos, noticias, ramosDaConta } from "@/db/schema";
+import { registrarMarcasPuladas, resumoDasMarcasPuladas, separarMarcasPorAssinatura } from "@/servicos/assinatura-tarefas";
 import { filtrarNoticiasDoRamo, type RamoParaOFiltro } from "@/servicos/filtro-de-noticias";
 import { creditoDaFoto } from "@/servicos/noticias-assuntos";
 import { DIAS_DA_CAPA } from "@/servicos/noticias-do-dia";
 
 import { fotoDaMateria, type ResultadoDaFoto, type TransporteDaFoto } from "./foto-da-materia";
-import { DIAS_DE_USO_PARA_TEMA, setoresEmUso } from "./temas-do-dia";
+import { DIAS_DE_USO_PARA_TEMA, setoresEmUsoComContagem } from "./temas-do-dia";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 const HORA_MS = 60 * 60 * 1000;
@@ -45,14 +46,27 @@ export type DependenciasDoFiltro = {
 
 /** Os ramos que o filtro cobre na rodada de depois da coleta. Exportada para o teste. */
 export async function ramosParaOFiltro(agora: Date = new Date()): Promise<RamoParaOFiltro[]> {
+  return (await ramosParaOFiltroComContagem(agora)).ramos;
+}
+
+/**
+ * Os ramos do filtro e quantas marcas ficaram de fora por falta de assinatura (E22 PR 3): a marca que precisa assinar não põe o ramo na lista, nem pelo roteiro, nem por ter aberto o
+ * aplicativo ou chegado nos últimos dias. Cobrança desligada: o critério de sempre.
+ */
+export async function ramosParaOFiltroComContagem(agora: Date = new Date()): Promise<{ ramos: RamoParaOFiltro[]; marcasPuladasPorAssinatura: number }> {
   const desde = new Date(agora.getTime() - DIAS_DE_USO_PARA_TEMA * DIA_MS);
-  const ids = new Set<number>(await setoresEmUso(agora));
+  const emUso = await setoresEmUsoComContagem(agora);
+  const ids = new Set<number>(emUso.setores);
 
   // Marcas ativas que abriram o aplicativo ou chegaram nos últimos dias, mesmo sem roteiro ainda.
-  const recentes = await db()
+  const recentesTodas = await db()
     .select({ id: clientes.id, nichoId: clientes.nichoId })
     .from(clientes)
     .where(and(eq(clientes.ativo, true), or(gte(clientes.ultimoAcessoEm, desde), gte(clientes.criadoEm, desde))));
+  const { liberadas, puladas } = await separarMarcasPorAssinatura(recentesTodas.map((m) => m.id), { agora });
+  const recentes = recentesTodas.filter((m) => liberadas.has(m.id));
+  // A mesma marca pode estar nas duas listas (roteiro e acesso recente): conta uma vez.
+  const marcasPuladasPorAssinatura = new Set([...emUso.idsDasMarcasPuladas, ...puladas]).size;
   for (const marca of recentes) if (marca.nichoId) ids.add(marca.nichoId);
   if (recentes.length > 0) {
     const alternativos = await db()
@@ -61,12 +75,13 @@ export async function ramosParaOFiltro(agora: Date = new Date()): Promise<RamoPa
       .where(inArray(ramosDaConta.clienteId, recentes.map((m) => m.id)));
     for (const l of alternativos) ids.add(l.nichoId);
   }
-  if (ids.size === 0) return [];
+  if (ids.size === 0) return { ramos: [], marcasPuladasPorAssinatura };
 
-  return db()
+  const ramos = await db()
     .select({ id: nichos.id, nome: nichos.nome, termos: nichos.termos })
     .from(nichos)
     .where(and(eq(nichos.ativo, true), inArray(nichos.id, [...ids])));
+  return { ramos, marcasPuladasPorAssinatura };
 }
 
 type AlvoDeFoto = { id: number; url: string; fonte: string | null };
@@ -170,10 +185,16 @@ export async function apagarFotosVelhas(agora: Date = new Date()): Promise<numbe
 
 export async function rodarFiltroDeNoticias(nichoId?: number, deps: DependenciasDoFiltro = {}): Promise<Record<string, unknown>> {
   const agora = deps.agora ?? new Date();
-  const ramos: RamoParaOFiltro[] =
-    nichoId !== undefined
-      ? await db().select({ id: nichos.id, nome: nichos.nome, termos: nichos.termos }).from(nichos).where(and(eq(nichos.id, nichoId), eq(nichos.ativo, true)))
-      : await ramosParaOFiltro(agora);
+  let marcasPuladasPorAssinatura = 0;
+  let ramos: RamoParaOFiltro[];
+  if (nichoId !== undefined) {
+    ramos = await db().select({ id: nichos.id, nome: nichos.nome, termos: nichos.termos }).from(nichos).where(and(eq(nichos.id, nichoId), eq(nichos.ativo, true)));
+  } else {
+    const lista = await ramosParaOFiltroComContagem(agora);
+    ramos = lista.ramos;
+    marcasPuladasPorAssinatura = lista.marcasPuladasPorAssinatura;
+    registrarMarcasPuladas("filtrar-noticias", marcasPuladasPorAssinatura);
+  }
 
   const termina = Date.now() + ORCAMENTO_DE_FOTOS_MS;
   let lotes = 0;
@@ -217,6 +238,7 @@ export async function rodarFiltroDeNoticias(nichoId?: number, deps: Dependencias
 
   return {
     ramos: ramos.length,
+    ...resumoDasMarcasPuladas(marcasPuladasPorAssinatura),
     lotes,
     candidatas,
     relevantes,

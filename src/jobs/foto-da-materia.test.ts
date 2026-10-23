@@ -174,6 +174,18 @@ describe("fotoDaMateria (o caminho inteiro, sem rede)", () => {
     expect(r).toMatchObject({ situacao: "guardada", tipo: "image/jpeg", origem: "https://s2-g1.glbimg.com/foto.jpg" });
   });
 
+  it("um og:image relativo se resolve contra o endereço FINAL, depois do redirecionamento, não contra o inicial", async () => {
+    const final = "https://www.folha.uol.com.br/mercado/2026/10/a.shtml";
+    const buscar: BuscarLeitor = async (url) => {
+      if (url === PAGINA) return resposta("", 301, { location: final });
+      if (url === final) return resposta(`<head><meta property="og:image" content="/img/foto.jpg"></head>`);
+      if (url === "https://www.folha.uol.com.br/img/foto.jpg") return resposta(jpeg(20_000));
+      throw new Error(`inesperado: ${url}`);
+    };
+    const r = await fotoDaMateria(PAGINA, { buscar });
+    expect(r).toMatchObject({ situacao: "guardada", origem: "https://www.folha.uol.com.br/img/foto.jpg" });
+  });
+
   it("página sem foto é definitiva; link que não resolve e página que não abre são passageiros", async () => {
     const semFoto = await fotoDaMateria(PAGINA, { buscar: async () => resposta("<head></head>") });
     expect(semFoto).toMatchObject({ situacao: "sem_foto", motivo: "pagina_sem_foto", passageiro: false });

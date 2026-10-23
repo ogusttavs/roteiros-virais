@@ -33,6 +33,22 @@ describe("montarSistemaEstavel", () => {
     expect(sistema).toContain("- nao mostrar rosto de cliente (fraca)");
   });
 
+  // E16, nível conta: o que rendeu nos vídeos já postados DESTA marca. Sem texto, o sistema é o de antes.
+  it("sem desempenhoDaConta (ausente ou vazio), o sistema é idêntico: nenhum bloco", () => {
+    const base = montarSistemaEstavel({ ...BASE, regrasCliente: [] });
+    expect(montarSistemaEstavel({ ...BASE, regrasCliente: [], desempenhoDaConta: "" })).toBe(base);
+    expect(base).not.toContain("já postou");
+  });
+
+  it("com desempenhoDaConta, o bloco serve de desempate e nunca baixa a nota por si", () => {
+    const linha = "- Vídeos feitos para lembrarem de você (5 vídeos): renderam 2,0 vezes o normal da conta.";
+    const sistema = montarSistemaEstavel({ ...BASE, regrasCliente: [], desempenhoDaConta: linha });
+    expect(sistema).toContain("O que funcionou nos vídeos que este cliente já postou");
+    expect(sistema).toContain("serve de desempate");
+    expect(sistema).toContain("Nunca baixe a nota de um tema só porque aquele tipo de vídeo rendeu menos");
+    expect(sistema).toContain(linha);
+  });
+
   // V12c, item 2, a E37b: "conhecido" vira persona tambem para quem vende, nao so para pessoa.
   it('persona "conhecido": o contexto e o pilar "gerar cliente" falam de ser procurado, nao de comprar', () => {
     const sistema = montarSistemaEstavel({ ...BASE, regrasCliente: [], persona: "conhecido" });
@@ -65,7 +81,7 @@ describe("a nota do tema não pune o que está fora do setor (06/10/2026)", () =
 
   it("o sistema diz que sem vídeo no banco é só um fato, usa as notícias de hoje como sinal, fala em segunda pessoa e proíbe id no texto", () => {
     const sistema = montarSistemaEstavel({ ...BASE, regrasCliente: [] });
-    expect(versao).toBe("1.12.0");
+    expect(versao).toBe("1.13.0");
     expect(sistema).toContain("o banco de vídeos só cobre o setor da pessoa");
     expect(sistema).toContain("nunca baixe a nota por causa disso");
     // Os dois sentidos da ausência (1.9.1): do assunto do setor, a ausência é sinal; de fora, não diz nada.
@@ -167,6 +183,6 @@ describe("a pergunta do público presa ao Tema livre (E28, parte 3)", () => {
   });
 
   it("a versão do prompt subiu", () => {
-    expect(versao).toBe("1.12.0");
+    expect(versao).toBe("1.13.0");
   });
 });

@@ -16,10 +16,11 @@ import * as temaDoMomentoIA from "@/ia/prompts/temaDoMomento";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
+import { registrarMarcasPuladas, resumoDasMarcasPuladas } from "@/servicos/assinatura-tarefas";
 import { formatarModeloNicho, modeloNichoAtual } from "@/servicos/pesquisa";
 import { listaDeTendenciasDeAgora, temasQueAindaValem } from "@/servicos/tendencias";
 
-import { setoresEmUso } from "./temas-do-dia";
+import { setoresEmUsoComContagem } from "./temas-do-dia";
 
 /** Quantos assuntos (do mais alto para baixo, sem os sensíveis) o modelo vê. */
 const MAXIMO_DE_ASSUNTOS_PARA_O_MODELO = 12;
@@ -143,8 +144,10 @@ export async function atualizarTemaDoMomento(nicho: NichoDoMomento, agora: Date 
 
 /** Depois de cada coleta de tendências: o tema do momento de todo setor em uso (o mesmo critério dos temas da madrugada, `setoresEmUso`). */
 export async function atualizarTemasDoMomentoDosSetoresEmUso(agora: Date = new Date()): Promise<Record<string, unknown>> {
-  const emUso = await setoresEmUso(agora);
-  if (emUso.size === 0) return { setores: 0 };
+  const uso = await setoresEmUsoComContagem(agora);
+  const emUso = uso.setores;
+  registrarMarcasPuladas("tendencias-brasil (tema do momento)", uso.marcasPuladasPorAssinatura);
+  if (emUso.size === 0) return { setores: 0, ...resumoDasMarcasPuladas(uso.marcasPuladasPorAssinatura) };
   const lista = await db().select({ id: nichos.id, nome: nichos.nome, termos: nichos.termos }).from(nichos).where(and(eq(nichos.ativo, true), inArray(nichos.id, [...emUso])));
   const contagem: Record<string, number> = {};
   const erros: string[] = [];
@@ -156,5 +159,5 @@ export async function atualizarTemasDoMomentoDosSetoresEmUso(agora: Date = new D
       erros.push(`setor ${nicho.id}: ${erro instanceof Error ? erro.message : String(erro)}`);
     }
   }
-  return { setores: lista.length, ...contagem, erros: erros.length > 0 ? erros : undefined };
+  return { setores: lista.length, ...contagem, ...resumoDasMarcasPuladas(uso.marcasPuladasPorAssinatura), erros: erros.length > 0 ? erros : undefined };
 }

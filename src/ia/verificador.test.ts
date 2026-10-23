@@ -14,7 +14,7 @@ vi.mock("./registro", () => ({
 import type { CartaoStory } from "@/db/schema";
 
 import { ErroIA } from "./erro";
-import { gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, temAlgoParaGuardar, verificarLocalmente } from "./verificador";
+import { ehMotivoMecanico, gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, temAlgoParaGuardar, verificarLocalmente } from "./verificador";
 
 const usoZero = { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0 };
 
@@ -705,6 +705,22 @@ describe("verificarLocalmente", () => {
       });
       expect(r.aprovado).toBe(false);
     });
+
+    /**
+     * 22/10/2026 (prova com chave): uma segunda tentativa saiu inteira sem acento ("sofa", "eleicao", "entao"). O texto trazia também "voce"/"nao"; esse motivo, sozinho, é mecânico, então
+     * `corrigirMecanicamente` acentuava as quatro palavras e o texto passava com o resto sem acento. O motivo "nenhum acento" precisa vir primeiro e não ser corrigível por código.
+     */
+    const TEXTO_SEM_ACENTO =
+      "entao voce nao precisa de nada caro para resolver isso: pegue o sofa, passe um pano limpo e veja o que sai, " +
+      "sem esfregar, sem pressa, e depois conte nos comentarios se a eleicao do seu proximo produto ficou mais facil.";
+
+    it("texto longo sem nenhum acento, mesmo com 'voce' e 'nao', reprova por 'nenhum acento' e esse motivo não é corrigível por código", () => {
+      expect(TEXTO_SEM_ACENTO.length).toBeGreaterThan(200);
+      const r = verificarLocalmente({ corpo: TEXTO_SEM_ACENTO });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("nenhum acento");
+      expect(r.motivos.every(ehMotivoMecanico)).toBe(false);
+    });
   });
 });
 
@@ -1125,5 +1141,95 @@ describe("verificarExtra (E52 PR 3, a conferência que só a tarefa conhece)", (
 
     expect(resultado.dados.capitulos).toBe(1);
     expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete não chega ao verificador de fatos", () => {
+  afterEach(() => {
+    gerarEstruturadoMock.mockReset();
+    registrarGeracaoMock.mockClear();
+  });
+
+  const parametrosBase = {
+    tarefa: "roteiro" as const,
+    nivel: "forte" as const,
+    schema: z.object({ corpo: z.string() }),
+    sistemaEstavel: "sistema estavel",
+    versaoPrompt: "1.0.0",
+    extrairCampos: (dados: { corpo: string }) => ({ corpo: dados.corpo }),
+  };
+  const SEM_ACENTO =
+    "entao voce nao precisa de nada caro para resolver isso: pegue o sofa, passe um pano limpo e veja o que sai, " +
+    "sem esfregar, sem pressa, e depois conte nos comentarios se a eleicao do seu proximo produto ficou mais facil.";
+  const COM_ACENTO = "Então você não precisa de nada caro: pegue o sofá, passe um pano limpo e veja o que sai, sem esfregar e sem pressa.";
+  const LEMBRETE = "lembrete de acentuacao";
+
+  it("o roteiro todo sem acento (com 'voce' e 'nao') não é consertado por código: refaz com o motivo, e a segunda tentativa termina com o lembrete de acentuação", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: SEM_ACENTO }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { corpo: COM_ACENTO }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+    const resultado = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", lembreteFinal: LEMBRETE });
+
+    expect(resultado.dados.corpo).toBe(COM_ACENTO);
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
+    const primeira = gerarEstruturadoMock.mock.calls[0][0] as { entrada: string };
+    const segunda = gerarEstruturadoMock.mock.calls[1][0] as { entrada: string };
+    expect(primeira.entrada.endsWith(LEMBRETE)).toBe(true);
+    expect(segunda.entrada.endsWith(LEMBRETE)).toBe(true);
+    expect(segunda.entrada).toContain(MARCADOR_SEGUNDA_TENTATIVA);
+    expect(segunda.entrada).toContain("nenhum acento");
+  });
+
+  it("se a segunda tentativa também sai sem acento, o resultado é o ErroIA (nunca um texto sem acento na tela)", async () => {
+    gerarEstruturadoMock.mockResolvedValue({ dados: { corpo: SEM_ACENTO }, modelo: "mock", ...usoZero });
+
+    await expect(gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", lembreteFinal: LEMBRETE })).rejects.toThrow(ErroIA);
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+  });
+
+  describe("colchetes na conferência de fatos", () => {
+    const COM_COLCHETE = "Você já passou por isso. Então [conte aqui como você faz para a mancha não voltar] e grave.";
+
+    function entradaDoVerificador(): string {
+      const chamada = gerarEstruturadoMock.mock.calls.map((c) => c[0] as { tarefa: string; entrada: string }).find((c) => c.tarefa === "verificarTexto");
+      expect(chamada).toBeDefined();
+      return chamada!.entrada;
+    }
+
+    it("com as fontes dos fatos, o verificador lê o marcador neutro no lugar do colchete, e o registro guarda o texto original", async () => {
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({ dados: { corpo: COM_COLCHETE }, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+      await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: "Perfil: lavagem de sofá" });
+
+      const entrada = entradaDoVerificador();
+      expect(entrada).toContain("Então [espaço para a pessoa completar] e grave.");
+      expect(entrada).not.toContain("conte aqui como você faz");
+      const registroDoVerificador = registrarGeracaoMock.mock.calls.map((c) => c[0] as { tarefa: string; entradas: { texto: string } }).find((c) => c.tarefa === "verificarTexto");
+      expect(registroDoVerificador?.entradas.texto).toContain("conte aqui como você faz");
+    });
+
+    it("um fato inventado FORA dos colchetes continua à vista do verificador", async () => {
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({ dados: { corpo: "O Uli está aqui do meu lado. Então [conte aqui como você faz] e grave." }, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+      await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: "Perfil: lavagem de sofá" });
+
+      expect(entradaDoVerificador()).toContain("O Uli está aqui do meu lado.");
+    });
+
+    it("sem as fontes dos fatos, o texto vai ao verificador como veio", async () => {
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({ dados: { corpo: COM_COLCHETE }, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+      await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original" });
+
+      expect(entradaDoVerificador()).toContain("conte aqui como você faz");
+    });
   });
 });

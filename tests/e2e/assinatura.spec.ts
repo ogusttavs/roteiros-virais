@@ -1,7 +1,8 @@
 /**
  * A assinatura pelo Stripe (E22 PR 1), pelo servidor de verdade (`next start` com o Stripe simulado, nunca a rede): o aviso do Stripe passa pelo middleware e é conferido pela
  * assinatura do corpo, o estado da assinatura aparece na lista de Contas do admin, o admin liga a cortesia, e o dono da marca chega ao pagamento simulado pelo botão de `/assinar`.
- * O portão em si (a marca sem assinatura cai em `/assinar`) está provado no teste do layout; aqui ele fica desligado, como em produção.
+ * O portão em si (a marca sem assinatura cai em `/assinar`) está provado no teste do layout e em `tests/integracao/assinatura-travas.test.ts`; aqui ele fica desligado, como em produção.
+ * E22 PR 2: o convite com o preço, o segundo clique que reaproveita o Checkout aberto, a confirmação depois de pagar, e o cartão "Sua assinatura" em Conta.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
@@ -9,7 +10,7 @@ import { eq } from "drizzle-orm";
 import Stripe from "stripe";
 
 import { db } from "../../src/db";
-import { account, assinaturas, clientes, eventosStripe, membrosMarca, nichos, preferenciasUsuario, user } from "../../src/db/schema";
+import { account, assinaturas, briefings, checkoutsStripe, clientes, eventosStripe, membrosMarca, nichos, preferenciasUsuario, user } from "../../src/db/schema";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA = "ExemploSenha123";
@@ -60,7 +61,10 @@ test.describe("assinatura pelo Stripe", () => {
     const [c] = await db().insert(clientes).values({ nome: "[teste e2e] Marca da Assinatura", nichoId: nicho.id, tipo: "negocio", alcance: "brasil" }).returning();
     marca = c.id;
     await db().insert(membrosMarca).values({ usuarioId: DONO_ID, clienteId: marca, papel: "dono" });
+    // O briefing completo: sem ele o painel manda para /comecar e Conta não abre.
+    await db().insert(briefings).values({ clienteId: marca, completo: true });
     await db().delete(assinaturas).where(eq(assinaturas.stripeAssinaturaId, "sub_e2e_assinatura"));
+    await db().delete(checkoutsStripe).where(eq(checkoutsStripe.clienteId, marca));
   });
 
   test("o aviso do Stripe passa pelo middleware: sem assinatura 400, com a assinatura certa 200, e a lista de Contas mostra a assinatura", async ({ page, request }) => {
@@ -110,22 +114,32 @@ test.describe("assinatura pelo Stripe", () => {
     expect((await db().select().from(clientes).where(eq(clientes.id, marca)))[0].cortesia).toBe(false);
   });
 
-  test("o dono da marca em /assinar: o plano em uma linha, e o botão leva ao pagamento (simulado)", async ({ page }) => {
+  test("o dono da marca em /assinar: o convite com o preço, e o botão leva ao pagamento (simulado); o segundo clique reaproveita o mesmo Checkout", async ({ page }) => {
     await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
+    await db().delete(checkoutsStripe).where(eq(checkoutsStripe.clienteId, marca));
     await entrar(page, DONO_EMAIL, /\/(hoje|comecar)/);
     await page.goto("/assinar");
     await expect(page.getByRole("heading", { name: "Assine para continuar" })).toBeVisible();
-    await expect(page.getByText("Plano trimestral: R$ 397 por mês, cobrados R$ 1.191 a cada 3 meses, no cartão.")).toBeVisible();
-    await page.getByRole("button", { name: "Assinar", exact: true }).click();
-    await expect(page).toHaveURL(/\/assinar\?simulado=checkout/);
+    await expect(page.getByText("R$ 397", { exact: true })).toBeVisible();
+    await expect(page.getByText("Cobrado R$ 1.191 a cada 3 meses, só no cartão.", { exact: false })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "O que você recebe" })).toBeVisible();
+    await page.getByRole("button", { name: "Assinar por R$ 1.191 a cada 3 meses" }).click();
+    await expect(page).toHaveURL(/\/assinar\?simulado=checkout&sessao=cs_simulada_\d+/);
+    const primeiro = page.url();
+
+    // A pessoa volta sem pagar e clica de novo: a mesma sessão do Stripe, nenhuma segunda.
+    await page.goto("/assinar");
+    await page.getByRole("button", { name: "Assinar por R$ 1.191 a cada 3 meses" }).click();
+    await expect(page).toHaveURL(primeiro);
+    expect(await db().select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, marca))).toHaveLength(1);
   });
 
-  test("voltando do pagamento sem o aviso ainda: 'estamos confirmando', sem o botao de assinar; com o aviso, segue para o Hoje", async ({ page }) => {
+  test("voltando do pagamento sem o aviso ainda: 'estamos confirmando', sem o botão de assinar; com o aviso, a assinatura confirmada e o caminho para o Hoje", async ({ page }) => {
     await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
     await entrar(page, DONO_EMAIL, /\/(hoje|comecar)/);
     await page.goto("/assinar?assinou=1");
-    await expect(page.getByText("Estamos confirmando o seu pagamento.", { exact: false })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Assinar", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Estamos confirmando o seu pagamento" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Assinar/ })).toHaveCount(0);
 
     const agora = new Date();
     await db().insert(assinaturas).values({
@@ -137,7 +151,37 @@ test.describe("assinatura pelo Stripe", () => {
       ultimoEventoEm: agora,
     });
     await page.goto("/assinar?assinou=1");
-    await expect(page).toHaveURL(/\/(hoje|comecar)/);
+    await expect(page.getByRole("heading", { name: "Assinatura confirmada" })).toBeVisible();
+    await expect(page.getByText(/Seu plano vai até .* e renova sozinho\./)).toBeVisible();
+    await page.getByRole("button", { name: "Ir para o Hoje" }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+    await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
+  });
+
+  test("em Conta, 'Sua assinatura' só aparece com assinatura (com a cobrança desligada e sem assinatura, Conta fica como sempre foi), e o portal abre", async ({ page }) => {
+    await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
+    await entrar(page, DONO_EMAIL, /\/(hoje|comecar)/);
+    await page.goto("/conta");
+    await expect(page.getByRole("heading", { name: "Conta", exact: true })).toBeVisible();
+    await expect(page.getByTestId("sua-assinatura")).toHaveCount(0);
+
+    const agora = new Date();
+    await db().insert(assinaturas).values({
+      clienteId: marca,
+      status: "active",
+      stripeClienteId: "cus_e2e_conta",
+      stripeAssinaturaId: "sub_e2e_conta",
+      periodoFim: new Date(agora.getTime() + 90 * 86400 * 1000),
+      ultimoEventoEm: agora,
+    });
+    await page.goto("/conta");
+    const cartao = page.getByTestId("sua-assinatura");
+    await expect(cartao).toBeVisible();
+    await expect(cartao.getByRole("heading", { name: "Sua assinatura" })).toBeVisible();
+    await expect(cartao).toContainText("Ativa");
+    await expect(cartao).toContainText(/Renova em/);
+    await cartao.getByRole("button", { name: "Gerenciar a assinatura" }).click();
+    await expect(page).toHaveURL(/\/assinar\?simulado=portal/);
     await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
   });
 });

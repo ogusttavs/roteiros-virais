@@ -245,6 +245,10 @@ Entra desligada: sem `COBRANCA_ATIVA=1` no `.env` da VPS ninguem e mandado para 
 - **O aviso (webhook)**: no painel do Stripe, um endpoint em `https://<endereco do app>/api/webhooks/stripe` para os eventos `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` e `invoice.payment_failed`; o segredo dele (`whsec_`) vai em `STRIPE_WEBHOOK_SECRET`. A conta e dividida com o OdontoTech: os eventos dele chegam ao mesmo endpoint e sao ignorados (sem `metadata.produto = roteiros`).
 - **Ligar o portao**: marcar as cortesias em `/admin/clientes/<id>` (Ajustes, "Cortesia") antes de pôr `COBRANCA_ATIVA=1` e reiniciar o app.
 - **A prova ponta a ponta em modo teste, com a CLI do Stripe**: no PR da etapa.
+- **O portal do cliente (E22 PR 2)**: `npm run stripe:preparar` tambem acha ou cria a configuracao do portal PROPRIA do Roteiros (`metadata.produto = roteiros`: cartao, faturas, e-mail e cancelar no fim do periodo; sem trocar de plano). A padrao da conta e do OdontoTech: o app nunca a usa, e sem a nossa o portal nao abre (erro, nao reserva). A chave restrita precisa de permissao de escrita em "Customer portal" e leitura de "Checkout Sessions" e "Subscriptions" (escrita para cancelar/expirar).
+- **Um Checkout por marca**: a sessao aberta fica em `checkouts_stripe` (migracao 0095, so `CREATE TABLE`); o segundo clique em Assinar a reaproveita se o Stripe ainda a diz aberta.
+- **O portao fora do layout**: toda Server Action do painel e toda rota `/api` chama `exigirAssinaturaValida` / `recusaDaCobranca` (`src/lib/portao-cobranca.ts`); `npm run checar-portao-cobranca` (na CI) reprova a que esquecer. Desligado, nada muda.
+- **Apagar uma marca**: so por `npm run marca:apagar -- <id> --confirmo` (cancela a assinatura no Stripe antes e so apaga se o Stripe confirmar). **Nunca apague a linha de `clientes` por SQL**: sem cancelar no Stripe antes, ele continua cobrando (desde a E22 PR 3 o banco recusa apagar a marca que ainda tem linha em `assinaturas`, `ON DELETE RESTRICT`).
 
 ## O que nunca fazer
 

@@ -83,8 +83,28 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  *
  * 1.8.1 (prova com chave de 22/10/2026: com o critério de aviso, o roteiro curto do tema da eleição ainda reprovou em 2 de 3, porque a entrada levava "Proibicoes do cliente: política" e a linha
  * "Nunca diria ou faria" nas fontes): no tema da própria pessoa a entrada sai sem a lista e as fontes sem essa linha (`fontesSemProibicoes`). O sistema estável não muda. Versão 1.8.1.
+ *
+ * 1.8.2 (prova com chave de 22/10/2026, dois falsos positivos que o prompt sozinho não segurou): (1) o espaço entre colchetes para a pessoa preencher ("então [conte aqui como você faz para a mancha
+ * não voltar]") era lido como prática do negócio inventada, apesar de a regra dizer desde a 1.7.3 que colchete não é fato; agora, por código, o verificador nunca vê o que está dentro do colchete
+ * (`neutralizarColchetes`: cada trecho de até 200 caracteres vira "[espaço para a pessoa completar]"; o resto do texto, onde um fato inventado apareceria, segue inteiro, e as conferências locais
+ * seguem lendo o texto original); (2) o medo do cliente ideal que o perfil lista ("Medos do cliente: já mandou fazer em outro lugar e o sofá ficou manchado") dito ao público ("você já mandou lavar
+ * uma vez e o sofá voltou manchado?") foi lido como caso vivido. Agora o critério separa as duas coisas: falar COM o público sobre o medo ou a dor que o perfil lista, como pergunta ou como situação
+ * comum de quem assiste, não é fato; contar um caso específico como ACONTECIDO com um cliente, com a pessoa ou com o negócio ("um cliente meu, na semana passada, ...") continua sendo, e reprova.
+ * Versão 1.8.2.
+ *
+ * 1.9.0 (prova com chave de 23/10/2026 sobre o 1.8.2, rodada 3: o roteiro ainda falhava duas vezes por falso positivo, e o cliente via o erro). Cinco classes, cada uma com o texto que a prova mostrou:
+ * (1) instrução de gravação ou de edição lida como fato sobre o negócio ("o cliente vai mostrar a foto de duas figuras eleitorais na tela, mas as fontes não trazem informação sobre o cliente ter
+ * acesso ou autorização"): por código, com fontes, o texto chega em dois blocos (`montarTextoParaConferir`): a fala e o que o público lê, e depois as INSTRUÇÕES PARA A PESSOA (onde gravar, o que
+ * mostrar, a cena, o ritmo de corte, os recursos, o áudio, o que está na imagem de cada capítulo), que o critério manda nunca conferir como fato; o imperativo ("mostre", "coloque", "grave") em
+ * qualquer lugar também é ordem, não afirmação; (2) o número que está nas fontes, repetido com um espaço entre colchetes ao lado ("cento e oitenta reais [espaço para a pessoa completar]"), era lido
+ * como preço com condição inventada: o número é o da fonte e o espaço é de quem grava; (3) o "você já...", "já mandou...", "quem já..." dirigido a quem assiste é o público, em pergunta ou em
+ * afirmação, nunca um caso da pessoa (a 1.8.2 só cobria a pergunta); caso da pessoa é na primeira pessoa ou atribuído a um cliente identificado; (4) a consequência direta e óbvia de um fato do
+ * perfil ("mora em apartamento sem quintal" leva a "precisa resolver a mancha ali mesmo") e o funcionamento geral do tipo de produto ou serviço ("o tempo que o produto fica agindo no tecido")
+ * não são fato inventado; número, resultado prometido, cliente, nome ou ingrediente e prática ou diferencial do negócio continuam sendo; (5) no gênero tema, recomendar o fechamento com chamada
+ * para comprar (citando o preço) e falar em segunda pessoa de direção ("grave", "abra com") é o trabalho da recomendação, nunca tom errado: só reprova se o texto tentar vender algo ao dono.
+ * O que continua reprovando: o caso inventado ("um cliente meu, na semana passada"), o número ou resultado que as fontes não trazem e a prática do negócio não dita. Versão 1.9.0.
  */
-export const versao = "1.8.1";
+export const versao = "1.9.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -124,8 +144,11 @@ const CRITERIO_TOM: Record<GeneroTexto, string> = {
   tema:
     "o texto é a recomendação sobre um tema que o dono do negócio propôs: dizer como ajustar e " +
     "como gravar (o que mostrar, em que ordem, que teste fazer) é esperado e correto, não reprove " +
-    "só por isso; reprove apenas se soar como propaganda de venda ou usar jargão de marketing " +
-    "ou de tecnologia;",
+    "só por isso; falar com o dono em segunda pessoa de direção (grave, abra com, mostre, termine " +
+    "com) e recomendar que o vídeo feche com uma chamada para comprar, citando o preço ou a oferta, " +
+    "é o trabalho desta recomendação, não é direção para uma equipe nem propaganda, e nunca reprova; " +
+    "reprove apenas se o próprio texto tentar vender algo ao dono (exclamação, urgência, promessa) " +
+    "ou usar jargão de marketing ou de tecnologia;",
 };
 
 /** Só os generos "roteiro", "regra" e "tema" precisam desta explicação extra; os outros não mudam de comportamento. */
@@ -148,7 +171,10 @@ const CONTEXTO_GENERO: Partial<Record<GeneroTexto, string>> = {
     "instruções de gravação (o que mostrar primeiro, que teste fazer, onde parar) escritas para " +
     "ele seguir sozinho no celular. Instrução de gravação é o formato certo deste gênero, não um " +
     "briefing interno nem direção para uma equipe; nunca reprove achando que não é o texto que o " +
-    "cliente vê, isso não é um erro de gênero.\n",
+    "cliente vê, isso não é um erro de gênero. A recomendação fala com o dono em segunda pessoa de " +
+    "direção (grave, abra com, mostre, termine com) e pode dizer que o vídeo deve fechar com uma " +
+    "chamada para comprar, citando o preço: isso é recomendar o roteiro, não é soar como briefing " +
+    "interno nem como propaganda de venda.\n",
 };
 
 /**
@@ -164,7 +190,7 @@ export const CRITERIO_FATOS =
   "gente\"), paráfrase ou reformulação de algo que está nas fontes (o mesmo número escrito de outro jeito, o mesmo lugar dito de outro jeito), inferência óbvia das fontes (clínica em um bairro " +
   "\"fica\" nesse bairro), repetir ou reformular o TEMA ou o momento (eles são fonte), a frase ou o assunto que o cliente pediu para dizer (\"o que o vídeo precisa comunicar\", o pedido), " +
   "hashtags, instruções de gravação (sugerir como ou onde gravar, mesmo mudando um detalhe do que o momento diz), perguntas (uma pergunta, mesmo comparando dois produtos, não afirma nada), frase que está " +
-  "literalmente nas fontes (o perfil traz \"nunca promete resultado\", \"Frase que fala: ...\" e o texto a repete) e o jeito de falar. Um espaço marcado entre colchetes para a pessoa preencher (\"[diga aqui onde você está]\") não é fato, é o " +
+  "literalmente nas fontes (o perfil traz \"nunca promete resultado\", \"Frase que fala: ...\" e o texto a repete) e o jeito de falar. FALAR COM O PÚBLICO sobre um medo, uma dor ou uma situação que o perfil lista para o cliente ideal (\"Medos do cliente: ...\") é o assunto do perfil dito a quem assiste, e não é fato: vale como pergunta (\"você já mandou lavar e o sofá voltou manchado?\") e também como afirmação dirigida a quem assiste (\"você já mandou lavar uma vez e ele voltou manchado\", \"quem já passou por isso sabe como é\", \"se o seu sofá já voltou manchado de outro lugar\"). O \"você já...\", o \"já mandou...\" e o \"quem já...\" falam do PÚBLICO, nunca da pessoa que grava. O que continua sendo fato, e reprova, é contar um CASO ESPECÍFICO como acontecido na primeira pessoa ou com alguém identificado: com a própria pessoa (\"eu já mandei lavar e voltou manchado\", \"comigo aconteceu\"), com um cliente do negócio ou com uma pessoa identificada (\"um cliente meu, na semana passada, mandou lavar em outro lugar e o sofá voltou manchado\", \"ontem uma cliente me contou\"), porque o medo do perfil não diz que isso aconteceu. INSTRUÇÃO PARA A PESSOA nunca é afirmação sobre o negócio: o que vem depois da linha \"INSTRUÇÕES PARA A PESSOA\" do texto (onde gravar, o que mostrar, a cena, o ritmo de corte, os recursos, o áudio, o que aparece na imagem de cada capítulo) e qualquer ordem no imperativo em qualquer lugar (\"mostre\", \"coloque na tela\", \"grave\", \"filme\", \"aponte\") dizem o que a pessoa vai fazer, não o que o negócio é, tem ou fez. Você não confere essa parte contra as FONTES e nunca reprova por fato por causa dela, mesmo que a foto, o objeto ou a cena citados não apareçam nas fontes: é a pessoa quem decide se tem e se grava. Um número que está nas FONTES, escrito de qualquer jeito (\"R$ 180\", \"cento e oitenta reais\"), e repetido com um espaço marcado entre colchetes ao lado (a condição, o prazo, o detalhe que a pessoa completa: \"custa cento e oitenta reais [espaço para a pessoa completar]\") não é fato novo: o número é o da fonte e o espaço é de quem grava; não reprove por \"condição não dita\". DEDUÇÃO DIRETA e CONHECIMENTO GERAL DO PRODUTO OU DO SERVIÇO também não são fato inventado: a consequência óbvia de um fato do perfil (o perfil diz que o cliente mora em apartamento, sem quintal; \"quem mora em apartamento sem quintal precisa resolver a mancha ali mesmo\" é a consequência, não um fato novo) e o funcionamento geral desse tipo de produto ou serviço (\"o tempo que o produto fica agindo no tecido\", \"a anestesia leva uns minutos para pegar\") são do ramo, não da fonte. Continuam sendo fato, e reprovam: número, prazo ou resultado prometido ou medido que as fontes não trazem (\"tira 100% da mancha\", \"seca em duas horas\", \"em dez minutos\"), cliente ou caso, nome de produto, de marca ou de ingrediente, e prática ou diferencial do negócio (\"damos 30 dias de garantia\"). Um espaço marcado entre colchetes para a pessoa preencher (\"[diga aqui onde você está]\", ou o marcador \"[espaço para a pessoa completar]\") não é fato, é o " +
   "certo quando a fonte não traz a informação. NA DÚVIDA, APROVE. Só reprove por fato quando você consegue apontar o fato específico E afirmar que nada nas fontes o sustenta; nesse caso " +
   "preencha fatoEspecifico com o fato, fonteMaisProxima com a frase das fontes mais próxima dele (ou \"nenhuma\") e o motivo em uma frase.\n" +
   "  Exemplos que APROVAM: as fontes dizem \"R$ 89\" e o texto diz \"89 reais\"; as fontes dizem \"bairro Vila Sorriso, São Paulo\" e o texto diz \"a clínica fica na Vila Sorriso\"; o texto diz " +
@@ -172,10 +198,54 @@ export const CRITERIO_FATOS =
   "o tema é \"o sofá da cliente de ontem\" e o texto diz \"o sofá da cliente de ontem\"; o tema é \"o erro que apareceu em todo vídeo da semana\" e o texto diz \"você viu esse erro em vídeo atrás de " +
   "vídeo\" (repetição ou paráfrase do tema); o cliente pediu para comunicar \"o horário mudou\" e o texto diz que o horário mudou (a frase que ele pediu para falar); o perfil diz \"nunca promete resultado que não pode cumprir\" e o texto diz " +
   "\"eu nunca prometo resultado\"; o perfil traz \"Frase que fala: aqui a gente aplica igual fábrica, sem bolha\" e o texto diz essa frase (frase do cliente que está no perfil); o texto diz \"sempre faço " +
-  "[conte aqui como você faz isso]\" (o espaço marcado entre colchetes não afirma nada); o texto pergunta \"qual dura mais, o produto A ou o B?\" (pergunta, não afirmação).\n" +
+  "[conte aqui como você faz isso]\" (o espaço marcado entre colchetes não afirma nada); o texto pergunta \"qual dura mais, o produto A ou o B?\" (pergunta, não afirmação); o perfil traz \"Medos do cliente: já mandou fazer em outro lugar e o sofá ficou manchado\" e o texto diz \"você já mandou lavar uma vez e o sofá voltou manchado?\" (o medo do perfil dito ao público); o texto diz \"então [espaço para a pessoa completar]\" (espaço marcado); as fontes dizem \"sofá de 3 lugares por R$ 180\" e o texto diz \"o sofá de três lugares custa cento e oitenta reais [espaço para a pessoa completar]\" (o número é o da fonte, o espaço é de quem grava); o texto manda \"mostre na tela a foto de duas figuras conhecidas\" e as fontes não trazem nada sobre figuras nem fotos (ordem à pessoa, não afirmação sobre o negócio); o perfil traz \"Medos do cliente: já mandou fazer em outro lugar e o sofá ficou manchado\" e o texto afirma ao público \"você já mandou lavar o sofá uma vez e ele voltou manchado\" (fala com quem assiste, não é caso da pessoa); o perfil traz \"Cliente ideal: mora em apartamento, sem quintal\" e o texto diz \"quem mora em apartamento sem quintal precisa resolver a mancha ali mesmo\" (consequência direta do perfil); o texto diz \"o produto precisa de um tempo agindo no tecido\" (funcionamento geral do produto).\n" +
   "  Exemplos que REPROVAM, quando as fontes não os trazem: \"o Uli está aqui do meu lado com a mochila nas costas\"; \"numa mesa de hotel com café já frio\"; \"um país quase caiu do roteiro " +
   "porque a feira repetia o que vejo no Brasil\"; \"uma parada ganhou dois dias a mais por causa da fábrica\"; \"testo antes de entrar no kit\" ou \"na nossa loja\" (prática ou loja que o " +
-  "perfil não traz);"
+  "perfil não traz); com o mesmo medo no perfil, \"um cliente meu, na semana passada, mandou lavar em outro lugar e o sofá voltou manchado\" (caso específico contado como acontecido); \"eu já mandei lavar o sofá e ele voltou manchado, por isso criei o meu método\" ou \"ontem uma cliente me contou\" (caso da própria pessoa ou de um cliente que o perfil não traz); \"o produto tira 100% da mancha em dez minutos\" e \"damos 30 dias de garantia\" quando as fontes não trazem esse número, esse resultado nem essa garantia (número, resultado e prática do negócio que o perfil não traz);"
+
+/** O que o verificador lê no lugar do que está entre colchetes (1.8.2). */
+export const MARCADOR_DE_ESPACO = "[espaço para a pessoa completar]";
+
+/** Tamanho máximo do que um colchete esconde do verificador: um espaço para preencher é curto; um colchete longo seria um jeito de esconder um parágrafo de fato inventado, então fica à vista. */
+const MAXIMO_DENTRO_DO_COLCHETE = 200;
+const ENTRE_COLCHETES = new RegExp(`\\[[^\\[\\]]{0,${MAXIMO_DENTRO_DO_COLCHETE}}\\]`, "g");
+
+/**
+ * 1.8.2: troca cada espaço marcado entre colchetes ("[conte aqui como você faz isso]") por um marcador neutro antes de o texto ir ao verificador. O que a pessoa vai escrever ali é dela, nunca
+ * fato que o roteiro afirma, e o modelo barato lia a instrução dentro do colchete como prática inventada. Só o que está DENTRO do colchete some; tudo fora dele segue inteiro, então um fato
+ * inventado fora dos colchetes continua à vista. Pura; as conferências locais (travessão, emoji, proibição) seguem lendo o texto original.
+ */
+export function neutralizarColchetes(texto: string): string {
+  return texto.replace(ENTRE_COLCHETES, MARCADOR_DE_ESPACO);
+}
+
+/** A linha que abre o bloco das instruções no texto a conferir (1.9.0); o critério de fato (`CRITERIO_FATOS`) e o simulador (`mock.ts`) a reconhecem pelo começo, "INSTRUÇÕES PARA A PESSOA". */
+export const TITULO_DAS_INSTRUCOES = "INSTRUÇÕES PARA A PESSOA (gravação e edição: dizem o que ela vai fazer, não afirmam nada sobre o negócio):";
+
+/**
+ * 1.9.0: os campos do roteiro que são ordem à pessoa (onde gravar, o ritmo de corte, os recursos, o áudio, o que olhar na referência, a cena, o que mostrar em cada cartão, o que aparece na imagem e como
+ * editar cada capítulo). Os nomes vêm de `extrairCamposRoteiro` e `camposDoRoteiroLongo`. De fora ficam os campos que o público lê ou ouve (título, gancho, corpo, fechamento, chamada final, fala do
+ * cartão, texto na tela, legenda, miniatura, tema curto) e o "por que assim": um fato inventado ali continua à vista.
+ */
+const CAMPOS_DE_INSTRUCAO = /^(ondeGravar|ritmoDeCorte|audio|referenciaOQueOlhar|recurso\d+|cena\d+|cartao\d+Mostrar|capitulo\d+(NaImagem|ComoEditar))$/;
+
+export function ehCampoDeInstrucao(nome: string): boolean {
+  return CAMPOS_DE_INSTRUCAO.test(nome);
+}
+
+/**
+ * O texto que vai ao `verificarTexto`. Sem fontes (a conferência de fato desligada), é o de sempre: os campos um por linha. Com fontes, o que o público ouve ou lê vem primeiro e as instruções
+ * para a pessoa vêm depois, sob `TITULO_DAS_INSTRUCOES`: o critério manda nunca conferir essa parte como fato (uma ordem como "mostre a foto de X" diz o que a pessoa vai fazer, não o que o negócio
+ * tem). Exportada para a produção e para os scripts de avaliação montarem o texto do mesmo jeito.
+ */
+export function montarTextoParaConferir(campos: Record<string, string>, comFontes: boolean): string {
+  if (!comFontes) return Object.values(campos).join("\n");
+  const entradas = Object.entries(campos);
+  const falas = entradas.filter(([nome]) => !ehCampoDeInstrucao(nome)).map(([, valor]) => valor);
+  const instrucoes = entradas.filter(([nome]) => ehCampoDeInstrucao(nome)).map(([, valor]) => valor);
+  if (instrucoes.length === 0) return falas.join("\n");
+  return [...falas, "", TITULO_DAS_INSTRUCOES, ...instrucoes].join("\n");
+}
 
 /** O critério da proibição, como sempre: o texto nunca fere o que o cliente listou no briefing. */
 export const CRITERIO_PROIBICAO = "nenhuma proibição que o cliente listou no briefing foi ferida.";
@@ -187,7 +257,7 @@ export const CRITERIO_PROIBICAO = "nenhuma proibição que o cliente listou no b
  */
 export const CRITERIO_PROIBICAO_COMO_AVISO =
   "o tema foi escolhido pela própria pessoa, então as proibições do briefing são preferências dela, não motivo de reprovação: citar ou tratar o assunto de uma proibição, dizer que o tema esbarra nela, " +
-  "ou escrever sobre ele com cuidado nunca reprova, e nunca fere a proibição. Reprove apenas se o texto atacar ou ofender uma pessoa, um candidato, um partido, um concorrente ou um grupo, prometer " +
+  "ou escrever sobre ele com cuidado nunca reprova, e nunca fere a proibição. Por este item, reprove só se o texto atacar ou ofender uma pessoa, um candidato, um partido, um concorrente ou um grupo, prometer " +
   "resultado que não pode cumprir ou tiver palavrão.";
 
 export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false, proibicaoEhAviso = false): string {
@@ -219,5 +289,8 @@ export function montarEntrada(dados: { texto: string; proibicoes: string[]; font
     dados.proibicoes.length > 0 ? dados.proibicoes.join("; ") : "nenhuma proibicao registrada";
   const blocoFontes = dados.fontes ? `\n\nFONTES (tudo o que foi dito ou escrito para este texto; só isto vale como fato):\n${dados.fontes}` : "";
 
-  return `Texto a conferir:\n${dados.texto}\n\nProibicoes do cliente: ${listaProibicoes}${blocoFontes}`;
+  // 1.8.2: com a conferência de fatos (com fontes), o espaço marcado entre colchetes chega como um marcador neutro; vale para a produção e para os scripts de avaliação, que montam a entrada aqui.
+  const texto = dados.fontes ? neutralizarColchetes(dados.texto) : dados.texto;
+
+  return `Texto a conferir:\n${texto}\n\nProibicoes do cliente: ${listaProibicoes}${blocoFontes}`;
 }

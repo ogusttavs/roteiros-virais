@@ -32,6 +32,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { clientes, consumoApi, metricasVideoCliente, videosCliente, type FonteMedida } from "@/db/schema";
 import { config, hojeISO } from "@/lib/config";
+import { registrarMarcasPuladas, resumoDasMarcasPuladas, separarMarcasPorAssinatura } from "@/servicos/assinatura-tarefas";
 import { estaNaHoraDeMedir, shortcodeDoPermalink, videosParaMedir, type VideoParaMedir } from "@/servicos/curva";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 
@@ -341,7 +342,12 @@ async function medirInstagram(videos: VideoParaMedir[], agora: Date, erros: stri
 
 export async function rodarCurvaCliente(agora = new Date()): Promise<Record<string, unknown>> {
   const candidatos = await videosParaMedir(agora);
-  const devidos = candidatos.filter((v) => estaNaHoraDeMedir(v.postadoEm, v.ultimaColeta, agora));
+  // E22 PR 3: marca sem assinatura (cobrança ligada) não é medida (Meta, Apify e YouTube são chamadas por ela). O que já foi medido fica guardado; se ela assinar de novo, volta a ser medida.
+  // Só conta como pulada a marca que teria vídeo para medir nesta hora.
+  const naHora = candidatos.filter((v) => estaNaHoraDeMedir(v.postadoEm, v.ultimaColeta, agora));
+  const { liberadas, puladas } = await separarMarcasPorAssinatura(naHora.map((v) => v.clienteId), { agora });
+  registrarMarcasPuladas("curva-cliente", puladas.length);
+  const devidos = naHora.filter((v) => liberadas.has(v.clienteId));
 
   const porPlataforma = {
     youtube: devidos.filter((v) => v.plataforma === "youtube"),
@@ -361,6 +367,7 @@ export async function rodarCurvaCliente(agora = new Date()): Promise<Record<stri
   return {
     candidatos: candidatos.length,
     devidos: devidos.length,
+    ...resumoDasMarcasPuladas(puladas.length),
     medidosYoutube,
     medidosTiktok,
     medidosInstagramMeta,

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { FaixaDoModo } from "@/app/(painel)/_casca/FaixaVerComo";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { temCapitulos } from "@/lib/marcas-de-fala";
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { falaDoRoteiro } from "@/servicos/marcar-fala";
@@ -32,6 +33,8 @@ export default async function Gravar({ params }: Props) {
   if (!cliente) {
     redirect(destinoSemMarca(sessao.user.role));
   }
+  // E22 PR 2, item 0a: esta página mora fora do grupo `(completo)` (sem a barra do painel), então o portão do layout não a alcança: a mesma regra aqui.
+  await exigirAssinaturaValida();
 
   if (!Number.isFinite(roteiroId)) {
     redirect("/hoje");

@@ -1259,6 +1259,18 @@ export const videos = pgTable(
       sql`to_tsvector('portuguese', coalesce(titulo, '') || ' ' || coalesce(descricao, '') || ' ' || coalesce(transcricao, '') || ' ' || coalesce(analise ->> 'assunto', ''))`,
     ),
     /**
+     * E17 parte 1 (refeita em 23/10/2026): a busca por significado com o que o Postgres já traz. Título, assunto e os primeiros 1.500 caracteres da transcrição,
+     * sem acento e com radical em português ("sofá" acha "sofas", "dente" acha "dentes"). `f_unaccent` é a versão imutável do `unaccent`, criada na migração
+     * (a original é `stable`, e coluna gerada só aceita função imutável). Só é lida com `BUSCA_POR_SIGNIFICADO=1`, para ordenar os candidatos do modelo barato; a `busca` de sempre não muda. Sem índice GIN de propósito: a consulta lê o conjunto elegível inteiro do setor (já cortado por setor, janela e piso), então nenhum índice de texto seria usado.
+     */
+    buscaSemAcento: tsvector("busca_sem_acento").generatedAlwaysAs(
+      sql`to_tsvector('portuguese', f_unaccent(coalesce(titulo, '') || ' ' || coalesce(analise ->> 'assunto', '') || ' ' || left(coalesce(transcricao, ''), 1500)))`,
+    ),
+    /** E17 parte 1: título e assunto, minúsculos e sem acento, para o `pg_trgm` achar grafia parecida ("dente" e "dental"). Curto de propósito: trigrama sobre transcrição inteira pesa. */
+    textoCurto: text("texto_curto").generatedAlwaysAs(
+      sql`lower(f_unaccent(coalesce(titulo, '') || ' ' || coalesce(analise ->> 'assunto', '')))`,
+    ),
+    /**
      * "coleta" veio do Apify ou da YouTube Data API, "seed" e exemplo de
      * desenvolvimento, "curadoria" foi posto pela equipe, "meta" veio da
      * Business Discovery ou da Hashtag Search da Meta (E6 parte 3, segunda
@@ -2597,9 +2609,13 @@ export const assinaturas = pgTable(
   "assinaturas",
   {
     id: id(),
+    /**
+     * `restrict`, não `cascade` (E22 PR 3): apagar a marca não leva a assinatura junto, porque o Stripe continuaria cobrando uma conta que não existe mais. O caminho de apagar marca
+     * (`servicos/apagar-marca.ts`) cancela no Stripe e apaga a linha da assinatura antes de apagar a marca; qualquer outro `delete from clientes` é recusado pelo banco.
+     */
     clienteId: integer("cliente_id")
       .notNull()
-      .references(() => clientes.id, { onDelete: "cascade" }),
+      .references(() => clientes.id, { onDelete: "restrict" }),
     status: text("status").$type<StatusAssinatura>().notNull(),
     stripeClienteId: text("stripe_cliente_id").notNull(),
     stripeAssinaturaId: text("stripe_assinatura_id").notNull(),
@@ -2656,6 +2672,24 @@ export const capasVideo = pgTable("capas_video", {
   atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 export type CapaVideo = typeof capasVideo.$inferSelect;
+
+/**
+ * E22 PR 2, item 0b: o Checkout aberto de cada marca. Uma linha por marca (índice único): o segundo clique em "Assinar" reaproveita a sessão que o primeiro abriu em vez de criar
+ * outra (duas sessões abertas deixariam a pessoa pagar duas vezes). Só o id da sessão fica aqui; o endereço do pagamento o Stripe devolve de novo quando a sessão ainda está aberta.
+ */
+export const checkoutsStripe = pgTable(
+  "checkouts_stripe",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    stripeSessaoId: text("stripe_sessao_id").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("checkouts_stripe_cliente").on(t.clienteId)],
+);
+export type CheckoutStripe = typeof checkoutsStripe.$inferSelect;
 
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;
