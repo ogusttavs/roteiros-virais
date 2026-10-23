@@ -6,6 +6,7 @@ import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { ErroIA } from "@/ia/erro";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import type { MarcasParaATela } from "@/lib/marcas-de-fala";
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
@@ -36,6 +37,7 @@ async function roteiroDoClienteOuFalha(roteiroId: number) {
 
 export async function marcarGravadoAction(roteiroId: number): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   await roteiroDoClienteOuFalha(roteiroId);
   await marcarGravado(roteiroId);
   // V9b, item 3: fecha o círculo do plano quando este roteiro veio de um item aceito (sem-op sem plano).
@@ -44,6 +46,7 @@ export async function marcarGravadoAction(roteiroId: number): Promise<void> {
 
 export async function marcarPostadoAction(roteiroId: number, url: string): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   await roteiroDoClienteOuFalha(roteiroId);
   await marcarPostado(roteiroId, url);
 }
@@ -54,6 +57,7 @@ export async function reprovarERescreverAction(
   motivoTexto?: string,
 ): Promise<{ id: number }> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   await roteiroDoClienteOuFalha(roteiroId);
   const novaVersao = await reprovarERescrever(roteiroId, motivosIds, motivoTexto);
   return { id: novaVersao.id };
@@ -64,6 +68,7 @@ export async function avaliarRoteiroAction(
   avaliacao: "gostei" | "nao_gostei",
 ): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   await roteiroDoClienteOuFalha(roteiroId);
   await avaliarRoteiro(roteiroId, avaliacao);
 }
@@ -74,6 +79,7 @@ export async function salvarEdicaoAction(
   campos: CamposEditaveisRoteiro,
 ): Promise<{ id: number }> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   await roteiroDoClienteOuFalha(roteiroId);
   const atualizado = await editarRoteiro(roteiroId, campos);
   return { id: atualizado.id };
@@ -87,6 +93,7 @@ export async function salvarEdicaoAction(
 export async function marcarFalaAction(roteiroId: number): Promise<ResultadoAcao<{ marcas: MarcasParaATela | null; motivo: MotivoSemMarcas | null; novas: boolean }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const cliente = await clienteDaSessaoAtual();
   // O id chega do navegador: algo que não é um inteiro positivo de 32 bits (o tipo da coluna) é "não achei", nunca um erro do banco.
   if (!Number.isInteger(roteiroId) || roteiroId <= 0 || roteiroId > 2_147_483_647) return { ok: false, erro: textosMarcasDeFala.erros.naoEncontrado };

@@ -117,8 +117,11 @@ export function criarPortaReal(chave: string): PortaStripe {
     throw new ErroStripe("A porta real do Stripe nao existe dentro do Vitest: os testes usam a simulada.");
   }
   if (!chave) throw new ErroStripe("STRIPE_SECRET_KEY nao esta definida.");
-  const stripe = new Stripe(chave, { maxNetworkRetries: 2, timeout: 20_000, appInfo: { name: "roteiros-virais" } });
+  return criarPortaComSdk(new Stripe(chave, { maxNetworkRetries: 2, timeout: 20_000, appInfo: { name: "roteiros-virais" } }));
+}
 
+/** A porta sobre um cliente do SDK já pronto. Separada de `criarPortaReal` para os testes darem um SDK de mentira (sem rede) e provarem as regras da conta dividida. */
+export function criarPortaComSdk(stripe: Stripe): PortaStripe {
   /** A configuração do portal que é deste produto (criada por `stripe:preparar`, com `metadata.produto = roteiros`). A padrão da conta é do OdontoTech: nunca serve de reserva. */
   async function configuracaoDoPortal(): Promise<string> {
     const lista = await stripe.billingPortal.configurations.list({ active: true, limit: 100 });
