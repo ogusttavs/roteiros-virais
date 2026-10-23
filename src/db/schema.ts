@@ -2597,9 +2597,13 @@ export const assinaturas = pgTable(
   "assinaturas",
   {
     id: id(),
+    /**
+     * `restrict`, não `cascade` (E22 PR 3): apagar a marca não leva a assinatura junto, porque o Stripe continuaria cobrando uma conta que não existe mais. O caminho de apagar marca
+     * (`servicos/apagar-marca.ts`) cancela no Stripe e apaga a linha da assinatura antes de apagar a marca; qualquer outro `delete from clientes` é recusado pelo banco.
+     */
     clienteId: integer("cliente_id")
       .notNull()
-      .references(() => clientes.id, { onDelete: "cascade" }),
+      .references(() => clientes.id, { onDelete: "restrict" }),
     status: text("status").$type<StatusAssinatura>().notNull(),
     stripeClienteId: text("stripe_cliente_id").notNull(),
     stripeAssinaturaId: text("stripe_assinatura_id").notNull(),
