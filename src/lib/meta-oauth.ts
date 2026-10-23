@@ -14,8 +14,12 @@ import { config } from "@/lib/config";
 
 /** A versão da Graph API que o resto do produto usa (`src/jobs/meta-api.ts`). */
 export const VERSAO_GRAPH = "v26.0";
-const GRAPH = `https://graph.facebook.com/${VERSAO_GRAPH}`;
-const DIALOGO = `https://www.facebook.com/${VERSAO_GRAPH}/dialog/oauth`;
+const GRAPH_DA_META = `https://graph.facebook.com/${VERSAO_GRAPH}`;
+const DIALOGO_DA_META = `https://www.facebook.com/${VERSAO_GRAPH}/dialog/oauth`;
+
+/** Lidos a cada chamada: só no e2e (`MODO_E2E=1`) eles apontam para o servidor local que simula a Meta (`config.metaConexao.simuladorE2E`); fora dele são sempre os da Meta. */
+const graph = () => (config.metaConexao.simuladorE2E ? `${config.metaConexao.simuladorE2E}/graph` : GRAPH_DA_META);
+const dialogo = () => (config.metaConexao.simuladorE2E ? `${config.metaConexao.simuladorE2E}/dialog/oauth` : DIALOGO_DA_META);
 
 /** As permissões que a configuração de login precisa liberar. O código confere, depois do login, que a pessoa liberou todas (`login-para-empresas.md`: todas ou nenhuma). */
 export const PERMISSOES_EXIGIDAS = ["instagram_basic", "instagram_manage_insights", "pages_show_list", "pages_read_engagement"] as const;
@@ -96,7 +100,7 @@ export function opcoesCookieState() {
 
 /** O endereço do diálogo do Login para Empresas: `config_id` no lugar de `scope` (a configuração define as permissões), fluxo de código, e o `state`. */
 export function urlDoDialogo(state: string): string {
-  const url = new URL(DIALOGO);
+  const url = new URL(dialogo());
   url.searchParams.set("client_id", config.metaConexao.appId);
   url.searchParams.set("redirect_uri", config.metaConexao.redirectUri);
   url.searchParams.set("state", state);
@@ -156,7 +160,7 @@ function conferirQueNaoEhRedeDeVerdade(): void {
 
 async function pedirGraph<T>(caminho: string, parametros: Record<string, string>, token?: string): Promise<T> {
   conferirQueNaoEhRedeDeVerdade();
-  const url = new URL(`${GRAPH}/${caminho}`);
+  const url = new URL(`${graph()}/${caminho}`);
   for (const [chave, valor] of Object.entries(parametros)) url.searchParams.set(chave, valor);
   if (token) {
     url.searchParams.set("access_token", token);
