@@ -104,6 +104,11 @@ type EntradaDoRetorno = {
   usuarioId: string | null;
 };
 
+/** Troca cada segredo que apareca no texto por [oculto]. */
+function semSegredos(texto: string, segredos: string[]): string {
+  return segredos.filter(Boolean).reduce((resto, segredo) => resto.split(segredo).join("[oculto]"), texto);
+}
+
 function normalizarHandle(valor: string | null | undefined): string {
   return (valor ?? "").trim().replace(/^@/, "").toLowerCase();
 }
@@ -137,15 +142,19 @@ export async function concluirLigacao(entrada: EntradaDoRetorno, agora: Date = n
   let longo: { token: string; expiraEmSeg: number | null };
   let metaUsuarioId: string;
   let contas: ContaDoInstagram[];
+  // Tudo que e segredo nesta volta (o codigo e os dois tokens): se a Meta ecoar algum numa mensagem de erro, ele nao vai para o log.
+  const segredos: string[] = [entrada.codigo];
   try {
     const curto = await trocarCodigoPorToken(entrada.codigo);
+    segredos.push(curto.token);
     longo = await trocarPorLongaDuracao(curto.token);
+    segredos.push(longo.token);
     if ((await permissoesQueFaltam(longo.token)).length > 0) return { resultado: "permissao" };
     metaUsuarioId = (await usuarioDoToken(longo.token)).id;
     contas = await contasDoInstagram(longo.token);
   } catch (erro) {
     // A mensagem do `ErroMetaLogin` nunca leva token nem endereço (`lib/meta-oauth.ts`).
-    logger.error({ clienteId, codigo: erro instanceof ErroMetaLogin ? erro.codigo : undefined, mensagem: erro instanceof Error ? erro.message : "erro" }, "meta: a ligacao falhou");
+    logger.error({ clienteId, codigo: erro instanceof ErroMetaLogin ? erro.codigo : undefined, mensagem: semSegredos(erro instanceof Error ? erro.message : "erro", segredos) }, "meta: a ligacao falhou");
     return { resultado: "falhou" };
   }
   if (contas.length === 0) return { resultado: "sem-instagram" };
@@ -348,16 +357,19 @@ export type ContaParaLeitura = { id: number; igId: string; token: string };
 
 /**
  * A conta ligada da marca, pronta para ler, ou `null` (sem conta, vencida, ou com o acesso guardado ilegível). SEMPRE filtra pela marca recebida. Conta que a Meta já recusou
- * (`erro` de acesso recusado) não é tentada de novo até a pessoa ligar outra vez: evita bater todo dia num acesso morto.
+ * (`erro` de acesso recusado) não é tentada de novo até a pessoa ligar outra vez: evita bater todo dia num acesso morto. O acesso ilegível (chave trocada, valor alterado) é
+ * conferido de novo a cada vez, porque abrir o valor é local e barato, e a chave pode ser corrigida no ambiente.
  */
 export async function contaParaLeitura(clienteId: number, agora: Date = new Date()): Promise<ContaParaLeitura | null> {
+  // Sem a ligacao configurada neste processo (falta a chave ou o aplicativo): nao e problema da conta, e do ambiente. Nao decifra e, principalmente, nao MARCA a conta com erro.
+  if (!ligacaoDisponivel()) return null;
   const [linha] = await db()
     .select()
     .from(contasConectadas)
     .where(and(eq(contasConectadas.clienteId, clienteId), eq(contasConectadas.plataforma, PLATAFORMA_INSTAGRAM), eq(contasConectadas.estado, "ativa")));
   if (!linha) return null;
   if (linha.tokenExpiraEm && linha.tokenExpiraEm.getTime() <= agora.getTime()) return null;
-  if (linha.erro === textosLigacao.erroDaConta.recusada || linha.erro === textosLigacao.erroDaConta.ilegivel) return null;
+  if (linha.erro === textosLigacao.erroDaConta.recusada) return null;
   try {
     return { id: linha.id, igId: linha.contaId, token: decifrarToken(linha.tokenCifrado, contextoDoToken(linha.clienteId, linha.plataforma, linha.contaId)) };
   } catch (erro) {
@@ -408,10 +420,10 @@ export async function renovarContasLigadas(agora: Date = new Date()): Promise<Re
     .returning({ id: contasConectadas.id });
   resumo.candidatasApagadas = velhas.length;
 
+  // A ligação desligada no ambiente (sem chave) não consegue decifrar: não é falha da conta, e nenhuma conta é marcada.
+  if (!ligacaoDisponivel()) return resumo;
   const ativas = await db().select().from(contasConectadas).where(eq(contasConectadas.estado, "ativa"));
   for (const linha of ativas) {
-    // A ligação desligada no ambiente (sem chave) não consegue decifrar: não é falha da conta.
-    if (!ligacaoDisponivel()) break;
     const venceu = Boolean(linha.tokenExpiraEm && linha.tokenExpiraEm.getTime() <= agora.getTime());
     if (!precisaRenovar(linha, agora) && !venceu) continue;
     resumo.avaliadas += 1;

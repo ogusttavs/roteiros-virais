@@ -418,6 +418,19 @@ describe("concluirLigacao: o que a Meta devolve", () => {
     }
   });
 
+  it("a Meta ecoa o codigo e o token na mensagem de erro: o log guarda a frase sem eles", async () => {
+    mockFetch.mockImplementation(async (entrada: URL | string) => {
+      const url = new URL(String(entrada));
+      if (url.searchParams.get("grant_type") !== "fb_exchange_token") return json({ access_token: TOKEN_CURTO, expires_in: 3600 });
+      return json({ error: { message: `Invalid token ${TOKEN_CURTO} for code codigo-da-meta`, code: 190 } }, 400);
+    });
+    expect(await concluirLigacao(volta("cc-dono-a", marcaA))).toEqual({ resultado: "falhou" });
+    const log = JSON.stringify(estado.logs);
+    expect(log).toContain("[oculto]");
+    expect(log).not.toContain(TOKEN_CURTO);
+    expect(log).not.toContain("codigo-da-meta");
+  });
+
   it("falha de rede: falha sem gravar", async () => {
     mockFetch.mockRejectedValue(new TypeError("fetch failed"));
     expect(await concluirLigacao(volta("cc-dono-a", marcaA))).toEqual({ resultado: "falhou" });
@@ -582,6 +595,15 @@ describe("isolamento entre marcas", () => {
     const [depois] = await db().select().from(contasConectadas).where(eq(contasConectadas.id, b.id));
     expect(depois.erro).toBe(textosLigacao.erroDaConta.ilegivel);
     // A de A continua lendo normalmente.
+    expect((await contaParaLeitura(marcaA))?.token).toBe("EAA-LONGO-A");
+  });
+
+  it("sem a ligacao configurada neste processo (falta a chave), a conta nao e lida e, principalmente, NAO e marcada com erro; com a chave de volta, volta a ler", async () => {
+    await inserirAtiva({ clienteId: marcaA, contaId: "ig-a", token: "EAA-LONGO-A" });
+    config.metaConexao.ativa = false;
+    expect(await contaParaLeitura(marcaA)).toBeNull();
+    expect((await linhas())[0].erro).toBeNull();
+    config.metaConexao.ativa = true;
     expect((await contaParaLeitura(marcaA))?.token).toBe("EAA-LONGO-A");
   });
 
