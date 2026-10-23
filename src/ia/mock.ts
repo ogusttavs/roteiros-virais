@@ -299,7 +299,7 @@ function mockAvaliarTema(entrada: string) {
   const pilares = {
     viralizar: {
       nota: notaViralizar,
-      justificativa: `${evidencias} video(s) de evidencia recebido(s)`,
+      justificativa: `${evidencias} video(s) recebido(s) que provam isso`,
     },
     gerarCliente: pilarPadrao,
     encaixe: pilarPadrao,
@@ -321,8 +321,8 @@ function mockAvaliarTema(entrada: string) {
       : tema.includes(MARCADOR_CITA_PROIBICAO)
         ? `Atenção: ${FRASE_DA_PROIBICAO_CITADA}: não falar de política. Se usar a analogia de eleição, não cite candidato nem partido e não tome lado.`
         : aprovado
-          ? "tema com evidencia suficiente"
-          : "ajustar para um angulo com evidencia",
+          ? "tema com prova suficiente"
+          : "ajustar para um angulo com prova",
     anguloSugerido: aprovado ? null : "angulo vizinho simulado",
     evidencias: tema.includes(MARCADOR_EVIDENCIA_INVENTADA) ? [...idsCitados, 999999] : idsCitados,
   };
