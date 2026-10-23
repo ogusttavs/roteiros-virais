@@ -909,3 +909,67 @@ describe("as rotas /api/meta/conectar e /api/meta/retorno", () => {
     expect(new URL(r.headers.get("location")!).searchParams.get("instagram")).toBe("cancelou");
   });
 });
+
+// ---------------------------------------------------------------------------
+// O portão da cobrança (E22) nas rotas e ações da conta ligada
+// ---------------------------------------------------------------------------
+
+describe("o portao da cobranca (COBRANCA_ATIVA)", () => {
+  const cobrancaOriginal = config.cobranca.ativa;
+  beforeEach(() => {
+    config.cobranca.ativa = true;
+  });
+  afterEach(async () => {
+    config.cobranca.ativa = cobrancaOriginal;
+    await db().update(clientes).set({ cortesia: false });
+  });
+
+  it("conectar: marca sem assinatura e sem cortesia recebe 402 e nenhum cookie; com cortesia segue para o dialogo", async () => {
+    entrar("cc-dono-a");
+    const barrada = await conectar();
+    expect(barrada.status).toBe(402);
+    expect(barrada.headers.get("set-cookie")).toBeNull();
+
+    await db().update(clientes).set({ cortesia: true }).where(eq(clientes.id, marcaA));
+    const liberada = await conectar();
+    expect(liberada.status).toBe(307);
+    expect(new URL(liberada.headers.get("location")!).hostname).toBe("www.facebook.com");
+  });
+
+  it("escolher e barrada (vai para /assinar); desligar NUNCA e barrada: apagar o acesso e da pessoa, pague ou nao", async () => {
+    instalarMeta({ contas: [{ pageId: "p1", pageName: "P1", igId: "ig-1", username: "x1" }, { pageId: "p2", pageName: "P2", igId: "ig-2", username: "x2" }] });
+    config.cobranca.ativa = false;
+    await concluirLigacao(volta("cc-dono-c", marcaC));
+    config.cobranca.ativa = true;
+    entrar("cc-dono-c");
+    await expect(escolherInstagramAction("ig-1")).rejects.toThrow();
+    expect((await linhas()).every((l) => l.estado === "escolher")).toBe(true);
+
+    expect(await desligarInstagramAction()).toEqual({ ok: true, dado: { apagadas: 2 } });
+    expect(await linhas()).toHaveLength(0);
+  });
+
+  it("o retorno da Meta e a exclusao de dados continuam funcionando sem assinatura (livres, com motivo no verificador)", async () => {
+    instalarMeta();
+    entrar("cc-dono-a");
+    const state = criarState({ c: marcaA, u: "cc-dono-a" });
+    const url = new URL("http://localhost:3000/api/meta/retorno");
+    url.searchParams.set("code", "c");
+    url.searchParams.set("state", state);
+    const r = await retorno(new NextRequest(url, { headers: { cookie: `${NOME_COOKIE_STATE_META}=${encodeURIComponent(state)}` } }));
+    expect(new URL(r.headers.get("location")!).searchParams.get("instagram")).toBe("ligada");
+
+    const e = await exclusao(pedidoDeExclusao(signedRequest("meta-pessoa-a")));
+    expect(e.status).toBe(200);
+    expect(await linhas()).toHaveLength(0);
+  });
+
+  it("a renovacao continua para marca sem assinatura (a ligacao nao se perde num mes sem pagar)", async () => {
+    const agora = new Date("2026-10-22T06:20:00Z");
+    await inserirAtiva({ clienteId: marcaA, contaId: "ig-a", token: "EAA-LONGO-A", expiraEm: new Date(agora.getTime() + 5 * 24 * 60 * 60 * 1000) });
+    instalarMeta({ longo: "EAA-RENOVADO" });
+    const resumo = await renovarContasLigadas(agora);
+    expect(resumo.renovadas).toBe(1);
+    expect((await contaParaLeitura(marcaA, agora))?.token).toBe("EAA-RENOVADO");
+  });
+});

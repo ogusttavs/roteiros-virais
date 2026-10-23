@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
@@ -25,12 +26,13 @@ export async function desligarInstagramAction(): Promise<ResultadoAcao<{ apagada
   return { ok: true, dado: { apagadas: resultado.apagadas } };
 }
 
-/** E19 PR 1: a pessoa escolheu qual das contas do Instagram devolvidas pela Meta é a dela (só quando a Meta devolveu mais de uma). Mesmas regras de `desligarInstagramAction`. */
+/** E19 PR 1: a pessoa escolheu qual (com o portao da cobranca: e coisa de produto; desligar, ao contrario, nunca e barrado) das contas do Instagram devolvidas pela Meta é a dela (só quando a Meta devolveu mais de uma). Mesmas regras de `desligarInstagramAction`. */
 export async function escolherInstagramAction(contaId: string): Promise<ResultadoAcao<{ contaId: string }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   const sessao = await sessaoDoPainel();
   if (!sessao) return { ok: false, erro: textosLigacao.retorno["sem-acesso"] };
+  await exigirAssinaturaValida();
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) return { ok: false, erro: textosLigacao.retorno["sem-acesso"] };
   const { resultado } = await escolherConta(sessao.user.id, cliente.id, String(contaId));
