@@ -57,8 +57,10 @@ import {
  * 1.4.0 (E16 PR 3, nível conta): o sistema estável ganha, quando a marca já tem pelo menos 8 vídeos postados e medidos, o bloco "O que funcionou nos vídeos que este cliente já postou" (`desempenhoDaConta`,
  * `servicos/desempenho-da-conta.ts`), o mesmo do roteiro curto (2.22.0), sem a linha de duração: a duração do longo vem da medida dos longos do ramo, não do que rendeu nos Reels. É tendência de uma marca só,
  * só rótulo e número (nunca tema ou texto de roteiro), calculada por código. Sem o bloco (a conta sem dado suficiente, hoje todas) o sistema é idêntico ao da 1.3.0. O schema de saída não muda.
+ * 1.5.0 (E59, 22/10/2026): o sistema ganha a regra de conformidade nova `R-CONF-10` (nunca nome de candidato nem de partido; imagem de pessoa pública só com quem grava no quadro e sem sugerir apoio), que vem
+ * pela tabela da seção 11 (`regras-copy-roteiro.ts` 1.2.0) e que o verificador aplica também aqui. A prova visual com imagem de outro (`R-ROTEIRO-20`) NÃO entra no roteiro longo: só no Reels falado.
  */
-export const versao = "1.4.0";
+export const versao = "1.5.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 

@@ -597,5 +597,65 @@
       "motivoTexto": "Eu nunca atendi dona Marlene nenhuma e nem tenho cliente em Campinas, e eu não falo assim, soa como propaganda de TV"
     },
     "pontoPrincipal": "REPROVAÇÃO ANTERIOR com conteúdo inventado e um motivo que cita nomes: a nova versão resolve o JEITO (voz do perfil, sem propaganda) e NÃO reaproveita dona Marlene, Campinas, o sofá de couro nem o \"chorou de alegria\" como se fossem fato; o que faltar vira espaço marcado entre colchetes. Critério: zero fato fora da entrada, e nada vindo do texto reprovado nem do motivo."
+  },
+  {
+    "tema": "comparar o que dois deputados de lados opostos prometeram sobre o preço da energia e o que isso pesa na conta de uma loja pequena",
+    "objetivo": "alcance",
+    "perfilCompilado": "Mercadinho de bairro com padaria. Vende pão, frios e mercearia para quem mora na região, com entrega na vizinhança. Cliente ideal é a família do bairro e o dono de comércio pequeno que conversa com ele no balcão. Medo do cliente: a conta de luz da geladeira e do forno comer a margem. Frase que fala: aqui a conta fecha porque eu conheço cada centavo. Cenas filmáveis: balcão da padaria, câmara fria, forno, caixa, a conta de luz na mão.",
+    "camadaExclusiva": "Cidade: Belo Horizonte, bairro Santa Efigênia. Concorrente citado pelo cliente: o supermercado grande da avenida.",
+    "modeloNicho": "Duração típica: 30 a 60 segundos. Assuntos quentes: custo de energia, preço do pão, margem do pequeno comércio. Ganchos que funcionam: o número da conta mostrado na tela antes de explicar (alta frequência). Estruturas comuns: mostrar a conta, explicar de onde vem o aumento, o que o dono faz. Fechamentos comuns: uma frase com o que ele leva para a semana. Chamadas finais comuns: comenta quanto veio a sua conta.",
+    "evidencias": [
+      {
+        "id": 301,
+        "assunto": "o que o aumento da luz fez com a padaria",
+        "gancho": "minha conta de luz subiu e olha o que eu fiz com o preço do pão",
+        "estrutura": "mostra a conta na tela, explica a causa, conta o que mudou no balcão",
+        "fechamento": "uma frase com a conta nova",
+        "chamadaFinal": "comenta quanto veio a sua conta",
+        "foraDaCurva": 5.1,
+        "momentoChave": "aos 3s, a conta de luz na tela ao lado do dono",
+        "recursosVisuais": [
+          "tela dividida com o print de uma notícia sobre a tarifa de energia",
+          "texto grande com o valor da conta"
+        ]
+      },
+      {
+        "id": 304,
+        "assunto": "reagindo ao anúncio da nova tarifa",
+        "gancho": "saiu a nova tarifa e eu vou te mostrar o que ela muda na sua loja",
+        "estrutura": "mostra o trecho do anúncio, comenta ponto a ponto, fecha com o que fazer",
+        "fechamento": "resumo do que fazer esta semana",
+        "chamadaFinal": "salva para conferir a sua conta",
+        "foraDaCurva": 3.8
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "E59, com figura pública: o 'como editar' sugere imagem de duas figuras PELO PAPEL (duas figuras eleitorais muito conhecidas, uma de cada lado), em tela dividida ou foto/print com a fonte na tela, com o dono SEMPRE no quadro comentando; nenhum nome de candidato nem de partido na fala, na tela nem nos recursos (R-CONF-10 não reprova); nada que sugira que alguém famoso apoia o mercadinho."
+  },
+  {
+    "tema": "o erro de passar o desengordurante antes de molhar a bancada de granito",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o desengordurante de cozinha por R$ 39. Cliente ideal mora em apartamento e cozinha todo dia. Medo do cliente: manchar a pedra da bancada e perder o brilho. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Cenas filmáveis: bancada da cozinha, fogão, pia, o produto na mão.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 35 segundos. Assuntos quentes: gordura de fogão, mancha em pedra, cheiro de cozinha. Ganchos que funcionam: mostrar o erro agindo antes de explicar (alta frequência). Estruturas comuns: mostrar o erro comum, mostrar o jeito certo, resultado final. Fechamentos comuns: mostrar o resultado sem falar por dois segundos. Chamadas finais comuns: comenta se você já fez esse erro.",
+    "evidencias": [
+      {
+        "id": 311,
+        "assunto": "o erro que mancha a bancada de granito",
+        "gancho": "você faz isso na sua bancada e não sabe que mancha",
+        "estrutura": "mostra o erro, mostra o jeito certo, resultado final",
+        "fechamento": "bancada brilhando, sem falar por dois segundos",
+        "chamadaFinal": "comenta se você já fez esse erro",
+        "foraDaCurva": 4.6,
+        "momentoChave": "aos 2s, a mancha aparecendo na pedra",
+        "recursosVisuais": [
+          "close no resultado",
+          "antes e depois lado a lado",
+          "texto na tela em cada passo"
+        ]
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "E59, sem figura pública: tema de cozinha, sem pessoa, fala pública nem notícia, e o banco só mostra recurso do próprio trabalho (close, antes e depois). O 'como editar' NÃO sugere tela dividida, foto ou trecho de outra pessoa; fala só de cenas do próprio negócio, com a pessoa no quadro."
   }
 ]

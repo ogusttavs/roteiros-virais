@@ -405,3 +405,76 @@ describe("montarEntradaCopyRoteiro", () => {
     expect(e.chamadaFinal).toBe("");
   });
 });
+
+describe("R-CONF-10 (E59): nome de partido e de candidato nunca; imagem de pessoa pública com quem grava no quadro", () => {
+  const SUGESTAO = "Tela dividida com a foto de duas figuras eleitorais muito conhecidas, uma de cada lado, e você continua no quadro, comentando.";
+
+  it("a sugestão pelo papel passa (duas figuras eleitorais muito conhecidas, uma de cada lado)", () => {
+    expect(reprovam({ itensDaEdicao: [SUGESTAO, "Mostre a foto da figura mais votada, com a fonte escrita na tela."] })).toEqual([]);
+    expect(reprovam({ itensDaEdicao: ["Coloque imagens de duas figuras muito famosas ao lado, você aparece no quadro falando."] })).toEqual([]);
+  });
+
+  it("nome de partido reprova na fala, na tela e no como editar, nas duas tentativas", () => {
+    expect(com(reprovam({ corpo: BOM.corpo + " O PSDB e o PSOL discordam." }), "R-CONF-10")).toBe(true);
+    expect(com(reprovam({ textoTodo: "Tela: o Partido dos Trabalhadores" }), "R-CONF-10")).toBe(true);
+    expect(com(reprovam({ itensDaEdicao: ["Mostre a foto da sede do partido liberal"] }), "R-CONF-10")).toBe(true);
+    expect(com(reprovam({ corpo: BOM.corpo + " O PSDB e o PSOL discordam.", tentativa: 2 }), "R-CONF-10")).toBe(true);
+  });
+
+  it("nome de candidato (cargo mais nome próprio) reprova; o papel, não", () => {
+    expect(com(reprovam({ chamadaFinal: "Comenta o que o deputado Fulano de Tal disse." }), "R-CONF-10")).toBe(true);
+    expect(com(reprovam({ itensDaEdicao: ["Trecho curto do discurso da candidata Maria Souza, com você comentando no quadro."] }), "R-CONF-10")).toBe(true);
+    expect(com(reprovam({ chamadaFinal: "Comenta o que o deputado mais votado da sua cidade disse." }), "R-CONF-10")).toBe(false);
+  });
+
+  it("sigla curta com outro uso não reprova fora de contexto político", () => {
+    expect(reprovam({ corpo: BOM.corpo + " Sou PT, personal trainer, e abro o arquivo PSD no Photoshop." })).toEqual([]);
+  });
+
+  it("sugerir imagem de pessoa pública sem dizer que quem grava continua no quadro reprova", () => {
+    const m = reprovam({ itensDaEdicao: ["Tela dividida com a foto de duas figuras famosas, uma de cada lado."] });
+    expect(m.some((x) => x.startsWith("R-CONF-10") && x.includes("no quadro"))).toBe(true);
+    expect(com(reprovam({ itensDaEdicao: ["Tela dividida com a foto de duas figuras famosas.", "Tela dividida com a foto de duas figuras famosas.", "Você aparece no quadro comentando."] }), "R-CONF-10")).toBe(false);
+  });
+
+  it("a pessoa no quadro pode estar em outro item do como editar (cena, onde gravar)", () => {
+    expect(reprovam({ itensDaEdicao: ["Mostre a foto de uma figura pública ao lado.", "Em toda a cena, você segue falando em quadro cheio."] })).toEqual([]);
+  });
+
+  it("foto do próprio produto ou do antes e depois não é imagem de pessoa pública", () => {
+    expect(reprovam({ itensDaEdicao: ["Foto do antes e depois do box", "Print do orçamento no WhatsApp"] })).toEqual([]);
+    expect(reprovam({ itensDaEdicao: ["Mostre os fatores que estragam a foto do sofá"] })).toEqual([]);
+  });
+
+  it("montar a imagem para sugerir apoio da pessoa famosa reprova, mas a proibição escrita no próprio recurso não", () => {
+    const apoio = reprovam({ itensDaEdicao: ["Foto de uma figura famosa segurando o produto, você no quadro comentando, como se ela recomendasse."] });
+    expect(apoio.some((x) => x.startsWith("R-CONF-10") && x.includes("apoia"))).toBe(true);
+    expect(reprovam({ itensDaEdicao: ["Foto de uma figura famosa, você no quadro comentando; nunca sugira que ela apoia o negócio."] })).toEqual([]);
+  });
+
+  it("R-CONF-10 está na lista do que reprova, e uma vez só", () => {
+    expect(REGRAS_QUE_REPROVAM.filter((r) => r === "R-CONF-10")).toHaveLength(1);
+  });
+
+  it("no roteiro longo a mesma regra vale (recursos e onde gravar)", () => {
+    const longo = {
+      gancho: "Em 5 minutos eu mostro como tirar a mancha do sofá da Neusa.",
+      chamadaFinal: "Me manda a foto da sua mancha no WhatsApp.",
+      capitulos: [{ nome: "A mancha que volta", pontos: ["Mostre o sofá"], ganchoParaOProximo: null, naImagem: "o sofá" }],
+      edicao: { textoNaTela: [{ oQue: "a mancha voltou?" }], recursos: ["Foto de duas figuras famosas lado a lado"] },
+      ondeGravar: "na sala",
+    };
+    const ctx = { fontes: "f", ramoSaude: false };
+    expect(verificarConformidadeDoLongo(longo, ctx).some((m) => m.startsWith("R-CONF-10"))).toBe(true);
+    expect(verificarConformidadeDoLongo({ ...longo, edicao: { ...longo.edicao, recursos: ["Foto de duas figuras famosas, você no quadro comentando"] } }, ctx)).toEqual([]);
+    expect(verificarConformidadeDoLongo({ ...longo, ondeGravar: "na sede do PSDB" }, ctx).some((m) => m.startsWith("R-CONF-10"))).toBe(true);
+  });
+
+  it("montarEntradaCopyRoteiro junta recursos, cenas e onde gravar em itensDaEdicao", () => {
+    const e = montarEntradaCopyRoteiro(
+      { ...BOM, cartoes: null, edicao: { textoNaTela: [], recursos: ["tela dividida"] }, cenas: [{ oQueFazer: "mostre a foto" }], ondeGravar: "na sala", tipoAbertura: "numero" },
+      { fontes: "f", ramoSaude: false, tentativa: 1 },
+    );
+    expect(e.itensDaEdicao).toEqual(["tela dividida", "mostre a foto", "na sala"]);
+  });
+});

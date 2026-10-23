@@ -21,7 +21,9 @@ import * as roteiroIA from "../src/ia/prompts/roteiro";
 import { montarFontesDosFatos } from "../src/ia/prompts/roteiro";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
 import { verificarLocalmente } from "../src/ia/verificador";
+import { montarEntradaCopyRoteiro, verificarRegrasCopyRoteiro } from "../src/ia/verificar-copy-roteiro";
 import { lerPorQueEmLinhas } from "../src/lib/por-que-do-bloco";
+import { motivosDaProvaVisualDeOutro } from "../src/lib/prova-visual-de-outro";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
 
 import type { PedidoGolden } from "./golden-lote";
@@ -41,6 +43,8 @@ const evidenciaSchema = z.object({
   momentoChave: z.string().optional(),
   /** E44 PR 1: o nome do formato do vídeo de referência (`config/formatos.ts`), como `servicos/roteiro.ts` o passa ao prompt. */
   formato: z.string().optional(),
+  /** E59: os recursos de edição que a análise visual do banco achou neste vídeo (`AnaliseVisual.recursos`); com tela dividida, foto ou print de outro, liga a prova visual com imagem de outro. */
+  recursosVisuais: z.array(z.string()).optional(),
 });
 
 const casoSchema = z.object({
@@ -146,6 +150,16 @@ function pedidoDoRoteiro(caso: Caso): PedidoGolden<roteiroIA.SaidaRoteiro> {
         roteirosRecentes: caso.roteirosRecentes,
         instrucaoAbertura: caso.instrucaoAbertura,
         anguloParaEvitar: caso.anguloParaEvitar,
+        // E59: o mesmo critério da produção (`servicos/roteiro.ts`); sem notícia presa neste conjunto, só o banco e o tema ligam.
+        provaVisualDeOutro: motivosDaProvaVisualDeOutro({
+          formato: caso.formato,
+          estilo: caso.estilo,
+          ehMomento: false,
+          tema: caso.tema,
+          temNoticia: false,
+          temNoticiasDoAssunto: false,
+          analisesVisuais: caso.evidencias.map((v) => (v.recursosVisuais ? { recursos: v.recursosVisuais, cenario: "", textoNaTela: [], momentoChave: null } : null)),
+        }),
       }),
     };
 }
@@ -177,6 +191,9 @@ function verificarLocal(caso: Caso, saida: roteiroIA.SaidaRoteiro, tentativa: 1 
       porQueAssim: usaPorQueAssim ? saida.porQueAssim : [],
       narrativa: { gancho: saida.gancho, corpo: saida.corpo, chamadaFinal: saida.chamadaFinal },
     });
+  // E59: o `R-CONF-10` (nome de partido e de candidato, imagem de pessoa pública com quem grava no quadro) é conformidade e reprova nas duas tentativas na produção (`verificarExtra`); aqui só ele, para o golden set provar a regra nova.
+  const conf10 = verificarRegrasCopyRoteiro(montarEntradaCopyRoteiro(saida, { fontes: "", ramoSaude: false, tentativa })).reprovam.filter((m) => m.startsWith("R-CONF-10"));
+  if (conf10.length > 0) return { ...local, aprovado: false, motivos: [...local.motivos, ...conf10] };
   return local;
 }
 

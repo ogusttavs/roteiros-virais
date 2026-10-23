@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 import { JARGAO } from "@/lib/regras-de-texto";
 
-import { blocoDasProibicoesComoAviso, LEMBRETE_ACENTUACAO, montarEntrada, montarFontesDosFatos, montarSistemaEstavel, type InstrucaoAbertura, versao } from "./roteiro";
+import { blocoDaProvaVisualDeOutro, blocoDasProibicoesComoAviso, LEMBRETE_ACENTUACAO, montarEntrada, montarFontesDosFatos, montarSistemaEstavel, schema, type InstrucaoAbertura, versao } from "./roteiro";
 
 // OBJETIVOS_EM_ORDEM[2] (nao o literal, checar-texto varre este diretorio): o objetivo
 // "gente me chamar para comprar" (`NOME_OBJETIVO`), o mesmo que a asserção abaixo confere.
@@ -611,5 +611,61 @@ describe("as proibições do briefing como aviso quando o tema é da própria pe
     const com = montarEntrada({ ...base, proibicoesComoAviso: ["política"] });
     expect(sem).not.toContain("uma preferência, não uma proibição");
     expect(com.indexOf("Tema escolhido: analogia de eleição")).toBeLessThan(com.indexOf("uma preferência, não uma proibição"));
+  });
+});
+
+describe("E59: o bloco da prova visual com imagem de outro (R-ROTEIRO-20)", () => {
+  const BASE_ENTRADA = {
+    tema: "comparar o que dois deputados disseram sobre o preço da energia",
+    objetivo: OBJETIVOS_EM_ORDEM[0],
+    formato: "reels" as const,
+    estilo: "falado" as const,
+    evidencias: [],
+    roteirosRecentes: [],
+    instrucaoAbertura: { tipo: null, tiposProibidos: [] } as InstrucaoAbertura,
+  };
+
+  it("sem motivo, a entrada é exatamente a de antes (o bloco não entra)", () => {
+    const antes = montarEntrada(BASE_ENTRADA);
+    expect(montarEntrada({ ...BASE_ENTRADA, provaVisualDeOutro: [] })).toBe(antes);
+    expect(antes).not.toContain("Prova visual com imagem de outro");
+    expect(blocoDaProvaVisualDeOutro(undefined)).toBeNull();
+    expect(blocoDaProvaVisualDeOutro([])).toBeNull();
+  });
+
+  it("com motivo, entra com o porquê e todos os limites, pelo papel e sem nome", () => {
+    const entrada = montarEntrada({ ...BASE_ENTRADA, provaVisualDeOutro: ["pessoa_publica", "noticia"] });
+    expect(entrada).toContain("Prova visual com imagem de outro (ligada para este roteiro porque o tema cita uma pessoa pública; e o tema vem de uma notícia)");
+    for (const trecho of [
+      "tela dividida, foto ou print com a fonte escrita na tela, ou um trecho curto de vídeo público",
+      "nunca o vídeo inteiro",
+      "nunca pelo nome",
+      "duas figuras muito famosas",
+      "duas figuras eleitorais muito conhecidas",
+      "Quem grava continua no quadro, comentando",
+      "uma figura de cada lado",
+      "Nunca escreva nome de candidato nem de partido",
+      "apoia o negócio",
+    ]) {
+      expect(entrada, trecho).toContain(trecho);
+    }
+    // O bloco vem antes do objetivo e do tema ficar para trás: o tema continua sendo a primeira coisa.
+    expect(entrada.indexOf("Tema escolhido")).toBeLessThan(entrada.indexOf("Prova visual com imagem de outro"));
+    expect(entrada.indexOf("Prova visual com imagem de outro")).toBeLessThan(entrada.indexOf("Objetivo:"));
+  });
+
+  it("o bloco não tem travessão, emoji nem nome de partido", () => {
+    const bloco = blocoDaProvaVisualDeOutro(["banco", "pessoa_publica", "fala_publica", "noticia"])!;
+    expect(bloco.includes(String.fromCharCode(0x2013)) || bloco.includes(String.fromCharCode(0x2014))).toBe(false);
+    expect(/\p{Extended_Pictographic}/u.test(bloco)).toBe(false);
+    expect(bloco).toContain("os vídeos que mais subiram neste ramo");
+  });
+
+  it("o sistema estável não muda com o bloco (o cache do prompt fica), e o schema do roteiro curto não ganhou campo", () => {
+    expect(montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", formato: "reels", estilo: "falado" })).toContain("R-ROTEIRO-20");
+    expect(Object.keys(schema.shape).sort()).toEqual(
+      ["cartoes", "cenas", "chamadaFinal", "corpo", "duracaoS", "edicao", "entregaDaPesquisa", "evidencias", "fechamento", "gancho", "legenda", "ondeGravar", "porQueAssim", "porQueDosBlocos", "temaCurto", "tipoAbertura", "titulo"],
+    );
+    expect(Object.keys(schema.shape.edicao.shape).sort()).toEqual(["audio", "recursos", "referencia", "ritmoDeCorte", "textoNaTela"]);
   });
 });
