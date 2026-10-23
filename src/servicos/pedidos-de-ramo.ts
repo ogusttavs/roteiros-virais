@@ -10,6 +10,7 @@ import { db } from "@/db";
 import { clientes, nichos, pedidosDeRamo, type PedidoDeRamo } from "@/db/schema";
 import { normalizarBusca, ramoMaisProximo } from "@/lib/buscar-ramo";
 
+import { pedirFiltroDeNoticias } from "./filtro-de-noticias";
 import { ErroNicho } from "./nichos";
 import { desligarSetorSeSemMarca, ErroLimiteDeSetores, setorParaAMarca } from "./ramos";
 import { tirarAlternativoQueViraPrincipal } from "./ramos-da-conta";
@@ -204,6 +205,8 @@ export async function fecharPedidoComSetor(pedido: PedidoDeRamo, nichoId: number
   for (const antigo of new Set([marca?.nichoId, pedido.setorProvisorioId])) {
     if (antigo && antigo !== nichoId) await desligarSetorSeSemMarca(antigo).catch(() => undefined);
   }
+  // Fix de 22/10/2026: o ramo que o admin decidiu ganha as Notícias no mesmo dia.
+  void pedirFiltroDeNoticias(nichoId);
 }
 
 /**

@@ -30,6 +30,7 @@ import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial } from "./briefin
 import { clientePorId } from "./clientes";
 import { contextoConfirmadoDoCliente, enfileirarEntenderMarca, marcaTemFonteParaLer } from "./contexto-marca";
 import { ROTULO_CATEGORIA } from "./contexto-marca-regras";
+import { pedirFiltroDeNoticiasDaMarca } from "./filtro-de-noticias";
 import { formatarPerfilComArroba, perfisCitadosDoCliente } from "./perfis-citados";
 import { referenciasParaPerfil } from "./referencias";
 
@@ -289,6 +290,9 @@ export async function avaliarResposta(
    */
   // `briefing.perfil === null`: a primeira compilação com sucesso. Cobre a que falhou da primeira vez (o briefing já estava
   // completo, `ficouCompletoAgora` não repete) e foi refeita depois.
+  // Fix de 22/10/2026: a marca que acaba de terminar o briefing ganha as Notícias do ramo dela no mesmo dia (antes só na madrugada seguinte, e só se gerasse roteiro).
+  if (ficouCompletoAgora) void pedirFiltroDeNoticiasDaMarca(clienteId);
+
   if (ficouCompletoAgora || (deveCompilarPerfil && briefing.perfil === null)) {
     const cliente = await clientePorId(clienteId);
     if (cliente && marcaTemFonteParaLer(cliente)) {

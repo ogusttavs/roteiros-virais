@@ -2,6 +2,7 @@
 
 import { Check, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 import { textosNoticias } from "@/textos/noticias";
 import { Botao } from "@/ui/componentes/Botao";
@@ -43,13 +44,26 @@ export function veiculoEhLongo(veiculo: string): boolean {
   return nome.length > 18 || nome.split(/\s+/).some((palavra) => palavra.length > 11);
 }
 
+/** A foto guardada do nosso lado (`/api/imagem-noticia/<id>`): só ela cai no quadro quando não abre; a do veículo continua como veio no feed. */
+function ehFotoNossa(imagemUrl: string): boolean {
+  return imagemUrl.startsWith("/api/imagem-noticia/");
+}
+
 function Foto({ noticia }: { noticia: NoticiaNaTela }) {
-  if (noticia.imagemUrl) {
+  // A foto nossa que não abre (já apagada, ou bytes ruins) vira o quadro com o nome do veículo, nunca um buraco nem o ícone de imagem quebrada.
+  const [falhou, setFalhou] = useState(false);
+  const imagem = useRef<HTMLImageElement>(null);
+  // A foto que falha antes de o React assumir a página (o HTML veio do servidor) já disparou o `onError` sem ninguém ouvindo: a conferência no primeiro quadro pega esse caso.
+  useEffect(() => {
+    const img = imagem.current;
+    if (img && img.complete && img.naturalWidth === 0) setFalhou(true);
+  }, []);
+  if (noticia.imagemUrl && !(falhou && ehFotoNossa(noticia.imagemUrl))) {
     return (
       <figure className={styles.foto}>
-        {/* A foto é do veículo e vem de fora: sem `referer` e sem pular a tela. O crédito é sempre o do veículo. */}
+        {/* A foto é do veículo (a nossa cópia ou a dele) e vem de fora: sem `referer` e sem pular a tela. O crédito é sempre o do veículo. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={noticia.imagemUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+        <img ref={imagem} src={noticia.imagemUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFalhou(true)} />
         <figcaption>{noticia.imagemCredito ?? textosNoticias.foto(noticia.veiculo)}</figcaption>
       </figure>
     );

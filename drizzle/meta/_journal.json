@@ -645,6 +645,13 @@
       "when": 1792713680465,
       "tag": "0092_capas-do-video",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1792715333941,
+      "tag": "0093_imagens-das-noticias",
+      "breakpoints": true
     }
   ]
 }
