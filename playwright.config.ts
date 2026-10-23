@@ -55,6 +55,9 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   use: {
     baseURL,
+    // O navegador da suíte no fuso de quem usa o app (22/10/2026): o runner da CI roda em UTC, e das 21:00 à meia-noite de Brasília
+    // o "hoje" do navegador já era amanhã enquanto o do servidor (hojeISO, America/Sao_Paulo) ainda era hoje; a agenda.spec caía só nesse horário.
+    timezoneId: "America/Sao_Paulo",
     // Em CI, o rastro de toda tentativa que falha (item 0c, 29/09/2026): "on-first-retry" so gravava
     // a segunda tentativa, e a corrida de referencias.spec.ts que estamos cacando as vezes passa na
     // segunda, levando o rastro da primeira embora. Localmente continua leve.
