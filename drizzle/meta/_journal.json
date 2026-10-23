@@ -680,6 +680,13 @@
       "when": 1792746746764,
       "tag": "0097_interessados",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1792749037344,
+      "tag": "0098_conta-conectada",
+      "breakpoints": true
     }
   ]
 }
