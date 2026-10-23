@@ -7,6 +7,7 @@ import { assinaturasDaMarca, ehDonoDaMarca } from "@/servicos/assinatura";
 import { situacaoDaAssinatura } from "@/servicos/assinatura-tela";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
+import { candidatasDaMarca, contaLigadaDaMarca, ehDonoDaMarca as ehDonoParaInstagram, ligacaoDisponivel } from "@/servicos/conta-conectada";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
@@ -22,11 +23,13 @@ import { InformacoesDoAparelhoAdmin } from "./InformacoesDoAparelhoAdmin";
 import { InstalarNoCelular } from "./InstalarNoCelular";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
+import { codigoDoRetorno, montarVisaoSeuInstagram } from "./seu-instagram-visao";
+import { SeuInstagram } from "./SeuInstagram";
 import { SuaAssinatura } from "./SuaAssinatura";
 import { TiposDeVideoConta } from "./TiposDeVideoConta";
 import { TrocarSenha } from "./TrocarSenha";
 
-export default async function Conta() {
+export default async function Conta({ searchParams }: { searchParams: Promise<{ instagram?: string | string[] }> }) {
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
@@ -52,6 +55,19 @@ export default async function Conta() {
   const mostrarAssinatura = cliente !== null && (config.cobranca.ativa || assinaturasDaConta.length > 0);
   const situacaoAssinatura = cliente ? situacaoDaAssinatura(cliente.cortesia, assinaturasDaConta) : null;
   const donoDaMarca = mostrarAssinatura && cliente && !sessao.verComo ? await ehDonoDaMarca(sessao.user.id, cliente.id) : false;
+  // E19 PR 2: o cartão "Seu Instagram". Só a dona da marca (fora do "ver como") vê os botões; a frase da volta do diálogo da Meta vem em `?instagram=<código>`.
+  const donoDoInstagram = cliente ? await ehDonoParaInstagram(sessao.user.id, cliente.id) : false;
+  const visaoInstagram = cliente
+    ? montarVisaoSeuInstagram({
+        ligacaoAberta: ligacaoDisponivel(),
+        aprovadoPelaMeta: config.metaConexao.aprovadoPelaMeta,
+        dono: donoDoInstagram,
+        verComo: sessao.verComo !== null,
+        conta: await contaLigadaDaMarca(cliente.id),
+        candidatas: await candidatasDaMarca(cliente.id),
+        retorno: codigoDoRetorno((await searchParams).instagram),
+      })
+    : null;
 
   return (
     <div className={styles.pagina}>
@@ -102,6 +118,7 @@ export default async function Conta() {
       ) : null}
       <div className={styles.colunaPrincipal}>
         {mostrarAssinatura && situacaoAssinatura ? <SuaAssinatura situacao={situacaoAssinatura} dono={donoDaMarca} verComo={sessao.verComo !== null} /> : null}
+        {visaoInstagram ? <SeuInstagram visao={visaoInstagram} /> : null}
         {/* E46 PR 2: no "ver como" nada que inscreve, instala ou sai em nome da pessoa aparece (o aviso de manhã, o convite de instalar e o Sair são do aparelho e da sessão de quem está olhando). */}
         {/* E58: a senha é de quem está logado; no "ver como" o admin olha e não troca a senha de ninguém. */}
         {sessao.verComo ? null : <TrocarSenha />}

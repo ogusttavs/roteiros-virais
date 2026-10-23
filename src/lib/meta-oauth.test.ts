@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { config } from "@/lib/config";
+
 vi.mock("@/lib/config", async (importarOriginal) => {
   const original = await importarOriginal<typeof import("@/lib/config")>();
   return {
@@ -115,6 +117,33 @@ describe("o endereco do dialogo", () => {
     expect(url.searchParams.get("state")).toBe("state-x");
     expect(url.searchParams.has("scope")).toBe(false);
     expect(url.toString()).not.toContain(SEGREDO_DO_APP);
+  });
+});
+
+describe("o simulador do e2e (E19 PR 2)", () => {
+  const fetchOriginal = globalThis.fetch;
+  afterEach(() => {
+    (config.metaConexao as { simuladorE2E: string }).simuladorE2E = "";
+    vi.stubGlobal("fetch", fetchOriginal);
+  });
+
+  it("sem o simulador, o dialogo e a Graph API sao os da Meta", async () => {
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue(resposta({ id: "99" }));
+    expect(urlDoDialogo("s")).toMatch(/^https:\/\/www\.facebook\.com\/v26\.0\/dialog\/oauth\?/);
+    await usuarioDoToken("EAAtoken");
+    expect(String(mockFetch.mock.calls[0][0])).toMatch(/^https:\/\/graph\.facebook\.com\/v26\.0\/me\?/);
+  });
+
+  it("com o simulador, os dois apontam para o servidor local e para nenhum lugar da Meta", async () => {
+    (config.metaConexao as { simuladorE2E: string }).simuladorE2E = "http://127.0.0.1:4747";
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue(resposta({ id: "99" }));
+    expect(urlDoDialogo("s")).toMatch(/^http:\/\/127\.0\.0\.1:4747\/dialog\/oauth\?/);
+    await usuarioDoToken("EAAtoken");
+    expect(String(mockFetch.mock.calls[0][0])).toMatch(/^http:\/\/127\.0\.0\.1:4747\/graph\/me\?/);
   });
 });
 

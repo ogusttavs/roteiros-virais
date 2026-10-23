@@ -154,6 +154,16 @@ export const config = {
     tokenChave: env("META_TOKEN_CHAVE"),
     redirectUri: env("META_REDIRECT_URI", `${env("APP_URL", "http://localhost:3000")}/api/meta/retorno`),
     ativa: env("META_APP_ID") !== "" && env("META_APP_SECRET") !== "" && env("META_LOGIN_CONFIG_ID") !== "" && env("META_TOKEN_CHAVE") !== "",
+    /**
+     * E19 PR 2: `META_APP_APROVADO=1` quando a Meta aprovar o aplicativo para todo mundo. Enquanto não for, o aplicativo está em modo de desenvolvimento e só quem tem papel nele
+     * consegue passar pelo diálogo; a tela de Conta avisa isso com calma (`textos/conta-conectada.ts`, `tela.emTeste`).
+     */
+    aprovadoPelaMeta: env("META_APP_APROVADO") === "1",
+    /**
+     * E19 PR 2, só para o e2e: o endereço de um servidor local que faz o papel do diálogo e da Graph API da Meta. Só vale com `MODO_E2E=1` (que
+     * `verificarSegredosDeProducao` recusa fora de localhost); em qualquer outro caso fica vazio e as chamadas vão à Meta de verdade.
+     */
+    simuladorE2E: env("MODO_E2E") === "1" ? env("META_SIMULADOR_E2E") : "",
   },
   /**
    * E48 PR 2: as chaves VAPID do aviso por push (gerar com `npx web-push generate-vapid-keys`). Sem elas nenhum push sai e o lembrete continua por
