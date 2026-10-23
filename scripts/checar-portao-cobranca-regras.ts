@@ -38,6 +38,7 @@ export const ACOES_LIVRES: Record<string, string> = {
 export const ROTAS_LIVRES: Record<string, string> = {
   "src/app/api/auth/[...all]/route.ts": "entrar e sair (better-auth): antes de existir marca ou assinatura",
   "src/app/api/capa/[videoId]/route.ts": "capa de vídeo é dado público da plataforma, igual para todas as marcas, sem gasto (só serve a quem está logado)",
+  "src/app/api/imagem-noticia/[id]/route.ts": "foto de matéria guardada do nosso lado, dado público do setor, só serve a quem está logado e é do setor, sem gasto de IA nem de terceiros (mesmo critério da capa)",
   "src/app/api/jobs/[nome]/route.ts": "autenticação própria por chave (cron e admin), não é do cliente",
   "src/app/api/momento/transcrever/route.ts": "só reexporta o POST de /api/transcrever, que tem o portão",
   "src/app/api/push/chave/route.ts": "chave pública do aviso, sem gasto",
