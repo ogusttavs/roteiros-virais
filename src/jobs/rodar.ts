@@ -32,6 +32,7 @@ import { rodarExtrairSemFala } from "./extrair-sem-fala";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { FILAS } from "./fila";
 import { rodarGuardarCapas } from "./guardar-capas";
+import { rodarFiltroDeNoticias } from "./filtrar-noticias";
 import { rodarLembrete } from "./lembrete";
 import { rodarLerLongos } from "./ler-longos";
 import { rodarMetaContas } from "./meta-contas";
@@ -62,6 +63,11 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.coletaApify]: (execucaoId) => rodarColetaApify(undefined, execucaoId),
   [FILAS.coletaMeioDia]: (execucaoId) => rodarColetaMeioDia(execucaoId),
   [FILAS.coletaNoticias]: () => rodarColetaNoticias(),
+  /** Fix de 22/10/2026: com um número na linha de comando, só aquele ramo; sem, todo ramo com marca ativa. */
+  [FILAS.filtrarNoticias]: () => {
+    const nichoIdArg = process.argv[3];
+    return rodarFiltroDeNoticias(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+  },
   [FILAS.tendenciasBrasil]: () => rodarTendenciasBrasil(),
   [FILAS.contasBase]: () => rodarContasBase(),
   [FILAS.metaContas]: () => rodarMetaContas(),

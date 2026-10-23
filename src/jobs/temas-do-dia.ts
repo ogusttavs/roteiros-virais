@@ -32,15 +32,15 @@
  * ela. Tema que não passa é descartado, não corrigido: o nicho fecha o dia
  * com menos de três temas quando for o caso.
  */
-import { and, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { clientes, nichos, noticias, ramosDaConta, roteiros, temasDia, type TemaDoDia } from "@/db/schema";
+import { clientes, nichos, ramosDaConta, roteiros, temasDia, type TemaDoDia } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
-import * as filtrarNoticiasIA from "@/ia/prompts/filtrarNoticias";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
 import { registrarGeracao } from "@/ia/registro";
 import { hojeISO } from "@/lib/config";
+import { filtrarNoticiasDoRamo, relevantesDoRamo, type NoticiaCandidata } from "@/servicos/filtro-de-noticias";
 import { diaPorExtenso } from "@/servicos/noticias-assuntos";
 import {
   formatarModeloNicho,
@@ -55,77 +55,21 @@ import { vozesDoSetor, vozesParaOPrompt, type VozNumerada } from "@/servicos/voz
 import { atualizarTemaDoMomento } from "./tema-do-momento";
 
 const VINTE_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
-const LIMITE_NOTICIAS = 60;
+/** Quantas notícias relevantes, no máximo, vão como evidência na chamada forte dos temas. */
+const LIMITE_NOTICIAS_NO_TEMA = 12;
 const LIMITE_SUBINDO = 30;
 
-type NoticiaCandidata = { id: number; titulo: string; resumo: string | null };
 type NichoAtivo = { id: number; slug: string; nome: string; termos: string[]; criadoEm: Date };
 
-async function noticiasCandidatas(nichoId: number): Promise<NoticiaCandidata[]> {
-  return db()
-    .select({ id: noticias.id, titulo: noticias.titulo, resumo: noticias.resumo })
-    .from(noticias)
-    .where(
-      and(
-        eq(noticias.nichoId, nichoId),
-        gte(noticias.coletadoEm, new Date(Date.now() - VINTE_QUATRO_HORAS_MS)),
-        isNull(noticias.relevante),
-      ),
-    )
-    .limit(LIMITE_NOTICIAS);
-}
-
 /**
- * Chama `filtrarNoticias`, grava `relevante`/`angulo` em cada notícia (para
- * nunca reprocessar a mesma notícia dia depois de dia) e devolve só as
- * relevantes, com o id delas no banco (correção do dia 1 da etapa 14): é o
- * id que `temasDoDia` cita como evidência.
+ * As notícias do ramo que servem de evidência de tema: as relevantes que a coleta trouxe nas últimas 24 horas. O filtro (`servicos/filtro-de-noticias.ts`) já roda sozinho depois de cada
+ * coleta e quando a marca chega; aqui ele só fecha o que ainda ficou sem veredito (uma única chamada, o limite que este job sempre teve), e a lista vem do banco, relevantes de rodadas
+ * anteriores incluídas (antes só as do lote filtrado agora entravam, e o segundo `temas-do-dia` do dia ficava sem notícia). Notícia publicada há mais de 7 dias nunca entra.
  */
-async function filtrarEGravarNoticias(
-  nicho: NichoAtivo,
-  candidatas: NoticiaCandidata[],
-): Promise<NoticiaCandidata[]> {
-  if (candidatas.length === 0) return [];
-
-  const resultado = await gerarEstruturado({
-    tarefa: "filtrarNoticias",
-    nivel: filtrarNoticiasIA.nivel,
-    effort: filtrarNoticiasIA.esforco,
-    schema: filtrarNoticiasIA.schema,
-    sistemaEstavel: filtrarNoticiasIA.montarSistemaEstavel(),
-    entrada: filtrarNoticiasIA.montarEntrada({
-      nomeNicho: nicho.nome,
-      termosNicho: nicho.termos,
-      noticias: candidatas.map((n) => ({ titulo: n.titulo, resumo: n.resumo })),
-    }),
-  });
-
-  await registrarGeracao({
-    tarefa: "filtrarNoticias",
-    versaoPrompt: filtrarNoticiasIA.versao,
-    modelo: resultado.modelo,
-    nivel: filtrarNoticiasIA.nivel,
-    entradas: { nichoId: nicho.id, noticias: candidatas.length },
-    saida: resultado.dados,
-    uso: {
-      tokensEntrada: resultado.tokensEntrada,
-      tokensSaida: resultado.tokensSaida,
-      tokensCacheLeitura: resultado.tokensCacheLeitura,
-      tokensCacheEscrita: resultado.tokensCacheEscrita,
-    },
-  });
-
-  const anguloPorIndice = new Map(resultado.dados.relevantes.map((r) => [r.indice, r.angulo]));
-
-  for (const [i, candidata] of candidatas.entries()) {
-    const angulo = anguloPorIndice.get(i + 1) ?? null;
-    await db()
-      .update(noticias)
-      .set({ relevante: angulo !== null, angulo })
-      .where(eq(noticias.id, candidata.id));
-  }
-
-  return candidatas.filter((_, i) => anguloPorIndice.has(i + 1));
+async function noticiasRelevantesDoDia(nicho: NichoAtivo): Promise<NoticiaCandidata[]> {
+  const desde = new Date(Date.now() - VINTE_QUATRO_HORAS_MS);
+  await filtrarNoticiasDoRamo(nicho, { coletadasDesde: desde, lotes: 1 });
+  return relevantesDoRamo(nicho.id, { coletadasDesde: desde, limite: LIMITE_NOTICIAS_NO_TEMA });
 }
 
 /**
@@ -295,13 +239,12 @@ export async function podeSobrescreverTemasDoDia(nichoId: number, temasNovos: Te
 async function gerarTemasDoNicho(
   nicho: NichoAtivo,
 ): Promise<{ status: "gerado" | "sem_evidencia" | "sem_prova" | "sem_novidade" | "mantido"; temasSemProva: number }> {
-  const [regua, subindo, semDono, candidatasNoticias, existente] = await Promise.all([
+  const [regua, subindo, semDono, existente] = await Promise.all([
     reguaDoSetor(nicho.id),
     // Hotfix de 02/10/2026: brasileiro primeiro na lista que o modelo recebe, senão o tema não tem
     // como montar a prova num setor com muita conta de fora.
     subindoHojeComAnalise(nicho.id, LIMITE_SUBINDO, { brasilPrimeiro: true }),
     semDonoComAnalise(nicho.id),
-    noticiasCandidatas(nicho.id),
     db()
       .select({ temas: temasDia.temas, candidatosNaUltimaTentativa: temasDia.candidatosNaUltimaTentativa })
       .from(temasDia)
@@ -327,7 +270,7 @@ async function gerarTemasDoNicho(
     return { status: "sem_novidade", temasSemProva: 0 };
   }
 
-  const noticiasRelevantes = await filtrarEGravarNoticias(nicho, candidatasNoticias);
+  const noticiasRelevantes = await noticiasRelevantesDoDia(nicho);
 
   if (subindo.length === 0 && semDono.length === 0 && noticiasRelevantes.length === 0) {
     return { status: "sem_evidencia", temasSemProva: 0 };

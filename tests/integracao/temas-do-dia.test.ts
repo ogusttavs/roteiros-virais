@@ -113,6 +113,8 @@ async function criarNoticia(url: string, opcoes: { titulo: string; resumo?: stri
       titulo: opcoes.titulo,
       resumo: opcoes.resumo,
       coletadoEm: opcoes.coletadoEm ?? new Date(),
+      // Fix de 22/10/2026: notícia sem data de publicação nunca é candidata ao filtro.
+      publicadoEm: opcoes.coletadoEm ?? new Date(),
     });
 }
 

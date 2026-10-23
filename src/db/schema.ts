@@ -1569,6 +1569,38 @@ export const noticias = pgTable("noticias", {
   coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Coluna bytea para a foto da matéria (Drizzle não tem um tipo pronto para ela). */
+const byteaDaFotoDaMateria = customType<{ data: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+/**
+ * A foto da matéria guardada do nosso lado (fix de 22/10/2026, Notícias). O Google News não traz foto no RSS; o job `filtrar-noticias` resolve o link dele até a página do veículo, lê o
+ * `og:image` (ou o `twitter:image`) e baixa a foto UMA vez, só das notícias que o filtro marcou como relevantes e que a capa ainda mostra. Uma linha por notícia: `guardada` com os bytes como
+ * vieram (teto de 1,5 MB, só JPEG, PNG ou WebP, conferidos pelos bytes e não pelo cabeçalho), ou `sem_foto` quando a página não deu foto que servisse (o job tenta de novo no máximo uma vez, por
+ * rede passageira). O crédito é o `noticias.imagem_credito` ("Foto: G1"). Foto de matéria é dado público do veículo, igual para todas as marcas; a rota `/api/imagem-noticia/<noticiaId>`
+ * só serve a quem está logado e é do setor da notícia. Apaga sozinha 14 dias depois.
+ */
+export type SituacaoDaFotoDaMateria = "guardada" | "sem_foto";
+
+export const imagensNoticia = pgTable("imagens_noticia", {
+  noticiaId: integer("noticia_id")
+    .primaryKey()
+    .references(() => noticias.id, { onDelete: "cascade" }),
+  situacao: text("situacao").$type<SituacaoDaFotoDaMateria>().notNull(),
+  /** "image/jpeg", "image/png" ou "image/webp", pelos bytes; nulo em `sem_foto`. */
+  tipo: text("tipo"),
+  bytes: byteaDaFotoDaMateria("bytes"),
+  /** O endereço da foto na página do veículo (para depurar), quando achou. */
+  origem: text("origem"),
+  tentativas: integer("tentativas").notNull().default(1),
+  tentouEm: timestamp("tentou_em", { withTimezone: true }).notNull().defaultNow(),
+  criadoEm: criadoEm(),
+});
+export type ImagemNoticia = typeof imagensNoticia.$inferSelect;
+
 /**
  * E53, assuntos que eu acompanho: até cinco por marca (texto livre mais os termos que a pessoa deu), acompanhados todo dia pelas notícias, nunca por vídeo. O sistema nunca sugere
  * assunto sozinho. Some sozinho depois de 30 dias sem a pessoa abrir uma notícia dele (`ultimoAbertoEm`, ou `criadoEm` se nunca abriu), a não ser que esteja fixado.

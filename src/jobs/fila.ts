@@ -19,6 +19,11 @@ export const FILAS = {
   /** Passada leve do meio-dia (E6 parte 3, terceira rodada, item 6); so agenda com config.coleta.coletaMeioDia. */
   coletaMeioDia: "coleta-meio-dia",
   coletaNoticias: "coleta-noticias",
+  /**
+   * O filtro das notícias do ramo e a foto da matéria (fix de 22/10/2026): depois de cada coleta (06:00 e 14:00) para os ramos com marca ativa, e na hora em que uma marca chega num ramo
+   * (briefing terminado, conta criada, ramo trocado, tela de Notícias aberta). `{ nichoId }` roda só aquele ramo; sem nada, todos os ramos com marca ativa.
+   */
+  filtrarNoticias: "filtrar-noticias",
   /** E55: o que está em alta no Brasil (buscas do Google e vídeos do YouTube), compartilhado por todos os setores; de madrugada e ao meio-dia. */
   tendenciasBrasil: "tendencias-brasil",
   contasBase: "contas-base",
@@ -99,6 +104,7 @@ export const FILAS_POR_RAMO = new Set<string>([
   FILAS.coletaYoutube,
   FILAS.coletaApify,
   FILAS.coletaNoticias,
+  FILAS.filtrarNoticias,
   FILAS.metaContas,
   FILAS.metaHashtags,
   FILAS.descobertaInstagram,
