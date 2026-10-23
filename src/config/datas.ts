@@ -174,7 +174,7 @@ export function ocorrenciasNoAno(data: DataDoCalendario, ano: number): string[] 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
 /** Uma data marcada num dia do calendário: o que a tela precisa, sem nada que não atravesse do servidor para o navegador. */
-export type DataMarcada = { chave: string; nome: string; tipo: TipoDeData; data: string };
+export type DataMarcada = { chave: string; nome: string; tipo: TipoDeData; data: string; fonte: string };
 
 export type DataProxima = DataMarcada & { dias: number };
 
@@ -199,7 +199,7 @@ export function datasDoPeriodo(inicio: string, fim: string, ramosDaMarca: readon
     for (const data of DATAS_DO_CALENDARIO) {
       if (!valeParaAMarca(data, ramosDaMarca)) continue;
       for (const dia of ocorrenciasNoAno(data, ano)) {
-        if (dia >= inicio && dia <= fim) achadas.push({ chave: data.chave, nome: data.nome, tipo: data.tipo, data: dia });
+        if (dia >= inicio && dia <= fim) achadas.push({ chave: data.chave, nome: data.nome, tipo: data.tipo, data: dia, fonte: data.fonte });
       }
     }
   }

@@ -200,3 +200,16 @@
   color: var(--cor-erro);
   font-size: var(--tamanho-rodape);
 }
+
+/* E60: o dia que tem uma data (feriado, data que vende, dia do ramo): um losango pequeno ao lado dos pontos de Reels e Story. */
+.marcaData {
+  display: block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  transform: rotate(45deg);
+  background: var(--cor-destaque);
+}
+
+.diaMes[aria-pressed="true"] .marcaData {
+  background: var(--cor-acao-texto);
+}

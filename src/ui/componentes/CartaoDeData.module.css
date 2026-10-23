@@ -1,0 +1,107 @@
+/**
+ * As datas do calendário (E60) no Hoje e na tela de temas do Criar: uma linha por data, o selo do tipo, a frase ("Hoje é Dia das Mães."), e o caminho para gravar sobre ela.
+ * O contorno é o da borda comum, sem a cor de seleção do cartão "Em alta hoje": a data não tem o prazo de um assunto em alta, é um lembrete.
+ */
+.cartao {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.lista {
+  display: grid;
+  gap: var(--espaco-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.linha {
+  display: grid;
+  gap: var(--espaco-2);
+  justify-items: start;
+}
+
+.linha + .linha {
+  padding-top: var(--espaco-4);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.selo {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 var(--espaco-2);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+  line-height: 1.2;
+}
+
+.frase {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.ajuda,
+.fonte {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.fonte {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.botao {
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--espaco-4);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  font-family: var(--fonte-texto);
+  cursor: pointer;
+}
+
+.botao:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botao:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botao:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}

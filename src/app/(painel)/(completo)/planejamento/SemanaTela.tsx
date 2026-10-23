@@ -4,7 +4,9 @@ import { Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import type { DataMarcada } from "@/config/datas";
 import type { DiaSemanaPlano, ItemSemanaPlano } from "@/servicos/roteiro";
+import { textosDatas } from "@/textos/datas";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
 import { ConfirmarMoverDia } from "@/ui/componentes/ConfirmarMoverDia";
@@ -20,6 +22,8 @@ import { useMoverDeDia } from "./useMoverDeDia";
 
 type Props = {
   dias: DiaSemanaPlano[];
+  /** E60: as datas de cada dia da semana (feriado, data que vende, dia do ramo), pela data do dia; só os dias que têm alguma. */
+  datas: Record<string, DataMarcada[]>;
 };
 
 const MAX_ITENS_VISIVEIS = 4;
@@ -74,7 +78,7 @@ function perguntaSeConflitoSemana(dias: DiaSemanaPlano[], item: ItemSemanaPlano,
  * dia"), nunca uma segunda regra (`useMoverDeDia.ts`). Um sugerido continua sem jeito de mudar de
  * dia nesta rodada (hipótese já registrada na parte 2a).
  */
-export function SemanaConteudo({ dias }: Props) {
+export function SemanaConteudo({ dias, datas }: Props) {
   const router = useRouter();
   const aoAbrirContarAgenda = useAbrirContarAgenda();
   const [ocupado, iniciarTransicao] = useTransition();
@@ -139,6 +143,7 @@ export function SemanaConteudo({ dias }: Props) {
         </section>
         <DiasGrade
           dias={dias}
+          datas={datas}
           ocupado={ocupado}
           ir={ir}
           abrirItem={abrirItem}
@@ -157,6 +162,7 @@ export function SemanaConteudo({ dias }: Props) {
     <>
       <DiasGrade
         dias={dias}
+        datas={datas}
         ocupado={ocupado}
         ir={ir}
         abrirItem={abrirItem}
@@ -183,6 +189,7 @@ export function SemanaConteudo({ dias }: Props) {
 
 function DiasGrade({
   dias,
+  datas,
   ocupado,
   ir,
   abrirItem,
@@ -192,6 +199,7 @@ function DiasGrade({
   mover,
 }: {
   dias: DiaSemanaPlano[];
+  datas: Record<string, DataMarcada[]>;
   ocupado: boolean;
   ir: (destino: string) => void;
   abrirItem: (item: ItemSemanaPlano, data: string) => void;
@@ -244,6 +252,13 @@ function DiasGrade({
                 </button>
               ) : null}
             </div>
+
+            {datas[dia.data] ? (
+              <p className={styles.nomeDaData} data-data-do-dia={dia.data}>
+                <span className="so-leitor">{textosDatas.legendaDoMes}: </span>
+                {textosDatas.nomesDoDia(datas[dia.data])}
+              </p>
+            ) : null}
 
             {semNada ? (
               !dia.passado ? (

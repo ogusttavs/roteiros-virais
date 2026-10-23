@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import type { DataMarcada, DataProxima } from "@/config/datas";
 import type { Plataforma, TemaDoDia } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import type { CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
@@ -12,6 +13,7 @@ import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { textosVozes } from "@/textos/vozes-do-publico";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
+import { CartaoDeData } from "@/ui/componentes/CartaoDeData";
 import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 import { Chips } from "@/ui/componentes/Chips";
 import { ClaqueteAnimada } from "@/ui/componentes/ClaqueteAnimada";
@@ -46,6 +48,8 @@ type Props = {
   emAlta?: DadosEmAlta | null;
   /** E28 (parte 3b): o que o público do setor perguntou nos comentários esta semana, depois dos três temas; nulo no setor sem leitura (o bloco nem aparece). */
   perguntas?: PerguntasDaTela | null;
+  /** E60: a data de hoje ou a que chega nos próximos 7 dias, como sugestão de tema (a fonte é a data); vazia sem data que valha para a marca. */
+  datas?: { hoje: DataMarcada[]; proximas: DataProxima[] } | null;
 };
 
 /**
@@ -57,7 +61,7 @@ type Props = {
 /** Quantos temas o dia fecha (os "três temas" do produto). */
 const TEMAS_POR_DIA = 3;
 
-export function TemasTela({ temas, evidenciasTemas, fontesNoticias = [], avisoLinhaEditorial, aviso, gerando = false, redePrincipal, dataInicial, emAlta = null, perguntas = null }: Props) {
+export function TemasTela({ temas, evidenciasTemas, fontesNoticias = [], avisoLinhaEditorial, aviso, gerando = false, redePrincipal, dataInicial, emAlta = null, perguntas = null, datas = null }: Props) {
   const router = useRouter();
 
   // Enquanto o tema é escolhido, a página pergunta ao servidor de novo a cada poucos segundos; o servidor só devolve "gerando" enquanto há pedido em andamento, então isto para sozinho.
@@ -106,6 +110,8 @@ export function TemasTela({ temas, evidenciasTemas, fontesNoticias = [], avisoLi
 
       <div className={styles.miolo}>
         {avisoLinhaEditorial ? <p className={styles.aviso}>{avisoLinhaEditorial}</p> : null}
+
+        {datas ? <CartaoDeData hoje={datas.hoje} proximas={datas.proximas} variante="sugestao" /> : null}
 
         <div className={styles.grupoRede}>
           {!redeAtual ? <span className={styles.perguntaRede}>{textosHoje.ondeVocePostaMais}</span> : null}
