@@ -34,7 +34,7 @@ const entrada = (extra: Partial<Parameters<typeof roteiroLongo.montarEntrada>[0]
 
 describe("o prompt do roteiro longo", () => {
   it("é uma tarefa própria, no modelo forte, com versão", () => {
-    expect(roteiroLongo.versao).toBe("1.3.0");
+    expect(roteiroLongo.versao).toBe("1.4.0");
     expect(roteiroLongo.nivel).toBe("forte");
   });
 
@@ -86,8 +86,29 @@ describe("o prompt do roteiro longo", () => {
     expect(texto).toContain("evitar gíria (fraca)");
   });
 
+  // E16 PR 3, nível conta: o que rendeu nos vídeos já postados DESTA marca. Sem texto, o sistema é o de antes.
+  it("sem desempenhoDaConta (ausente ou vazio), o sistema é idêntico: nenhum bloco", () => {
+    const base = sistema();
+    expect(sistema({ desempenhoDaConta: "" })).toBe(base);
+    expect(sistema({ desempenhoDaConta: undefined })).toBe(base);
+    expect(base).not.toContain("já postou");
+  });
+
+  it("com desempenhoDaConta, o bloco traz a tendência, as linhas, a duração vinda da entrada e a proibição de citar os números", () => {
+    const linha = "- Vídeos que abrem com um número (4 vídeos): renderam 2,5 vezes o normal da conta.";
+    const texto = sistema({ desempenhoDaConta: linha });
+    expect(texto).toContain("O que funcionou nos vídeos que este cliente já postou");
+    expect(texto).toContain("É tendência dele, não regra");
+    expect(texto).toContain("A duração e a estrutura deste vídeo vêm da entrada");
+    expect(texto).toContain("Nunca cite estes números");
+    expect(texto).toContain(linha);
+    // o bloco entra depois das regras do cliente e antes da camada exclusiva
+    expect(texto.indexOf(linha)).toBeGreaterThan(texto.indexOf("PERFIL: kit tira-mancha"));
+    expect(texto.indexOf(linha)).toBeLessThan(texto.indexOf("CAMADA: Campinas"));
+  });
+
   it("sem travessão, sem emoji e sem jargão no que o modelo lê (a mesma regra do checar-texto, na fonte única)", () => {
-    const tudo = `${sistema({ regrasCliente: [{ regra: "x", contagem: 1 }] })}
+    const tudo = `${sistema({ regrasCliente: [{ regra: "x", contagem: 1 }], desempenhoDaConta: "- Vídeos que abrem com um número (4 vídeos): renderam 2,5 vezes o normal da conta." })}
 ${entrada()}`;
     expect(encontrarProblemas(tudo)).toEqual([]);
   });

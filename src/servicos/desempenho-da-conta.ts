@@ -96,10 +96,16 @@ function mediana(valores: number[]): number {
 }
 
 /**
+ * Opções de quem lê o desempenho. `semDimensoes` tira uma dimensão ANTES de escolher as linhas: o roteiro longo tira a duração, porque a faixa de duração só mede Reels curto e a duração do
+ * longo vem da medida dos longos do ramo (uma linha "de até 20 segundos" contradiria o pedido e ainda gastaria uma das quatro vagas).
+ */
+export type OpcoesDeDesempenho = { semDimensoes?: Dimensao[] };
+
+/**
  * O que rendeu mais ou menos que o normal da conta, por dimensão. Puro (sem banco). Um grupo que
  * tem todos os vídeos da dimensão não diz nada (não há com o que comparar) e fica de fora.
  */
-export function resumirDesempenho(videos: VideoMedido[]): GrupoDeDesempenho[] {
+export function resumirDesempenho(videos: VideoMedido[], opcoes: OpcoesDeDesempenho = {}): GrupoDeDesempenho[] {
   if (videos.length < MINIMO_VIDEOS_MEDIDOS) return [];
 
   const candidatos: GrupoDeDesempenho[] = [];
@@ -111,6 +117,7 @@ export function resumirDesempenho(videos: VideoMedido[]): GrupoDeDesempenho[] {
   ];
 
   for (const { dimensao, rotulo } of dimensoes) {
+    if (opcoes.semDimensoes?.includes(dimensao)) continue;
     const grupos = new Map<string, number[]>();
     let comRotulo = 0;
     for (const v of videos) {
@@ -208,9 +215,9 @@ export async function videosMedidosDaMarca(clienteId: number, agora: Date = new 
  * O bloco do nível conta para o prompt, só desta marca. Qualquer falha devolve vazio: o
  * aprendizado ajuda o roteiro, nunca o trava.
  */
-export async function desempenhoDaConta(clienteId: number, agora: Date = new Date()): Promise<string> {
+export async function desempenhoDaConta(clienteId: number, agora: Date = new Date(), opcoes: OpcoesDeDesempenho = {}): Promise<string> {
   try {
-    return formatarDesempenhoDaConta(resumirDesempenho(await videosMedidosDaMarca(clienteId, agora)));
+    return formatarDesempenhoDaConta(resumirDesempenho(await videosMedidosDaMarca(clienteId, agora), opcoes));
   } catch (erro) {
     logger.warn({ err: erro, clienteId }, "desempenho-da-conta: nao foi possivel ler; segue sem o bloco");
     return "";
