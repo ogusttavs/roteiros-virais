@@ -8,7 +8,7 @@ import {
   type VideoParaProva,
 } from "@/servicos/prova-tema";
 
-import { evidenciaValida } from "./temas-do-dia";
+import { aceitarTemasDeNoticia, evidenciaValida } from "./temas-do-dia";
 
 function tema(dados: Partial<TemaDoDia> = {}): TemaDoDia {
   return {
@@ -229,5 +229,51 @@ describe("temaTemProvaSuficiente", () => {
       video(3, { contaId: 30 }),
     ];
     expect(temaTemProvaSuficiente([1, 2, 3], mapa(videos), AGORA, 7)).toBe(false);
+  });
+});
+
+/** Hotfix de 23/10/2026: o que o código aceita do modelo quando a notícia completa o dia. */
+describe("aceitarTemasDeNoticia", () => {
+  const IDS = new Set([10, 11, 12]);
+  const deNoticia = (titulo: string, ids: number[], extra: Partial<TemaDoDia> = {}) => tema({ titulo, evidencias: [], evidenciasNoticias: ids, ...extra });
+
+  it("aceita um tema por notícia enviada, sem vídeo citado, até o limite de vagas", () => {
+    const aceitos = aceitarTemasDeNoticia([deNoticia("a", [10]), deNoticia("b", [11]), deNoticia("c", [12])], IDS, [], 2);
+    expect(aceitos.map((t) => t.titulo)).toEqual(["a", "b"]);
+    for (const t of aceitos) expect(t.evidencias).toEqual([]);
+    expect(aceitos.map((t) => t.evidenciasNoticias)).toEqual([[10], [11]]);
+  });
+
+  it("descarta tema que cita notícia que não foi enviada (nunca inventa fonte) ou que não cita nenhuma", () => {
+    const aceitos = aceitarTemasDeNoticia([deNoticia("inventada", [999]), deNoticia("sem fonte", []), deNoticia("boa", [10])], IDS, [], 3);
+    expect(aceitos.map((t) => t.titulo)).toEqual(["boa"]);
+  });
+
+  it("limpa o vídeo que o modelo citou por engano: tema de notícia não afirma prova de vídeo", () => {
+    const [aceito] = aceitarTemasDeNoticia([deNoticia("a", [10], { evidencias: [5, 6, 7] })], IDS, [], 1);
+    expect(aceito.evidencias).toEqual([]);
+  });
+
+  it("uma notícia só vale para um tema e título repetido (ou igual a um que o dia já tem) cai", () => {
+    const jaTem = [tema({ titulo: "Já Existe", evidencias: [1, 2, 3], evidenciasNoticias: [12] })];
+    const aceitos = aceitarTemasDeNoticia(
+      [deNoticia("já existe", [10]), deNoticia("novo", [12]), deNoticia("novo", [10]), deNoticia("outro", [10]), deNoticia("repete a noticia", [10])],
+      IDS,
+      jaTem,
+      3,
+    );
+    // "novo" com a 12 (já usada pelo tema do dia) e "já existe" caem; "novo" com a 10 entra; "outro" e "repete a noticia" usam a 10 de novo e caem.
+    expect(aceitos.map((t) => [t.titulo, t.evidenciasNoticias])).toEqual([["novo", [10]]]);
+  });
+
+  it("não carrega pergunta do público nem assunto em alta para o tema de notícia", () => {
+    const [aceito] = aceitarTemasDeNoticia(
+      [deNoticia("a", [10], { perguntaDoPublico: { chave: "k", tipo: "duvida", texto: "t", vezes: 1, plataformas: ["youtube"] } })],
+      IDS,
+      [],
+      1,
+    );
+    expect(aceito.perguntaDoPublico).toBeUndefined();
+    expect(aceito.doMomento).toBeUndefined();
   });
 });

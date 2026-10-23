@@ -49,6 +49,18 @@ export const textosHoje = {
   evidenciaMultiplo: (rotulo: string, views: string, quando: string) =>
     `${rotulo}, ${views} visualizaç${views === "1" ? "ão" : "ões"} ${quando}`,
   evidenciaParecidos: (n: number) => `Mais ${n} vídeo${n === 1 ? "" : "s"} parecido${n === 1 ? "" : "s"} nos últimos 7 dias`,
+  /**
+   * Hotfix de 23/10/2026: o tema que nasceu de uma notícia do setor (faltou vídeo de prova para fechar o dia). O cartão diz de onde ele veio no lugar do bloco do vídeo: nunca um número
+   * de visualização, porque nenhum vídeo sustenta este tema.
+   */
+  temaDeNoticia: {
+    rotulo: "Veio de uma notícia do setor",
+    quando: (dias: number) => (dias <= 0 ? "hoje" : dias === 1 ? "ontem" : `há ${dias} dias`),
+    veiculoEQuando: (veiculo: string | null, quando: string) => (veiculo ? `${veiculo}, ${quando}` : quando),
+  },
+  /** Hotfix de 23/10/2026: menos de três temas no dia (o último recurso, sem notícia nem assunto em alta que sirva); fala calma, sem culpa e sem inventar tema. */
+  poucosTemas: (quantos: number) =>
+    `Hoje o seu setor trouxe ${quantos === 1 ? "só um tema" : `só ${quantos === 2 ? "dois" : quantos} temas`} com fonte de verdade. Preferimos mostrar menos a inventar um tema sem base. Se quiser mais, escreva o seu assunto.`,
   maisIndicadoParaHoje: "Mais indicado para hoje",
   queroEsse: "Quero esse",
   /** Enquanto a tela seguinte abre depois do toque (V7, item 4): o botão que foi tocado diz isto, os outros ficam desabilitados. */

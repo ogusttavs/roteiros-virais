@@ -27,7 +27,7 @@ import {
   validarQuemAparece,
   type OrigemRoteiro,
 } from "@/servicos/roteiro";
-import { limparNotaDoRascunhoSeForDoTexto } from "@/servicos/temas";
+import { apagarRascunhoSeForDoTexto } from "@/servicos/temas";
 import { gerarVersoes } from "@/servicos/versoes";
 import { textosRoteiro } from "@/textos/roteiro";
 import type { VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
@@ -96,10 +96,10 @@ export async function gerarVersoesAction(
       perguntaChave: origemValida.origem === "livre" ? chaveDeVozValida(perguntaChave) : undefined,
       pesquisaId: pesquisaValida,
     });
-    // Hotfix de 22/10/2026 (item 3): o roteiro saiu deste assunto seu; a nota guardada deixa de ser "onde a pessoa parou" (a linha "Continuar de onde parou" do Criar some). O texto continua no rascunho.
+    // O roteiro saiu deste assunto seu: o rascunho do Tema livre (texto e nota) some, e a próxima visita começa em branco (pedido do Gustavo em 23/10/2026; antes ficava o texto).
     if (origemValida.origem === "livre") {
       const sessao = await sessaoDoPainel();
-      if (sessao) await limparNotaDoRascunhoSeForDoTexto(sessao.user.id, cliente.id, origemValida.textoTema).catch(() => undefined);
+      if (sessao) await apagarRascunhoSeForDoTexto(sessao.user.id, cliente.id, origemValida.textoTema).catch(() => undefined);
     }
     return { ok: true, dado: { grupo } };
   } catch (falha) {

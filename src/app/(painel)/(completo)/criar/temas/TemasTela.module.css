@@ -66,6 +66,13 @@
   line-height: var(--altura-corpo);
 }
 
+/* Hotfix de 23/10/2026: a frase calma e o botão do assunto próprio, quando o dia fecha com menos de três temas. */
+.poucosTemas {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: start;
+}
+
 .grupoRede {
   display: grid;
   gap: var(--espaco-3);

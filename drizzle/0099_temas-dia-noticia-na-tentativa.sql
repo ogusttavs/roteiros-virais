@@ -1,0 +1,1 @@
+ALTER TABLE "temas_dia" ADD COLUMN "noticia_mais_nova_na_tentativa" integer;

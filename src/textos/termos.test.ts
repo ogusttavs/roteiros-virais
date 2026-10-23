@@ -5,6 +5,15 @@
  */
 import { describe, expect, it } from "vitest";
 
+import {
+  MAXIMO_FRACAO_DE_UMA_MARCA,
+  MINIMO_DONOS_DO_PADRAO,
+  MINIMO_MARCAS_DO_PADRAO,
+  MINIMO_VIDEOS_DO_PADRAO,
+  podeCircularPadrao,
+  type ContribuicaoDeMarca,
+} from "../servicos/padrao-agregado";
+
 import { textosTermos, VERSAO_TERMOS_EM } from "./termos";
 
 function paragrafosDe(secoes: { titulo: string; paragrafos: string[] }[]): string[] {
@@ -56,9 +65,9 @@ describe("a versão dos termos", () => {
     expect(VERSAO_TERMOS_EM.getTime()).toBeLessThanOrEqual(Date.now());
   });
 
-  it("a versão que manda repetir o aceite continua a de 09/10; a data mostrada na página é a da última mudança de texto (E57a, 22/10, sem subir a versão)", () => {
-    expect(VERSAO_TERMOS_EM.toISOString().slice(0, 10)).toBe("2026-10-09");
-    expect(textosTermos.atualizadoEm).toBe("atualizado em 22 de outubro de 2026");
+  it("a data dita na página é a da versão (23/10, meia-noite de Brasília)", () => {
+    expect(textosTermos.atualizadoEm).toBe("atualizado em 23 de outubro de 2026");
+    expect(VERSAO_TERMOS_EM.toISOString()).toBe("2026-10-23T03:00:00.000Z");
   });
 });
 
@@ -79,5 +88,55 @@ describe("a privacidade e quem pede para testar (E57a)", () => {
     const titulos = textosTermos.privacidade.secoes.map((s) => s.titulo);
     titulos.forEach((titulo, i) => expect(titulo.startsWith(`${i + 1}. `)).toBe(true));
     expect(titulos.at(-1)).toBe("7. Contato");
+  });
+});
+
+describe("a cláusula do que circula entre marcas: circula padrão, nunca o que é de cada um", () => {
+  const secao = textosTermos.termos.secoes.find((s) => s.titulo.includes("O que aprendemos entre clientes"));
+  const texto = (secao?.paragrafos ?? []).join(" ");
+
+  it("diz que o que a pessoa escreve, grava e mede nunca aparece para outra marca, e que ela não vê o de ninguém", () => {
+    expect(secao).toBeDefined();
+    expect(texto).toContain("circula o padrão, nunca o que é seu");
+    expect(texto).toContain("o briefing, os temas, os roteiros");
+    expect(texto).toContain("tudo o que você grava");
+    expect(texto).toContain("os números dos seus vídeos");
+    expect(texto).toContain("nunca aparecem para outra marca");
+    expect(texto).toContain("você nunca vê nada disso de outra marca");
+  });
+
+  it("dá o exemplo de padrão e o mínimo para circular: 5 marcas, 3 donos, 10 vídeos, nenhuma com mais da metade", () => {
+    expect(texto).toContain("neste setor, abrir o vídeo com uma pergunta rende mais");
+    expect(texto).toContain("pelo menos 5 marcas");
+    expect(texto).toContain("pelo menos 3 donos diferentes");
+    expect(texto).toContain("pelo menos 10 vídeos no total");
+    expect(texto).toContain("nenhuma marca sozinha responda por mais da metade");
+    expect(texto).toContain("Abaixo disso, nada circula");
+  });
+
+  it("os números do texto são os do código que decide o que circula (padrao-agregado.ts, E16): mudar um sem o outro reprova aqui", () => {
+    expect(texto).toContain(`pelo menos ${MINIMO_MARCAS_DO_PADRAO} marcas`);
+    expect(texto).toContain(`pelo menos ${MINIMO_DONOS_DO_PADRAO} donos diferentes`);
+    expect(texto).toContain(`pelo menos ${MINIMO_VIDEOS_DO_PADRAO} vídeos no total`);
+    // "mais da metade": o código reprova só quando uma marca passa de 0,5 (exatamente a metade ainda circula).
+    expect(MAXIMO_FRACAO_DE_UMA_MARCA).toBe(0.5);
+    expect(texto).toContain("mais da metade");
+
+    // E o comportamento bate com a frase: o mínimo exato circula; um a menos de marcas, de donos ou de vídeos não; uma marca com mais da metade não.
+    const de = (marcas: number, donos: number, videosPorMarca: number): ContribuicaoDeMarca[] =>
+      Array.from({ length: marcas }, (_, i) => ({ marcaId: i + 1, donoId: `dono-${i % donos}`, videos: videosPorMarca }));
+    expect(podeCircularPadrao(de(5, 3, 2)).pode).toBe(true);
+    expect(podeCircularPadrao(de(4, 3, 3)).pode).toBe(false);
+    expect(podeCircularPadrao(de(5, 2, 2)).pode).toBe(false);
+    expect(podeCircularPadrao(de(5, 3, 1)).pode).toBe(false);
+    expect(podeCircularPadrao([{ marcaId: 1, donoId: "a", videos: 6 }, ...de(5, 3, 1).map((c) => ({ ...c, marcaId: c.marcaId + 1 }))]).pode).toBe(false);
+  });
+
+  it("a privacidade repete o mínimo, para as duas páginas não se contradizerem", () => {
+    const privacidade = textosTermos.privacidade.secoes.find((s) => s.titulo.includes("O que aprendemos entre clientes"));
+    const t = (privacidade?.paragrafos ?? []).join(" ");
+    expect(t).toContain("pelo menos 5 marcas");
+    expect(t).toContain("pelo menos 3 donos diferentes");
+    expect(t).toContain("nenhuma marca responda por mais da metade");
   });
 });

@@ -456,6 +456,19 @@ export async function guardarNotaNoRascunho(usuarioId: string, clienteId: number
 }
 
 /** O roteiro saiu deste tema: a nota guardada deixa de ser "onde a pessoa parou" (o texto continua no rascunho). Só apaga se a nota é deste mesmo texto. */
+/**
+ * O roteiro saiu deste assunto (pedido do Gustavo, 23/10/2026: "cliquei para criar um novo com o meu tema e ainda estava o texto do outro roteiro"): o rascunho do Tema livre
+ * some inteiro, texto e nota, e a próxima visita começa em branco. Só apaga se o rascunho ainda é deste mesmo texto (a pessoa pode ter começado outro em outra aba).
+ */
+export async function apagarRascunhoSeForDoTexto(usuarioId: string, clienteId: number, texto: string): Promise<void> {
+  const [linha] = await db()
+    .select({ texto: rascunhosTemaLivre.texto })
+    .from(rascunhosTemaLivre)
+    .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
+  if (!linha || marcaDoTexto(linha.texto) !== marcaDoTexto(texto)) return;
+  await apagarRascunhoTemaLivre(usuarioId, clienteId);
+}
+
 export async function limparNotaDoRascunhoSeForDoTexto(usuarioId: string, clienteId: number, texto: string): Promise<void> {
   await db()
     .update(rascunhosTemaLivre)

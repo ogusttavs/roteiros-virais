@@ -1858,6 +1858,11 @@ export const temasDia = pgTable(
      * ter chegado evidência nenhuma a mais desde a última tentativa.
      */
     candidatosNaUltimaTentativa: integer("candidatos_na_ultima_tentativa"),
+    /**
+     * Hotfix de 23/10/2026 (os temas de hoje só vinham 1): o id da notícia relevante mais nova que o setor tinha na última tentativa (a que completa o dia quando falta vídeo de prova).
+     * Uma linha sem tema de verdade só tenta de novo quando chega vídeo novo OU notícia mais nova que esta; nulo (linha de antes do hotfix) vale como "ainda não tentou com notícia".
+     */
+    noticiaMaisNovaNaTentativa: integer("noticia_mais_nova_na_tentativa"),
     criadoEm: criadoEm(),
   },
   (t) => [uniqueIndex("temas_dia_nicho_data").on(t.nichoId, t.data)],
