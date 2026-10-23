@@ -23,6 +23,7 @@ import { textosObjetivo } from "@/textos/objetivo";
 import { textosPesquisa } from "@/textos/pesquisa";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { CampoComFala } from "@/ui/componentes/CampoComFala";
+import { CapaImagem } from "@/ui/componentes/CapaImagem";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { PerguntaMomentoDoDia, PerguntaParaQuando } from "@/ui/componentes/PerguntaAgendamento";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
@@ -42,8 +43,7 @@ function CapaDoExemplo({ capaUrl }: { capaUrl: string | null }) {
   return (
     <span className={styles.exemploCapa} aria-hidden="true" data-capa={capaUrl !== null && !comErro ? "imagem" : "neutra"}>
       {capaUrl !== null && !comErro ? (
-        // eslint-disable-next-line @next/next/no-img-element -- url externa (CDN da plataforma), sem otimizacao do Next
-        <img src={capaUrl} alt="" className={styles.exemploCapaImagem} onError={() => setComErro(true)} />
+        <CapaImagem src={capaUrl} className={styles.exemploCapaImagem} aoFalhar={() => setComErro(true)} />
       ) : (
         <Play size={20} strokeWidth={1.5} aria-hidden="true" />
       )}
