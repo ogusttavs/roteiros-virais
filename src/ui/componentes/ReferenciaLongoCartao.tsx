@@ -10,6 +10,7 @@ import { textosReferencias } from "@/textos/referencias";
 import { ID_FAIXA_SEM_CONEXAO } from "@/ui/ConexaoContext";
 
 import { Botao } from "./Botao";
+import { CapaImagem } from "./CapaImagem";
 import styles from "./ReferenciaCartao.module.css";
 import stylesLongo from "./ReferenciaLongoCartao.module.css";
 
@@ -60,9 +61,8 @@ export function ReferenciaLongoCartao({ video, salvo, salvando = false, semRede 
     <article className={[styles.cartao, stylesLongo.longo].join(" ")} data-cartao-longo>
       <div className={styles.videoTopo}>
         <span className={stylesLongo.capaLonga} aria-hidden="true">
-          {mostrarCapa ? (
-            // eslint-disable-next-line @next/next/no-img-element -- url externa (CDN do YouTube), sem otimizacao do Next
-            <img src={video.capaUrl ?? undefined} alt="" className={styles.capaImagem} onError={() => setCapaComErro(true)} />
+          {mostrarCapa && video.capaUrl ? (
+            <CapaImagem src={video.capaUrl} className={styles.capaImagem} aoFalhar={() => setCapaComErro(true)} />
           ) : (
             <Play size={24} strokeWidth={1.5} aria-hidden="true" />
           )}

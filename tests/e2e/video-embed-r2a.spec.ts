@@ -218,8 +218,9 @@ test.describe("R2a, a prévia do vídeo dentro do aplicativo", () => {
 
     const folha = page.getByRole("dialog", { name: "Por que esse funcionou" });
     await expect(folha).toBeVisible();
-    // R2b, item 1: a capa com o play antes de tocar; só o toque monta o iframe de verdade.
-    await folha.getByRole("button", { name: /^Tocar / }).click();
+    // Hotfix de 22/10/2026: este vídeo do Instagram não tem capa viva (o link do CDN vence), então o embed oficial entra na hora,
+    // sem o quadro preto com o play; só o que tem capa (ou não é Instagram) espera o toque (R2b, item 1).
+    await expect(folha.getByRole("button", { name: /^Tocar / })).toHaveCount(0);
     await expect(folha.locator("iframe")).toHaveAttribute("src", "https://www.instagram.com/p/e2e-r2a-instagram/embed", {
       timeout: 10_000,
     });

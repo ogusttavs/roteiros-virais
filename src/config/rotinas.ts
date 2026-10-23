@@ -8,6 +8,7 @@ export type Rotina = { chave: string; titulo: string; faz: string; filas: string
 
 export const ROTINAS: Rotina[] = [
   { chave: "buscar", titulo: "Buscar vídeos novos", faz: "Procura, em cada rede, os vídeos novos das contas que a gente acompanha.", filas: [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaMeioDia, FILAS.contasBase, FILAS.metaContas, FILAS.metaHashtags, FILAS.descobertaInstagram] },
+  { chave: "capas", titulo: "Guardar a capa dos vídeos", faz: "Baixa a imagem de capa dos vídeos do Instagram enquanto o link da rede ainda abre, para a referência não aparecer vazia depois.", filas: [FILAS.guardarCapas] },
   { chave: "noticias", titulo: "Ler as notícias do ramo", faz: "Junta as notícias do dia de cada ramo.", filas: [FILAS.coletaNoticias] },
   { chave: "tendencias", titulo: "Ver o que está em alta no Brasil", faz: "Junta as buscas e os vídeos em alta no país, para todos os ramos, e põe o tema do momento no dia de cada ramo.", filas: [FILAS.tendenciasBrasil] },
   { chave: "pontuar", titulo: "Ver quais vídeos estão indo bem", faz: "Compara cada vídeo com a conta dele e separa os que passaram da média.", filas: [FILAS.pontuar, FILAS.vigilancia] },
@@ -38,6 +39,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.metaContas]: "a leitura do Instagram pela Meta",
   [FILAS.metaHashtags]: "a busca por hashtag na Meta",
   [FILAS.descobertaInstagram]: "a descoberta de contas no Instagram",
+  [FILAS.guardarCapas]: "a guarda das capas dos vídeos",
   [FILAS.pontuar]: "a pontuação dos vídeos",
   [FILAS.vigilancia]: "a lista de vigilância",
   [FILAS.transcrever]: "a transcrição",

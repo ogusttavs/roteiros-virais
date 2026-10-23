@@ -149,6 +149,18 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "pontuacao (fora-da-curva, velocidade), todo dia as 03:45, depois das coletas e do contas-base",
   },
   {
+    fila: FILAS.guardarCapas,
+    cron: "55 3 * * *",
+    descricao: "guarda a capa dos videos do instagram enquanto o link da rede vale, todo dia as 03:55, depois das coletas (reserva: o worker ja enfileira ao fim de cada coleta)",
+    chave: "madrugada",
+  },
+  {
+    fila: FILAS.guardarCapas,
+    cron: "20 12 * * *",
+    descricao: "guarda a capa dos videos do instagram, segunda vez do dia, as 12:20, depois da passada do meio-dia",
+    chave: "meio-dia",
+  },
+  {
     fila: FILAS.vigilancia,
     cron: "30 4 * * *",
     descricao: "lista de vigilancia, todo dia as 04:30",
