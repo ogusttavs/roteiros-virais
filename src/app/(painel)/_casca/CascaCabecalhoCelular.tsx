@@ -28,6 +28,10 @@ function temBarraPropria(pathname: string): boolean {
     ROTAS_COM_BARRA_PROPRIA.includes(pathname) ||
     pathname.startsWith("/criar/tema-livre") ||
     pathname.startsWith("/criar/temas") ||
+    // 23/10/2026 (achado do Gustavo no iPhone): Planejar (`PlanejadorShell.tsx`) e a pesquisa na hora (`PesquisaTela.tsx`) já tinham `BarraTopo` própria e faltavam
+    // aqui; o cabeçalho genérico ficava por baixo e o nome do produto aparecia em cima do título da tela, com os dois pares de botões também empilhados.
+    pathname.startsWith("/planejamento") ||
+    pathname.startsWith("/criar/pesquisa") ||
     pathname.startsWith("/roteiros/")
   );
 }
