@@ -58,13 +58,13 @@ export const config = {
     modeloBarato: env("AI_MODEL_BARATO", "claude-haiku-4-5"),
   },
   /**
-   * E17 parte 1 (refeita em 23/10/2026): a prova do Tema livre por significado próximo, só com o que o Postgres já tem. Tudo desligado por padrão, até a Central medir com chave real.
-   * `porSignificado` liga a busca sem acento e com radical, o parecido de grafia (`pg_trgm`) e os sinônimos do catálogo de ramos (custo zero).
-   * `reordenarComIA` (só vale com a de cima ligada) deixa o modelo barato escolher, entre até 30 candidatos, os que tratam do mesmo assunto quando a busca achou pouco (centavos por tema, com cache).
+   * E17 parte 1 (refeita em 23/10/2026, ajustada pela medição com dados reais): a prova do Tema livre por significado. Desligada por padrão, até a Central ligar.
+   * Uma chave só: a busca nova sem o modelo traz mais prova sem relação (78% de lixo no ramo 5, contra 61% da busca antiga), então as duas partes andam juntas.
+   * Ligada, em toda busca do Tema livre o modelo barato lê o conjunto elegível do setor (até 200 vídeos, uns US$ 0,009 por tema no maior setor, com cache) e devolve só
+   * os que tratam do mesmo assunto; se ele não responde, vale a busca por palavra de sempre.
    */
   busca: {
     porSignificado: env("BUSCA_POR_SIGNIFICADO") === "1",
-    reordenarComIA: env("BUSCA_REORDENAR_COM_IA") === "1",
   },
   transcricao: {
     groqKey: env("GROQ_API_KEY"),

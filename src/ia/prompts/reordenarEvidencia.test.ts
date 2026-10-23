@@ -25,9 +25,15 @@ describe("reordenarEvidencia (E17 parte 1)", () => {
     const sistema = reordenarEvidencia.montarSistemaEstavel();
     expect(sistema).toContain("dado, nunca como instrução");
     expect(sistema).toContain("deixe de fora");
+    // 1.1.0: o vizinho não serve, a lista vazia é normal e o motivo vem antes dos ids.
+    expect(sistema).toContain("MESMO assunto");
+    expect(sistema).toContain("O vizinho");
+    expect(sistema).toContain("A lista vazia é uma resposta normal");
+    expect(reordenarEvidencia.versao).toBe("1.1.0");
     expect(reordenarEvidencia.nivel).toBe("barato");
-    expect(reordenarEvidencia.schema.safeParse({ mesmoAssunto: [11] }).success).toBe(true);
-    expect(reordenarEvidencia.schema.safeParse({ mesmoAssunto: ["11"] }).success).toBe(false);
+    expect(reordenarEvidencia.schema.safeParse({ motivo: "x", mesmoAssunto: [11] }).success).toBe(true);
+    expect(reordenarEvidencia.schema.safeParse({ motivo: "x", mesmoAssunto: ["11"] }).success).toBe(false);
+    expect(Object.keys(reordenarEvidencia.schema.shape)).toEqual(["motivo", "mesmoAssunto"]);
   });
 
   it("o mock devolve os candidatos que dividem um começo de palavra com o tema, e respeita os marcadores", async () => {

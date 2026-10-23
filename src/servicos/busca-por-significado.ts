@@ -1,12 +1,13 @@
 /**
- * E17 parte 1 (refeita em 23/10/2026): o modelo barato escolhendo a prova do Tema livre por significado, quando a busca por palavra achou pouco.
+ * E17 parte 1 (refeita em 23/10/2026, ajustada pela medição com dados reais): o modelo barato escolhendo a prova do Tema livre por significado.
  *
- * `evidenciaParaTema` (`servicos/pesquisa.ts`) junta até 30 candidatos do setor e chama `escolherComIA`; esta função devolve os ids que tratam do mesmo assunto, do mais
- * próximo ao menos próximo, ou `null` quando não houve escolha (sem candidato, modelo fora do ar, resposta sem id válido), caso em que a prova fica a da busca por palavra.
+ * `evidenciaParaTema` (`servicos/pesquisa.ts`), com `BUSCA_POR_SIGNIFICADO` ligada, chama `escolherComIA` em TODA busca do Tema livre com o conjunto elegível do setor (até
+ * `MAXIMO_DE_CANDIDATOS_PARA_IA`); esta função devolve os ids que tratam do mesmo assunto, do mais próximo ao menos (lista vazia quando nenhum trata: é uma resposta válida), ou `null`
+ * quando não houve escolha (sem candidato, modelo fora do ar), caso em que a prova fica a da busca por palavra de sempre.
  *
- * Três travas de custo: (1) o teto de `MAXIMO_DE_CANDIDATOS_PARA_IA` candidatos por chamada, cada um com uma linha curta (assunto e título), e uma saída de no máximo
- * `MAXIMO_DE_TOKENS_DE_SAIDA` tokens; (2) o cache: a mesma pergunta (mesmos setores, mesmo texto de tema, mesmos candidatos) responde do que já está em `geracoes_ia`, sem pagar de
- * novo, por `DIAS_DO_CACHE` dias; (3) só roda com `BUSCA_POR_SIGNIFICADO` e `BUSCA_REORDENAR_COM_IA` ligadas (`config.busca`), desligadas por padrão.
+ * Travas de custo: (1) o teto de candidatos por chamada, cada um com uma linha curta (assunto e título; uns US$ 0,009 por tema com 170 vídeos, US$ 0,002 com 30) e uma saída de no
+ * máximo `MAXIMO_DE_TOKENS_DE_SAIDA` tokens; (2) o cache: a mesma pergunta (mesmos setores, mesmo texto de tema, mesmos candidatos, mesma versão do prompt) responde do que já está em
+ * `geracoes_ia`, sem pagar de novo, por `DIAS_DO_CACHE` dias (um vídeo novo no setor muda os candidatos e então a pergunta é outra); (3) só roda com `config.busca.porSignificado`.
  *
  * Isolamento: o cache guarda ids de vídeos do setor (dado compartilhado) e o texto do tema com o cliente que o escreveu, como toda geração; outra pessoa só reaproveita
  * a resposta se escrever o mesmo texto sobre os mesmos candidatos, e o que recebe são ids de vídeos públicos, nunca o texto dela.
@@ -24,8 +25,8 @@ import { normalizarBusca } from "@/lib/buscar-ramo";
 import { logger } from "@/lib/log";
 
 /** O teto por chamada: nunca mais que isto vai ao modelo, qualquer que seja o tamanho do setor. */
-export const MAXIMO_DE_CANDIDATOS_PARA_IA = 30;
-const MAXIMO_DE_TOKENS_DE_SAIDA = 400;
+export const MAXIMO_DE_CANDIDATOS_PARA_IA = 200;
+const MAXIMO_DE_TOKENS_DE_SAIDA = 600;
 const DIAS_DO_CACHE = 14;
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -110,7 +111,7 @@ export async function escolherComIA(dados: {
       clienteId: dados.clienteId,
       entradas: { chave, tema: dados.tema, nichoId: dados.setores[0], setores: dados.setores, candidatos: candidatos.map((c) => c.id) },
       evidencias: escolhidos,
-      saida: { mesmoAssunto: escolhidos },
+      saida: { motivo: resultado.dados.motivo, mesmoAssunto: escolhidos },
       uso: {
         tokensEntrada: resultado.tokensEntrada,
         tokensSaida: resultado.tokensSaida,

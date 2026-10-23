@@ -1301,9 +1301,9 @@ const MARCADOR_REPROVA_EVIDENCIA_POR_MARCA = "reprove toda a evidencia por nao c
 function mockReordenarEvidencia(entrada: string) {
   const [cabecalho, ...resto] = entrada.split("\n\nVídeos candidatos:\n");
   const tema = cabecalho.replace(/^Tema: /, "");
-  if (tema.includes("[mock:reordenar-vazio]")) return { mesmoAssunto: [] };
+  if (tema.includes("[mock:reordenar-vazio]")) return { motivo: "Nenhum trata do mesmo assunto.", mesmoAssunto: [] };
   const linhas = resto.join("\n").split("\n").filter((l) => /^id \d+:/.test(l));
-  if (tema.includes("[mock:reordenar-tudo]")) return { mesmoAssunto: linhas.map((l) => Number(l.match(/^id (\d+):/)![1])) };
+  if (tema.includes("[mock:reordenar-tudo]")) return { motivo: "Todos servem (simulado).", mesmoAssunto: linhas.map((l) => Number(l.match(/^id (\d+):/)![1])) };
   const sem = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   const palavras = [...new Set(sem(tema).match(/[a-z]{5,}/g) ?? [])];
   const ids = linhas
@@ -1312,7 +1312,7 @@ function mockReordenarEvidencia(entrada: string) {
       return palavras.some((p) => texto.includes(p.slice(0, 5)));
     })
     .map((l) => Number(l.match(/^id (\d+):/)![1]));
-  return { mesmoAssunto: ids };
+  return { motivo: ids.length > 0 ? "Dividem palavra com o tema (simulado)." : "Nenhum divide palavra com o tema (simulado).", mesmoAssunto: ids };
 }
 
 function mockFiltrarEvidenciaPorMarca(entrada: string) {

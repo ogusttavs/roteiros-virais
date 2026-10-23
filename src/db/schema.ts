@@ -1261,7 +1261,7 @@ export const videos = pgTable(
     /**
      * E17 parte 1 (refeita em 23/10/2026): a busca por significado com o que o Postgres já traz. Título, assunto e os primeiros 1.500 caracteres da transcrição,
      * sem acento e com radical em português ("sofá" acha "sofas", "dente" acha "dentes"). `f_unaccent` é a versão imutável do `unaccent`, criada na migração
-     * (a original é `stable`, e coluna gerada só aceita função imutável). Só é lida com `BUSCA_POR_SIGNIFICADO=1`; a `busca` de sempre não muda.
+     * (a original é `stable`, e coluna gerada só aceita função imutável). Só é lida com `BUSCA_POR_SIGNIFICADO=1`, para ordenar os candidatos do modelo barato; a `busca` de sempre não muda. Sem índice GIN de propósito: a consulta lê o conjunto elegível inteiro do setor (já cortado por setor, janela e piso), então nenhum índice de texto seria usado.
      */
     buscaSemAcento: tsvector("busca_sem_acento").generatedAlwaysAs(
       sql`to_tsvector('portuguese', f_unaccent(coalesce(titulo, '') || ' ' || coalesce(analise ->> 'assunto', '') || ' ' || left(coalesce(transcricao, ''), 1500)))`,
@@ -1406,8 +1406,6 @@ export const videos = pgTable(
     index("videos_nicho_publicado").on(t.nichoId, t.publicadoEm),
     index("videos_nicho_fora_da_curva").on(t.nichoId, t.foraDaCurva),
     index("videos_busca_idx").using("gin", t.busca),
-    index("videos_busca_sem_acento_idx").using("gin", t.buscaSemAcento),
-    index("videos_texto_curto_trgm_idx").using("gin", t.textoCurto.op("gin_trgm_ops")),
     /** Janela de 90 dias por conta, usada pelo job `pontuar` (etapa 7). */
     index("videos_conta_publicado").on(t.contaId, t.publicadoEm),
     /** Consulta "subindo hoje" (etapa 7, src/servicos/pesquisa.ts). */

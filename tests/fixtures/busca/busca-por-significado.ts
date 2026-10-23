@@ -1,7 +1,6 @@
 /**
  * Banco de brinquedo da busca por significado (E17 parte 1, 23/10/2026): um setor de odontologia com 18 vídeos inventados e 10 temas de exemplo, cada um com o que
- * a busca de sempre acha (`antes`) e o primeiro que a busca por significado acha (`primeiro`), em chaves de vídeo. Usado pelo teste de integração e pelo script de comparação
- * (`scripts/comparar-busca-por-significado.ts`), para o PR mostrar os dois lados com os mesmos dados. Nenhum dado real.
+ * a busca de sempre acha (`antes`), em chaves de vídeo. Usado pelo teste de integração. Nenhum dado real.
  */
 import { db } from "@/db";
 import { videos } from "@/db/schema";
@@ -38,25 +37,21 @@ export const VIDEOS_DE_BUSCA: VideoDeBusca[] = [
 
 export type TemaDeComparacao = {
   tema: string;
-  /** O que a busca de sempre acha (chaves), na ordem. */
+  /** O que a busca de sempre acha (chaves), na ordem; é o que continua valendo com a chave desligada e quando o modelo barato não responde. */
   antes: string[];
-  /** O primeiro que a busca por significado acha; `null` quando ela continua sem achar nada. Quem já era achado continua sendo. */
-  primeiro: string | null;
-  /** Por que muda (ou não). */
-  nota: string;
 };
 
 export const TEMAS_DE_COMPARACAO: TemaDeComparacao[] = [
-  { tema: "clarear os dentes", antes: [], primeiro: "clareamento", nota: "grafia parecida (clarear e clareamento); \"dentes\" é palavra do setor e vale meio ponto" },
-  { tema: "hálito ruim", antes: [], primeiro: "halito", nota: "uma palavra basta num tema de duas; a outra nenhum vídeo tem" },
-  { tema: "aparelho invisivel", antes: [], primeiro: "aparelho", nota: "sem acento no tema, com acento no vídeo" },
-  { tema: "ranger os dentes de noite", antes: ["bruxismo"], primeiro: "bruxismo", nota: "já achava (todas as palavras estavam no vídeo); continua igual" },
-  { tema: "dor de dente quando bebo gelado", antes: [], primeiro: "sensibilidade", nota: "falta uma palavra no vídeo e a de antes exigia todas; o vídeo que escreve \"dente\" e \"gelado\" vem na frente" },
-  { tema: "gengiva sangrando ao escovar", antes: ["gengiva"], primeiro: "gengiva", nota: "já achava; continua igual" },
-  { tema: "quanto custa implante dentario", antes: [], primeiro: "implante", nota: "sem acento no tema, com acento no vídeo" },
-  { tema: "como tirar mancha de vinho dos dentes", antes: ["cafe"], primeiro: "cafe", nota: "já achava pela etiqueta; continua igual, sem puxar os outros vídeos de dente" },
-  { tema: "tratamento de canal doi", antes: [], primeiro: "canal", nota: "\"doi\" sem acento impedia o casamento de todas as palavras" },
-  { tema: "meu filho tem medo de dentista", antes: [], primeiro: null, nota: "o vídeo certo (crianças no dentista) não divide palavra com o tema: é para o modelo barato" },
+  { tema: "clarear os dentes", antes: [] },
+  { tema: "hálito ruim", antes: [] },
+  { tema: "aparelho invisivel", antes: [] },
+  { tema: "ranger os dentes de noite", antes: ["bruxismo"] },
+  { tema: "dor de dente quando bebo gelado", antes: [] },
+  { tema: "gengiva sangrando ao escovar", antes: ["gengiva"] },
+  { tema: "quanto custa implante dentario", antes: [] },
+  { tema: "como tirar mancha de vinho dos dentes", antes: ["cafe"] },
+  { tema: "tratamento de canal doi", antes: [] },
+  { tema: "meu filho tem medo de dentista", antes: [] },
 ];
 
 /** Semeia os vídeos num setor e devolve a chave de cada um para o id. Vistos e views acima de qualquer piso; publicados há 10 dias. */
