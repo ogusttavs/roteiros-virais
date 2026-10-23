@@ -182,6 +182,11 @@ export const textosRoteiro = {
   abrirReferencia: "Abrir o vídeo de referência",
   /** Rodapé como no design (revisão do PR #31, item 7): preenchido enquanto não gravou. */
   jaGravei: "Já gravei",
+  /** O aviso logo depois de "Já gravei", com o botão que desfaz (tocar sem querer acontece). */
+  gravadoAviso: "Marcado como gravado.",
+  desfazerGravado: "Desfazer",
+  /** Depois de desfazer, e a opção do menu de um roteiro já marcado como gravado. */
+  desmarcadoAviso: "Voltou para não gravado.",
   /** O rótulo de "Já gravei" e do botão de salvar o link enquanto o pedido está indo (V7, item 4 do PROXIMO.md). */
   salvando: "Salvando",
   postei: "Postei",
@@ -193,6 +198,8 @@ export const textosRoteiro = {
   linkInvalido: "Esse link não parece certo. Confira se colou o endereço inteiro do vídeo.",
   menu: {
     reprovar: "Reprovar",
+    /** Só no roteiro marcado como gravado e ainda não postado: volta ao estado de antes do "Já gravei". */
+    aindaNaoGravei: "Ainda não gravei",
     /** O roteiro nasceu do que a pessoa contou (o momento): volta ao Criar com o texto dela preenchido, para reescrever. */
     reescreverMomento: "Reescrever o que contei",
     copiar: "Copiar o texto do roteiro",
@@ -229,6 +236,8 @@ export const textosRoteiro = {
   erroMarcarGravado:
     "Não conseguimos marcar como gravado agora. Toque em Já gravei de novo em alguns instantes.",
   erroMarcarGravadoSemRede: "Sem conexão agora. Toque em Já gravei de novo quando a rede voltar.",
+  erroDesmarcarGravado: "Não conseguimos desfazer agora. Tente de novo em alguns instantes.",
+  erroDesmarcarGravadoSemRede: "Sem conexão agora. Tente desfazer de novo quando a rede voltar.",
   erroSalvarLink:
     "Não conseguimos salvar o link agora. O que você colou continua aqui; tente de novo.",
   erroCopiar: "Não conseguimos copiar o texto agora. Tente de novo.",

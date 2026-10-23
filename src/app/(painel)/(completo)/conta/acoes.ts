@@ -1,5 +1,6 @@
 "use server";
 
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import {
@@ -40,6 +41,7 @@ export async function salvarContaAction(dados: {
 }): Promise<ResultadoAcao<{ pedidoDeRamo: PedidoDeRamoNaTela | null | undefined }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   const cliente = await clienteDaSessaoAtual();

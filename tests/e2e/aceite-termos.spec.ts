@@ -184,7 +184,7 @@ test.describe("aceite dos termos no primeiro acesso", () => {
     const guardamos = "o que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou";
 
     await page.goto("/termos");
-    await expect(page.getByText("atualizado em 9 de outubro de 2026")).toBeVisible();
+    await expect(page.getByText("atualizado em 22 de outubro de 2026")).toBeVisible();
     await expect(page.getByText(leitura)).toBeVisible();
 
     await page.goto("/privacidade");

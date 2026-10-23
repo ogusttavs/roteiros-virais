@@ -15,6 +15,7 @@ import { asc, count, eq, gte, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { chamadasMetaApi, configuracaoAdmin } from "@/db/schema";
 import { config } from "@/lib/config";
+import { provaDoSegredo } from "@/lib/meta-oauth";
 
 const BASE = "https://graph.facebook.com/v26.0";
 
@@ -281,24 +282,33 @@ export async function aguardarJanela(opts?: {
   }
 }
 
-async function chamar<T>(caminho: string, parametros: Record<string, string>): Promise<T> {
+/**
+ * `tokenDaConta` (E19 PR 1): o token de uma conta ligada pela propria pessoa (`servicos/conta-conectada.ts`). Sem ele, a chamada e a de sempre, pelo token do usuario do sistema (V8).
+ * Com ele, a chamada e feita COM O ACESSO DA PESSOA e so enxerga o que ela liberou; a pausa da Meta (limite do aplicativo) e o ritmo entre chamadas valem do mesmo jeito, mas a janela
+ * de 200 por hora e o registro dela NAO: aquele limite e da conta chamadora do sistema (Business Discovery, item i do plano), e a conta da pessoa tem o limite dela. O endereco leva o
+ * token (e a `appsecret_proof`, quando o segredo do aplicativo existe): nunca vai para log, nem aqui nem em erro.
+ */
+async function chamar<T>(caminho: string, parametros: Record<string, string>, tokenDaConta?: string): Promise<T> {
   const pausa = await pausaVigenteDaMeta();
   if (pausa) throw new PausaDaMeta(pausa);
-  await aguardarJanela();
+  if (tokenDaConta === undefined) await aguardarJanela();
   await esperarRitmo();
 
   const url = new URL(`${BASE}/${caminho}`);
   for (const [chave, valor] of Object.entries(parametros)) {
     url.searchParams.set(chave, valor);
   }
-  url.searchParams.set("access_token", config.coleta.metaToken);
+  url.searchParams.set("access_token", tokenDaConta ?? config.coleta.metaToken);
+  if (tokenDaConta !== undefined && config.metaConexao.appSecret) {
+    url.searchParams.set("appsecret_proof", provaDoSegredo(tokenDaConta));
+  }
 
   /**
    * Antes do `fetch`, nao depois (correcao 5): uma chamada que falha na
    * rede tambem conta para o limite de 200/hora da Meta (a Meta ja recebeu
    * a requisicao antes de ela falhar do lado de ca).
    */
-  await registrarChamada();
+  if (tokenDaConta === undefined) await registrarChamada();
   const resposta = await fetch(url);
 
   // O quanto do limite do aplicativo já foi usado: passou do limite, a pausa começa agora (esta resposta ainda vale; a próxima chamada é que não sai).
@@ -343,13 +353,14 @@ export async function buscarTodasAsPaginas<T>(
   caminho: string,
   parametros: Record<string, string>,
   maxPaginas = 10,
+  tokenDaConta?: string,
 ): Promise<T[]> {
   let resultado: T[] = [];
   let after: string | undefined;
 
   for (let i = 0; i < maxPaginas; i += 1) {
     const params = after ? { ...parametros, after } : parametros;
-    const resposta = await chamar<{ data?: T[]; paging?: MetaPaginacao }>(caminho, params);
+    const resposta = await chamar<{ data?: T[]; paging?: MetaPaginacao }>(caminho, params, tokenDaConta);
     resultado = resultado.concat(resposta.data ?? []);
     after = resposta.paging?.cursors?.after;
     if (!after) break;
@@ -511,8 +522,8 @@ const CAMPOS_MEDIA_DA_CONTA = "permalink,media_type,media_product_type,like_coun
  * paginas (250 midias) cobrem de sobra um cliente que posta com frequencia
  * normal e cujo video tem no maximo 30 dias (`LIMITE_DIAS` de `curva.ts`).
  */
-export async function buscarMediaDaConta(igId: string, maxPaginas = 10): Promise<MetaMediaItem[]> {
-  return buscarTodasAsPaginas<MetaMediaItem>(`${igId}/media`, { fields: CAMPOS_MEDIA_DA_CONTA }, maxPaginas);
+export async function buscarMediaDaConta(igId: string, maxPaginas = 10, tokenDaConta?: string): Promise<MetaMediaItem[]> {
+  return buscarTodasAsPaginas<MetaMediaItem>(`${igId}/media`, { fields: CAMPOS_MEDIA_DA_CONTA }, maxPaginas, tokenDaConta);
 }
 
 /**
@@ -520,8 +531,8 @@ export async function buscarMediaDaConta(igId: string, maxPaginas = 10): Promise
  * (V8, item 2, "nas seguintes leia a midia direto pelo id, uma chamada so"):
  * evita listar a conta inteira de novo a cada medicao.
  */
-export async function buscarMediaPorId(mediaId: string): Promise<MetaMediaItem> {
-  return chamar<MetaMediaItem>(mediaId, { fields: CAMPOS_MEDIA_DA_CONTA });
+export async function buscarMediaPorId(mediaId: string, tokenDaConta?: string): Promise<MetaMediaItem> {
+  return chamar<MetaMediaItem>(mediaId, { fields: CAMPOS_MEDIA_DA_CONTA }, tokenDaConta);
 }
 
 /** Mesmos campos do `top_media`, mais `media_product_type` (distingue REELS de VIDEO puro, como a Business Discovery). */

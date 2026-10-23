@@ -5,6 +5,7 @@ import type { Objetivo } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
@@ -31,6 +32,7 @@ import { textosPesquisa } from "@/textos/pesquisa";
  */
 export async function lerMomentoDeTextoAction(texto: string): Promise<CamposMomento> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
@@ -88,6 +90,7 @@ function textoObrigatorio(valor: string): string {
 export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<ResultadoAcao<{ id: number }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");

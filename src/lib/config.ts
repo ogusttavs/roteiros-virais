@@ -57,6 +57,15 @@ export const config = {
     modeloForte: env("AI_MODEL_FORTE", "claude-opus-5"),
     modeloBarato: env("AI_MODEL_BARATO", "claude-haiku-4-5"),
   },
+  /**
+   * E17 parte 1 (refeita em 23/10/2026, ajustada pela medição com dados reais): a prova do Tema livre por significado. Desligada por padrão, até a Central ligar.
+   * Uma chave só: a busca nova sem o modelo traz mais prova sem relação (78% de lixo no ramo 5, contra 61% da busca antiga), então as duas partes andam juntas.
+   * Ligada, em toda busca do Tema livre o modelo barato lê o conjunto elegível do setor (até 200 vídeos, uns US$ 0,009 por tema no maior setor, com cache) e devolve só
+   * os que tratam do mesmo assunto; se ele não responde, vale a busca por palavra de sempre.
+   */
+  busca: {
+    porSignificado: env("BUSCA_POR_SIGNIFICADO") === "1",
+  },
   transcricao: {
     groqKey: env("GROQ_API_KEY"),
     groqModel: env("GROQ_MODEL", "whisper-large-v3-turbo"),
@@ -133,6 +142,30 @@ export const config = {
     de: env("EMAIL_FROM", "painel@localhost"),
   },
   /**
+   * E19 PR 1, o Instagram ligado pela própria pessoa (Login do Facebook para Empresas, fluxo de código). `appId` e `appSecret` são do aplicativo da Meta; `loginConfigId` é o
+   * `config_id` da configuração de login criada no painel da Meta (define as permissões e os ativos pedidos); `tokenChave` cifra o token de cada conta ligada (AES-256-GCM,
+   * 32 bytes em base64 ou em 64 caracteres hexadecimais; `openssl rand -base64 32`). `redirectUri` é a URI cadastrada no aplicativo, exata. `ativa` só com os quatro dados: sem
+   * eles, ninguém consegue começar a ligação e a curva segue pelos outros dois caminhos, sem erro de boot.
+   */
+  metaConexao: {
+    appId: env("META_APP_ID"),
+    appSecret: env("META_APP_SECRET"),
+    loginConfigId: env("META_LOGIN_CONFIG_ID"),
+    tokenChave: env("META_TOKEN_CHAVE"),
+    redirectUri: env("META_REDIRECT_URI", `${env("APP_URL", "http://localhost:3000")}/api/meta/retorno`),
+    ativa: env("META_APP_ID") !== "" && env("META_APP_SECRET") !== "" && env("META_LOGIN_CONFIG_ID") !== "" && env("META_TOKEN_CHAVE") !== "",
+    /**
+     * E19 PR 2: `META_APP_APROVADO=1` quando a Meta aprovar o aplicativo para todo mundo. Enquanto não for, o aplicativo está em modo de desenvolvimento e só quem tem papel nele
+     * consegue passar pelo diálogo; a tela de Conta avisa isso com calma (`textos/conta-conectada.ts`, `tela.emTeste`).
+     */
+    aprovadoPelaMeta: env("META_APP_APROVADO") === "1",
+    /**
+     * E19 PR 2, só para o e2e: o endereço de um servidor local que faz o papel do diálogo e da Graph API da Meta. Só vale com `MODO_E2E=1` (que
+     * `verificarSegredosDeProducao` recusa fora de localhost); em qualquer outro caso fica vazio e as chamadas vão à Meta de verdade.
+     */
+    simuladorE2E: env("MODO_E2E") === "1" ? env("META_SIMULADOR_E2E") : "",
+  },
+  /**
    * E48 PR 2: as chaves VAPID do aviso por push (gerar com `npx web-push generate-vapid-keys`). Sem elas nenhum push sai e o lembrete continua por
    * e-mail para todo mundo. A chave pública também vai ao navegador (a tela a recebe do servidor, em tempo de execução: `NEXT_PUBLIC_*` pediria
    * a chave no build da imagem). `subject` é um `mailto:` ou uma URL do responsável.
@@ -179,13 +212,22 @@ export const config = {
     notaMinimaTema: 9,
     vigilanciaPorNicho: 50,
     limiarForaDaCurva: 3,
-    transcricoesPorDia: 40,
+    /**
+     * Quantos vídeos o `transcrever` lê por noite em cada setor (era uma constante, 40). Achado de 23/10/2026: o ramo 5 tinha 3.523 vídeos acima do piso e só 109 lidos, e 40 por noite
+     * levariam três meses para esvaziar a fila. O setor com ao menos uma marca ativa (`setoresComMarcaAtiva`) lê `transcricoesPorDiaComMarca` (100); os outros ficam no padrão. Dentro do
+     * teto a fila vai pelos vídeos acima do piso de maior "fora da curva" (e pelos que sobem hoje, antes). O que limita de verdade é o tempo (cerca de 52 s por vídeo do YouTube), por isso o
+     * setor com marca também ganha mais orçamento de tempo (`orcamentoTranscreverPorSetorComMarcaMin`).
+     */
+    transcricoesPorDia: envNumero("TRANSCRICOES_POR_DIA", 40),
+    transcricoesPorDiaComMarca: envNumero("TRANSCRICOES_POR_DIA_COM_MARCA", 100),
     /**
      * Orçamento de tempo do `transcrever` por setor, em minutos (M5c): passou disto, o setor para (o que sobrou fica para
      * a noite seguinte: a fila é por vídeo ainda sem leitura) e o job passa ao próximo setor. Sem isto, um setor lento
      * (o YouTube pelo proxy, 4 minutos por vídeo) comia a madrugada inteira e os setores seguintes ficavam a zero.
      */
     orcamentoTranscreverPorSetorMin: envNumero("ORCAMENTO_TRANSCREVER_SETOR_MIN", 30),
+    /** O mesmo orçamento para o setor com marca ativa, que lê mais vídeos por noite (100 vídeos do YouTube a cerca de 52 s cada pedem uns 90 minutos). Sai do teto do job inteiro, depois de reservar o orçamento comum dos setores que faltam. */
+    orcamentoTranscreverPorSetorComMarcaMin: envNumero("ORCAMENTO_TRANSCREVER_SETOR_COM_MARCA_MIN", 90),
     /**
      * Teto do `transcrever` inteiro, em minutos (M5c): 3h30, abaixo das 4 horas em que a fila dá o job por vencido. O orçamento
      * de cada setor é o menor entre o seu e o que sobra deste teto dividido pelos setores que faltam, então nenhum setor
@@ -341,6 +383,21 @@ export class ErroConfiguracao extends Error {}
  * esse passo de build do servidor rodando de verdade (etapa 4, achado ao
  * rodar `npm run build` local com o .env.example ainda no .env).
  */
+/** A chave que cifra o token das contas ligadas tem 32 bytes (base64 ou 64 caracteres hexadecimais)? Mora aqui para o carregamento da configuração conferir sem importar o módulo que cifra. */
+export function chaveDoTokenValida(valor: string | undefined): boolean {
+  return Boolean(valor) && bytesDaChaveDoToken(valor as string) !== null;
+}
+
+/** Os 32 bytes da chave, ou `null` quando o valor não é uma chave válida. */
+export function bytesDaChaveDoToken(valor: string): Buffer | null {
+  if (/^[0-9a-fA-F]{64}$/.test(valor)) return Buffer.from(valor, "hex");
+  if (/^[A-Za-z0-9+/_-]{42,43}={0,2}$/.test(valor)) {
+    const bytes = Buffer.from(valor.replaceAll("-", "+").replaceAll("_", "/"), "base64");
+    return bytes.length === 32 ? bytes : null;
+  }
+  return null;
+}
+
 /** `null` sem host valido (URL ausente ou malformada): tratado como reprovado por MODO_E2E. */
 function hostDeUrl(valor: string | undefined): string | null {
   if (!valor) return null;
@@ -363,6 +420,10 @@ export function verificarSegredosDeProducao(
     COBRANCA_ATIVA?: string;
     STRIPE_SECRET_KEY?: string;
     STRIPE_WEBHOOK_SECRET?: string;
+    META_APP_ID?: string;
+    META_APP_SECRET?: string;
+    META_LOGIN_CONFIG_ID?: string;
+    META_TOKEN_CHAVE?: string;
   } = process.env,
 ): void {
   if (env.NODE_ENV !== "production") return;
@@ -389,6 +450,21 @@ export function verificarSegredosDeProducao(
     }
     if (!env.STRIPE_WEBHOOK_SECRET) {
       throw new ErroConfiguracao("COBRANCA_ATIVA=1 exige STRIPE_WEBHOOK_SECRET; sem ele o webhook recusa todo evento e a assinatura nunca vira ativa.");
+    }
+  }
+
+  /**
+   * E19 PR 1: a ligação do Instagram guarda um token de acesso por conta. Qualquer um dos dados da ligação preenchido exige os quatro, e a chave que cifra o token precisa ter 32 bytes
+   * (base64 ou 64 caracteres hexadecimais): subir com a ligação pela metade deixaria a pessoa chegar ao diálogo da Meta e voltar sem poder guardar o token, ou, pior, guardar com uma chave
+   * fraca. Melhor não subir do que subir assim.
+   */
+  const dadosDaLigacao = [env.META_APP_ID, env.META_APP_SECRET, env.META_LOGIN_CONFIG_ID, env.META_TOKEN_CHAVE];
+  if (dadosDaLigacao.some(Boolean)) {
+    if (!dadosDaLigacao.every(Boolean)) {
+      throw new ErroConfiguracao("A ligacao do Instagram exige META_APP_ID, META_APP_SECRET, META_LOGIN_CONFIG_ID e META_TOKEN_CHAVE juntos; falta pelo menos um.");
+    }
+    if (!chaveDoTokenValida(env.META_TOKEN_CHAVE)) {
+      throw new ErroConfiguracao("META_TOKEN_CHAVE precisa ter 32 bytes (base64 de 32 bytes, p. ex. `openssl rand -base64 32`, ou 64 caracteres hexadecimais).");
     }
   }
 

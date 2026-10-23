@@ -9,9 +9,9 @@ import Stripe from "stripe";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
-import { assinaturas, clientes, eventosStripe, membrosMarca, nichos, user } from "@/db/schema";
+import { assinaturas, checkoutsStripe, clientes, eventosStripe, membrosMarca, nichos, user } from "@/db/schema";
 import { config } from "@/lib/config";
-import { chamadasSimuladas, usarPortaStripe, type EventoDoStripe, type PortaStripe } from "@/lib/stripe";
+import { chamadasSimuladas, limparSessoesSimuladas, usarPortaStripe, type EventoDoStripe, type PortaStripe } from "@/lib/stripe";
 import { listarContasAdmin } from "@/servicos/admin-contas";
 import { trocarCortesiaDaConta } from "@/servicos/admin-trocas";
 import { abrirPortalDaAssinatura, ErroAssinatura, frasesDaAssinatura, iniciarAssinatura, marcaPrecisaAssinar, tratarEventoDoStripe } from "@/servicos/assinatura";
@@ -85,7 +85,21 @@ beforeAll(async () => {
   ]);
 }, 30_000);
 
+/** Uma porta que não faz nada (para os testes trocarem só o método que importa). */
+function portaSemNada(): PortaStripe {
+  return {
+    precoDoPlano: vi.fn(),
+    criarCheckout: vi.fn(),
+    sessaoAberta: vi.fn(),
+    expirarSessao: vi.fn(),
+    criarPortal: vi.fn(),
+    cancelarAssinatura: vi.fn(),
+  };
+}
+
 beforeEach(async () => {
+  await db().delete(checkoutsStripe);
+  limparSessoesSimuladas();
   await db().delete(assinaturas);
   await db().delete(eventosStripe);
   await db().update(clientes).set({ cortesia: false });
@@ -252,6 +266,39 @@ describe("o tratamento de cada evento", () => {
     expect((await linhas())[0].status).toBe("active");
   });
 
+  it("checkout (mais novo) antes da assinatura (mais velha): a assinatura nao muda o status, mas preenche periodo, preco e cliente que ficaram vazios", async () => {
+    const sub = "sub_fora_de_ordem";
+    await tratarEventoDoStripe(eventoDeCheckout({ clienteId: marcaA, assinaturaId: sub, clienteStripeId: "cus_fo", criadoEm: T0 + 1 }));
+    const [antes] = (await linhas()).filter((l) => l.stripeAssinaturaId === sub);
+    expect(antes).toMatchObject({ status: "active", stripePrecoId: null, periodoFim: null });
+    expect(await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.created", { clienteId: marcaA, assinaturaId: sub, clienteStripeId: "cus_fo", status: "incomplete", criadoEm: T0, precoId: "price_fo", inicio: T0, fim: T0 + 90 * SEGUNDOS.DIA }))).toBe("tratado");
+    const [depois] = (await linhas()).filter((l) => l.stripeAssinaturaId === sub);
+    expect(depois).toMatchObject({ status: "active", stripePrecoId: "price_fo" });
+    expect(depois.periodoInicio?.getTime()).toBe(T0 * 1000);
+    expect(depois.periodoFim?.getTime()).toBe((T0 + 90 * SEGUNDOS.DIA) * 1000);
+    // O instante do último evento que mexeu no status continua o do checkout.
+    expect(depois.ultimoEventoEm.getTime()).toBe((T0 + 1) * 1000);
+  });
+
+  it("na ordem certa (assinatura, depois checkout) a linha fica igual: completa e active", async () => {
+    const sub = "sub_na_ordem";
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.created", { clienteId: marcaA, assinaturaId: sub, clienteStripeId: "cus_no", status: "active", criadoEm: T0, precoId: "price_no", inicio: T0, fim: T0 + 90 * SEGUNDOS.DIA }));
+    await tratarEventoDoStripe(eventoDeCheckout({ clienteId: marcaA, assinaturaId: sub, clienteStripeId: "cus_no", criadoEm: T0 + 1 }));
+    const [l] = (await linhas()).filter((x) => x.stripeAssinaturaId === sub);
+    expect(l).toMatchObject({ status: "active", stripePrecoId: "price_no", stripeClienteId: "cus_no" });
+    expect(l.periodoFim?.getTime()).toBe((T0 + 90 * SEGUNDOS.DIA) * 1000);
+  });
+
+  it("evento mais velho nao sobrescreve periodo e preco que ja existem (so preenche o vazio) e nao reabre o status", async () => {
+    const sub = "sub_so_vazio";
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { clienteId: marcaA, assinaturaId: sub, status: "past_due", criadoEm: T0 + 100, precoId: "price_novo", inicio: T0 + 100, fim: T0 + 190 * SEGUNDOS.DIA }));
+    await tratarEventoDoStripe(eventoDeFatura("invoice.paid", { clienteId: marcaA, assinaturaId: sub, criadoEm: T0 + 50, inicio: T0, fim: T0 + 90 * SEGUNDOS.DIA }));
+    const [l] = (await linhas()).filter((x) => x.stripeAssinaturaId === sub);
+    expect(l.status).toBe("past_due");
+    expect(l.stripePrecoId).toBe("price_novo");
+    expect(l.periodoFim?.getTime()).toBe((T0 + 190 * SEGUNDOS.DIA) * 1000);
+  });
+
   it("cancelada e final: nenhum evento depois, nem do mesmo segundo, ressuscita (reassinar cria outra assinatura no Stripe)", async () => {
     await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.deleted", { clienteId: marcaA, assinaturaId: "sub_final", criadoEm: T0 + 100 }));
     await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { clienteId: marcaA, assinaturaId: "sub_final", status: "active", criadoEm: T0 + 100 }));
@@ -374,7 +421,7 @@ describe("comecar a assinar e o portal", () => {
   });
 
   it("preco nao encontrado no Stripe: frase para a pessoa, nenhum checkout criado", async () => {
-    const porta: PortaStripe = { precoDoPlano: async () => null, criarCheckout: vi.fn(), criarPortal: vi.fn() };
+    const porta: PortaStripe = { ...portaSemNada(), precoDoPlano: async () => null, criarCheckout: vi.fn() };
     usarPortaStripe(porta);
     await expect(iniciarAssinatura(dono, { id: marcaA })).rejects.toThrow(frasesDaAssinatura.semPlano);
     expect(porta.criarCheckout).not.toHaveBeenCalled();
@@ -382,11 +429,11 @@ describe("comecar a assinar e o portal", () => {
 
   it("erro do Stripe vira a frase de 'tente de novo', sem vazar a mensagem tecnica", async () => {
     const porta: PortaStripe = {
+      ...portaSemNada(),
       precoDoPlano: async () => ({ id: "price_x" }),
       criarCheckout: async () => {
         throw new Error("Invalid API Key provided: rk_test_vazou_aqui");
       },
-      criarPortal: vi.fn(),
     };
     usarPortaStripe(porta);
     const erro = await iniciarAssinatura(dono, { id: marcaA }).catch((e) => e);

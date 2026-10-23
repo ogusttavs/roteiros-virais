@@ -17,6 +17,7 @@ export const textosAdmin = {
     equipe: "admin",
     inicio: "Início",
     clientes: "Contas",
+    interessados: "Interessados",
     nichos: "Ramos",
     jobs: "Rotinas",
     geracoes: "Gerações",

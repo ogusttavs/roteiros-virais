@@ -32,9 +32,10 @@ const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/api/versao", "/termos", "/pri
  * testes chamam a funcao da rota direto, sem passar pelo middleware, entao
  * esse redirecionamento nunca tinha sido pego antes. `/api/webhooks/stripe` (E22 PR 1)
  * tambem: quem chama e o Stripe, sem cookie; a rota confere a assinatura do corpo com
- * `STRIPE_WEBHOOK_SECRET` antes de qualquer coisa.
+ * `STRIPE_WEBHOOK_SECRET` antes de qualquer coisa. `/api/meta/exclusao` (E19 PR 1) tambem: quem chama e a Meta, sem cookie; a rota confere a assinatura do
+ * `signed_request` com o segredo do aplicativo. Ja `/api/meta/conectar` e `/api/meta/retorno` NAO entram aqui: sao da pessoa logada, e sem cookie de sessao vao para `/entrar`.
  */
-const ROTAS_COM_AUTENTICACAO_PROPRIA = ["/api/jobs", "/api/webhooks/stripe"];
+const ROTAS_COM_AUTENTICACAO_PROPRIA = ["/api/jobs", "/api/webhooks/stripe", "/api/meta/exclusao"];
 
 /**
  * `/roteiros/[id]/imprimir` (roteiro em PDF, `PROXIMO.md`, acabamento do
@@ -49,10 +50,19 @@ function ehImpressaoDeRoteiro(pathname: string): boolean {
   return pathname.startsWith("/roteiros/") && pathname.endsWith("/imprimir");
 }
 
+/**
+ * `/` (E57a): a pagina de vendas e de captura ("Quero testar"). So a raiz EXATA e publica; `startsWith("/")` em `ROTAS_PUBLICAS` abriria o aplicativo inteiro, entao a raiz tem a
+ * checagem propria. Quem ja esta com sessao e levado ao painel pela propria pagina (`src/app/page.tsx`). A Server Action do formulario chega por POST nesta mesma raiz.
+ */
+function ehPaginaDeEntrada(pathname: string): boolean {
+  return pathname === "/";
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
+    ehPaginaDeEntrada(pathname) ||
     ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota)) ||
     ROTAS_COM_AUTENTICACAO_PROPRIA.some((rota) => pathname.startsWith(rota)) ||
     ehImpressaoDeRoteiro(pathname)

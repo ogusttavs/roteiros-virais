@@ -29,6 +29,20 @@ describe("middleware", () => {
     expect(foiRedirecionada(middleware(requisicao("/entrar")))).toBe(false);
   });
 
+  it("/ (a pagina de vendas e de captura, E57a) passa sem cookie de sessao", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/")))).toBe(false);
+  });
+
+  it("so a raiz exata e publica: o resto do aplicativo continua pedindo sessao", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    for (const caminho of ["/hoje", "/criar", "/admin", "/admin/interessados", "/roteiros/1", "/qualquer-coisa"]) {
+      const resposta = middleware(requisicao(caminho));
+      expect(resposta.status, caminho).toBe(307);
+      expect(new URL(resposta.headers.get("location")!).pathname).toBe("/entrar");
+    }
+  });
+
   it("/dados passa sem cookie de sessao (rota publica, exclusao de dados da Meta, E6 parte 3, item 8)", () => {
     vi.mocked(getSessionCookie).mockReturnValue(null);
     expect(foiRedirecionada(middleware(requisicao("/dados")))).toBe(false);
@@ -52,6 +66,15 @@ describe("middleware", () => {
   it("/api/webhooks/stripe passa sem cookie de sessao (autenticacao propria: a assinatura do corpo)", () => {
     vi.mocked(getSessionCookie).mockReturnValue(null);
     expect(foiRedirecionada(middleware(requisicao("/api/webhooks/stripe")))).toBe(false);
+  });
+
+  it("E19: so o aviso de exclusao da Meta passa sem cookie; o comeco e a volta da ligacao do Instagram continuam atras da sessao; a pagina de status e publica", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/api/meta/exclusao")))).toBe(false);
+    expect(foiRedirecionada(middleware(requisicao("/api/meta/conectar")))).toBe(true);
+    expect(foiRedirecionada(middleware(requisicao("/api/meta/retorno")))).toBe(true);
+    expect(foiRedirecionada(middleware(requisicao("/api/meta/outra")))).toBe(true);
+    expect(foiRedirecionada(middleware(requisicao("/dados/exclusao")))).toBe(false);
   });
 
   it("outra rota de webhooks, ou o prefixo parecido, continua protegida", () => {

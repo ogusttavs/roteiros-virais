@@ -129,7 +129,7 @@ export async function avaliarMomentos(): Promise<ResultadoAvaliarMomentos> {
         effort: verificarTextoIA.esforco,
         schema: verificarTextoIA.schema,
         sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro", true),
-        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [], fontes: montarFontesDosFatos({ perfilCompilado: caso.perfilCompilado, camadaExclusiva: caso.camadaExclusiva, momento: { onde: caso.onde, oQueEstaAcontecendo: caso.oQueEstaAcontecendo, oQueDaParaMostrar: caso.oQueDaParaMostrar }, marcaCitada: caso.marcaCitada }) }),
+        entrada: verificarTextoIA.montarEntrada({ texto: verificarTextoIA.montarTextoParaConferir(campos, true), proibicoes: [], fontes: montarFontesDosFatos({ perfilCompilado: caso.perfilCompilado, camadaExclusiva: caso.camadaExclusiva, momento: { onde: caso.onde, oQueEstaAcontecendo: caso.oQueEstaAcontecendo, oQueDaParaMostrar: caso.oQueDaParaMostrar }, marcaCitada: caso.marcaCitada }) }),
       }),
     })),
   });

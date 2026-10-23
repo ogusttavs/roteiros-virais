@@ -241,6 +241,22 @@ describe("montarSistemaEstavel", () => {
     expect(sistema).toContain("- nao citar concorrente (fraca)");
   });
 
+  // E16, nível conta: o que rendeu nos vídeos já postados DESTA marca. Sem texto, o sistema é o de antes.
+  it("sem desempenhoDaConta (ausente ou vazio), o sistema é idêntico: nenhum bloco", () => {
+    const base = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [] });
+    expect(montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], desempenhoDaConta: "" })).toBe(base);
+    expect(base).not.toContain("já postou");
+  });
+
+  it("com desempenhoDaConta, o bloco traz a tendência, as linhas e a proibição de citar os números", () => {
+    const linha = "- Vídeos que abrem com um número (4 vídeos): renderam 2,5 vezes o normal da conta.";
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], desempenhoDaConta: linha });
+    expect(sistema).toContain("O que funcionou nos vídeos que este cliente já postou");
+    expect(sistema).toContain("É tendência dele, não regra");
+    expect(sistema).toContain("Nunca cite estes números");
+    expect(sistema).toContain(linha);
+  });
+
   // V9b, item 0.1 (revisao do PR #55): "negocio" pode usar a primeira pessoa do singular quando
   // quem grava conta a propria experiencia; so nao pode inventar um "nos" que nao existe.
   it("tipo negocio: instrui a voz da marca, mas permite primeira pessoa do singular na experiencia de quem grava", () => {
@@ -430,7 +446,7 @@ describe("o roteiro não inventa fato (04/10/2026)", () => {
   const SISTEMA = montarSistemaEstavel({ perfilCompilado: "perfil", modeloNicho: "modelo", camadaExclusiva: "camada", regrasCliente: [], tipo: "negocio", formato: "reels", estilo: "falado" });
 
   it("a versão do prompt subiu e a regra dura está no sistema, com o espaço marcado entre colchetes", () => {
-    expect(versao).toBe("2.21.0");
+    expect(versao).toBe("2.22.0");
     expect(SISTEMA).toContain("Nenhum fato que ninguém contou");
     expect(SISTEMA).toContain("[diga aqui onde você está]");
     expect(SISTEMA).toContain("Nunca invente cena para dar vida ao texto");
@@ -525,7 +541,7 @@ describe("a pergunta do público presa ao roteiro (E28, parte 3)", () => {
   });
 
   it("a versão do prompt subiu", () => {
-    expect(versao).toBe("2.21.0");
+    expect(versao).toBe("2.22.0");
   });
 });
 

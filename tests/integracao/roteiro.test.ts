@@ -46,6 +46,7 @@ import { boss, FILAS } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
 import { evidenciaParaRoteiro, evidenciaPorIds } from "@/servicos/pesquisa";
 import {
+  desmarcarGravado,
   editarRoteiro,
   ErroRoteiro,
   gerarRoteiro,
@@ -1340,6 +1341,48 @@ describe("marcarGravado e marcarPostado", () => {
 
     const atualizado = await marcarGravado(roteiro.id);
     expect(atualizado.status).toBe("gravado");
+  });
+
+  it("desmarcarGravado volta o roteiro gravado para gerado e limpa a hora", async () => {
+    const clienteId = await criarCliente();
+    const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "limpeza de sofa", objetivo: "alcance" });
+    const gravado = await marcarGravado(roteiro.id);
+    expect(gravado.gravadoEm).not.toBeNull();
+
+    const desfeito = await desmarcarGravado(roteiro.id, clienteId);
+
+    expect(desfeito.status).toBe("gerado");
+    expect(desfeito.gravadoEm).toBeNull();
+    const lido = await roteiroPorId(roteiro.id, clienteId);
+    expect(lido?.status).toBe("gerado");
+    expect(lido?.gravadoEm).toBeNull();
+  });
+
+  it("desmarcarGravado recusa o roteiro que nao esta gravado (gerado ou postado) e nao mexe nele", async () => {
+    const clienteId = await criarCliente();
+    const gerado = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "limpeza de colchao", objetivo: "alcance" });
+    await expect(desmarcarGravado(gerado.id, clienteId)).rejects.toThrow(ErroRoteiro);
+
+    const postado = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "limpeza de tapete", objetivo: "alcance" });
+    await marcarGravado(postado.id);
+    await marcarPostado(postado.id, "https://www.tiktok.com/@sofalimpo/video/987654321");
+    await expect(desmarcarGravado(postado.id, clienteId)).rejects.toThrow(ErroRoteiro);
+    const lido = await roteiroPorId(postado.id, clienteId);
+    expect(lido?.status).toBe("postado");
+    expect(lido?.gravadoEm).not.toBeNull();
+  });
+
+  it("desmarcarGravado recusa o roteiro de outra marca e nao mexe nele", async () => {
+    const dono = await criarCliente();
+    const outro = await criarCliente();
+    const roteiro = await gerarRoteiro(dono, { origem: "livre", textoTema: "limpeza de cortina", objetivo: "alcance" });
+    await marcarGravado(roteiro.id);
+
+    await expect(desmarcarGravado(roteiro.id, outro)).rejects.toThrow(ErroRoteiro);
+
+    const lido = await roteiroPorId(roteiro.id, dono);
+    expect(lido?.status).toBe("gravado");
+    expect(lido?.gravadoEm).not.toBeNull();
   });
 
   it("marcarPostado cria o video do cliente, infere a plataforma pelo dominio, e muda o status", async () => {

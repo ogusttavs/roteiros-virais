@@ -12,8 +12,8 @@ type Secao = { titulo: string; paragrafos: string[] };
  * `/termos` e `/privacidade` (etapa 12, decisão 7 do `PROXIMO.md`,
  * `EntrarContaTela.dc.html`, quadro "texto"): página pública, sem sessão.
  * O aviso de revisão jurídica pendente só aparece fora de produção.
- * "voltar" leva a `/hoje` (etapa 13, ajuste 2): com sessão cai no painel; sem
- * sessão, o middleware manda para `/entrar`.
+ * "voltar" leva a `/` (E57a; antes era `/hoje`, etapa 13, ajuste 2): com sessão a
+ * própria raiz manda para o painel; sem sessão, mostra a página de entrada, de onde a pessoa veio.
  */
 export function PaginaLegal({ titulo, secoes }: { titulo: string; secoes: Secao[] }) {
   const emDesenvolvimento = process.env.NODE_ENV !== "production";
@@ -23,7 +23,7 @@ export function PaginaLegal({ titulo, secoes }: { titulo: string; secoes: Secao[
       <div className={styles.envoltorio}>
         <div className={styles.cabecalho}>
           <Simbolo altura={24} />
-          <Link href="/hoje" className={styles.voltar}>
+          <Link href="/" className={styles.voltar}>
             <ArrowLeft size={18} strokeWidth={1.5} aria-hidden="true" />
             {textosTermos.voltar}
           </Link>

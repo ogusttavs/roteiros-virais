@@ -70,6 +70,7 @@ import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa, noticiaDeOrigemGuardada, noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
+import { desempenhoDaConta } from "./desempenho-da-conta";
 import { montarEntregaDaPesquisa, paraEntradaDaPesquisa } from "./entrega-da-pesquisa";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { noticiaPorId } from "./noticias";
@@ -1059,6 +1060,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     modeloNichoLinha,
     roteirosRecentesDoBanco,
     regrasCliente,
+    desempenhoMedido,
     ultimosRoteirosDoBanco,
     marcaCitada,
     vozesDoSetorAtual,
@@ -1071,6 +1073,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     modeloNichoAtual(nichoId),
     historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
     regrasAtivasDoCliente(dados.clienteId),
+    // E16, nível conta: o que rendeu nos vídeos já postados DESTA marca (vazio sem dado suficiente; o roteiro longo não recebe).
+    ehLongo ? Promise.resolve("") : desempenhoDaConta(dados.clienteId),
     ultimosRoteirosParaAbertura(dados.clienteId),
     marcaCitadaPorId(dados.momento?.marcaId, dados.clienteId),
     // E28: o que o público do setor perguntou nos comentários de vídeos do YouTube (sem leitura, com a leitura velha e no roteiro do momento: nada; a cena é a única fonte).
@@ -1293,6 +1297,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       redePrincipal: dados.cliente.redePrincipal,
       duracaoTipicaMaxS: modeloNichoLinha?.modelo.duracaoTipicaS?.max,
       regrasCliente,
+      desempenhoDaConta: desempenhoMedido,
       tipo: dados.cliente.tipo,
       persona: dados.cliente.persona,
       quemAparece: quemApareceResolvido,
@@ -1940,6 +1945,21 @@ export async function marcarGravado(roteiroId: number): Promise<RoteiroLinha> {
     .where(eq(roteiros.id, roteiroId))
     .returning();
   if (!roteiro) throw new ErroRoteiro("roteiro nao encontrado.");
+  return roteiro;
+}
+
+/**
+ * "Ainda não gravei": desfaz um "Já gravei" tocado sem querer (achado do uso real, 22/10/2026). Só volta
+ * quem está `gravado`; um roteiro `postado` (ou ainda `gerado`) nunca é tocado, e a posse entra na própria
+ * condição do UPDATE (marca da sessão), para o dado de outra marca nem existir para esta chamada.
+ */
+export async function desmarcarGravado(roteiroId: number, clienteId: number): Promise<RoteiroLinha> {
+  const [roteiro] = await db()
+    .update(roteiros)
+    .set({ status: "gerado", gravadoEm: null })
+    .where(and(eq(roteiros.id, roteiroId), eq(roteiros.clienteId, clienteId), eq(roteiros.status, "gravado")))
+    .returning();
+  if (!roteiro) throw new ErroRoteiro("roteiro nao esta gravado.");
   return roteiro;
 }
 

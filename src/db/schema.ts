@@ -1259,6 +1259,18 @@ export const videos = pgTable(
       sql`to_tsvector('portuguese', coalesce(titulo, '') || ' ' || coalesce(descricao, '') || ' ' || coalesce(transcricao, '') || ' ' || coalesce(analise ->> 'assunto', ''))`,
     ),
     /**
+     * E17 parte 1 (refeita em 23/10/2026): a busca por significado com o que o Postgres já traz. Título, assunto e os primeiros 1.500 caracteres da transcrição,
+     * sem acento e com radical em português ("sofá" acha "sofas", "dente" acha "dentes"). `f_unaccent` é a versão imutável do `unaccent`, criada na migração
+     * (a original é `stable`, e coluna gerada só aceita função imutável). Só é lida com `BUSCA_POR_SIGNIFICADO=1`, para ordenar os candidatos do modelo barato; a `busca` de sempre não muda. Sem índice GIN de propósito: a consulta lê o conjunto elegível inteiro do setor (já cortado por setor, janela e piso), então nenhum índice de texto seria usado.
+     */
+    buscaSemAcento: tsvector("busca_sem_acento").generatedAlwaysAs(
+      sql`to_tsvector('portuguese', f_unaccent(coalesce(titulo, '') || ' ' || coalesce(analise ->> 'assunto', '') || ' ' || left(coalesce(transcricao, ''), 1500)))`,
+    ),
+    /** E17 parte 1: título e assunto, minúsculos e sem acento, para o `pg_trgm` achar grafia parecida ("dente" e "dental"). Curto de propósito: trigrama sobre transcrição inteira pesa. */
+    textoCurto: text("texto_curto").generatedAlwaysAs(
+      sql`lower(f_unaccent(coalesce(titulo, '') || ' ' || coalesce(analise ->> 'assunto', '')))`,
+    ),
+    /**
      * "coleta" veio do Apify ou da YouTube Data API, "seed" e exemplo de
      * desenvolvimento, "curadoria" foi posto pela equipe, "meta" veio da
      * Business Discovery ou da Hashtag Search da Meta (E6 parte 3, segunda
@@ -2454,6 +2466,72 @@ export const hashtagsMetaUsadas = pgTable(
 );
 
 /**
+ * E19 PR 1: a conta de uma rede ligada pela própria pessoa (Login do Facebook para Empresas), uma linha por conta. Hoje só "instagram".
+ *
+ * O token de acesso NUNCA fica aqui em texto: `tokenCifrado` é AES-256-GCM (`lib/meta-token.ts`), amarrado à marca, à plataforma e à conta, de modo que um valor copiado para a linha de
+ * outra marca não decifra. Quem lê a conta de uma marca filtra SEMPRE por `clienteId` (`servicos/conta-conectada.ts`); uma marca nunca enxerga a conta de outra.
+ *
+ * `estado`: "ativa" é a conta que a curva usa (no máximo uma por marca e plataforma, e uma conta da rede em no máximo uma marca); "escolher" é uma conta que a Meta devolveu quando a pessoa
+ * liberou mais de uma Página e o produto ainda não sabe qual é a dela: ficam guardadas (com o mesmo token cifrado) por poucos minutos até a pessoa escolher, ou somem.
+ * `metaUsuarioId` é o id da pessoa no aplicativo da Meta: é o que o aviso de exclusão de dados traz, e é por ele que se apaga a ligação.
+ * `erro` é a frase curta do último problema (token que a Meta recusou, renovação que falhou), nunca com token; vazio quando está tudo bem.
+ */
+export type EstadoContaConectada = "ativa" | "escolher";
+
+export const contasConectadas = pgTable(
+  "contas_conectadas",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    plataforma: text("plataforma").notNull().default("instagram"),
+    contaId: text("conta_id").notNull(),
+    nome: text("nome").notNull(),
+    paginaId: text("pagina_id"),
+    paginaNome: text("pagina_nome"),
+    metaUsuarioId: text("meta_usuario_id").notNull(),
+    estado: text("estado").$type<EstadoContaConectada>().notNull().default("ativa"),
+    tokenCifrado: text("token_cifrado").notNull(),
+    /** Quando o token vence (a Meta diz em segundos, na troca); nulo quando ela não disse. */
+    tokenExpiraEm: timestamp("token_expira_em", { withTimezone: true }),
+    conectadoPor: text("conectado_por").references(() => user.id, { onDelete: "set null" }),
+    conectadaEm: timestamp("conectada_em", { withTimezone: true }).notNull().defaultNow(),
+    renovadaEm: timestamp("renovada_em", { withTimezone: true }),
+    ultimaLeituraEm: timestamp("ultima_leitura_em", { withTimezone: true }),
+    erro: text("erro"),
+    erroEm: timestamp("erro_em", { withTimezone: true }),
+    /** Quando a pessoa foi avisada por e-mail de que a ligação não renova mais; evita avisar todo dia. */
+    avisadaEm: timestamp("avisada_em", { withTimezone: true }),
+    atualizadaEm: timestamp("atualizada_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("contas_conectadas_uma_ativa_por_marca").on(t.clienteId, t.plataforma).where(sql`${t.estado} = 'ativa'`),
+    uniqueIndex("contas_conectadas_uma_marca_por_conta").on(t.plataforma, t.contaId).where(sql`${t.estado} = 'ativa'`),
+    uniqueIndex("contas_conectadas_candidata_unica").on(t.clienteId, t.plataforma, t.contaId),
+    index("contas_conectadas_meta_usuario").on(t.metaUsuarioId),
+  ],
+);
+export type ContaConectada = typeof contasConectadas.$inferSelect;
+
+/**
+ * E19 PR 1: os pedidos de exclusão de dados que a Meta mandou (o aviso assinado de "a pessoa removeu o aplicativo e pediu para apagar"). O `codigo` é o que a Meta mostra à pessoa e
+ * o que a página pública de status lê (`/dados/exclusao?codigo=...`). Não guarda o id da pessoa nem de quem quer que seja: só que o pedido chegou, quando foi atendido e quantas ligações
+ * foram apagadas.
+ */
+export const exclusoesMeta = pgTable(
+  "exclusoes_meta",
+  {
+    id: id(),
+    codigo: text("codigo").notNull(),
+    recebidoEm: timestamp("recebido_em", { withTimezone: true }).notNull().defaultNow(),
+    concluidoEm: timestamp("concluido_em", { withTimezone: true }),
+    ligacoesApagadas: integer("ligacoes_apagadas").notNull().default(0),
+  },
+  (t) => [uniqueIndex("exclusoes_meta_codigo").on(t.codigo)],
+);
+
+/**
  * Como o cliente avaliou a geracao. "outro_angulo" e o nome antigo do fluxo
  * de reprovar (etapa 11); linhas gravadas antes da E27 continuam com esse
  * valor, nunca reescritas. "reprovado" e o fluxo novo (E27, parte 1),
@@ -2584,6 +2662,26 @@ export const versoesDoRoteiro = pgTable(
   },
   (t) => [uniqueIndex("versoes_do_roteiro_grupo_ordem").on(t.grupo, t.ordem), index("versoes_do_roteiro_cliente").on(t.clienteId, t.criadoEm)],
 );
+/**
+ * E57a: quem preencheu o "Quero testar" da página de entrada (`/`). Não é conta nem cliente: é um contato que pediu para falar sobre o teste. Só o admin lê (lista em
+ * `/admin/interessados`). `email` é guardado em minúsculas e é único: inscrever o mesmo e-mail de novo não cria outra linha nem outro aviso (e a resposta é a mesma, para a
+ * página não revelar quem já está na lista). `whatsapp` são só dígitos, com DDD e sem o 55. `aceitouContatoEm` é o aceite do contato (LGPD): sem ele a linha não existe.
+ * Nenhum IP é guardado.
+ */
+export const interessados = pgTable(
+  "interessados",
+  {
+    id: id(),
+    nome: text("nome").notNull(),
+    email: text("email").notNull(),
+    whatsapp: text("whatsapp").notNull(),
+    ramo: text("ramo").notNull(),
+    aceitouContatoEm: timestamp("aceitou_contato_em", { withTimezone: true }).notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("interessados_email").on(t.email), index("interessados_criado_em").on(t.criadoEm)],
+);
+
 export type VersaoDoRoteiro = typeof versoesDoRoteiro.$inferSelect;
 
 /**
@@ -2597,9 +2695,13 @@ export const assinaturas = pgTable(
   "assinaturas",
   {
     id: id(),
+    /**
+     * `restrict`, não `cascade` (E22 PR 3): apagar a marca não leva a assinatura junto, porque o Stripe continuaria cobrando uma conta que não existe mais. O caminho de apagar marca
+     * (`servicos/apagar-marca.ts`) cancela no Stripe e apaga a linha da assinatura antes de apagar a marca; qualquer outro `delete from clientes` é recusado pelo banco.
+     */
     clienteId: integer("cliente_id")
       .notNull()
-      .references(() => clientes.id, { onDelete: "cascade" }),
+      .references(() => clientes.id, { onDelete: "restrict" }),
     status: text("status").$type<StatusAssinatura>().notNull(),
     stripeClienteId: text("stripe_cliente_id").notNull(),
     stripeAssinaturaId: text("stripe_assinatura_id").notNull(),
@@ -2657,6 +2759,24 @@ export const capasVideo = pgTable("capas_video", {
 });
 export type CapaVideo = typeof capasVideo.$inferSelect;
 
+/**
+ * E22 PR 2, item 0b: o Checkout aberto de cada marca. Uma linha por marca (índice único): o segundo clique em "Assinar" reaproveita a sessão que o primeiro abriu em vez de criar
+ * outra (duas sessões abertas deixariam a pessoa pagar duas vezes). Só o id da sessão fica aqui; o endereço do pagamento o Stripe devolve de novo quando a sessão ainda está aberta.
+ */
+export const checkoutsStripe = pgTable(
+  "checkouts_stripe",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    stripeSessaoId: text("stripe_sessao_id").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("checkouts_stripe_cliente").on(t.clienteId)],
+);
+export type CheckoutStripe = typeof checkoutsStripe.$inferSelect;
+
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;
 export type ExecucaoJob = typeof execucoesJob.$inferSelect;
@@ -2665,3 +2785,4 @@ export type AprendizadoCliente = typeof aprendizadoCliente.$inferSelect;
 export type ContextoMarca = typeof contextoMarca.$inferSelect;
 export type ContextoMarcaItem = typeof contextoMarcaItens.$inferSelect;
 export type PedidoDeRamo = typeof pedidosDeRamo.$inferSelect;
+export type Interessado = typeof interessados.$inferSelect;

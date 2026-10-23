@@ -23,11 +23,15 @@ import { config } from "@/lib/config";
  * meia-noite, para quem aceitou hoje antes do deploy ver o aceite novo também; precisa ser anterior ao deploy, senão quem aceita logo
  * depois de subir seria perguntado de novo a cada visita até a data chegar.
  */
+/**
+ * E57a (22/10/2026): a política ganhou a seção "Quem pede para testar" (o formulário da página inicial). `VERSAO_TERMOS_EM` NÃO subiu: a seção trata de gente que ainda não tem
+ * conta e não passa pelo aceite do painel, e subir a data faria todo cliente aceitar de novo sem ter mudado nada que o afete. Só `atualizadoEm` (a data que a página mostra) mudou.
+ */
 export const VERSAO_TERMOS_EM = new Date("2026-10-09T14:00:00Z");
 
 export const textosTermos = {
   avisoRevisaoPendente: "texto base, revisão jurídica pendente",
-  atualizadoEm: "atualizado em 9 de outubro de 2026",
+  atualizadoEm: "atualizado em 22 de outubro de 2026",
   voltar: "voltar",
 
   termos: {
@@ -76,6 +80,7 @@ export const textosTermos = {
         paragrafos: [
           "O briefing (as respostas sobre o seu negócio), os roteiros gerados para você, e os links dos vídeos que você marca como postado. Guardamos também os perfis que você informa em Conta (Instagram, TikTok, YouTube).",
           "Guardamos também o que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou.",
+          "Se você ligar o seu Instagram ao aplicativo (em Conta), guardamos o nome da conta, o acesso que a Meta nos dá para ler os números dos seus vídeos (cifrado, nunca à vista) e esses números: visualizações, curtidas e comentários. Usamos só para acompanhar o desempenho dos seus vídeos. Você desliga quando quiser, em Conta, e desligar apaga o acesso na hora.",
         ],
       },
       {
@@ -104,7 +109,14 @@ export const textosTermos = {
         ],
       },
       {
-        titulo: "6. Contato",
+        titulo: "6. Quem pede para testar",
+        paragrafos: [
+          "Na página inicial, quem preenche o Quero testar nos dá o nome, o e-mail, o WhatsApp e o ramo do negócio, e guardamos também o dia e a hora em que a pessoa aceitou o nosso contato. Esses dados servem só para a gente falar com você sobre o teste, por WhatsApp ou por e-mail, e só quem administra o produto os vê.",
+          `Ficam guardados por até 12 meses depois do pedido, ou até você pedir para apagar, o que vier primeiro. Para apagar, escreva para ${config.emailContato} dizendo o e-mail que usou no formulário. O endereço de internet do seu aparelho é usado só na hora, para barrar pedidos em excesso, e não fica guardado.`,
+        ],
+      },
+      {
+        titulo: "7. Contato",
         paragrafos: [`Dúvida sobre os seus dados, escreva para ${config.emailContato}.`],
       },
     ],
@@ -117,12 +129,14 @@ export const textosTermos = {
         titulo: "1. Como pedir a exclusão",
         paragrafos: [
           `Escreva para ${config.emailContato}, do mesmo e-mail que você usa para entrar na plataforma, pedindo a exclusão dos seus dados.`,
+          "Se você ligou o seu Instagram, também pode pedir pela própria Meta: no Facebook, abra Configurações e privacidade, depois Configurações, depois Aplicativos e sites, remova este aplicativo e peça a exclusão dos dados. Recebemos o pedido sozinhos, apagamos a ligação e você vê a confirmação em uma página que a Meta mostra.",
         ],
       },
       {
         titulo: "2. O que é apagado",
         paragrafos: [
           "O briefing (as respostas sobre o seu negócio), os roteiros gerados para você, os perfis informados em Conta (Instagram, TikTok, YouTube) e os links dos vídeos que você marcou como postado. O que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou também é apagado.",
+          "Se você ligou o seu Instagram: o acesso guardado, o nome da conta ligada e os números dos seus vídeos que lemos por essa ligação.",
         ],
       },
       {

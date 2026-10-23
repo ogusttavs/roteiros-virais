@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { hojeISO } from "@/lib/config";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { assuntosSemEncaixeSemFalha, cartaoEmAltaSemFalha } from "@/servicos/em-alta";
@@ -34,7 +35,7 @@ export default async function Criar({ searchParams }: Props) {
 
   const [cliente, marcas] = await Promise.all([clienteAtivoDoUsuario(sessao.user.id), marcasDoUsuario(sessao.user.id)]);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   const hoje = hojeISO();

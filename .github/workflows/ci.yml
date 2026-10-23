@@ -90,3 +90,7 @@ jobs:
       - run: npm run checar-admin-protegido
 
       - run: npm run checar-ver-como
+
+      - run: npm run checar-portao-cobranca
+
+      - run: npm run checar-marca

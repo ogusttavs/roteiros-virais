@@ -16,6 +16,7 @@ import * as resumirNoticiaIA from "@/ia/prompts/resumirNoticia";
 import { registrarGeracao } from "@/ia/registro";
 import { logger } from "@/lib/log";
 import { tetoDiarioEmReais } from "@/servicos/admin-custos";
+import { filtrarPorAssinatura, registrarMarcasPuladas, resumoDasMarcasPuladas } from "@/servicos/assinatura-tarefas";
 import { expirarAssuntosSemUso } from "@/servicos/assuntos";
 import {
   casaComAssunto,
@@ -156,6 +157,8 @@ export type ResumoColetaAssuntos = {
   paradoPor?: string;
   /** Quantas notícias não entraram porque o teto de resumos da marca no dia já tinha acabado. */
   semResumoPeloTeto?: number;
+  /** E22 PR 3: quantas marcas ficaram de fora por falta de assinatura (só aparece quando alguma ficou). */
+  marcasPuladasPorAssinatura?: number;
 };
 
 type Dependencias = {
@@ -213,12 +216,24 @@ export async function coletarNoticiasDosAssuntos(deps: Dependencias = {}): Promi
   const buscarPagina = deps.buscarPagina ?? baixarFotoDaPagina;
 
   const expirados = await expirarAssuntosSemUso(agora);
-  const ativos = await db()
+  const dasMarcasAtivas = await db()
     .select({ assunto: assuntosDaMarca })
     .from(assuntosDaMarca)
     .innerJoin(clientes, eq(clientes.id, assuntosDaMarca.clienteId))
     .where(and(eq(assuntosDaMarca.ativo, true), eq(clientes.ativo, true)));
-  const resumo: ResumoColetaAssuntos = { assuntos: ativos.length, expirados, feedsLidos: 0, noticiasNovas: 0, resumos: 0, fotosDePagina: 0, semFoto: 0 };
+  // E22 PR 3: o assunto de marca sem assinatura (cobrança ligada) não é coletado nem resumido pela IA. Cobrança desligada: todos, como sempre.
+  const { itens: ativos, marcasPuladas } = await filtrarPorAssinatura(dasMarcasAtivas, (linha) => linha.assunto.clienteId, { agora });
+  registrarMarcasPuladas("coleta-noticias (assuntos da marca)", marcasPuladas);
+  const resumo: ResumoColetaAssuntos = {
+    assuntos: ativos.length,
+    expirados,
+    feedsLidos: 0,
+    noticiasNovas: 0,
+    resumos: 0,
+    fotosDePagina: 0,
+    semFoto: 0,
+    ...resumoDasMarcasPuladas(marcasPuladas),
+  };
   if (ativos.length === 0) return resumo;
 
   const falhas: string[] = [];

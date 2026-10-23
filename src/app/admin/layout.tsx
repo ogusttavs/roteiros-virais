@@ -27,7 +27,7 @@ export default async function LayoutAdmin({ children }: { children: ReactNode })
   return (
     <div className={styles.pagina}>
       <LateralAdmin
-        rotulos={{ inicio: t.inicio, clientes: t.clientes, nichos: t.nichos, jobs: t.jobs, geracoes: t.geracoes, custos: t.custos }}
+        rotulos={{ inicio: t.inicio, clientes: t.clientes, interessados: t.interessados, nichos: t.nichos, jobs: t.jobs, geracoes: t.geracoes, custos: t.custos }}
         selos={{ nichos: { quantos: pedidosAbertos, descricao: textosAdmin.pedidosDeRamo.seloAria(pedidosAbertos) } }}
         nomeDoAdmin={sessao.user.name}
         selo={t.equipe}

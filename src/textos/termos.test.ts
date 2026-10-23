@@ -43,7 +43,7 @@ describe("termos de uso, privacidade e exclusão: a linha do site e das redes", 
       "4. Cancelamento",
       "5. Contato",
     ]);
-    expect(textosTermos.privacidade.secoes).toHaveLength(6);
+    expect(textosTermos.privacidade.secoes).toHaveLength(7);
     expect(textosTermos.dados.secoes).toHaveLength(4);
     const tudo = [...paragrafosDe(textosTermos.termos.secoes), ...paragrafosDe(textosTermos.privacidade.secoes), ...paragrafosDe(textosTermos.dados.secoes)].join("\n");
     expect(tudo).not.toMatch(/[‒-―\u{1F300}-\u{1FAFF}]/u);
@@ -56,8 +56,28 @@ describe("a versão dos termos", () => {
     expect(VERSAO_TERMOS_EM.getTime()).toBeLessThanOrEqual(Date.now());
   });
 
-  it("a data dita na página é a da versão", () => {
-    expect(textosTermos.atualizadoEm).toBe("atualizado em 9 de outubro de 2026");
+  it("a versão que manda repetir o aceite continua a de 09/10; a data mostrada na página é a da última mudança de texto (E57a, 22/10, sem subir a versão)", () => {
     expect(VERSAO_TERMOS_EM.toISOString().slice(0, 10)).toBe("2026-10-09");
+    expect(textosTermos.atualizadoEm).toBe("atualizado em 22 de outubro de 2026");
+  });
+});
+
+describe("a privacidade e quem pede para testar (E57a)", () => {
+  it("diz o que se coleta no Quero testar, para que serve, por quanto tempo fica, como pedir para apagar e que o endereço de internet não é guardado", () => {
+    const secao = textosTermos.privacidade.secoes.find((s) => s.titulo.includes("Quem pede para testar"));
+    expect(secao).toBeDefined();
+    const texto = secao!.paragrafos.join(" ");
+    for (const dado of ["o nome", "o e-mail", "o WhatsApp", "o ramo do negócio"]) expect(texto).toContain(dado);
+    expect(texto).toContain("só para a gente falar com você sobre o teste");
+    expect(texto).toContain("até 12 meses");
+    expect(texto).toContain("até você pedir para apagar");
+    expect(texto).toContain("escreva para");
+    expect(texto).toContain("não fica guardado");
+  });
+
+  it("as seções são numeradas em ordem e o contato continua por último", () => {
+    const titulos = textosTermos.privacidade.secoes.map((s) => s.titulo);
+    titulos.forEach((titulo, i) => expect(titulo.startsWith(`${i + 1}. `)).toBe(true));
+    expect(titulos.at(-1)).toBe("7. Contato");
   });
 });

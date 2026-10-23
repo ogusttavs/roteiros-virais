@@ -53,6 +53,9 @@ export function dolares(valor: number): string {
   return `US$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Os nomes das redes como a pessoa escreve. */
+export const NOME_DA_REDE = { youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram" } as const;
+
 export const textosInicioAdmin = {
   titulo: "Início",
   linhaDoDia: (quando: string, contas: number, ramos: number) => `${quando}. Hoje: ${contas === 1 ? "1 conta" : `${contas} contas`}, ${ramos === 1 ? "1 ramo" : `${ramos} ramos`}`,
@@ -72,6 +75,11 @@ export const textosInicioAdmin = {
     proxyParado: (motivo: "proxy sem trafego" | "proxy recusou o acesso" | "proxy fora do ar", desde: string) => ({
       titulo: { "proxy sem trafego": "O proxy do YouTube está sem tráfego", "proxy recusou o acesso": "O proxy do YouTube recusou o acesso", "proxy fora do ar": "O proxy do YouTube não está respondendo" }[motivo],
       detalhe: `desde ${desde}; nenhum vídeo do YouTube nem do TikTok é transcrito enquanto isso${{ "proxy sem trafego": "; recarregue o pacote no DataImpulse", "proxy recusou o acesso": "; confira a senha e o pacote no DataImpulse e o YTDLP_PROXY da máquina", "proxy fora do ar": "; veja se o DataImpulse está no ar" }[motivo]}`,
+    }),
+    // Achado de 23/10/2026 (a leitura do YouTube ficou 20 dias parada sem ninguém ver): a leitura de uma rede parou por bloqueio, ou por falha de todos os vídeos tentados, e a fila já passou a vez para as redes que funcionam.
+    leituraParada: (rede: "youtube" | "tiktok" | "instagram", causa: "bloqueio" | "sem leitura", desde: string) => ({
+      titulo: causa === "bloqueio" ? `O ${NOME_DA_REDE[rede]} está barrando a leitura dos vídeos` : `A leitura dos vídeos do ${NOME_DA_REDE[rede]} parou`,
+      detalhe: `desde ${desde}; a fila lê só as redes que funcionam e tenta uma leitura de prova por noite no ${NOME_DA_REDE[rede]}${causa === "bloqueio" ? "; confira se o yt-dlp está atualizado e se o proxy responde" : "; veja o erro da última rodada em Rotinas"}`,
     }),
     // Achado de 05/10/2026: a API da IA recusou por falta de crédito (a geração do cliente só diz "tente de novo"); some sozinho quando uma geração dá certo depois.
     creditoDaIA: (desde: string) => ({ titulo: "A API da IA está sem crédito", detalhe: `desde ${desde}; nenhuma geração sai enquanto isso; recarregue em Plans & Billing da Anthropic` }),

@@ -11,6 +11,7 @@ import {
   fraseDiasAtras,
   rotuloMultiploConta,
 } from "@/lib/formatarNumero";
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
@@ -44,6 +45,7 @@ function revalidarAgenda() {
 /** E39b, item (b): "Arquivar" num atrasado; também o menu de três ações (E39c, parte 2a). */
 export async function arquivarAtrasadoAction(roteiroId: number): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   await roteiroDoClienteOuFalha(roteiroId);
   await arquivarRoteiro(roteiroId);
   revalidarAgenda();
@@ -52,6 +54,7 @@ export async function arquivarAtrasadoAction(roteiroId: number): Promise<void> {
 /** E39c, parte 2a: o "desfazer" do toast de "Arquivar" no menu de três ações. */
 export async function desarquivarAction(roteiroId: number): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   await roteiroDoClienteOuFalha(roteiroId);
   await desarquivarRoteiro(roteiroId);
   revalidarAgenda();
@@ -63,6 +66,7 @@ export async function desarquivarAction(roteiroId: number): Promise<void> {
  */
 export async function mudarDataAtrasadoAction(roteiroId: number, novaData: string): Promise<ResultadoAcao<null>> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   await roteiroDoClienteOuFalha(roteiroId);
   try {
     await mudarDataRoteiro(roteiroId, novaData);
@@ -97,6 +101,7 @@ export type RespostaAindaVale = { vale: true } | { vale: false; assunto: string;
  */
 export async function conferirAindaValeAction(roteiroId: number): Promise<RespostaAindaVale> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   await roteiroDoClienteOuFalha(roteiroId);
   const resultado = await conferirAindaVale(roteiroId);
   revalidarAgenda();

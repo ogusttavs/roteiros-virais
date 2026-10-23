@@ -254,14 +254,15 @@ export async function resolverLinkDoGoogleNews(link: string, transporte: Transpo
 /** O começo do HTML da página da matéria (o `<head>` basta), ou nulo se não respondeu. */
 export async function buscarPaginaDaMateria(endereco: string, transporte: TransporteDaFoto = {}): Promise<{ html: string; enderecoFinal: string } | null> {
   try {
-    const { bytes } = await lerComGuarda(endereco, {
+    const { bytes, enderecoFinal } = await lerComGuarda(endereco, {
       aceita: "text/html",
       limiteBytes: BYTES_DA_PAGINA,
       tempoMs: 8_000,
       hostPermitido: hostDeVeiculoPermitido,
       buscar: transporte.buscar,
     });
-    return { html: new TextDecoder("utf-8").decode(bytes), enderecoFinal: endereco };
+    // O endereço de depois dos redirecionamentos: um `og:image` relativo se resolve contra ele (o veículo pode redirecionar para outro domínio).
+    return { html: new TextDecoder("utf-8").decode(bytes), enderecoFinal };
   } catch {
     return null;
   }

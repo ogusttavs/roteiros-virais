@@ -9,6 +9,8 @@
 import { logger } from "@/lib/log";
 import { baixarCapa, gravarResultadoDaCapa, videosComCapaPorGuardar } from "@/servicos/capas";
 
+import { buscarComAgenteSeguro } from "./busca-segura";
+
 /** Quantos downloads ao mesmo tempo: o CDN aguenta e são imagens pequenas, mas a coleta e a VPS compartilhada não precisam de mais que isto. */
 const SIMULTANEOS = 4;
 const POR_LOTE = 200;
@@ -25,7 +27,7 @@ export type ResumoGuardarCapas = {
 };
 
 export async function rodarGuardarCapas(opcoes: { buscar?: typeof fetch; agora?: () => number; tempoMaximoMs?: number } = {}): Promise<ResumoGuardarCapas> {
-  const buscar = opcoes.buscar ?? fetch;
+  const buscar = opcoes.buscar ?? buscarComAgenteSeguro;
   const agora = opcoes.agora ?? Date.now;
   const limite = agora() + (opcoes.tempoMaximoMs ?? TEMPO_MAXIMO_MS);
   const resumo: ResumoGuardarCapas = { tentadas: 0, guardadas: 0, vencidas: 0, grandes: 0, tentandoDeNovo: 0, interrompidoPeloTempo: false };

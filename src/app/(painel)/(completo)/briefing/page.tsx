@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { config } from "@/lib/config";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { regrasDoCliente } from "@/servicos/aprendizado";
 import { garantirBriefing } from "@/servicos/briefing";
@@ -19,7 +20,7 @@ export default async function Briefing() {
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   const [briefing, regras, perfisAnalisados, contextoMarca, tipos] = await Promise.all([
