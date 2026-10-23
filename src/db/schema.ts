@@ -1259,6 +1259,18 @@ export const videos = pgTable(
       sql`to_tsvector('portuguese', coalesce(titulo, '') || ' ' || coalesce(descricao, '') || ' ' || coalesce(transcricao, '') || ' ' || coalesce(analise ->> 'assunto', ''))`,
     ),
     /**
+     * E17 parte 1 (refeita em 23/10/2026): a busca por significado com o que o Postgres já traz. Título, assunto e os primeiros 1.500 caracteres da transcrição,
+     * sem acento e com radical em português ("sofá" acha "sofas", "dente" acha "dentes"). `f_unaccent` é a versão imutável do `unaccent`, criada na migração
+     * (a original é `stable`, e coluna gerada só aceita função imutável). Só é lida com `BUSCA_POR_SIGNIFICADO=1`, para ordenar os candidatos do modelo barato; a `busca` de sempre não muda. Sem índice GIN de propósito: a consulta lê o conjunto elegível inteiro do setor (já cortado por setor, janela e piso), então nenhum índice de texto seria usado.
+     */
+    buscaSemAcento: tsvector("busca_sem_acento").generatedAlwaysAs(
+      sql`to_tsvector('portuguese', f_unaccent(coalesce(titulo, '') || ' ' || coalesce(analise ->> 'assunto', '') || ' ' || left(coalesce(transcricao, ''), 1500)))`,
+    ),
+    /** E17 parte 1: título e assunto, minúsculos e sem acento, para o `pg_trgm` achar grafia parecida ("dente" e "dental"). Curto de propósito: trigrama sobre transcrição inteira pesa. */
+    textoCurto: text("texto_curto").generatedAlwaysAs(
+      sql`lower(f_unaccent(coalesce(titulo, '') || ' ' || coalesce(analise ->> 'assunto', '')))`,
+    ),
+    /**
      * "coleta" veio do Apify ou da YouTube Data API, "seed" e exemplo de
      * desenvolvimento, "curadoria" foi posto pela equipe, "meta" veio da
      * Business Discovery ou da Hashtag Search da Meta (E6 parte 3, segunda
