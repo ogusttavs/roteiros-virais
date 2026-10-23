@@ -48,6 +48,24 @@ describe("textosAvisoDeLeitura", () => {
     expect(recusou).not.toContain("Recarregue");
   });
 
+  it("proxy fora do ar: neutro por padrão, e com o túnel do computador diz que o túnel fechou e onde ver o log", () => {
+    const base: ParadaParaOAviso = { plataforma: "youtube", causa: "proxy fora do ar", desde, dias: 1 };
+    const neutro = textosAvisoDeLeitura.bloco(base);
+    expect(neutro).toContain("fornecedor do proxy");
+    expect(neutro).not.toContain("túnel");
+    const tunel = textosAvisoDeLeitura.bloco({ ...base, proxyEhTunel: true });
+    expect(tunel).toContain("túnel do computador do Gustavo está fechado");
+    expect(tunel).toContain("ligado e com internet");
+    expect(tunel).toContain("roteiros-tunel-youtube.log");
+    expect(tunel).not.toContain("fornecedor");
+  });
+
+  it("nenhuma causa cita um fornecedor pelo nome", () => {
+    for (const causa of CAUSAS) {
+      for (const proxyEhTunel of [false, true]) expect(textosAvisoDeLeitura.bloco({ plataforma: "youtube", causa, desde, dias: 2, proxyEhTunel })).not.toMatch(/dataimpulse/i);
+    }
+  });
+
   it("sem travessão nem emoji em nenhuma causa", () => {
     for (const causa of CAUSAS) {
       const texto = textosAvisoDeLeitura.bloco({ plataforma: "tiktok", causa, desde, dias: 2 });

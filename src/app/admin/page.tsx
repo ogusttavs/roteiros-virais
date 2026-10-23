@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { CAMBIO_DATA_TEXTO, CAMBIO_USD_BRL, usdParaBrl } from "@/config/dinheiro";
+import { proxyEhTunel } from "@/lib/proxy-tunel";
 import { exigirAdmin } from "@/lib/sessao";
 import { inicioDoAdmin, type InicioAdmin, type LinhaDaMadrugada } from "@/servicos/admin-inicio";
 import { dataEHoraPorExtenso, dolares, quandoPorExtenso, reais, textosInicioAdmin as t } from "@/textos/admin-contas";
@@ -41,7 +42,7 @@ function itensDeAtencao(inicio: InicioAdmin): ItemDeAtencao[] {
   }
   if (inicio.contas.pararam > 0) itens.push({ chave: "pararam", ...t.atencao.contasPararam(inicio.contas.pararam), href: "/admin/clientes?filtro=parou", rotulo: t.atencao.verContas });
   if (inicio.atencao.creditoDaIA) itens.push({ chave: "credito", ...t.atencao.creditoDaIA(`${diaDoMes(inicio.atencao.creditoDaIA.desde)}, ${horaDoDia(inicio.atencao.creditoDaIA.desde)}`), href: "/admin/custos", rotulo: t.atencao.verCustos });
-  if (inicio.atencao.proxy) itens.push({ chave: "proxy", ...t.atencao.proxyParado(inicio.atencao.proxy.motivo, diaDoMes(inicio.atencao.proxy.desde)), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
+  if (inicio.atencao.proxy) itens.push({ chave: "proxy", ...t.atencao.proxyParado(inicio.atencao.proxy.motivo, diaDoMes(inicio.atencao.proxy.desde), proxyEhTunel()), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
   for (const parada of inicio.atencao.leituraParada) {
     if (parada.causa === "bloqueio" || parada.causa === "sem leitura") {
       itens.push({ chave: `leitura-${parada.plataforma}`, ...t.atencao.leituraParada(parada.plataforma, parada.causa, diaDoMes(parada.desde)), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
