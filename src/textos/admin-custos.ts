@@ -107,6 +107,17 @@ export const textosCustosAdmin = {
     nota: (videosPorSemana: number, minutosPorSemana: number) =>
       `Por ramo, no máximo ${videosPorSemana} ${videosPorSemana === 1 ? "vídeo" : "vídeos"} e ${minutosPorSemana} minutos de vídeo por semana. O custo daqui também está somado em "Por ramo", em "Fora da IA" e em "Por onde o dinheiro vai", que vão até ontem; este bloco inclui hoje.`,
   },
+  /** Revisão do Fable de 22/10/2026 (item 12): o filtro das notícias dia a dia. Já está somado em "Por onde o dinheiro vai"; aqui aparece com hoje. */
+  filtroDeNoticias: {
+    titulo: "Filtro das notícias",
+    legenda: "7 dias, com hoje",
+    vazio: "O filtro das notícias ainda não chamou a IA nos últimos 7 dias.",
+    resumo: (chamadas: number) => `${chamadas} ${chamadas === 1 ? "chamada" : "chamadas"} em 7 dias`,
+    porRamoPorDia: (chamadas: string, valor: string) => `Em média ${chamadas} por ramo por dia, ${valor} por ramo por dia`,
+    dia: (chamadas: number, ramos: number) => `${chamadas} ${chamadas === 1 ? "chamada" : "chamadas"}, ${ramos} ${ramos === 1 ? "ramo" : "ramos"}`,
+    nota: (lotes: number) =>
+      `O que já tem veredito nunca é filtrado de novo, então o normal é de 2 a 5 chamadas por ramo por dia (até ${lotes} por rodada, duas rodadas por dia, mais as marcas que chegam). Se o valor por ramo incomodar, baixar esse limite para 2 corta o custo sem perder notícia: o resto entra na rodada seguinte.`,
+  },
   fixos: {
     titulo: "Os fixos",
     legenda: "o que se paga todo mês, sem depender do uso",
