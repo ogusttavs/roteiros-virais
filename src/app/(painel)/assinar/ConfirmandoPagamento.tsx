@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 
 import { textosAssinatura } from "@/textos/assinatura";
 
+import styles from "./page.module.css";
+
 const INTERVALO_MS = 3000;
 const TENTATIVAS = 20;
 
 /**
- * E22 PR 1 (provisorio): a pessoa voltou do pagamento e o aviso do Stripe ainda nao chegou. Em vez do botao "Assinar" (que deixaria pagar duas vezes), a pagina diz que esta
- * confirmando e se atualiza a cada 3 segundos, por um minuto; chegou o aviso, o servidor a leva para o Hoje.
+ * A pessoa voltou do pagamento e o aviso do Stripe ainda não chegou. Em vez do botão "Assinar" (que deixaria pagar duas vezes), a página diz que está confirmando e se atualiza a
+ * cada 3 segundos, por um minuto; chegou o aviso, o servidor mostra a assinatura confirmada. Passado o minuto, a frase muda para "não pague de novo".
  */
 export function ConfirmandoPagamento() {
   const router = useRouter();
@@ -25,5 +27,11 @@ export function ConfirmandoPagamento() {
     return () => clearTimeout(id);
   }, [tentativas, router]);
 
-  return <p role="status">{tentativas >= TENTATIVAS ? textosAssinatura.confirmandoDemora : textosAssinatura.confirmando}</p>;
+  const demorou = tentativas >= TENTATIVAS;
+  return (
+    <p role="status" className={styles.estadoDeEspera}>
+      {demorou ? null : <span className={styles.girando} aria-hidden="true" />}
+      <span>{demorou ? textosAssinatura.situacoes.aguardando.demora : textosAssinatura.situacoes.aguardando.frase}</span>
+    </p>
+  );
 }

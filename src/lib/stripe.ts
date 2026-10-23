@@ -62,17 +62,19 @@ export type ChamadaSimulada = { metodo: "precoDoPlano" | "criarCheckout" | "sess
 export const chamadasSimuladas: ChamadaSimulada[] = [];
 
 /** As sessões de Checkout que a porta simulada abriu (id para marca e se ainda está aberta); os testes fecham uma com `fecharSessaoSimulada` para imitar o pagamento ou a expiração. */
-const sessoesSimuladas = new Map<string, { clienteId: number; aberta: boolean }>();
-let contadorDeSessoes = 0;
+type EstadoDasSessoes = { sessoes: Map<string, { clienteId: number; aberta: boolean }>; contador: number };
+/** No `globalThis` porque o Next empacota cada rota e cada Server Action à parte: o estado do módulo não é o mesmo entre elas, e o segundo clique de um teste e2e não acharia a sessão do primeiro. */
+const globalDasSessoes = globalThis as typeof globalThis & { __sessoesSimuladasRoteiros?: EstadoDasSessoes };
+const estadoDasSessoes: EstadoDasSessoes = (globalDasSessoes.__sessoesSimuladasRoteiros ??= { sessoes: new Map(), contador: 0 });
 
 export function fecharSessaoSimulada(sessaoId: string): void {
-  const s = sessoesSimuladas.get(sessaoId);
+  const s = estadoDasSessoes.sessoes.get(sessaoId);
   if (s) s.aberta = false;
 }
 
 export function limparSessoesSimuladas(): void {
-  sessoesSimuladas.clear();
-  contadorDeSessoes = 0;
+  estadoDasSessoes.sessoes.clear();
+  estadoDasSessoes.contador = 0;
 }
 
 export function criarPortaSimulada(): PortaStripe {
@@ -83,14 +85,14 @@ export function criarPortaSimulada(): PortaStripe {
     },
     async criarCheckout(pedido) {
       chamadasSimuladas.push({ metodo: "criarCheckout", pedido });
-      contadorDeSessoes += 1;
-      const sessaoId = `cs_simulada_${contadorDeSessoes}`;
-      sessoesSimuladas.set(sessaoId, { clienteId: pedido.clienteId, aberta: true });
+      estadoDasSessoes.contador += 1;
+      const sessaoId = `cs_simulada_${estadoDasSessoes.contador}`;
+      estadoDasSessoes.sessoes.set(sessaoId, { clienteId: pedido.clienteId, aberta: true });
       return { url: `${config.appUrl}/assinar?simulado=checkout&sessao=${sessaoId}`, sessaoId };
     },
     async sessaoAberta(sessaoId, clienteId) {
       chamadasSimuladas.push({ metodo: "sessaoAberta", pedido: { sessaoId, clienteId } });
-      const s = sessoesSimuladas.get(sessaoId);
+      const s = estadoDasSessoes.sessoes.get(sessaoId);
       if (!s || !s.aberta || s.clienteId !== clienteId) return null;
       return { url: `${config.appUrl}/assinar?simulado=checkout&sessao=${sessaoId}` };
     },

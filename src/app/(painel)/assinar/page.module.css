@@ -1,0 +1,214 @@
+/* E22 PR 2: `/assinar`. Só tokens e as peças que o painel já tem (Cartao, Botao); nenhuma cor, fonte ou espaço fora de tokens.css. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-6);
+  max-width: var(--largura-leitura);
+}
+
+.cabeca {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-rotulo);
+  color: var(--cor-texto-suave);
+}
+
+.frase {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-corpo);
+  max-width: 34rem;
+}
+
+/* O convite: preço, o que inclui, o botão. */
+.plano {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+}
+
+.preco {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espaco-2);
+  flex-wrap: wrap;
+}
+
+.valor {
+  font-family: var(--fonte-titulo);
+  font-size: var(--tamanho-titulo-lg);
+  font-weight: var(--peso-titulo);
+  letter-spacing: var(--espacamento-titulo);
+  line-height: var(--altura-titulo-grande);
+  color: var(--cor-titulo);
+}
+
+.porMes {
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-texto-suave);
+}
+
+.total {
+  margin: calc(var(--espaco-3) * -1) 0 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.inclui {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  padding-top: var(--espaco-5);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.incluiTitulo {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  font-weight: var(--peso-regular);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-rotulo);
+  color: var(--cor-texto-suave);
+}
+
+.itens {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-texto);
+}
+
+.itens li {
+  position: relative;
+  padding-left: var(--espaco-6);
+}
+
+/* O marcador: um ponto na cor de destaque do tema (verde-limão no escuro, verde fechado no claro), sem imagem. */
+.itens li::before {
+  content: "";
+  position: absolute;
+  left: var(--espaco-1);
+  top: 0.55em;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-destaque);
+}
+
+.garantias {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+/* Os estados (ativa, confirmada, cartão, cortesia, esperando). */
+.estado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+}
+
+.situacao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin: 0;
+}
+
+.situacaoValor {
+  font-size: var(--tamanho-leitura);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.aviso {
+  margin: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto);
+  font-size: var(--tamanho-secundario);
+}
+
+.estadoDeEspera {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  margin: 0;
+  color: var(--cor-texto);
+  font-size: var(--tamanho-corpo);
+}
+
+.girando {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--cor-texto-suave);
+  border-top-color: transparent;
+  animation: girar 0.9s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girando {
+    animation-duration: 1.6s;
+  }
+}
+
+/* Os botões: empilhados e do tamanho da coluna no celular, lado a lado a partir do tablet. */
+.botoes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.botoesLinha {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.botoesLinha > button {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .botoesLinha {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .botoesLinha > button {
+    width: auto;
+  }
+}
+
+.erro {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-erro);
+}

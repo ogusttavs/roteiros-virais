@@ -22,6 +22,9 @@ import { portaStripe, type EventoDoStripe } from "@/lib/stripe";
 /** Erro de regra da assinatura, com a frase que a pessoa pode ler. */
 export class ErroAssinatura extends Error {}
 
+/** Status em que a assinatura ainda existe e pode cobrar no Stripe (mesmo quando o acesso já não vale). */
+const STATUS_VIVOS_NO_STRIPE: StatusAssinatura[] = ["active", "trialing", "past_due", "unpaid", "paused"];
+
 // ---------------------------------------------------------------------------
 // O portão
 // ---------------------------------------------------------------------------
@@ -70,7 +73,8 @@ export async function marcaPrecisaAssinar(cliente: Pick<Cliente, "id" | "cortesi
 // Começar a assinar e abrir o portal (as ações chamam estas)
 // ---------------------------------------------------------------------------
 
-async function ehDonoDaMarca(usuarioId: string, clienteId: number): Promise<boolean> {
+/** Só o dono da marca assina e abre o portal; as telas usam a mesma pergunta para decidir se mostram os botões. */
+export async function ehDonoDaMarca(usuarioId: string, clienteId: number): Promise<boolean> {
   const [linha] = await db()
     .select({ papel: membrosMarca.papel })
     .from(membrosMarca)
@@ -81,6 +85,7 @@ async function ehDonoDaMarca(usuarioId: string, clienteId: number): Promise<bool
 export const frasesDaAssinatura = {
   soODono: "Só quem criou a conta pode assinar. Peça para essa pessoa fazer isto.",
   jaAssinada: "Esta conta já tem uma assinatura ativa.",
+  emAndamento: "Esta conta já tem uma assinatura, só falta acertar o cartão. Abra a gestão da assinatura para atualizar o cartão.",
   semPlano: "Não deu para abrir o pagamento agora. Tente de novo daqui a pouco.",
   semAssinatura: "Esta conta ainda não tem uma assinatura para gerenciar.",
   falhou: "Não deu para abrir o pagamento agora. Tente de novo daqui a pouco.",
@@ -100,6 +105,9 @@ export async function iniciarAssinatura(usuario: { id: string; email: string }, 
 
   const lista = await assinaturasDaMarca(cliente.id);
   if (lista.some((a) => assinaturaVale(a, agora))) throw new ErroAssinatura(frasesDaAssinatura.jaAssinada);
+  // Uma assinatura que o Stripe ainda considera viva (cartão recusado, ou aviso de renovação que não chegou) não deixa abrir OUTRA: a pessoa seria cobrada duas vezes. Ela atualiza o
+  // cartão no portal; se o Stripe desistir de cobrar, a assinatura vira `canceled` e aí sim assina de novo.
+  if (lista.some((a) => STATUS_VIVOS_NO_STRIPE.includes(a.status))) throw new ErroAssinatura(frasesDaAssinatura.emAndamento);
 
   try {
     const porta = portaStripe();

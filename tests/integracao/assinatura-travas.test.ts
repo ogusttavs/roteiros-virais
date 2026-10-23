@@ -17,8 +17,8 @@ import { assinaturas, briefings, checkoutsStripe, clientes, geracoesIA, membrosM
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { chamadasSimuladas, fecharSessaoSimulada, limparSessoesSimuladas, usarPortaStripe, type PortaStripe } from "@/lib/stripe";
-import { ErroAssinatura, frasesDaAssinatura, iniciarAssinatura, tratarEventoDoStripe } from "@/servicos/assinatura";
 import { apagarMarca, ErroApagarMarca } from "@/servicos/apagar-marca";
+import { ErroAssinatura, frasesDaAssinatura, iniciarAssinatura, tratarEventoDoStripe } from "@/servicos/assinatura";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { eventoDeAssinatura, SEGUNDOS } from "../fixtures/stripe-eventos";
@@ -299,6 +299,19 @@ describe("(b) um Checkout aberto por marca", () => {
     await darAssinaturaQueVale(marcaA, "sub_b");
     await expect(iniciarAssinatura(donoA, { id: marcaA })).rejects.toThrow(frasesDaAssinatura.jaAssinada);
     expect(criacoes()).toBe(0);
+  });
+
+  it("assinatura que o Stripe ainda considera viva (cartão recusado há dias) não deixa abrir OUTRA: a pessoa seria cobrada duas vezes", async () => {
+    await tratarEventoDoStripe(
+      eventoDeAssinatura("customer.subscription.updated", { clienteId: marcaA, assinaturaId: "sub_atrasada", status: "past_due", criadoEm: agoraS() - 20 * SEGUNDOS.DIA, inicio: agoraS() - 40 * SEGUNDOS.DIA, fim: agoraS() - 10 * SEGUNDOS.DIA }),
+    );
+    await expect(iniciarAssinatura(donoA, { id: marcaA })).rejects.toThrow(frasesDaAssinatura.emAndamento);
+    expect(criacoes()).toBe(0);
+  });
+
+  it("assinatura cancelada no Stripe deixa assinar de novo", async () => {
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.deleted", { clienteId: marcaA, assinaturaId: "sub_acabou", criadoEm: agoraS() }));
+    await expect(iniciarAssinatura(donoA, { id: marcaA })).resolves.toMatchObject({ url: expect.stringContaining("simulado=checkout") });
   });
 
   it("o Stripe falhar ao criar não deixa linha guardada", async () => {
