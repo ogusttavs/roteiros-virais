@@ -12,6 +12,7 @@ import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { diaPorExtenso, enderecoHttpsSeguro } from "@/servicos/noticias-assuntos";
 import { videoPorId } from "@/servicos/pesquisa";
+import { visaoDePublicar } from "@/servicos/publicar-instagram";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
 import { grupoDoRoteiro } from "@/servicos/versoes";
 
@@ -44,7 +45,7 @@ export default async function Roteiro({ params }: Props) {
   }
 
   const preferencias = await preferenciasDoUsuario(sessao.user.id);
-  const [video, versoes, momento, grupoDeVersoes] = await Promise.all([
+  const [video, versoes, momento, grupoDeVersoes, publicar] = await Promise.all([
     roteiro.referenciaVideoId ? videoPorId(roteiro.referenciaVideoId) : Promise.resolve(null),
     versoesDoRoteiro(roteiroId),
     // E55 PR 2b: o roteiro que nasceu de um assunto em alta diz se o assunto ainda está em alta (selo e linha de prazo) ou já passou (selo neutro e aviso). Uma falha aqui só tira o selo.
@@ -54,6 +55,8 @@ export default async function Roteiro({ params }: Props) {
     // E26 4b: se o roteiro nasceu de uma comparação de versões, as outras continuam guardadas e a tela leva a elas. Uma falha aqui só tira o link.
     // Um grupo de uma versão só não tem "outras" para mostrar.
     grupoDoRoteiro(cliente.id, roteiroId).then((g) => (g && g.total > 1 ? g : null)).catch(() => null),
+    // E56 PR 1: "Publicar no Instagram". Uma falha aqui só tira a função da tela.
+    visaoDePublicar({ usuarioId: sessao.user.id, clienteId: cliente.id, roteiro, verComo: sessao.verComo != null }).catch(() => null),
   ]);
 
   // E50 parte 2, PR 4: os vídeos do banco que o "Por quê" cita (o link só https, a conta e quantas vezes acima do normal). Uma falha em um vídeo só tira o link dele.
@@ -103,6 +106,7 @@ export default async function Roteiro({ params }: Props) {
       marcas={marcas}
       nomePessoa={sessao.user.name}
       conviteInstalarPodeAparecer={conviteDeInstalarPodeAparecer(preferencias, new Date())}
+      publicar={publicar}
     />
   );
 }

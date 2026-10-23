@@ -118,6 +118,7 @@ export const textosPublicar = {
     enviando: (porcento: number) => `Enviando o vídeo, ${porcento}%`,
     enviandoSemNumero: "Enviando o vídeo",
     naoFechar: "Deixe esta tela aberta até o envio terminar.",
+    envioAnterior: "Um envio anterior não terminou. Cancele para poder publicar de novo.",
     processando: "O Instagram está preparando o vídeo. Isso leva alguns instantes e você pode sair desta tela.",
     publicando: "Publicando",
     publicada: "Publicado no Instagram.",

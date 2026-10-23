@@ -79,7 +79,7 @@ describe("quem vê os botões", () => {
 describe("a conta ligada na tela", () => {
   it("leva o nome, a página, desde quando e a última leitura formatados, e nada do acesso guardado", () => {
     const visao = montarVisaoSeuInstagram({ ...BASE, conta: conta({ ultimaLeituraEm: new Date("2026-10-22T09:20:00Z"), erro: "uma frase" }) });
-    expect(visao.conta).toEqual({ nome: "casa.em.ordem", pagina: "Casa em Ordem", desde: "12/10/2026", ultimaLeitura: "22/10/2026 às 06:20", erro: "uma frase" });
+    expect(visao.conta).toEqual({ nome: "casa.em.ordem", pagina: "Casa em Ordem", desde: "12/10/2026", ultimaLeitura: "22/10/2026 às 06:20", erro: "uma frase", publicar: false });
     expect(JSON.stringify(visao)).not.toMatch(/token/i);
   });
 

@@ -16,6 +16,7 @@ import { ENVIO_PARADO_APOS_MS, ESPERAS_DA_CONFERENCIA_S, LIMITE_DE_PUBLICACOES_P
 import { db } from "@/db";
 import { ESTADOS_VIVOS_DA_PUBLICACAO, publicacoes, videosCliente, type EstadoDaPublicacao, type Publicacao, type TipoDePublicacao } from "@/db/schema";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
+import { problemaDaLegenda } from "@/lib/legenda-do-instagram";
 import { logger } from "@/lib/log";
 import { ErroMetaLogin } from "@/lib/meta-oauth";
 import { criarContainerDeVideo, enderecoDaMidia, enviarVideo, ErroDeEnvioDoVideo, publicarContainer, statusDoContainer, usoDoLimite } from "@/lib/meta-publicar";
@@ -38,14 +39,6 @@ export function legendaDoRoteiro(roteiro: Pick<RoteiroLinha, "conteudo">): strin
   const propria = corpo.legenda?.trim();
   const texto = propria || [corpo.titulo?.trim(), corpo.chamadaFinal?.trim()].filter(Boolean).join("\n\n");
   return texto.slice(0, LIMITES_DA_LEGENDA.caracteres);
-}
-
-/** O primeiro problema da legenda contra os limites do Instagram (letras, hashtags, @), ou `null`. */
-export function problemaDaLegenda(legenda: string): CodigoDeRecusa | null {
-  if ([...legenda].length > LIMITES_DA_LEGENDA.caracteres) return "legenda-longa";
-  if ((legenda.match(/#[\p{L}\p{N}_]+/gu) ?? []).length > LIMITES_DA_LEGENDA.hashtags) return "legenda-hashtags";
-  if ((legenda.match(/@[\w.]+/g) ?? []).length > LIMITES_DA_LEGENDA.marcacoes) return "legenda-marcacoes";
-  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +134,36 @@ export async function publicacaoDoRoteiro(clienteId: number, roteiroId: number):
     .orderBy(desc(publicacoes.id))
     .limit(1);
   return linha ? vista(linha) : null;
+}
+
+/** O que a folha "Publicar no Instagram" recebe do servidor. Tudo serializável; nada do acesso. */
+export type VisaoDePublicar = {
+  situacao: { pode: true; conta: string } | { pode: false; codigo: CodigoDeRecusa; frase: string };
+  /** A legenda de partida (a do roteiro), para a pessoa editar. */
+  legenda: string;
+  /** Reels, a menos que o roteiro seja um Story. */
+  tipoInicial: TipoDePublicacao;
+  megas: Record<TipoDePublicacao, number>;
+  /** A publicação mais recente deste roteiro, ou `null`. */
+  publicacao: VistaDaPublicacao | null;
+};
+
+/**
+ * O que a tela do roteiro mostra de "Publicar no Instagram", ou `null` quando o botão não aparece: no "ver como", para quem não é dono da marca, no vídeo longo (vai para o YouTube) e
+ * enquanto a publicação não está aberta neste ambiente. Sem conta ligada (ou sem a permissão), aparece, e a folha explica o caminho em vez de esconder a função.
+ */
+export async function visaoDePublicar(entrada: { usuarioId: string; clienteId: number; roteiro: RoteiroLinha; verComo: boolean }, agora: Date = new Date()): Promise<VisaoDePublicar | null> {
+  const { usuarioId, clienteId, roteiro, verComo } = entrada;
+  if (verComo || roteiro.duracaoDoVideo === "longo") return null;
+  const situacao = await situacaoDaPublicacao(usuarioId, clienteId, agora);
+  if (!situacao.pode && (situacao.codigo === "nao-configurada" || situacao.codigo === "so-dono")) return null;
+  return {
+    situacao: situacao.pode ? situacao : { pode: false, codigo: situacao.codigo, frase: fraseDeRecusa(situacao.codigo) },
+    legenda: legendaDoRoteiro(roteiro),
+    tipoInicial: roteiro.formato === "story" ? "story" : "reels",
+    megas: { reels: LIMITES_DA_PUBLICACAO.reels.megasMax, story: LIMITES_DA_PUBLICACAO.story.megasMax },
+    publicacao: await publicacaoDoRoteiro(clienteId, roteiro.id),
+  };
 }
 
 // ---------------------------------------------------------------------------

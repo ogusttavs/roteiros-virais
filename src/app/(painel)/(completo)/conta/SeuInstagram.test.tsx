@@ -83,7 +83,7 @@ describe("sem conta ligada", () => {
     const ligar = within(cartao()).getByRole("link", { name: t.ligar });
     expect(ligar.getAttribute("href")).toBe("/api/meta/conectar");
     expect(within(cartao()).getByText(t.oQueLemos)).toBeTruthy();
-    expect(within(cartao()).getByText(/nunca fazemos: postar por você nem ler as suas mensagens/)).toBeTruthy();
+    expect(within(cartao()).getByText(/nunca fazemos: ler as suas mensagens nem postar sem você pedir/)).toBeTruthy();
     const aviso = within(cartao()).getByText(/abre para todos quando a Meta aprovar o aplicativo/);
     expect(aviso.textContent).toContain("Se a Meta disser que você não pode entrar");
   });
@@ -110,7 +110,7 @@ describe("sem conta ligada", () => {
 
 describe("com a conta ligada", () => {
   it("mostra o nome da conta, a Página, desde quando e a última leitura", () => {
-    desenhar({ conta: conta({ ultimaLeituraEm: new Date("2026-10-22T09:20:00Z") }) });
+    desenhar({ conta: conta({ ultimaLeituraEm: new Date("2026-10-22T09:20:00Z"), publicarLiberado: true }) });
     expect(cartao().getAttribute("data-estado")).toBe("ligada");
     const c = cartao();
     expect(within(c).getByText("@casa.em.ordem")).toBeTruthy();
@@ -119,6 +119,16 @@ describe("com a conta ligada", () => {
     expect(within(c).getByText("22/10/2026 às 06:20")).toBeTruthy();
     expect(within(c).getByRole("button", { name: t.desligar })).toBeTruthy();
     expect(within(c).queryByRole("link")).toBeNull();
+  });
+
+  it("E56: conta ligada sem a publicação liberada diz como liberar (ligar de novo); com ela, diz que está liberada", () => {
+    const sem = desenhar({ conta: conta() });
+    expect(within(cartao()).getByText(t.publicarFalta).closest("[data-parte='publicar']")?.getAttribute("data-publicar")).toBe("falta");
+    expect(within(cartao()).getByRole("link", { name: t.ligarDeNovo }).getAttribute("href")).toBe("/api/meta/conectar");
+    sem.unmount();
+    desenhar({ conta: conta({ publicarLiberado: true }) });
+    expect(within(cartao()).getByText(t.publicarLiberada).closest("[data-parte='publicar']")?.getAttribute("data-publicar")).toBe("liberada");
+    expect(within(cartao()).queryByRole("link", { name: t.ligarDeNovo })).toBeNull();
   });
 
   it("sem leitura ainda, diz que acontece sozinho", () => {
