@@ -28,6 +28,11 @@ export const FILAS = {
   metaHashtags: "meta-hashtags",
   /** Apify do Instagram, so descoberta de conta nova, semanal (E6 parte 3, segunda rodada, item 4); so agenda com config.coleta.metaAtivo. */
   descobertaInstagram: "descoberta-instagram",
+  /**
+   * Hotfix de 22/10/2026: baixa e guarda a capa dos vídeos do Instagram enquanto o link assinado do CDN vale (`jobs/guardar-capas.ts`). O worker enfileira ao fim de cada coleta que traz capa e na
+   * partida; o cron é a reserva.
+   */
+  guardarCapas: "guardar-capas",
   pontuar: "pontuar",
   vigilancia: "vigilancia",
   transcrever: "transcrever",

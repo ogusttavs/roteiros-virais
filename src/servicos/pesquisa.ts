@@ -27,12 +27,14 @@ import {
   type MedianaOrigem,
   type ModeloNicho,
   type Plataforma,
+  type SituacaoDaCapa,
   type TipoAbertura,
   type TipoConteudo,
 } from "@/db/schema";
 import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
 import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
+import { escolherCapa, situacaoDaCapaSql } from "@/servicos/capas";
 import type { FiltroDeFormatosDaMarca } from "@/servicos/formatos";
 import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { aplicarTetoPorConta } from "@/servicos/teto-por-conta";
@@ -1129,6 +1131,7 @@ const CAMPOS_VIDEO_REFERENCIA = {
   contaPais: contas.pais,
   contaIdiomaPrincipal: contas.idiomaPrincipal,
   capaUrl: videos.capaUrl,
+  capaSituacao: situacaoDaCapaSql,
   semFala: videos.semFala,
   formatoCatalogo: videos.formatoCatalogo,
   fichaCatalogo: videos.fichaCatalogo,
@@ -1158,6 +1161,7 @@ type LinhaVideoReferencia = {
   contaPais: string | null;
   contaIdiomaPrincipal: string | null;
   capaUrl: string | null;
+  capaSituacao: SituacaoDaCapa | null;
   semFala: boolean | null;
   analiseVisual: AnaliseVisual | null;
   tipoConteudo: TipoConteudo | null;
@@ -1193,7 +1197,7 @@ function paraVideoReferencia(l: LinhaVideoReferencia, regua: ReguaSetor, setores
     estrutura: l.analise.estrutura,
     porQueFuncionou: l.analise.porQueFuncionou,
     formato: l.analise.formato,
-    capaUrl: l.capaUrl,
+    capaUrl: escolherCapa({ videoId: l.id, capaUrl: l.capaUrl, situacao: l.capaSituacao }),
     semFala: l.semFala,
     segundoChave: l.analiseVisual?.momentoChave?.segundo ?? null,
     tipoConteudo: l.tipoConteudo,
@@ -1500,6 +1504,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
       foraDaCurva: videos.foraDaCurva,
       analise: videos.analise,
       capaUrl: videos.capaUrl,
+      capaSituacao: situacaoDaCapaSql,
       formatoCatalogo: videos.formatoCatalogo,
     })
     .from(videos)
@@ -1516,7 +1521,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
     contaMedianaOrigem: linha.contaMedianaOrigem,
     foraDaCurva: linha.foraDaCurva === null ? 0 : Number(linha.foraDaCurva),
     porQueFuncionou: linha.analise?.porQueFuncionou ?? null,
-    capaUrl: linha.capaUrl,
+    capaUrl: escolherCapa({ videoId: linha.id, capaUrl: linha.capaUrl, situacao: linha.capaSituacao }),
     formatoCatalogo: linha.formatoCatalogo,
   };
 }

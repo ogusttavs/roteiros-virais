@@ -37,6 +37,7 @@ import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { boss, FILAS, garantirFilas } from "./fila";
+import { rodarGuardarCapas } from "./guardar-capas";
 import { rodarLembrete } from "./lembrete";
 import { rodarLerLongos } from "./ler-longos";
 import { rodarMetaContas } from "./meta-contas";
@@ -50,6 +51,18 @@ import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
+
+/**
+ * Pede o job que guarda as capas (hotfix de 22/10/2026): chamado ao fim de cada coleta que traz capa nova, com o link ainda fresco, e na partida do worker (o que cobre o deploy). Dez minutos
+ * de `singletonSeconds` juntam os pedidos de coletas seguidas numa rodada só. Falhar aqui nunca derruba a coleta: o cron das 03:55 e das 12:20 é a reserva.
+ */
+async function pedirGuardarCapas(): Promise<void> {
+  try {
+    await boss().send(FILAS.guardarCapas, {}, { singletonSeconds: 600 });
+  } catch (erro) {
+    console.error("nao foi possivel enfileirar guardar-capas:", erro);
+  }
+}
 
 async function main(): Promise<void> {
   const { deveInicializarSentry, opcoesSentry } = await import("@/lib/sentry");
@@ -73,6 +86,8 @@ async function main(): Promise<void> {
   const orfaos = await recolherOrfaosDoWorkerAnterior();
   if (orfaos.jobs > 0 || orfaos.execucoes > 0) console.log(`worker recolheu o que o anterior deixou: ${orfaos.jobs} job(s) ativo(s), ${orfaos.execucoes} execucao(oes) rodando.`);
   await agendarTudo();
+  // Na partida do worker (o que cobre cada deploy): guarda as capas que ainda estao vivas e marca as que venceram.
+  await pedirGuardarCapas();
 
   /**
    * `job[0]?.data?.nichoId` (etapa 24, parte 1): "coletar agora" na tela do
@@ -88,9 +103,11 @@ async function main(): Promise<void> {
       rodarColetaApify(job[0]?.data?.nichoId, execucaoId),
       { ramoId: job[0]?.data?.nichoId ?? null },
     );
+    await pedirGuardarCapas();
   });
   await boss().work(FILAS.coletaMeioDia, async () => {
     await executarComRegistro(FILAS.coletaMeioDia, (execucaoId) => rodarColetaMeioDia(execucaoId));
+    await pedirGuardarCapas();
   });
   await boss().work<{ nichoId?: number }>(FILAS.coletaNoticias, async (job) => {
     await executarComRegistro(FILAS.coletaNoticias, () => rodarColetaNoticias(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
@@ -100,15 +117,20 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.contasBase, async () => {
     await executarComRegistro(FILAS.contasBase, rodarContasBase);
+    await pedirGuardarCapas();
   });
   await boss().work<{ nichoId?: number; retomadaDesde?: string }>(FILAS.metaContas, async (job) => {
     await executarComRegistro(FILAS.metaContas, () => rodarMetaContas(job[0]?.data?.nichoId, { desde: job[0]?.data?.retomadaDesde }), { ramoId: job[0]?.data?.nichoId ?? null });
+    await pedirGuardarCapas();
   });
   await boss().work<{ nichoId?: number }>(FILAS.metaHashtags, async (job) => {
     await executarComRegistro(FILAS.metaHashtags, () => rodarMetaHashtags(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work<{ nichoId?: number }>(FILAS.descobertaInstagram, async (job) => {
     await executarComRegistro(FILAS.descobertaInstagram, () => rodarDescobertaInstagram(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
+  });
+  await boss().work(FILAS.guardarCapas, async () => {
+    await executarComRegistro(FILAS.guardarCapas, () => rodarGuardarCapas());
   });
   await boss().work(FILAS.pontuar, async () => {
     await executarComRegistro(FILAS.pontuar, rodarPontuar);
