@@ -3,12 +3,12 @@
  * `estrategia/briefing-e-rubricas.md`. NÃO editar à mão: troque o documento e gere de novo
  * (o teste `regras-copy-roteiro.test.ts` reprova se os dois divergirem).
  *
- * E50 parte 2 (20/10/2026): as 53 regras de copy (R-COPY, 25), de estrutura de roteiro (R-ROTEIRO, 19)
- * e de conformidade (R-CONF, 9). `texto` é o que o prompt recebe; `porQue` é a frase para a pessoa,
+ * E50 parte 2 (20/10/2026) e E59 (22/10/2026): as 55 regras de copy (R-COPY, 25), de estrutura de roteiro (R-ROTEIRO, 20)
+ * e de conformidade (R-CONF, 10). `texto` é o que o prompt recebe; `porQue` é a frase para a pessoa,
  * que a tela mostrará por código (PR 3), nunca escrita pelo modelo.
  */
 
-export const versao = "1.1.0";
+export const versao = "1.2.0";
 
 export type RegraCopyRoteiro = {
   numero: string;
@@ -557,6 +557,18 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
     "fonte": "F10-1 (C, n07, só pista); F14-2 (C, n09); F21-4 (A, n15, vendedor: a surpresa teve 1,7 vez a taxa de visualização completa); F18-2 (A, n12)"
   },
   {
+    "numero": "R-ROTEIRO-20",
+    "grupo": "ROTEIRO",
+    "texto": "Prova visual com imagem de outro, só quando a entrada traz o bloco \"Prova visual com imagem de outro\" ou quando o próprio tema cita uma pessoa pública, uma fala pública ou uma notícia; fora disso, não sugira. O \"como editar\" (os recursos e a cena que a usa) pode pedir uma tela dividida, uma foto ou print com a fonte escrita na tela, ou um trecho curto de vídeo público (poucos segundos, nunca o vídeo inteiro de outra pessoa), dizendo o que mostrar e por quê (\"mostre a foto da figura mais votada enquanto você diz...\"). A sugestão é aberta e pelo papel, nunca pelo nome (\"coloque imagens de duas figuras muito famosas\", \"duas figuras eleitorais muito conhecidas\"): quem grava escolhe as pessoas. Quem grava continua SEMPRE no quadro, comentando; a imagem é só a prova do que ele diz, nunca o vídeo em si. No tema político, peça uma figura de cada lado. Quando as regras de plataforma acima são as do TikTok, a pessoa fica em tela cheia e a imagem entra como recorte pequeno, nunca tela dividida. Nunca monte a imagem de modo que a pessoa conhecida pareça apoiar o negócio.",
+    "porQue": "Uma imagem de alguém que todo mundo conhece mostra o que você diz, e você continua no quadro comentando.",
+    "bloco": "frases na tela",
+    "forca": "media",
+    "forcaNoDocumento": "média",
+    "conferePorCodigo": "parcial",
+    "confereNoDocumento": "parcial (o código decide quando a entrada traz o bloco; a pessoa no quadro e o resto dos limites são conferidos em `R-CONF-10`)",
+    "fonte": "`R-TT-VIDEO-06` (seção 9: fora do Para Você a \"tela dividida\" e a \"reação sem sentido\", `academia-criadores.md`); `R-IG-REEL-06` (seção 9: menos distribuição a repostagem e a vídeo com marca d'água de outra rede, `ranking-explicado-2023.md`); decisão do Gustavo em 22/10/2026 (E59: a sugestão aberta, pelo papel, vale para qualquer tema, foto e trecho de vídeo, \"uma de cada lado\" no tema político)"
+  },
+  {
     "numero": "R-CONF-01",
     "grupo": "CONF",
     "texto": "Tudo o que o vídeo diz de preço, prazo, condição, garantia, vaga ou brinde está na ficha ou no momento e pode ser cumprido. Citando preço, diga a condição (à vista, parcelado, \"a partir de\"). Prazo e vaga limitados só se reais (data ou quantidade). O que o roteiro não tem, ele deixa em branco (\"[preencher]\") para a pessoa.",
@@ -663,5 +675,17 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
     "conferePorCodigo": "sim",
     "confereNoDocumento": "sim (lista)",
     "fonte": "F26-8 (A, n19: art. 27 §6º)"
+  },
+  {
+    "numero": "R-CONF-10",
+    "grupo": "CONF",
+    "texto": "Nome de candidato e de partido nunca aparece no roteiro, nem na fala, nem na tela, nem no \"como editar\" (nem a sigla, nem \"o candidato Fulano\"): fale pelo papel (\"o candidato mais votado\", \"uma figura de cada lado\"). Foto, print ou trecho de vídeo de pessoa pública só entra com quem grava no quadro, comentando; a foto ou o print leva a fonte escrita na tela; e nunca se monta a imagem para sugerir que a pessoa conhecida apoia, recomenda ou aprova o negócio ou o produto.",
+    "porQue": "Não cite candidato nem partido, e nunca faça parecer que uma pessoa famosa apoia o seu negócio.",
+    "bloco": "todos",
+    "forca": "forte",
+    "forcaNoDocumento": "forte (decisão do Gustavo, 22/10/2026)",
+    "conferePorCodigo": "sim",
+    "confereNoDocumento": "sim (a lista oficial dos partidos do TSE em `pesquisa/partidos/`, com a sigla curta só em contexto político; o padrão \"cargo mais nome próprio\" para candidato; a sugestão de imagem de pessoa pública sem a frase de que quem grava continua no quadro, ou que sugira apoio)",
+    "fonte": "Decisão do Gustavo em 22/10/2026 (E59: \"o roteiro nunca escreve o nome de candidato nem de partido\"; a imagem de pessoa pública nunca sugere apoio ao negócio); a pessoa no quadro vem de `R-TT-VIDEO-06` e `R-IG-REEL-06` (seção 9). A leitura da lei eleitoral e do direito de imagem de terceiros NÃO foi feita (pendência, como a do conselho de odontologia). Lista de partidos: TSE, Dados Abertos, baixada em 22/10/2026 (`pesquisa/partidos/README.md`)"
   },
 ];

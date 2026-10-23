@@ -13,9 +13,13 @@
  *    calibrada com pouco dado nunca derrubar sozinha uma geração que a pessoa está esperando
  *    (o mesmo princípio da faixa de duração do nicho, `gerarComVerificacao`).
  *
+ * E59 (22/10/2026): `R-CONF-10` entra aqui (nome de partido e de candidato nunca; imagem de pessoa pública só com quem grava no quadro e sem sugerir apoio).
+ *
  * Função pura, sem I/O: o serviço do roteiro monta a entrada (`EntradaCopyRoteiro`) e passa o
  * resultado para o `verificarExtra` e para os avisos de `gerarComVerificacao`.
  */
+
+import { acharNomePolitico } from "./nomes-politicos";
 
 export type EntradaCopyRoteiro = {
   /** Reels falado tem gancho, corpo, fechamento e chamada; Story e sem fala só têm o texto dos cartões (as regras de estrutura não valem lá). */
@@ -28,6 +32,8 @@ export type EntradaCopyRoteiro = {
   textoTodo: string;
   /** O que entra na tela (edicao.textoNaTela), uma frase por item. */
   frasesNaTela: string[];
+  /** E59: os itens do "como editar" que não são fala nem tela: cada recurso, o que fazer em cada cena e o onde gravar (`R-CONF-10` lê aqui as imagens de outro). */
+  itensDaEdicao?: string[];
   /** Perfil, tema, momento, notícia, dados da pesquisa: o que vale como fonte (`montarFontesDosFatos`). */
   fontes: string;
   /** O ramo da marca é de saúde (grupo "saude" do catálogo de ramos). */
@@ -172,6 +178,52 @@ const CALAO = COM_FRONTEIRA([
 function confCalao(e: EntradaCopyRoteiro): string | null {
   const achado = achar(e.textoTodo, CALAO);
   return achado ? `R-CONF-09: o roteiro tem palavrão ou calão ("${achado.replace(/^[^a-z]+/, "")}"); tire` : null;
+}
+
+// --- R-CONF-10 (E59) --------------------------------------------------------------------------
+
+/** R-CONF-10 (todos os blocos e o "como editar"): nome de partido ou de candidato nunca sai, fale pelo papel. */
+function confPartidoOuCandidato(e: EntradaCopyRoteiro): string | null {
+  const achado = acharNomePolitico([e.textoTodo, ...(e.itensDaEdicao ?? [])].join(". "));
+  if (!achado) return null;
+  return `R-CONF-10: o roteiro cita ${achado.tipo === "partido" ? "o partido" : "o candidato"} "${achado.trecho}"; tire o nome e fale pelo papel ("o candidato mais votado", "uma figura de cada lado")`;
+}
+
+/** Foto, print, tela dividida ou trecho de vídeo (imagem de outra pessoa na tela). */
+const IMAGEM_DE_OUTRO = /(tela dividida|split screen|divid[ao] (ao meio|em duas)|(^|[^a-z])fotos?([^a-z]|$)|fotografias?|(^|[^a-z])prints?([^a-z]|$)|captura de tela|imagens? d[aeo]s?|imagens de|trechos? (curtos? )?(de|do|da) (video|videos|entrevista|fala|discurso|reportagem)|recortes? d[aeo]s? (video|foto|imagem|entrevista|reportagem))/;
+/** Pessoa pública: pelo papel (a sugestão é aberta) ou pelo cargo. */
+const PESSOA_PUBLICA = /(^|[^a-z])((figuras?|pessoas?|personalidades?) ((muito|bem|super|mais|tao|extremamente) )*(publicas?|famosas?|conhecidas?|eleitorais|politicas?)|famos[oa]s?|celebridades?|politic[oa]s?|deputad[oa]s?|senador(a|es)?|candidat[oa]s?|governador(a|es)?|prefeit[oa]s?|presidente|autoridades?|personalidades?|influenciador(a|es)?|artistas?|cantor(a|es)?|jogador(a|es)?|atores|atriz(es)?)([^a-z]|$)/;
+/** A pessoa que grava aparece no quadro, comentando. */
+const NO_QUADRO = /(no quadro|em quadro|em cena|tela cheia|(voce|quem grava|a pessoa|o dono|a dona)[^.;]{0,50}(aparec|continu|segu|fic[ae]|permanec|comenta|falando|fala)|(aparec|continu|segu|permanec)[^.;]{0,25}(falando|comentando|no video|no quadro|em cena))/;
+const APOIO = /(apoia|apoiando|apoio|recomenda|recomendando|aprova|aprovando|endossa|endossando|ao lado do (produto|nosso produto|logo|negocio)|segurando o (produto|nosso produto)|com o (produto|logo) d[eao]s?)/;
+const NEGACAO_ANTES = /(nunca|jamais|sem|nao|evite|evitar|nada de)[^.;]{0,40}$/;
+
+function itensComImagemDePessoaPublica(e: EntradaCopyRoteiro): string[] {
+  return (e.itensDaEdicao ?? []).filter((item) => {
+    const n = normalizar(emUmaLinha(item));
+    return IMAGEM_DE_OUTRO.test(n) && PESSOA_PUBLICA.test(n);
+  });
+}
+
+/** R-CONF-10: a sugestão de imagem de pessoa pública sempre diz que quem grava continua no quadro, comentando. */
+function confImagemSemQuadro(e: EntradaCopyRoteiro): string | null {
+  const itens = itensComImagemDePessoaPublica(e);
+  if (itens.length === 0) return null;
+  const tudo = normalizar(emUmaLinha((e.itensDaEdicao ?? []).join(". ")));
+  if (NO_QUADRO.test(tudo)) return null;
+  return `R-CONF-10: o "como editar" sugere imagem de pessoa pública ("${itens[0].slice(0, 80)}") e não diz que você continua no quadro, comentando; acrescente isso (a imagem é só a prova do que você diz)`;
+}
+
+/** R-CONF-10: a imagem de pessoa pública nunca é montada para sugerir que ela apoia o negócio ou o produto. */
+function confImagemComApoio(e: EntradaCopyRoteiro): string | null {
+  for (const item of itensComImagemDePessoaPublica(e)) {
+    const n = normalizar(emUmaLinha(item));
+    const achado = APOIO.exec(n);
+    if (!achado) continue;
+    if (NEGACAO_ANTES.test(n.slice(0, achado.index))) continue;
+    return `R-CONF-10: a imagem de pessoa pública não pode sugerir que ela apoia, recomenda ou aprova o negócio ("${achado[0]}"); tire essa montagem`;
+  }
+  return null;
 }
 
 // --- R-COPY e R-ROTEIRO (reprovam só na primeira tentativa) -----------------------------------
@@ -474,6 +526,9 @@ const CONFORMIDADE: Conferencia[] = [
   { regra: "R-CONF-04", roda: confPesquisaSemFonte },
   { regra: "R-CONF-07", roda: confSaude },
   { regra: "R-CONF-09", roda: confCalao },
+  { regra: "R-CONF-10", roda: confPartidoOuCandidato },
+  { regra: "R-CONF-10", roda: confImagemSemQuadro },
+  { regra: "R-CONF-10", roda: confImagemComApoio },
 ];
 
 /** As "sim" de força forte ou média: reprovam na primeira tentativa e viram aviso na segunda. */
@@ -488,14 +543,15 @@ const DEMAIS: Conferencia[] = [
   { regra: "R-ROTEIRO-15", roda: roteiroFechamentoCurto },
 ];
 
-export const REGRAS_QUE_REPROVAM = [...CONFORMIDADE, ...DEMAIS].map((c) => c.regra);
+export const REGRAS_QUE_REPROVAM = [...new Set([...CONFORMIDADE, ...DEMAIS].map((c) => c.regra))];
 
 /** O que a saída do roteiro longo precisa ter para a conformidade (R-CONF) olhar: o gancho do vídeo, cada capítulo (nome, pontos, gancho para o próximo, na imagem), a chamada e a tela. */
 export type SaidaLongaParaConformidade = {
   gancho: string;
   chamadaFinal: string;
   capitulos: { nome: string; pontos: string[]; ganchoParaOProximo: string | null; naImagem: string }[];
-  edicao: { textoNaTela: { oQue: string }[] };
+  edicao: { textoNaTela: { oQue: string }[]; recursos?: string[] };
+  ondeGravar?: string;
 };
 
 /**
@@ -515,6 +571,7 @@ export function verificarConformidadeDoLongo(saida: SaidaLongaParaConformidade, 
     chamadaFinal: saida.chamadaFinal,
     textoTodo: [saida.gancho, nomes, corpo, saida.chamadaFinal, ...frasesNaTela].join(". "),
     frasesNaTela,
+    itensDaEdicao: [...(saida.edicao.recursos ?? []), saida.ondeGravar ?? ""].filter((t) => t.trim()),
     fontes: contexto.fontes,
     ramoSaude: contexto.ramoSaude,
     tentativa: 1,
@@ -547,7 +604,10 @@ export type SaidaParaCopyRoteiro = {
   fechamento: string | null;
   chamadaFinal: string | null;
   cartoes: { oQueFalar: string; textoNaTela: string }[] | null;
-  edicao: { textoNaTela: { oQue: string }[] };
+  edicao: { textoNaTela: { oQue: string }[]; recursos?: string[] };
+  /** E59: o que fazer em cada cena e o onde gravar entram em `itensDaEdicao` (`R-CONF-10`). */
+  cenas?: { oQueFazer: string }[];
+  ondeGravar?: string;
   tipoAbertura: string | null;
 };
 
@@ -561,6 +621,7 @@ export function montarEntradaCopyRoteiro(
   contexto: Pick<EntradaCopyRoteiro, "fontes" | "ramoSaude" | "nomeDaMarca" | "palavrasDoTema" | "tentativa">,
 ): EntradaCopyRoteiro {
   const frasesNaTela = saida.edicao.textoNaTela.map((t) => t.oQue).filter((t) => t.trim());
+  const itensDaEdicao = [...(saida.edicao.recursos ?? []), ...(saida.cenas ?? []).map((c) => c.oQueFazer), saida.ondeGravar ?? ""].filter((t) => t.trim());
   if (saida.cartoes && saida.cartoes.length > 0) {
     const textos = saida.cartoes.map((c) => `${c.oQueFalar} ${c.textoNaTela}`.trim());
     const ultimo = textos.length > 1 ? textos[textos.length - 1] : "";
@@ -573,6 +634,7 @@ export function montarEntradaCopyRoteiro(
       chamadaFinal: ultimo,
       textoTodo: [...textos, ...frasesNaTela].join(". "),
       frasesNaTela,
+      itensDaEdicao,
       tipoAbertura: saida.tipoAbertura,
     };
   }
@@ -589,6 +651,7 @@ export function montarEntradaCopyRoteiro(
     chamadaFinal,
     textoTodo: [gancho, corpo, fechamento, chamadaFinal, ...frasesNaTela].join(". "),
     frasesNaTela,
+    itensDaEdicao,
     tipoAbertura: saida.tipoAbertura,
   };
 }

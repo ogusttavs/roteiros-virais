@@ -9,10 +9,10 @@ const QUEBRA = String.fromCharCode(10);
 const RETORNO = String.fromCharCode(13);
 const PADRAO_LINHA = /^[|][ ]*(R-(?:COPY|ROTEIRO|CONF)-[0-9]{2})[ ]*[|]/;
 
-/** A versão das regras (o `checar-versao-prompt` exige versão nova quando um arquivo de `src/ia/prompts/` muda). Subir junto com qualquer mudança da seção 11. 1.0.0: as 53 regras (PR 1); 1.1.0: R-COPY-21 como indício (PR 2). */
-export const VERSAO_DAS_REGRAS = "1.1.0";
+/** A versão das regras (o `checar-versao-prompt` exige versão nova quando um arquivo de `src/ia/prompts/` muda). Subir junto com qualquer mudança da seção 11. 1.0.0: as 53 regras (PR 1); 1.1.0: R-COPY-21 como indício (PR 2); 1.2.0: R-ROTEIRO-20 e R-CONF-10 (E59, 22/10/2026). */
+export const VERSAO_DAS_REGRAS = "1.2.0";
 
-export const TOTAL_ESPERADO = { COPY: 25, ROTEIRO: 19, CONF: 9 } as const;
+export const TOTAL_ESPERADO = { COPY: 25, ROTEIRO: 20, CONF: 10 } as const;
 
 function forcaDe(celula: string): RegraCopyRoteiro["forca"] {
   const inicio = celula.trim().toLowerCase();
@@ -83,8 +83,8 @@ export function montarArquivoGerado(regras: RegraCopyRoteiro[]): string {
     " * `estrategia/briefing-e-rubricas.md`. NÃO editar à mão: troque o documento e gere de novo",
     " * (o teste `regras-copy-roteiro.test.ts` reprova se os dois divergirem).",
     " *",
-    " * E50 parte 2 (20/10/2026): as 53 regras de copy (R-COPY, 25), de estrutura de roteiro (R-ROTEIRO, 19)",
-    " * e de conformidade (R-CONF, 9). `texto` é o que o prompt recebe; `porQue` é a frase para a pessoa,",
+    " * E50 parte 2 (20/10/2026) e E59 (22/10/2026): as 55 regras de copy (R-COPY, 25), de estrutura de roteiro (R-ROTEIRO, 20)",
+    " * e de conformidade (R-CONF, 10). `texto` é o que o prompt recebe; `porQue` é a frase para a pessoa,",
     " * que a tela mostrará por código (PR 3), nunca escrita pelo modelo.",
     " */",
     "",

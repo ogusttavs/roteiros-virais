@@ -28,14 +28,14 @@ const CAMINHO_GERADO = path.resolve(process.cwd(), "src/ia/prompts/regras-copy-r
 const TRAVESSOES = [String.fromCharCode(0x2013), String.fromCharCode(0x2014)];
 const QUEBRA = String.fromCharCode(10);
 
-describe("a tabela gerada das 53 regras (seção 11)", () => {
-  it("tem 25 R-COPY, 19 R-ROTEIRO e 9 R-CONF, sem número repetido", () => {
+describe("a tabela gerada das 55 regras (seção 11)", () => {
+  it("tem 25 R-COPY, 20 R-ROTEIRO e 10 R-CONF, sem número repetido", () => {
     const por = (g: string) => REGRAS_COPY_ROTEIRO.filter((r) => r.grupo === g).length;
-    expect(REGRAS_COPY_ROTEIRO).toHaveLength(53);
+    expect(REGRAS_COPY_ROTEIRO).toHaveLength(55);
     expect(por("COPY")).toBe(25);
-    expect(por("ROTEIRO")).toBe(19);
-    expect(por("CONF")).toBe(9);
-    expect(NUMEROS_REGRAS_COPY_ROTEIRO.size).toBe(53);
+    expect(por("ROTEIRO")).toBe(20);
+    expect(por("CONF")).toBe(10);
+    expect(NUMEROS_REGRAS_COPY_ROTEIRO.size).toBe(55);
   });
 
   it("o arquivo gerado tem versão (o checar-versao-prompt exige quando ele muda) e ela é a do gerador", () => {
@@ -114,20 +114,20 @@ describe("o gerador (lógica pura)", () => {
   it("lê só a seção 11 (para na próxima de nível 2) e normaliza força e coluna de conferência", () => {
     const todas = [
       ...Array.from({ length: 25 }, (_, i) => linha(`R-COPY-${String(i + 1).padStart(2, "0")}`)),
-      ...Array.from({ length: 19 }, (_, i) => linha(`R-ROTEIRO-${String(i + 1).padStart(2, "0")}`)),
-      ...Array.from({ length: 9 }, (_, i) => linha(`R-CONF-${String(i + 1).padStart(2, "0")}`, "forte (lei)")),
+      ...Array.from({ length: 20 }, (_, i) => linha(`R-ROTEIRO-${String(i + 1).padStart(2, "0")}`)),
+      ...Array.from({ length: 10 }, (_, i) => linha(`R-CONF-${String(i + 1).padStart(2, "0")}`, "forte (lei)")),
     ];
     const regras = lerTabelaDaSecao11(doc(todas));
-    expect(regras).toHaveLength(53);
+    expect(regras).toHaveLength(55);
     expect(regras[0]).toMatchObject({ numero: "R-COPY-01", forca: "media", conferePorCodigo: "sim", grupo: "COPY" });
-    expect(regras[52]).toMatchObject({ numero: "R-CONF-09", forca: "forte" });
+    expect(regras[54]).toMatchObject({ numero: "R-CONF-10", forca: "forte" });
   });
 });
 
 describe("o que o prompt recebe", () => {
   it("só as de força forte e média entram; as de indício ficam fora", () => {
     const entram = regrasQueEntramNoPrompt();
-    expect(entram).toHaveLength(27);
+    expect(entram).toHaveLength(29);
     expect(entram.every((r) => r.forca !== "indicio")).toBe(true);
     const texto = textoRegrasCopyRoteiro();
     expect(texto).toContain("R-ROTEIRO-05");
@@ -252,5 +252,61 @@ describe("o bloco no sistema estável do roteiro", () => {
     const pedaco = (t: string) => t.slice(t.indexOf("Regras de texto e de estrutura do roteiro"), t.indexOf("Perfil do cliente:"));
     expect(pedaco(a)).toBe(pedaco(b));
     expect(pedaco(a).length).toBeGreaterThan(3000);
+  });
+});
+
+describe("E59: R-ROTEIRO-20 e R-CONF-10 na tabela e no prompt", () => {
+  const porNumero = new Map(REGRAS_COPY_ROTEIRO.map((r) => [r.numero, r]));
+  const BASE = { perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", tipo: "negocio" as const, regrasCliente: [] };
+
+  it("estão na tabela com a fonte (as duas regras das plataformas e a decisão do Gustavo)", () => {
+    const r20 = porNumero.get("R-ROTEIRO-20");
+    expect(r20).toMatchObject({ grupo: "ROTEIRO", forca: "media", conferePorCodigo: "parcial" });
+    expect(r20?.fonte).toContain("R-TT-VIDEO-06");
+    expect(r20?.fonte).toContain("R-IG-REEL-06");
+    expect(r20?.fonte).toContain("decisão do Gustavo em 22/10/2026");
+    const c10 = porNumero.get("R-CONF-10");
+    expect(c10).toMatchObject({ grupo: "CONF", forca: "forte", conferePorCodigo: "sim", bloco: "todos" });
+    expect(c10?.fonte).toContain("22/10/2026");
+  });
+
+  it("o curto recebe as duas; o longo, só a de conformidade (a prova visual é do Reels falado)", () => {
+    const curto = textoRegrasCopyRoteiro("curto");
+    expect(curto).toContain("R-ROTEIRO-20 (frases na tela)");
+    expect(curto).toContain("R-CONF-10 (todos os blocos)");
+    const longo = textoRegrasCopyRoteiro("longo");
+    expect(longo).toContain("R-CONF-10");
+    expect(longo).not.toContain("R-ROTEIRO-20");
+  });
+
+  it("a regra pede a sugestão aberta, pelo papel, com a pessoa no quadro, e nunca o nome", () => {
+    const texto = porNumero.get("R-ROTEIRO-20")!.texto;
+    for (const trecho of [
+      "duas figuras muito famosas",
+      "duas figuras eleitorais muito conhecidas",
+      "nunca pelo nome",
+      "continua SEMPRE no quadro",
+      "uma figura de cada lado",
+      "tela cheia",
+      "fonte escrita na tela",
+      "nunca o vídeo inteiro",
+      "apoiar o negócio",
+      "só quando a entrada traz o bloco",
+    ]) {
+      expect(texto.toLowerCase(), trecho).toContain(trecho.toLowerCase());
+    }
+    const conf = porNumero.get("R-CONF-10")!.texto;
+    expect(conf).toContain("Nome de candidato e de partido nunca aparece");
+    expect(conf).toContain("quem grava no quadro");
+  });
+
+  it("entram no sistema estável do Reels (e a de conformidade no do longo), sem citar regra de plataforma", () => {
+    const reels = montarSistemaEstavel({ ...BASE, formato: "reels", estilo: "falado" });
+    expect(reels).toContain("R-ROTEIRO-20");
+    expect(reels).toContain("R-CONF-10");
+    const longo = montarSistemaEstavelLongo({ ...BASE });
+    expect(longo).toContain("R-CONF-10");
+    expect(longo).not.toContain("R-ROTEIRO-20");
+    for (const proibido of ["R-IG-REEL-06", "R-TT-VIDEO-06"]) expect(textoRegrasCopyRoteiro("curto").includes(proibido), proibido).toBe(false);
   });
 });

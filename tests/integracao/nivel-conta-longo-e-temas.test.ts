@@ -252,7 +252,7 @@ describe("o roteiro longo recebe o que funcionou na própria conta", () => {
     expect(roteiro.duracaoDoVideo).toBe("longo");
     expect(roteiro.conteudo.capitulos?.length).toBeGreaterThanOrEqual(3);
     const [geracao] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, roteiro.geracaoId!));
-    expect(geracao.versaoPrompt).toBe("1.4.0");
+    expect(geracao.versaoPrompt).toBe("1.5.0");
   });
 });
 

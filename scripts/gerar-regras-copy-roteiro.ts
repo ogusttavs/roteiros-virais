@@ -1,6 +1,6 @@
 /**
  * E50 parte 2, PR 1: gera `src/ia/prompts/regras-copy-roteiro.ts` a partir da seção 11 de
- * `estrategia/briefing-e-rubricas.md` (as 53 regras: 25 R-COPY, 19 R-ROTEIRO, 9 R-CONF). A tabela
+ * `estrategia/briefing-e-rubricas.md` (as 55 regras: 25 R-COPY, 20 R-ROTEIRO, 10 R-CONF). A tabela
  * do documento é a fonte; o arquivo gerado é commitado porque a CI só tem o checkout de
  * `plataforma/` e o prompt precisa das regras lá. O texto é copiado, nunca reescrito: trocar uma
  * regra é trocar o documento e rodar `npm run gerar:regras-copy-roteiro`.

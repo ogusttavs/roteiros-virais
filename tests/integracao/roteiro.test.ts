@@ -1220,6 +1220,20 @@ describe("V9a, o momento (item 1, 2 e 4 do PROXIMO.md)", () => {
     expect(entradaV2).toContain(v1.conteudo.gancho);
   });
 
+  it("E59: tema que cita pessoa pública liga o bloco da prova visual com imagem de outro; tema comum, não; e o roteiro de mock passa no R-CONF-10", async () => {
+    const clienteId = await criarCliente();
+    const comPessoa = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "comparar o que dois deputados disseram sobre o preço da energia", objetivo: "alcance" });
+    const [g1] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, comPessoa.geracaoId!));
+    const entrada1 = (g1.entradas as { entrada: string }).entrada;
+    expect(entrada1).toContain("Prova visual com imagem de outro");
+    expect(entrada1).toContain("o tema cita uma pessoa pública");
+    expect(entrada1).toContain("nunca pelo nome");
+
+    const comum = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "mancha de vinho no estofado", objetivo: "alcance" });
+    const [g2] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, comum.geracaoId!));
+    expect((g2.entradas as { entrada: string }).entrada).not.toContain("Prova visual com imagem de outro");
+  });
+
   it("marca citada: a entrada leva o nome e o perfil da marca que a pessoa citou, com a regra dura 11", async () => {
     const clienteId = await criarCliente();
     contadorUsuario += 1;

@@ -63,6 +63,7 @@ import { logger } from "@/lib/log";
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, temCapitulos } from "@/lib/marcas-de-fala";
 import { comArroba } from "@/lib/perfil-redes";
 import { lerPorQueEmLinhas, limparPorQueDosBlocos } from "@/lib/por-que-do-bloco";
+import { motivosDaProvaVisualDeOutro } from "@/lib/prova-visual-de-outro";
 import { textosHoje } from "@/textos/hoje";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -1287,6 +1288,18 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     }
   }
 
+  // E59: a prova visual com imagem de outro (R-ROTEIRO-20) só entra na entrada quando o critério em código liga; o limite do que sai (R-CONF-10) vale sempre, em `verificarExtra`.
+  const provaVisualDeOutro = motivosDaProvaVisualDeOutro({
+    formato: dados.formato,
+    estilo: dados.estilo,
+    ehMomento,
+    tema: dados.tema,
+    objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
+    temNoticia: Boolean(dados.noticia),
+    temNoticiasDoAssunto: (noticiasDoAssunto?.length ?? 0) > 0,
+    analisesVisuais: evidencias.map((v) => v.analiseVisual),
+  });
+
   const { dados: saida, geracaoId, avisos } = await gerarComVerificacao({
     tarefa: "roteiro",
     nivel: roteiroIA.nivel,
@@ -1360,6 +1373,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         : undefined,
       pesquisa: pesquisaNaEntrada,
       proibicoesComoAviso: dados.temaDaPessoa ? perfil.fatos.proibicoes : undefined,
+      provaVisualDeOutro,
     }),
     fontesDosFatos,
     // E54 (parte 2): com pesquisa, todo número com cara de dado do roteiro (porcentagem, valor, ano) tem de estar nas fontes acima, com a mesma unidade e escala.
