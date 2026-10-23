@@ -449,7 +449,7 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
   // Ordem fixa por id: a mesma de sempre, sem depender da ordem em que o banco devolve as linhas.
   const nichosAtivos = await db().select().from(nichos).where(and(...condicoes)).orderBy(nichos.id);
   // Os setores com marca ativa leem mais por noite (`transcricoesPorDiaComMarca`) e ganham mais tempo; os outros ficam no padrão.
-  const setoresComMarca = await setoresComMarcaAtiva(new Date(inicioDoJob));
+  const setoresComMarca = await setoresComMarcaAtiva();
   // O que a rodada anterior deixou: as redes cuja leitura estava parada ficam fora da fila (só uma tentativa de prova por rede).
   const estadoAnterior = await estadoAtualDaLeitura();
   const paradasAgora = new Map<Plataforma, CausaDaParada>();
@@ -723,11 +723,11 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
       freio: { youtube: freioNoYoutube, tiktok: freioNoTiktok },
       proxyRespondeu: proxyRespondeuVezes > 0,
     };
-    estadoNovo = proximoEstadoDaLeitura(estadoAnterior, observacao, new Date(agora()));
+    estadoNovo = proximoEstadoDaLeitura(estadoAnterior, observacao, new Date());
     // O e-mail ao admin sai só da rodada de todos os setores (a de um setor só, a "primeira carga", não fala pela noite inteira), uma vez por dia; falha de e-mail nunca derruba a leitura.
     if (nichoId === undefined) {
       try {
-        aviso = await avisarLeituraParada(estadoNovo, new Date(agora()));
+        aviso = await avisarLeituraParada(estadoNovo);
       } catch (erro) {
         logger.error({ err: erro }, "nao foi possivel avisar o admin da leitura parada");
       }
