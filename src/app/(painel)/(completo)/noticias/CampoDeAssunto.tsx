@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Sparkles, TrendingUp, X } from "lucide-react";
+import { Search, TrendingUp, X } from "lucide-react";
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { grupoDoAssunto } from "@/config/assuntos-do-catalogo";
@@ -82,6 +82,13 @@ export function CampoDeAssunto({ texto, aoMudarTexto, aoEscolher, emAlta, maxLen
     setAtivo(-1);
     setAnuncio(textosNoticias.assuntoEscolhido(opcao.nome, opcao.palavras.length));
     aoEscolher({ nome: opcao.nome, palavras: opcao.palavras, origem: opcao.origem });
+  }
+
+  /** Pedir as palavras fecha a lista (a frase "não achamos" já foi lida) e deixa o foco onde a pessoa estava. */
+  function sugerir() {
+    setAberto(false);
+    setAtivo(-1);
+    aoSugerir();
   }
 
   function aoTeclar(evento: KeyboardEvent<HTMLInputElement>) {
@@ -231,8 +238,7 @@ export function CampoDeAssunto({ texto, aoMudarTexto, aoEscolher, emAlta, maxLen
       {mostrarSugerir ? (
         <div className={styles.sugerir} onMouseDown={(evento) => evento.preventDefault()}>
           <span>{textosNoticias.sugerirAjuda}</span>
-          <Botao type="button" variante="secundario" tamanho="md" carregando={sugerindo} disabled={sugerindo || desabilitado} onClick={aoSugerir}>
-            <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+          <Botao type="button" variante="secundario" tamanho="md" carregando={sugerindo} disabled={sugerindo || desabilitado} onClick={sugerir}>
             {textosNoticias.sugerirPalavras}
           </Botao>
         </div>

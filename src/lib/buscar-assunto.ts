@@ -7,9 +7,9 @@
  *  - Termo curto inteiro: palavra digitada com uma ou duas letras só casa com uma palavra IGUAL a ela ("ia" acha "IA" e não "iate" nem "iatismo"; "pt" não acha "pteridófita"). Uma letra
  *    sozinha não sugere nada (acharia metade do catálogo).
  *  - Plural e singular: "eleições" acha "eleição", "jornais" acha "jornal", "prefeitos" acha "prefeito" (a palavra digitada também vale sem o plural e sem a vogal final).
- *  - Quanto mais perto do nome, mais pontos: nome, depois as palavras de busca prontas, depois os sinônimos, depois o nome do grupo.
+ *  - Quanto mais perto do nome, mais pontos: nome, depois as palavras de busca prontas, depois os sinônimos. O nome do grupo só vale quando nada mais casou.
  *
- * Duas tentativas: (1) todas as palavras digitadas casam com o mesmo assunto; (2) se nada casou e há mais de uma palavra, os assuntos que casam com ALGUMA delas (os que casam com
+ * Tentativas: (1) todas as palavras digitadas casam com o mesmo assunto; (1b) o mesmo, agora contando o nome do grupo; (2) se nada casou e há mais de uma palavra, os assuntos que casam com ALGUMA delas (os que casam com
  * mais palavras primeiro), para que "dólar hoje" ache Dólar e câmbio mesmo que "hoje" não esteja em lugar nenhum.
  */
 import { ASSUNTOS_DO_CATALOGO, GRUPOS_DE_ASSUNTO, type AssuntoDoCatalogo } from "@/config/assuntos-do-catalogo";
@@ -88,21 +88,21 @@ function pontosNoConjunto(digitada: string, palavras: string[], base: number): n
   return melhor;
 }
 
-function pontosDaForma(forma: string, item: Indexado): number {
+function pontosDaForma(forma: string, item: Indexado, comGrupo: boolean): number {
   const noNome = pontosNoConjunto(forma, item.nome, 30);
   let nasPalavras = 0;
   for (const termo of item.palavras) nasPalavras = Math.max(nasPalavras, pontosNoConjunto(forma, termo, 20));
   let nosSinonimos = 0;
   for (const termo of item.tambem) nosSinonimos = Math.max(nosSinonimos, pontosNoConjunto(forma, termo, 12));
-  const noGrupo = pontosNoConjunto(forma, item.grupo, 3);
+  const noGrupo = comGrupo ? pontosNoConjunto(forma, item.grupo, 3) : 0;
   return Math.max(noNome, nasPalavras, nosSinonimos, noGrupo);
 }
 
 /** O melhor das formas da palavra digitada; as formas que não são a digitada valem um pouco menos (a exata na frente). */
-function pontosDaPalavra(digitada: string, item: Indexado): number {
+function pontosDaPalavra(digitada: string, item: Indexado, comGrupo: boolean): number {
   let melhor = 0;
   formasDaPalavra(digitada).forEach((forma, i) => {
-    const pontos = pontosDaForma(forma, item);
+    const pontos = pontosDaForma(forma, item, comGrupo);
     if (pontos > 0) melhor = Math.max(melhor, i === 0 ? pontos : pontos - 2);
   });
   return melhor;
@@ -120,12 +120,12 @@ function palavrasQueContam(consulta: string): string[] {
 
 type Pontuado = { assunto: AssuntoDoCatalogo; ordem: number; pontos: number; casadas: number };
 
-function pontuarEstrito(consulta: string, digitadas: string[], todos: Indexado[]): Pontuado[] {
+function pontuarEstrito(consulta: string, digitadas: string[], todos: Indexado[], comGrupo: boolean): Pontuado[] {
   const resultado: Pontuado[] = [];
   todos.forEach((item, ordem) => {
     let soma = 0;
     for (const digitada of digitadas) {
-      const pontos = pontosDaPalavra(digitada, item);
+      const pontos = pontosDaPalavra(digitada, item, comGrupo);
       if (pontos === 0) return;
       soma += pontos;
     }
@@ -145,7 +145,7 @@ function pontuarParcial(digitadas: string[], todos: Indexado[]): Pontuado[] {
     for (const digitada of digitadas) {
       // Na busca parcial, palavra de uma ou duas letras não conta: ela casaria com qualquer coisa solta.
       if (digitada.length <= TAMANHO_DO_TERMO_CURTO) continue;
-      const daPalavra = pontosDaPalavra(digitada, item);
+      const daPalavra = pontosDaPalavra(digitada, item, false);
       if (daPalavra > 0) {
         casadas += 1;
         pontos += daPalavra;
@@ -167,7 +167,9 @@ export function buscarAssuntos(consultaBruta: string, limite: number = MAXIMO_DE
   if (digitadas.length === 1 && digitadas[0].length < 2) return [];
 
   const todos = indiceDoCatalogo();
-  let pontuados = pontuarEstrito(consulta, digitadas, todos);
+  // O nome do grupo só entra se nada casou sem ele: "eleic" mostra Eleições e não o grupo inteiro de política; "esporte" sem nada melhor mostra os assuntos do grupo.
+  let pontuados = pontuarEstrito(consulta, digitadas, todos, false);
+  if (pontuados.length === 0) pontuados = pontuarEstrito(consulta, digitadas, todos, true);
   if (pontuados.length === 0 && digitadas.length > 1) pontuados = pontuarParcial(digitadas, todos);
 
   return pontuados

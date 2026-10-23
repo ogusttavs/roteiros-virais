@@ -110,6 +110,13 @@ describe("buscarAssuntos: começo de palavra, sem acento e sem maiúscula", () =
     expect(slugs("openai")).toContain("inteligencia-artificial");
   });
 
+  it("o nome do grupo não enche a lista: 'eleic' mostra só quem tem eleição, não todo o grupo de política", () => {
+    const resultado = slugs("eleic");
+    expect(resultado[0]).toBe("eleicoes");
+    expect(resultado).not.toContain("governo-federal");
+    expect(resultado).not.toContain("congresso-nacional");
+  });
+
   it("acha pelo nome do grupo quando nada mais casa melhor", () => {
     const resultado = slugs("esporte");
     expect(resultado.length).toBeGreaterThan(0);
@@ -196,6 +203,10 @@ describe("buscarAssuntos: termo curto inteiro", () => {
 
   it("no meio de uma consulta maior, a palavra curta continua inteira ('ferramentas ia')", () => {
     expect(slugs("ferramentas ia")[0]).toBe("ia-no-trabalho");
+  });
+
+  it("sem nada melhor, o nome do grupo traz os assuntos dele ('datas' não é nome de assunto, mas é do grupo Datas e épocas de venda)", () => {
+    expect(slugs("datas")).toContain("black-friday");
   });
 });
 

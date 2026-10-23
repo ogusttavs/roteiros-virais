@@ -27,7 +27,6 @@ import { versao as versaoDoPrompt } from "@/ia/prompts/sugerirPalavrasDoAssunto"
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroVerComo, exigirForaDoVerComo } from "@/lib/ver-como";
-import { listaDeTendenciasDeAgora } from "@/servicos/tendencias";
 import {
   assuntosEmAltaParaAcompanhar,
   DIAS_DO_CACHE_DE_PALAVRAS,
@@ -35,6 +34,7 @@ import {
   PEDIDOS_DE_PALAVRAS_POR_MARCA_POR_DIA,
   sugerirPalavrasDoAssunto,
 } from "@/servicos/palavras-do-assunto";
+import { listaDeTendenciasDeAgora } from "@/servicos/tendencias";
 import { textosNoticias } from "@/textos/noticias";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
