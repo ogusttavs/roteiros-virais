@@ -68,6 +68,15 @@ describe("middleware", () => {
     expect(foiRedirecionada(middleware(requisicao("/api/webhooks/stripe")))).toBe(false);
   });
 
+  it("E19: so o aviso de exclusao da Meta passa sem cookie; o comeco e a volta da ligacao do Instagram continuam atras da sessao; a pagina de status e publica", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/api/meta/exclusao")))).toBe(false);
+    expect(foiRedirecionada(middleware(requisicao("/api/meta/conectar")))).toBe(true);
+    expect(foiRedirecionada(middleware(requisicao("/api/meta/retorno")))).toBe(true);
+    expect(foiRedirecionada(middleware(requisicao("/api/meta/outra")))).toBe(true);
+    expect(foiRedirecionada(middleware(requisicao("/dados/exclusao")))).toBe(false);
+  });
+
   it("outra rota de webhooks, ou o prefixo parecido, continua protegida", () => {
     vi.mocked(getSessionCookie).mockReturnValue(null);
     expect(foiRedirecionada(middleware(requisicao("/api/webhooks/outro")))).toBe(true);

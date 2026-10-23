@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { config } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { NOME_COOKIE_STATE_META, opcoesCookieState } from "@/lib/meta-oauth";
 import { sessaoAtual } from "@/lib/sessao";
 import { modoVerComoLigado } from "@/lib/ver-como";
 import { concluirLigacao } from "@/servicos/conta-conectada";
+import type { CodigoDoRetorno } from "@/textos/conta-conectada";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +21,20 @@ export async function GET(req: NextRequest) {
   // Sessão do "ver como" nunca termina uma ligação: a ligação é da pessoa, não de quem a está vendo.
   const usuarioId = sessao && !(await modoVerComoLigado()) ? sessao.user.id : null;
 
-  const { resultado } = await concluirLigacao({
-    codigo: consulta.get("code"),
-    erroDaMeta: consulta.get("error"),
-    state: consulta.get("state"),
-    stateDoCookie: req.cookies.get(NOME_COOKIE_STATE_META)?.value ?? null,
-    usuarioId,
-  });
+  let resultado: CodigoDoRetorno;
+  try {
+    ({ resultado } = await concluirLigacao({
+      codigo: consulta.get("code"),
+      erroDaMeta: consulta.get("error"),
+      state: consulta.get("state"),
+      stateDoCookie: req.cookies.get(NOME_COOKIE_STATE_META)?.value ?? null,
+      usuarioId,
+    }));
+  } catch (erro) {
+    // Banco fora do ar ou coisa parecida: a pessoa volta para a Conta com a frase de tentar de novo, nunca para uma tela de erro do servidor.
+    logger.error({ err: erro }, "meta: o retorno da ligacao quebrou");
+    resultado = "falhou";
+  }
 
   const destino = new URL("/conta", config.appUrl);
   destino.searchParams.set("instagram", resultado);
