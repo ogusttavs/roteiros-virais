@@ -211,7 +211,7 @@ export const CRITERIO_PROIBICAO = "nenhuma proibição que o cliente listou no b
  */
 export const CRITERIO_PROIBICAO_COMO_AVISO =
   "o tema foi escolhido pela própria pessoa, então as proibições do briefing são preferências dela, não motivo de reprovação: citar ou tratar o assunto de uma proibição, dizer que o tema esbarra nela, " +
-  "ou escrever sobre ele com cuidado nunca reprova, e nunca fere a proibição. Reprove apenas se o texto atacar ou ofender uma pessoa, um candidato, um partido, um concorrente ou um grupo, prometer " +
+  "ou escrever sobre ele com cuidado nunca reprova, e nunca fere a proibição. Por este item, reprove só se o texto atacar ou ofender uma pessoa, um candidato, um partido, um concorrente ou um grupo, prometer " +
   "resultado que não pode cumprir ou tiver palavrão.";
 
 export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false, proibicaoEhAviso = false): string {
