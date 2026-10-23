@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { fichaPadraoDoObjetivo, fichaRecomendadaParaTema, type Ficha } from "@/config/fichas";
 import { chaveDeVozValida } from "@/lib/chave-da-voz";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
@@ -32,7 +33,7 @@ export default async function Objetivo({ searchParams }: Props) {
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   const { tema, livre, data, noticiaId, noticiaAssuntoId, alta, momento, pergunta, pesquisa } = await searchParams;

@@ -176,11 +176,16 @@ test.describe("ver como", () => {
     // Com sessão de CLIENTE: o cookie (mesmo que viesse certo) nunca vira modo; sobrando, é apagado, e o painel é o da própria pessoa, sem faixa.
     const comoCliente = await browser.newContext();
     const p = await comoCliente.newPage();
-    await entrar(p, OUTRA_EMAIL, /\/(hoje|comecar)/);
+    // A "outra pessoa" é uma conta cliente sem marca: desde o fix da conta sem marca (22/10/2026) ela entra em /sem-marca, não mais em /hoje ou /comecar.
+    await entrar(p, OUTRA_EMAIL, /\/(hoje|comecar|sem-marca)/);
     await comoCliente.addCookies([{ name: "ver_como", value: "forjado.0000", url: "http://localhost:3000" }]);
     await p.goto("/conta");
     await expect(p.locator("[data-faixa-ver-como]")).toHaveCount(0);
     expect((await comoCliente.cookies()).some((c) => c.name === "ver_como")).toBe(false);
+    // Sem o cookie, a pessoa segue sendo ela mesma, sem marca: a tela própria, nunca o painel de outra conta.
+    await p.goto("/conta");
+    await expect(p).toHaveURL(/\/sem-marca$/);
+    await expect(p.locator("[data-faixa-ver-como]")).toHaveCount(0);
     await comoCliente.close();
   });
 
