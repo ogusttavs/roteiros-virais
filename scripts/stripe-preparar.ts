@@ -21,10 +21,13 @@ async function main() {
     process.exit(1);
   }
   const stripe = new Stripe(chave, { maxNetworkRetries: 2, appInfo: { name: "roteiros-virais-preparar" } });
-  const relatorio = await prepararStripe(stripe as unknown as StripeLike);
+  // O nome que aparece na fatura do cartão vem do APP_NAME (o mesmo do app); o padrão é o de `src/lib/config.ts`.
+  const nomeDoApp = process.env.APP_NAME || "Klaki";
+  const relatorio = await prepararStripe(stripe as unknown as StripeLike, nomeDoApp);
   console.log(`stripe-preparar (${ehProducao ? "PRODUCAO" : "modo teste"}):`);
   console.log(`  produto ${relatorio.produtoId}: ${relatorio.criouProduto ? "criado" : "ja existia"}`);
   console.log(`  preco ${relatorio.precoId}: ${relatorio.criouPreco ? "criado" : "ja existia"}`);
+  console.log(`  fatura do cartao mostra "${relatorio.descritor}": ${relatorio.criouProduto || relatorio.atualizouDescritor ? "definido agora" : "ja estava assim"}`);
   console.log(`  portal do cliente ${relatorio.portalId}: ${relatorio.criouPortal ? "criado" : "ja existia"}`);
 }
 
