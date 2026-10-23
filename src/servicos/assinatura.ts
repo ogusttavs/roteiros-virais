@@ -158,26 +158,35 @@ export async function abrirPortalDaAssinatura(usuario: { id: string }, cliente: 
 /** Status em que a assinatura já acabou de vez (nada mais a cobrar no Stripe). */
 const STATUS_ACABADOS: StatusAssinatura[] = ["canceled", "incomplete_expired"];
 
+/** O que há para cancelar no Stripe quando uma marca vai ser apagada: as assinaturas que ainda não acabaram e o Checkout que ficou aberto. */
+export type AlvosDoCancelamento = { assinaturaIds: string[]; sessaoId: string | null };
+
 /**
- * Antes de apagar uma marca: cancela no Stripe toda assinatura dela que ainda não acabou e fecha o Checkout que ficou aberto. O `ON DELETE CASCADE` apagaria as linhas daqui e o Stripe
- * continuaria cobrando uma conta que não existe mais. Se o Stripe falhar em qualquer uma, **lança e a marca não deve ser apagada** (quem chama só apaga depois de esta função voltar).
- * Devolve quantas assinaturas cancelou. Marca sem assinatura nem Checkout aberto não chama o Stripe nenhuma vez (nada muda para quem nunca assinou).
+ * Lê (sem mexer em nada) o que o Stripe precisa cancelar antes de a marca sumir. Tem de rodar ANTES do `DELETE` da marca: o `ON DELETE CASCADE` leva as linhas de `assinaturas` e de
+ * `checkouts_stripe` junto, e com elas o único registro de quais assinaturas do Stripe eram dela.
  */
-export async function cancelarAssinaturasDaMarca(clienteId: number): Promise<number> {
-  const lista = await assinaturasDaMarca(clienteId);
-  const vivas = lista.filter((a) => !STATUS_ACABADOS.includes(a.status));
-  const [aberto] = await db().select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, clienteId));
-  if (vivas.length === 0 && !aberto) return 0;
+export async function alvosDoCancelamento(clienteId: number, executor: Pick<ReturnType<typeof db>, "select"> = db()): Promise<AlvosDoCancelamento> {
+  const lista = await executor.select().from(assinaturas).where(eq(assinaturas.clienteId, clienteId)).orderBy(desc(assinaturas.criadoEm), desc(assinaturas.id));
+  const [aberto] = await executor.select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, clienteId));
+  return { assinaturaIds: lista.filter((a) => !STATUS_ACABADOS.includes(a.status)).map((a) => a.stripeAssinaturaId), sessaoId: aberto?.stripeSessaoId ?? null };
+}
+
+/**
+ * Cancela no Stripe o que `alvosDoCancelamento` achou: primeiro fecha o Checkout aberto (se a pessoa pagasse depois de a marca sumir, o Stripe cobraria e o aviso não acharia a conta),
+ * depois cancela cada assinatura. Se o Stripe falhar em qualquer uma, **lança `ErroAssinatura`** e quem chama não pode apagar a marca. Sem alvo, não chama o Stripe nenhuma vez
+ * (nada muda para quem nunca assinou). Devolve quantas assinaturas cancelou.
+ */
+export async function cancelarNoStripe(clienteId: number, alvos: AlvosDoCancelamento): Promise<number> {
+  if (alvos.assinaturaIds.length === 0 && !alvos.sessaoId) return 0;
   try {
     const porta = portaStripe();
-    // Primeiro fecha o Checkout aberto (se a pessoa pagasse depois de a marca sumir, o Stripe cobraria e o aviso não acharia a conta); depois cancela as assinaturas.
-    if (aberto) await porta.expirarSessao(aberto.stripeSessaoId);
-    for (const a of vivas) await porta.cancelarAssinatura(a.stripeAssinaturaId);
+    if (alvos.sessaoId) await porta.expirarSessao(alvos.sessaoId);
+    for (const id of alvos.assinaturaIds) await porta.cancelarAssinatura(id);
   } catch (erro) {
     logger.error({ err: erro, clienteId }, "assinatura: o Stripe falhou ao cancelar a assinatura de uma marca que ia ser apagada; a marca nao foi apagada");
     throw new ErroAssinatura(frasesDaAssinatura.naoCancelou);
   }
-  return vivas.length;
+  return alvos.assinaturaIds.length;
 }
 
 // ---------------------------------------------------------------------------
