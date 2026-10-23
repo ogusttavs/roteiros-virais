@@ -223,6 +223,38 @@ describe("buscarRamos: o que vale mais, preso por exemplos", () => {
   });
 });
 
+/** Achado do Gustavo criando a conta (22/10/2026): "IA", "inteligência artificial" e "marketing digital" não achavam nada. */
+describe("buscarRamos: os sinônimos de Tecnologia e automação (38), Marketing e design (39) e Empreendedorismo e negócios (41)", () => {
+  it.each([
+    ["inteligência artificial", 38],
+    ["inteligencia artificial", 38],
+    ["IA", 38],
+    ["ia", 38],
+    ["ferramentas de IA", 38],
+    ["automação com IA", 38],
+    ["marketing digital", 39],
+    ["conteúdo", 39],
+    ["redes sociais", 39],
+    ["marketing com IA", 39],
+    ["abrir empresa", 41],
+    ["começar do zero", 41],
+    ["startup", 41],
+  ])("'%s' tem o ramo %i como primeiro resultado", (consulta, numero) => {
+    expect(primeiroRamoDosResultados(buscarRamos(consulta))?.numero).toBe(numero);
+  });
+
+  it("'IA' curto casa só no começo de uma palavra: 'dia' e 'média' não trazem Tecnologia e automação", () => {
+    expect(numeros("dia")).not.toContain(38);
+    expect(numeros("média")).not.toContain(38);
+    expect(numeros("media")).not.toContain(38);
+    expect(numeros("dia")[0]).toBe(1);
+  });
+
+  it("nenhuma outra palavra de ramo começa com 'ia': 'ia' só traz os ramos que têm IA nas palavras (38 e 39)", () => {
+    expect(numeros("ia")).toEqual([38, 39]);
+  });
+});
+
 /** E45 PR 2: o ramo provisório de quem escolheu "Não achei o meu". */
 describe("ramoMaisProximo", () => {
   it.each([
