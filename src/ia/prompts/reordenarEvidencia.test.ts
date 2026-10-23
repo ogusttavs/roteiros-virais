@@ -29,11 +29,28 @@ describe("reordenarEvidencia (E17 parte 1)", () => {
     expect(sistema).toContain("MESMO assunto");
     expect(sistema).toContain("O vizinho");
     expect(sistema).toContain("A lista vazia é uma resposta normal");
-    expect(reordenarEvidencia.versao).toBe("1.1.0");
+    expect(reordenarEvidencia.versao).toBe("1.2.0");
     expect(reordenarEvidencia.nivel).toBe("barato");
     expect(reordenarEvidencia.schema.safeParse({ motivo: "x", mesmoAssunto: [11] }).success).toBe(true);
     expect(reordenarEvidencia.schema.safeParse({ motivo: "x", mesmoAssunto: ["11"] }).success).toBe(false);
     expect(Object.keys(reordenarEvidencia.schema.shape)).toEqual(["motivo", "mesmoAssunto"]);
+  });
+
+  it("1.2.0: só vale o mesmo assunto específico, negócio em geral nunca basta, e os quatro casos da medição vêm como exemplos que voltam vazios", () => {
+    const sistema = reordenarEvidencia.montarSistemaEstavel().replace(/\s+/g, " ");
+    expect(sistema).toContain("REGRA DO ASSUNTO ESPECÍFICO");
+    expect(sistema).toContain("e não do mesmo setor nem do mesmo público");
+    expect(sistema).toContain("EM GERAL nunca basta");
+    expect(sistema).toContain("devem voltar vazios");
+    expect(sistema).toContain("a lista é vazia");
+    expect(sistema).toContain("Na dúvida entre incluir e deixar de fora, deixe de fora");
+    // Os quatro temas genéricos do ramo 5 que geravam o lixo, parafraseados, cada um com o que vale e o que não vale.
+    for (const exemplo of ["vender só pela internet, sem loja", "guerra de preço", "ser lembrada pelo cliente", "debate político"]) {
+      expect(sistema).toContain(exemplo);
+    }
+    expect(reordenarEvidencia.montarSistemaEstavel().match(/^- "/gm)).toHaveLength(4);
+    // Nenhum texto de cliente: nada de nome de marca, @ ou número de roteiro nos exemplos.
+    expect(sistema).not.toMatch(/@\w|roteiro \d|E\d\d/);
   });
 
   it("o mock devolve os candidatos que dividem um começo de palavra com o tema, e respeita os marcadores", async () => {
