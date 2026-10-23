@@ -78,7 +78,7 @@ export const textosPublicar = {
     "nao-preparou": (tipo: TipoDePublicacao) => {
       const l = LIMITES_DA_PUBLICACAO[tipo];
       const duracao = l.segundosMax >= 60 && l.segundosMax % 60 === 0 && l.segundosMax > 60 ? `${l.segundosMax / 60} minutos` : `${l.segundosMax} segundos`;
-      return `O Instagram não conseguiu preparar o vídeo. Confira se ele é MP4 ou MOV, se tem de ${l.segundosMin} segundos a ${duracao} e se passa de ${l.megasMax} MB; depois tente de novo.`;
+      return `O Instagram não conseguiu preparar o vídeo. Confira se ele é MP4 ou MOV, se tem de ${l.segundosMin} segundos a ${duracao} e se tem no máximo ${l.megasMax} MB; depois tente de novo.`;
     },
     "limite-do-dia": "O Instagram já recebeu o máximo de publicações de hoje desta conta. Tente de novo amanhã.",
     "conta-restrita": "O Instagram diz que a conta está restrita ou pede uma confirmação. Abra o aplicativo do Instagram, resolva o que ele pedir e tente de novo.",

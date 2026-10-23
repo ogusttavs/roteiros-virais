@@ -70,7 +70,7 @@ type Props = {
 };
 
 /**
- * O conteúdo da folha "Publicar no Instagram" do roteiro (E56 PR 1). Reels ou Story, o vídeo que a pessoa já gravou, a legenda do roteiro já preenchida e editável. O vídeo sobe pelo aplicativo
+ * O corpo da folha "Publicar no Instagram" do roteiro (E56 PR 1). Reels ou Story, o vídeo que a pessoa já gravou, a legenda do roteiro já preenchida e editável. O vídeo sobe pelo aplicativo
  * direto para a Meta (`PUT /api/publicar/<id>/video`), com o andamento; depois a Meta prepara e o aplicativo publica, e a folha pergunta de tempos em tempos até terminar (o worker também
  * confere, então fechar a folha não perde nada). Usa as peças da tela do roteiro: folha, chips, área de texto e botão.
  */
@@ -223,8 +223,9 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
     } catch (falha) {
       // O servidor já marcou a falha (e a frase); a folha mostra a mesma e deixa tentar de novo.
       const frase = falha instanceof Error && !ehFalhaDeRede(falha) ? falha.message : tratarFalha(falha, t.erroGenerico, t.semConexao);
-      setErro(frase);
+      // Com a publicação já aberta, a frase vai como o motivo dela (a folha a mostra uma vez só); antes disso, é um erro do formulário.
       if (id !== null) aoMudar({ id, tipo, estado: "falhou", motivo: frase, permalink: null });
+      else setErro(frase);
     } finally {
       setComecando(false);
       setPorcento(null);

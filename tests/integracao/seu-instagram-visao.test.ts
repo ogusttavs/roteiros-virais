@@ -92,7 +92,7 @@ describe("a visão do cartão a partir do banco", () => {
   it("a conta ligada chega com o nome, a Página, o dia e a última leitura, e nada do acesso guardado", async () => {
     await guardar({ clienteId: marcaA, contaId: "ig-a", nome: "conta.a", estado: "ativa", conectadaEm: new Date("2026-10-12T15:30:00Z"), ultimaLeituraEm: new Date("2026-10-22T09:20:00Z") });
     const visao = await visaoPara("si-dono-a", marcaA);
-    expect(visao.conta).toEqual({ nome: "conta.a", pagina: "Pagina de conta.a", desde: "12/10/2026", ultimaLeitura: "22/10/2026 às 06:20", erro: null });
+    expect(visao.conta).toEqual({ nome: "conta.a", pagina: "Pagina de conta.a", desde: "12/10/2026", ultimaLeitura: "22/10/2026 às 06:20", erro: null, publicar: false });
     const tudo = JSON.stringify(visao);
     expect(tudo).not.toContain("EAA-SEGREDO-DA-TELA");
     expect(tudo).not.toMatch(/token/i);
