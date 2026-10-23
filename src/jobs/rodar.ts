@@ -42,6 +42,7 @@ import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
+import { rodarPublicarInstagram } from "./publicar-instagram";
 import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
@@ -137,6 +138,8 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.renovarContasLigadas]: () => rodarRenovarContasLigadas(),
   /** Por evento (E54): `npm run job -- pesquisa-na-hora <pesquisaId>` roda uma pesquisa já criada, na hora (busca paga com a chave real). */
   [FILAS.pesquisaNaHora]: () => rodarPesquisaNaHora(Number(process.argv[3])),
+  /** Por evento (E56): `npm run job -- publicar-instagram <publicacaoId>` confere (e publica, se o vídeo estiver pronto) uma publicação já criada. */
+  [FILAS.publicarInstagram]: () => rodarPublicarInstagram(Number(process.argv[3])),
   /**
    * Por evento, nao por horario, sempre para um cliente so (E27, parte 2,
    * item 2): sem um "todos os clientes" que faca sentido, o disparo manual

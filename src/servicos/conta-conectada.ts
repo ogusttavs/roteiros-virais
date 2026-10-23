@@ -24,7 +24,7 @@ import {
   ErroMetaLogin,
   lerSignedRequest,
   lerState,
-  permissoesQueFaltam,
+  permissoesDoToken,
   trocarCodigoPorToken,
   trocarPorLongaDuracao,
   urlDoDialogo,
@@ -142,6 +142,7 @@ export async function concluirLigacao(entrada: EntradaDoRetorno, agora: Date = n
   let longo: { token: string; expiraEmSeg: number | null };
   let metaUsuarioId: string;
   let contas: ContaDoInstagram[];
+  let publicarLiberado = false;
   // Tudo que e segredo nesta volta (o codigo e os dois tokens): se a Meta ecoar algum numa mensagem de erro, ele nao vai para o log.
   const segredos: string[] = [entrada.codigo];
   try {
@@ -149,7 +150,9 @@ export async function concluirLigacao(entrada: EntradaDoRetorno, agora: Date = n
     segredos.push(curto.token);
     longo = await trocarPorLongaDuracao(curto.token);
     segredos.push(longo.token);
-    if ((await permissoesQueFaltam(longo.token)).length > 0) return { resultado: "permissao" };
+    const permissoes = await permissoesDoToken(longo.token);
+    if (permissoes.faltam.length > 0) return { resultado: "permissao" };
+    publicarLiberado = permissoes.publicar;
     metaUsuarioId = (await usuarioDoToken(longo.token)).id;
     contas = await contasDoInstagram(longo.token);
   } catch (erro) {
@@ -165,9 +168,9 @@ export async function concluirLigacao(entrada: EntradaDoRetorno, agora: Date = n
   const dasPaginas = contas.length === 1 ? contas : contas.filter((conta) => handle !== "" && normalizarHandle(conta.nome) === handle);
 
   if (dasPaginas.length === 1) {
-    return gravarAtiva({ clienteId, usuarioId: usuarioDoState, metaUsuarioId, conta: dasPaginas[0], token: longo.token, expiraEm, agora });
+    return gravarAtiva({ clienteId, usuarioId: usuarioDoState, metaUsuarioId, conta: dasPaginas[0], token: longo.token, expiraEm, publicarLiberado, agora });
   }
-  await gravarCandidatas({ clienteId, usuarioId: usuarioDoState, metaUsuarioId, contas, token: longo.token, expiraEm, agora });
+  await gravarCandidatas({ clienteId, usuarioId: usuarioDoState, metaUsuarioId, contas, token: longo.token, expiraEm, publicarLiberado, agora });
   return { resultado: "escolher" };
 }
 
@@ -178,6 +181,8 @@ type DadosDaGravacao = {
   conta: ContaDoInstagram;
   token: string;
   expiraEm: Date | null;
+  /** E56 PR 1: a pessoa liberou a publicação no diálogo da Meta. */
+  publicarLiberado: boolean;
   agora: Date;
 };
 
@@ -207,6 +212,7 @@ async function gravarAtiva(dados: DadosDaGravacao): Promise<ResultadoDaLigacao> 
         estado: "ativa",
         tokenCifrado: cifrarToken(dados.token, contextoDoToken(clienteId, PLATAFORMA_INSTAGRAM, conta.contaId)),
         tokenExpiraEm: dados.expiraEm,
+        publicarLiberado: dados.publicarLiberado,
         conectadoPor: dados.usuarioId,
         conectadaEm: dados.agora,
         atualizadaEm: dados.agora,
@@ -240,6 +246,7 @@ async function gravarCandidatas(dados: Omit<DadosDaGravacao, "conta"> & { contas
           estado: "escolher",
           tokenCifrado: cifrarToken(dados.token, contextoDoToken(clienteId, PLATAFORMA_INSTAGRAM, conta.contaId)),
           tokenExpiraEm: dados.expiraEm,
+          publicarLiberado: dados.publicarLiberado,
           conectadoPor: dados.usuarioId,
           conectadaEm: dados.agora,
           atualizadaEm: dados.agora,
@@ -269,6 +276,8 @@ export type ContaLigadaVista = {
   tokenExpiraEm: Date | null;
   /** A frase do último problema (de `textosLigacao.erroDaConta`), ou `null` quando está tudo bem. */
   erro: string | null;
+  /** E56 PR 1: a pessoa liberou a publicação ao ligar. Falso nas contas ligadas antes, e enquanto a configuração da Meta não pede a permissão. */
+  publicarLiberado?: boolean;
 };
 
 function vista(linha: ContaConectada): ContaLigadaVista {
@@ -281,6 +290,7 @@ function vista(linha: ContaConectada): ContaLigadaVista {
     ultimaLeituraEm: linha.ultimaLeituraEm,
     tokenExpiraEm: linha.tokenExpiraEm,
     erro: linha.erro,
+    publicarLiberado: linha.publicarLiberado,
   };
 }
 
@@ -376,6 +386,37 @@ export async function contaParaLeitura(clienteId: number, agora: Date = new Date
     if (!(erro instanceof ErroTokenCifrado)) throw erro;
     await registrarErroDaConta(linha.id, textosLigacao.erroDaConta.ilegivel, agora);
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// A publicação lê pela conta ligada (E56 PR 1)
+// ---------------------------------------------------------------------------
+
+/** O que a publicação precisa para falar com a Meta em nome da marca. O segundo lugar em que o token sai decifrado (o primeiro é `contaParaLeitura`). */
+export type ContaParaPublicar = { id: number; igId: string; nome: string; token: string };
+export type RecusaDePublicar = "nao-configurada" | "sem-conta" | "sem-permissao" | "acesso-recusado" | "venceu" | "ilegivel";
+
+/**
+ * A conta ligada da marca, pronta para PUBLICAR, ou o motivo de não estar. SEMPRE filtra pela marca recebida (uma marca nunca recebe o acesso de outra). Só devolve o acesso quando a pessoa
+ * liberou a publicação ao ligar (`publicarLiberado`), o acesso não venceu e a Meta não o recusou. O acesso ilegível (chave trocada, valor alterado) marca a conta com o erro, como na leitura.
+ */
+export async function contaParaPublicar(clienteId: number, agora: Date = new Date()): Promise<{ conta: ContaParaPublicar } | { recusa: RecusaDePublicar }> {
+  if (!ligacaoDisponivel()) return { recusa: "nao-configurada" };
+  const [linha] = await db()
+    .select()
+    .from(contasConectadas)
+    .where(and(eq(contasConectadas.clienteId, clienteId), eq(contasConectadas.plataforma, PLATAFORMA_INSTAGRAM), eq(contasConectadas.estado, "ativa")));
+  if (!linha) return { recusa: "sem-conta" };
+  if (linha.tokenExpiraEm && linha.tokenExpiraEm.getTime() <= agora.getTime()) return { recusa: "venceu" };
+  if (linha.erro === textosLigacao.erroDaConta.recusada) return { recusa: "acesso-recusado" };
+  if (!linha.publicarLiberado) return { recusa: "sem-permissao" };
+  try {
+    return { conta: { id: linha.id, igId: linha.contaId, nome: linha.nome, token: decifrarToken(linha.tokenCifrado, contextoDoToken(linha.clienteId, linha.plataforma, linha.contaId)) } };
+  } catch (erro) {
+    if (!(erro instanceof ErroTokenCifrado)) throw erro;
+    await registrarErroDaConta(linha.id, textosLigacao.erroDaConta.ilegivel, agora);
+    return { recusa: "ilegivel" };
   }
 }
 

@@ -2556,6 +2556,11 @@ export const contasConectadas = pgTable(
     erroEm: timestamp("erro_em", { withTimezone: true }),
     /** Quando a pessoa foi avisada por e-mail de que a ligação não renova mais; evita avisar todo dia. */
     avisadaEm: timestamp("avisada_em", { withTimezone: true }),
+    /**
+     * E56 PR 1: a pessoa liberou a publicação (`instagram_content_publish`) no diálogo da Meta. Falso nas contas ligadas antes da E56 e quando a configuração do Login para Empresas ainda não
+     * pede a permissão: a leitura dos números segue funcionando, e a tela de publicar diz "ligue de novo e libere a publicação".
+     */
+    publicarLiberado: boolean("publicar_liberado").notNull().default(false),
     atualizadaEm: timestamp("atualizada_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -2566,6 +2571,60 @@ export const contasConectadas = pgTable(
   ],
 );
 export type ContaConectada = typeof contasConectadas.$inferSelect;
+
+/** E56 PR 1: o que a pessoa publica pelo aplicativo no Instagram da própria marca. */
+export type TipoDePublicacao = "reels" | "story";
+/**
+ * Enviando: o vídeo está subindo para a Meta. Processando: a Meta está preparando. Publicando: o aplicativo mandou publicar e espera a resposta (a trava que impede publicar duas vezes). Publicada ou
+ * falhou: terminou.
+ */
+export type EstadoDaPublicacao = "enviando" | "processando" | "publicando" | "publicada" | "falhou";
+export const ESTADOS_VIVOS_DA_PUBLICACAO: EstadoDaPublicacao[] = ["enviando", "processando", "publicando", "publicada"];
+
+/**
+ * E56 PR 1: uma publicação no Instagram feita pelo aplicativo, pela conta que a própria marca ligou (E19). Nunca guarda o acesso da Meta nem o vídeo (o vídeo passa direto do navegador
+ * para a Meta). `legenda` é o texto que a pessoa confirmou; `motivo` é a frase de falha em língua de gente; `codigoMeta` e `subcodigoMeta` são os da Graph API, só para o diagnóstico.
+ * Só pode haver uma publicação viva (não falhada) por roteiro e tipo: duas pessoas tocando em "Publicar" ao mesmo tempo não publicam duas vezes.
+ */
+export const publicacoes = pgTable(
+  "publicacoes",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id),
+    roteiroId: integer("roteiro_id")
+      .notNull()
+      .references(() => roteiros.id),
+    plataforma: text("plataforma").notNull().default("instagram"),
+    tipo: text("tipo").$type<TipoDePublicacao>().notNull(),
+    estado: text("estado").$type<EstadoDaPublicacao>().notNull().default("enviando"),
+    legenda: text("legenda").notNull().default(""),
+    tamanhoBytes: integer("tamanho_bytes").notNull(),
+    tipoDoArquivo: text("tipo_do_arquivo").notNull(),
+    /** O id do contêiner na Meta (não é segredo). */
+    containerId: text("container_id"),
+    /** O id da mídia publicada e o endereço dela no Instagram. */
+    midiaId: text("midia_id"),
+    permalink: text("permalink"),
+    motivo: text("motivo"),
+    codigoMeta: integer("codigo_meta"),
+    subcodigoMeta: integer("subcodigo_meta"),
+    /** Quantas vezes a Meta foi perguntada se o vídeo já está pronto. */
+    conferencias: integer("conferencias").notNull().default(0),
+    criadaPor: text("criada_por").references(() => user.id, { onDelete: "set null" }),
+    criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
+    atualizadaEm: timestamp("atualizada_em", { withTimezone: true }).notNull().defaultNow(),
+    terminadaEm: timestamp("terminada_em", { withTimezone: true }),
+  },
+  (t) => [
+    index("publicacoes_marca_roteiro").on(t.clienteId, t.roteiroId),
+    uniqueIndex("publicacoes_uma_viva_por_roteiro_e_tipo")
+      .on(t.roteiroId, t.tipo)
+      .where(sql`${t.estado} in ('enviando', 'processando', 'publicando', 'publicada')`),
+  ],
+);
+export type Publicacao = typeof publicacoes.$inferSelect;
 
 /**
  * E19 PR 1: os pedidos de exclusão de dados que a Meta mandou (o aviso assinado de "a pessoa removeu o aplicativo e pediu para apagar"). O `codigo` é o que a Meta mostra à pessoa e

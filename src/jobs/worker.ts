@@ -49,6 +49,7 @@ import { recolherOrfaosDoWorkerAnterior } from "./orfaos";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { type PayloadPesquisaNaHora, rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
+import { type PayloadPublicarInstagram, rodarPublicarInstagram } from "./publicar-instagram";
 import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
@@ -230,6 +231,11 @@ async function main(): Promise<void> {
   /** Por evento (E54): `criarPesquisa` manda `{ pesquisaId }`. Sem repetição da fila: cada tentativa gasta buscas pagas. */
   await boss().work<PayloadPesquisaNaHora>(FILAS.pesquisaNaHora, async (job) => {
     await executarComRegistro(FILAS.pesquisaNaHora, () => rodarPesquisaNaHora(job[0].data.pesquisaId));
+  });
+
+  /** Por evento (E56 PR 1): `receberVideo` manda `{ publicacaoId }` quando o vídeo termina de subir; o job reagenda a si mesmo até a Meta preparar o vídeo. */
+  await boss().work<PayloadPublicarInstagram>(FILAS.publicarInstagram, async (job) => {
+    await executarComRegistro(FILAS.publicarInstagram, () => rodarPublicarInstagram(job[0].data.publicacaoId));
   });
 
   console.log("worker no ar.");
