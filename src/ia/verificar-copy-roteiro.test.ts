@@ -478,3 +478,40 @@ describe("R-CONF-10 (E59): nome de partido e de candidato nunca; imagem de pesso
     expect(e.itensDaEdicao).toEqual(["tela dividida", "mostre a foto", "na sala"]);
   });
 });
+
+describe("R-CONF-10: reconhece a pessoa pública em todas as variações da frase aberta (achado da prova com chave)", () => {
+  const SEM_QUADRO = (frase: string) => reprovam({ itensDaEdicao: [`Tela dividida com a foto de ${frase}, uma de cada lado.`] });
+  const COM_APOIO = (frase: string) => reprovam({ itensDaEdicao: [`Foto de ${frase}, você no quadro comentando, como se elas recomendassem o produto.`] });
+
+  it.each([
+    "duas figuras muito conhecidas",
+    "duas figuras muito famosas",
+    "duas figuras eleitorais muito conhecidas",
+    "duas figuras bem conhecidas",
+    "duas figuras conhecidas",
+    "duas figuras famosas",
+    "duas figuras públicas",
+    "duas figuras muito públicas",
+    "uma figura pública",
+    "uma figura muito famosa",
+    "duas pessoas muito conhecidas",
+    "duas pessoas bem famosas",
+    "duas pessoas públicas",
+    "uma pessoa conhecida",
+    "duas personalidades muito conhecidas",
+    "uma personalidade famosa",
+    "uma personalidade pública",
+  ])("%s: sem a pessoa no quadro reprova; com apoio reprova", (frase) => {
+    expect(SEM_QUADRO(frase).some((m) => m.startsWith("R-CONF-10") && m.includes("no quadro")), "sem quadro").toBe(true);
+    expect(COM_APOIO(frase).some((m) => m.startsWith("R-CONF-10") && m.includes("apoia")), "apoio").toBe(true);
+  });
+
+  it("com a pessoa no quadro e sem apoio, a mesma frase passa", () => {
+    expect(reprovam({ itensDaEdicao: ["Tela dividida com a foto de duas figuras muito conhecidas, e você continua no quadro, comentando."] })).toEqual([]);
+  });
+
+  it("'figuras' e 'conhecidas' soltas, sem ser pessoa pública, não ligam a conferência", () => {
+    expect(reprovam({ itensDaEdicao: ["Foto das marcas mais conhecidas de detergente, uma de cada lado."] })).toEqual([]);
+    expect(reprovam({ itensDaEdicao: ["Print das figuras do manual do produto."] })).toEqual([]);
+  });
+});
