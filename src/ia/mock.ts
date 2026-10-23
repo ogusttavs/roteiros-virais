@@ -52,6 +52,10 @@ ${params.sistemaVariavel ?? ""}`);
   if (params.tarefa === "conferirVideoDoSetor" && params.entrada.includes("[mock:conferir-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
+  // E17 parte 1: o modelo barato que escolhe a prova do tema livre fora do ar; a prova volta a ser a da busca por palavra.
+  if (params.tarefa === "reordenarEvidencia" && params.entrada.includes("[mock:reordenar-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
   if (params.tarefa === "juntarVozes" && params.entrada.includes("[mock:juntar-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
@@ -113,6 +117,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockOrganizarFalaBriefing(entrada);
     case "filtrarEvidenciaPorMarca":
       return mockFiltrarEvidenciaPorMarca(entrada);
+    case "reordenarEvidencia":
+      return mockReordenarEvidencia(entrada);
     case "aindaValeRoteiro":
       return mockAindaValeRoteiro(entrada);
     case "notaDaVersao":
@@ -1286,6 +1292,28 @@ function mockClassificarContaDoSetor(entrada: string) {
  * precisaria saber deste filtro novo só para continuar passando como antes.
  */
 const MARCADOR_REPROVA_EVIDENCIA_POR_MARCA = "reprove toda a evidencia por nao combinar com a marca";
+
+/**
+ * E17 parte 1: o mock não entende significado (isso só a chave real mede). Devolve, na ordem da lista, os candidatos que dividem com o tema uma palavra de 5 letras ou mais
+ * pelo começo dela (sem acento), o suficiente para provar o encanamento: chamada, teto, cache e queda para a busca de sempre. "[mock:reordenar-vazio]" no tema devolve
+ * a lista vazia; "[mock:reordenar-tudo]" devolve todos os candidatos (para provar o corte por `limite`). "[mock:reordenar-fora]" derruba a chamada (`gerarMock`).
+ */
+function mockReordenarEvidencia(entrada: string) {
+  const [cabecalho, ...resto] = entrada.split("\n\nVídeos candidatos:\n");
+  const tema = cabecalho.replace(/^Tema: /, "");
+  if (tema.includes("[mock:reordenar-vazio]")) return { mesmoAssunto: [] };
+  const linhas = resto.join("\n").split("\n").filter((l) => /^id \d+:/.test(l));
+  if (tema.includes("[mock:reordenar-tudo]")) return { mesmoAssunto: linhas.map((l) => Number(l.match(/^id (\d+):/)![1])) };
+  const sem = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const palavras = [...new Set(sem(tema).match(/[a-z]{5,}/g) ?? [])];
+  const ids = linhas
+    .filter((l) => {
+      const texto = sem(l);
+      return palavras.some((p) => texto.includes(p.slice(0, 5)));
+    })
+    .map((l) => Number(l.match(/^id (\d+):/)![1]));
+  return { mesmoAssunto: ids };
+}
 
 function mockFiltrarEvidenciaPorMarca(entrada: string) {
   const ids = extrairIds(entrada);

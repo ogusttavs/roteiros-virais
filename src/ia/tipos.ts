@@ -51,6 +51,8 @@ export type TarefaIA =
   | "classificarContaDoSetor"
   | "organizarFalaBriefing"
   | "filtrarEvidenciaPorMarca"
+  /** E17 parte 1: entre até 30 vídeos candidatos do setor, escolhe os que tratam do mesmo assunto do tema livre (a busca por palavra achou pouco). */
+  | "reordenarEvidencia"
   | "aindaValeRoteiro"
   /** E26 (4b): as três notas de uma versão do roteiro (viralizar, te chamarem, lembrarem de você), por um juiz separado, o mesmo para todas as versões. */
   | "notaDaVersao"

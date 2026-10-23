@@ -536,6 +536,7 @@ export async function avaliarTema(
       undefined,
       alternativosDaMarca.map((a) => a.nichoId),
       await filtroDeFormatosDaMarca(cliente.id),
+      { clienteId: cliente.id },
     ),
     modeloNichoAtual(cliente.nichoId),
     regrasAtivasDoCliente(cliente.id),

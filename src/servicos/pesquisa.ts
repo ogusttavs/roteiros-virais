@@ -34,6 +34,8 @@ import {
 import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
 import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
+import { sinonimosDoTema } from "@/lib/sinonimos-do-catalogo";
+import { escolherComIA, MAXIMO_DE_CANDIDATOS_PARA_IA } from "@/servicos/busca-por-significado";
 import { escolherCapa, situacaoDaCapaSql } from "@/servicos/capas";
 import type { FiltroDeFormatosDaMarca } from "@/servicos/formatos";
 import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
@@ -55,6 +57,9 @@ function diasAtras(dias: number): Date {
  * internacionais.
  */
 const FATOR_POOL_BRASIL = 4;
+
+/** E17 parte 1: com menos provas que isto (ou que o `limite`, se for menor), o modelo barato escolhe entre os candidatos do setor. */
+const MINIMO_DE_PROVAS_SEM_IA = 3;
 
 export type VideoRankeado = {
   id: number;
@@ -544,6 +549,108 @@ function condicaoDeFormato(formatos: FiltroDeFormatosDaMarca | undefined, exigir
   return sql`(${serve} and ${doTipo})`;
 }
 
+/** Sem acento nem maiúscula, igual ao que o `f_unaccent` do banco faz com o texto do vídeo (só as marcas de acento; ç vira c). */
+function semAcento(texto: string): string {
+  return texto.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+function arrayDeTexto(lista: string[]): SQL {
+  return lista.length > 0
+    ? sql`array[${sql.join(
+        lista.map((item) => sql`${item}::text`),
+        sql`, `,
+      )}]::text[]`
+    : sql`array[]::text[]`;
+}
+
+/** Palavras a partir de 5 letras entram no parecido de grafia (`pg_trgm`); menores dão trigrama de menos e casam com qualquer coisa. */
+const TAMANHO_MINIMO_PARA_GRAFIA = 5;
+/** Palavra que casa com mais deste tanto dos vídeos do setor é palavra do setor ("dentes" na odontologia), não do assunto: vale meio ponto, não um. */
+const FRACAO_DE_PALAVRA_COMUM = 0.25;
+/** Com menos vídeos que isto no setor a fração não diz nada (setor novo): todas as palavras valem um ponto. */
+const MINIMO_DE_VIDEOS_PARA_PESAR = 10;
+
+/**
+ * A consulta de texto de uma palavra, avaliada UMA vez por consulta e não uma por linha: `plainto_tsquery` é `stable` e, solta no filtro, o Postgres a refaz (com o
+ * dicionário e o radical) em cada vídeo do setor; dentro de um `(select ...)` sem referência à linha ela vira um InitPlan, calculado uma vez e reaproveitado.
+ */
+function consultaUmaVez(palavra: string, semAcentoNoBanco: boolean): SQL {
+  return semAcentoNoBanco
+    ? sql`(select plainto_tsquery('portuguese', f_unaccent(${palavra}::text)))`
+    : sql`(select plainto_tsquery('portuguese', ${palavra}::text))`;
+}
+
+/** A palavra casa com o vídeo: pelo radical sem acento, pelo radical de sempre ou por grafia parecida no título e no assunto (`pg_trgm`: "dente" acha "dental"). */
+function palavraCasa(palavra: string): SQL {
+  const grafia =
+    semAcento(palavra).length >= TAMANHO_MINIMO_PARA_GRAFIA ? sql` or ${videos.textoCurto} %> ${semAcento(palavra)}::text` : sql``;
+  return sql`(${videos.buscaSemAcento} @@ ${consultaUmaVez(palavra, true)} or ${videos.busca} @@ ${consultaUmaVez(palavra, false)}${grafia})`;
+}
+
+/**
+ * E17 parte 1: o peso de cada palavra do tema, na ordem delas: 1, ou meio ponto se ela casa com `FRACAO_DE_PALAVRA_COMUM` ou mais dos vídeos do setor (`semTexto` são as
+ * condições da busca menos o texto). Sem isto, num tema como "clarear os dentes" todo vídeo de dente entrava pela palavra do setor e o que importa ("clarear") se perdia.
+ */
+export async function pesosDasPalavras(palavras: string[], semTexto: SQL[]): Promise<number[]> {
+  if (palavras.length === 0) return [];
+  const contagens = palavras.map((p, i) => sql`count(*) filter (where ${palavraCasa(p)})::int as ${sql.raw(`c${i}`)}`);
+  const resultado = await db().execute<Record<string, number>>(
+    sql`select count(*)::int as total, ${sql.join(contagens, sql`, `)} from videos where ${and(...semTexto)}`,
+  );
+  const linha = resultado.rows[0] ?? {};
+  const total = Number(linha.total ?? 0);
+  if (total < MINIMO_DE_VIDEOS_PARA_PESAR) return palavras.map(() => 1);
+  return palavras.map((_, i) => (Number(linha[`c${i}`] ?? 0) / total >= FRACAO_DE_PALAVRA_COMUM ? 0.5 : 1));
+}
+
+/**
+ * E17 parte 1 (refeita em 23/10/2026): o que a busca por significado soma ao casamento de sempre, só com o que o Postgres já traz. Devolve o pedaço de SQL que
+ * ADMITE o vídeo (somado, com OU, ao casamento antigo: quem entrava continua entrando) e a relevância nova (ordena a prova, mais alta quanto mais perto do tema).
+ *
+ * Cada palavra do tema vale seu peso (`pesosDasPalavras`: um ponto, ou meio se for comum no setor) quando casa com o vídeo (`palavraCasa`). Os sinônimos do catálogo de ramos
+ * valem meio ponto no total (um só, não importa quantos casem). Admite o vídeo que junta um ponto, com tema de até duas palavras, ou um ponto e meio, com mais; o sinônimo conta
+ * nessa soma, mas sozinho nunca basta (é preciso ao menos meio ponto de palavra do tema, e isso sai da própria conta: o exigido menos meio ponto do sinônimo nunca é zero).
+ * As palavras e os sinônimos vão desenrolados no SQL (um `case` por palavra) para cada consulta de texto ser calculada uma vez por consulta, não uma por vídeo.
+ */
+function casamentoPorSignificado(texto: string, palavras: string[], pesos: number[], padroesSemAcento: string[]): { admite: SQL; relevancia: SQL<number> } {
+  const sinonimos = sinonimosDoTema(texto);
+  const exigido = palavras.length <= 2 ? 1 : 1.5;
+  const pontos = sql`(${sql.join(
+    palavras.map((p, i) => sql`(case when ${palavraCasa(p)} then ${pesos[i] ?? 1}::numeric else 0 end)`),
+    sql` + `,
+  )})`;
+  const umSinonimo =
+    sinonimos.length > 0
+      ? sql`(case when ${sql.join(
+          sinonimos.map((sin) => sql`${videos.buscaSemAcento} @@ ${consultaUmaVez(sin, true)}`),
+          sql` or `,
+        )} then 1 else 0 end)`
+      : sql`0`;
+  const etiquetas = sql`(select count(*) from jsonb_array_elements_text(${videos.etiquetas}) as etiqueta(valor)
+    where lower(f_unaccent(etiqueta.valor)) like any (${arrayDeTexto(padroesSemAcento)}))`;
+  // O radical do português é largo ("gelado" e "gelo" são o mesmo radical): a palavra escrita igual no título ou no assunto desempata a favor do vídeo que a tem de verdade.
+  const escritasIgual = sql`(${sql.join(
+    palavras.map((p) => sql`(case when ${videos.textoCurto} ~ ${`(^|[^a-z0-9])${semAcento(p).replace(/[^a-z0-9]/g, "")}([^a-z0-9]|$)`} then 1 else 0 end)`),
+    sql` + `,
+  )})`;
+
+  // O pré-filtro deixa os três índices GIN (`busca`, `busca_sem_acento`, `texto_curto`) trabalharem antes da conta por palavra.
+  const doTexto = (comAcento: boolean) =>
+    sql.join(
+      palavras.map((p) => consultaUmaVez(p, !comAcento)),
+      sql` || `,
+    );
+  const longas = palavras.filter((p) => semAcento(p).length >= TAMANHO_MINIMO_PARA_GRAFIA).map(semAcento);
+  const preFiltro = sql`(${videos.buscaSemAcento} @@ (${doTexto(false)}) or ${videos.busca} @@ (${doTexto(true)})${
+    longas.length > 0 ? sql` or ${videos.textoCurto} %> any (${arrayDeTexto(longas)})` : sql``
+  })`;
+
+  return {
+    admite: sql`(${preFiltro} and ${pontos} + 0.5 * ${umSinonimo} >= ${exigido} and ${pontos} >= 0.5)`,
+    relevancia: sql<number>`(${pontos} + ${etiquetas} + 0.25 * ${escritasIgual} + 0.5 * ${umSinonimo})`,
+  };
+}
+
 function condicoesEvidencia(
   nichoId: number,
   texto: string,
@@ -553,7 +660,9 @@ function condicoesEvidencia(
   alternativos: SetorDaBusca[] = [],
   /** E44 PR 1: os formatos ligados da marca; com resposta dela, o corte global de meme e recorte da H4 sai e vale o formato. */
   formatos?: FiltroDeFormatosDaMarca,
-): { condicoes: SQL[]; relevancia: SQL<number> } {
+  /** E17 parte 1: soma o casamento por significado (sem acento, radical, grafia parecida e sinônimos do catálogo) ao de sempre, com o peso de cada palavra do tema (`pesosDasPalavras`). Sem isto, o SQL é o mesmo de antes. */
+  significado?: { pesos: number[] },
+): { condicoes: SQL[]; relevancia: SQL<number>; /** Tudo menos o casamento com o texto: o conjunto de onde o modelo barato escolhe quando a busca achou pouco. */ semTexto: SQL[] } {
   const palavras = palavrasChave(texto);
   const padroes = palavras.map((p) => `%${p}%`);
   // "text[]" pede um array de verdade; um array JS interpolado direto vira
@@ -573,7 +682,7 @@ function condicoesEvidencia(
           sql`, `,
         )}]::text[]`
       : sql`array[]::text[]`;
-  const condicoes = [
+  const semTexto = [
     // O setor e o piso dele (V9d, item 0b: o piso vem antes do múltiplo, decisão do Gustavo em 25/09/2026; vale para a evidência do tema e
     // do roteiro tanto quanto para a biblioteca de referências; M3: piso do setor). E45 PR 3: com ramos alternativos, cada setor com o seu piso.
     ...condicaoDeSetores([{ id: nichoId, pisoViews: regua.pisoViews }, ...alternativos]),
@@ -581,21 +690,30 @@ function condicoesEvidencia(
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
-    sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${texto}) or exists (
+  ];
+  if (!incluirSeed()) semTexto.push(ne(videos.origem, "seed"));
+  const porFormato = condicaoDeFormato(formatos, exigirServeDeModelo);
+  if (porFormato) semTexto.push(porFormato);
+
+  const casamentoDeSempre = sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${texto}) or exists (
       select 1 from jsonb_array_elements_text(${videos.etiquetas}) as etiqueta(valor)
       where lower(etiqueta.valor) like any (${padroesSql})
-    ))`,
-  ];
-  if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
-  const porFormato = condicaoDeFormato(formatos, exigirServeDeModelo);
-  if (porFormato) condicoes.push(porFormato);
+    ))`;
 
-  const relevancia = sql<number>`(
+  const relevanciaDeSempre = sql<number>`(
     (select count(*) from unnest(${palavrasSql}) as palavra where ${videos.busca} @@ plainto_tsquery('portuguese', palavra))
     + (select count(*) from jsonb_array_elements_text(${videos.etiquetas}) as etiqueta(valor) where lower(etiqueta.valor) like any (${padroesSql}))
   )`;
 
-  return { condicoes, relevancia };
+  if (!significado || palavras.length === 0) {
+    return { condicoes: [...semTexto, casamentoDeSempre], relevancia: relevanciaDeSempre, semTexto };
+  }
+  const porSignificado = casamentoPorSignificado(texto, palavras, significado.pesos, padroes.map(semAcento));
+  return {
+    condicoes: [...semTexto, sql`(${casamentoDeSempre} or ${porSignificado.admite})`],
+    relevancia: porSignificado.relevancia,
+    semTexto,
+  };
 }
 
 /** No desempate da relevância, o vídeo do ramo principal vem antes do de um alternativo (só quando a conta tem alternativo). */
@@ -630,26 +748,44 @@ export async function evidenciaParaTema(
   alternativos: number[] = [],
   /** E44 PR 1: os formatos ligados da marca. */
   formatos?: FiltroDeFormatosDaMarca,
+  /** E17 parte 1: de quem é o tema (para registrar a escolha do modelo barato em `geracoes_ia`). Sem ele, o modelo barato nunca é chamado. */
+  opcoes?: { clienteId?: number },
 ): Promise<VideoEvidenciaTema[]> {
   const regua = await reguaDoSetor(nichoId);
   const proporcaoBrasil = proporcaoBrasilExplicita ?? regua.proporcaoBrasil;
-  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true, await setoresComPiso(alternativos), formatos);
+  const setores = await setoresComPiso(alternativos);
+  // E17 parte 1: ligado por `BUSCA_POR_SIGNIFICADO`; desligado, a consulta é a mesma de sempre.
+  const porSignificado = config.busca.porSignificado;
+  const primeira = condicoesEvidencia(nichoId, texto, regua, true, setores, formatos);
+  const { condicoes, relevancia, semTexto } = porSignificado
+    ? condicoesEvidencia(nichoId, texto, regua, true, setores, formatos, { pesos: await pesosDasPalavras(palavrasChave(texto), primeira.semTexto) })
+    : primeira;
+  const colunas = {
+    id: videos.id,
+    nichoId: videos.nichoId,
+    analise: videos.analise,
+    foraDaCurva: videos.foraDaCurva,
+    idioma: videos.idioma,
+    contaPais: contas.pais,
+    contaIdiomaPrincipal: contas.idiomaPrincipal,
+    contaHandle: contas.handle,
+  };
   const linhas = await db()
-    .select({
-      id: videos.id,
-      nichoId: videos.nichoId,
-      analise: videos.analise,
-      foraDaCurva: videos.foraDaCurva,
-      idioma: videos.idioma,
-      contaPais: contas.pais,
-      contaIdiomaPrincipal: contas.idiomaPrincipal,
-      contaHandle: contas.handle,
-    })
+    .select(colunas)
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoes))
     .orderBy(desc(relevancia), ...principalPrimeiro(nichoId, alternativos), desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite * FATOR_POOL_BRASIL);
+
+  const paraEvidencia = (l: (typeof linhas)[number] & { analise: AnaliseVideo }): VideoEvidenciaTema => ({
+    id: l.id,
+    nichoId: l.nichoId,
+    assunto: l.analise.assunto,
+    gancho: l.analise.gancho,
+    foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
+    conta: l.contaHandle ?? null,
+  });
 
   const comAnalise = linhas.filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null);
   const comProporcao = aplicarProporcaoBrasil(
@@ -658,15 +794,41 @@ export async function evidenciaParaTema(
     (l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)),
     proporcaoBrasil,
   );
+  const encontrados = comProporcao.map(paraEvidencia);
 
-  return comProporcao.map((l) => ({
-    id: l.id,
-    nichoId: l.nichoId,
-    assunto: l.analise.assunto,
-    gancho: l.analise.gancho,
-    foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
-    conta: l.contaHandle ?? null,
-  }));
+  // E17 parte 1: quando a busca achou pouco, o modelo barato escolhe, entre até 30 candidatos do setor, os que tratam do mesmo assunto.
+  // Desligado por `BUSCA_REORDENAR_COM_IA` (e só com a busca por significado ligada); qualquer falha devolve o que a busca achou.
+  if (porSignificado && config.busca.reordenarComIA && opcoes?.clienteId !== undefined && encontrados.length < Math.min(limite, MINIMO_DE_PROVAS_SEM_IA)) {
+    const candidatas = await db()
+      .select({ ...colunas, titulo: videos.titulo })
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(and(...semTexto))
+      .orderBy(desc(relevancia), ...principalPrimeiro(nichoId, alternativos), desc(videos.foraDaCurva), asc(videos.id))
+      .limit(MAXIMO_DE_CANDIDATOS_PARA_IA);
+    const comAnaliseCandidatas = candidatas.filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null);
+    const escolhidas = await escolherComIA({
+      clienteId: opcoes.clienteId,
+      tema: texto,
+      setores: setores.map((s) => s.id),
+      candidatos: comAnaliseCandidatas.map((l) => ({ id: l.id, assunto: l.analise.assunto, titulo: l.titulo })),
+      limite,
+    });
+    if (escolhidas) {
+      const porId = new Map(comAnaliseCandidatas.map((l) => [l.id, l]));
+      const naOrdemDoModelo = escolhidas.flatMap((id) => {
+        const linha = porId.get(id);
+        return linha ? [linha] : [];
+      });
+      const cortadas =
+        naOrdemDoModelo.length > limite
+          ? aplicarProporcaoBrasil(naOrdemDoModelo, limite, (l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)), proporcaoBrasil)
+          : naOrdemDoModelo;
+      return cortadas.map(paraEvidencia);
+    }
+  }
+
+  return encontrados;
 }
 
 export type VideoEvidenciaRoteiro = {

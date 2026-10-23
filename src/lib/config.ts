@@ -57,6 +57,15 @@ export const config = {
     modeloForte: env("AI_MODEL_FORTE", "claude-opus-5"),
     modeloBarato: env("AI_MODEL_BARATO", "claude-haiku-4-5"),
   },
+  /**
+   * E17 parte 1 (refeita em 23/10/2026): a prova do Tema livre por significado próximo, só com o que o Postgres já tem. Tudo desligado por padrão, até a Central medir com chave real.
+   * `porSignificado` liga a busca sem acento e com radical, o parecido de grafia (`pg_trgm`) e os sinônimos do catálogo de ramos (custo zero).
+   * `reordenarComIA` (só vale com a de cima ligada) deixa o modelo barato escolher, entre até 30 candidatos, os que tratam do mesmo assunto quando a busca achou pouco (centavos por tema, com cache).
+   */
+  busca: {
+    porSignificado: env("BUSCA_POR_SIGNIFICADO") === "1",
+    reordenarComIA: env("BUSCA_REORDENAR_COM_IA") === "1",
+  },
   transcricao: {
     groqKey: env("GROQ_API_KEY"),
     groqModel: env("GROQ_MODEL", "whisper-large-v3-turbo"),

@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "checar-texto": "tsx scripts/checar-texto.ts",
     "medir:gramatica": "tsx scripts/medir-gramatica.ts",
+    "comparar:busca": "tsx scripts/comparar-busca-por-significado.ts",
     "stripe:preparar": "tsx scripts/stripe-preparar.ts",
     "gerar:regras-copy-roteiro": "tsx scripts/gerar-regras-copy-roteiro.ts",
     "checar-tokens": "tsx scripts/checar-tokens.ts",

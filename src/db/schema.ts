@@ -1259,6 +1259,18 @@ export const videos = pgTable(
       sql`to_tsvector('portuguese', coalesce(titulo, '') || ' ' || coalesce(descricao, '') || ' ' || coalesce(transcricao, '') || ' ' || coalesce(analise ->> 'assunto', ''))`,
     ),
     /**
+     * E17 parte 1 (refeita em 23/10/2026): a busca por significado com o que o Postgres já traz. Título, assunto e os primeiros 1.500 caracteres da transcrição,
+     * sem acento e com radical em português ("sofá" acha "sofas", "dente" acha "dentes"). `f_unaccent` é a versão imutável do `unaccent`, criada na migração
+     * (a original é `stable`, e coluna gerada só aceita função imutável). Só é lida com `BUSCA_POR_SIGNIFICADO=1`; a `busca` de sempre não muda.
+     */
+    buscaSemAcento: tsvector("busca_sem_acento").generatedAlwaysAs(
+      sql`to_tsvector('portuguese', f_unaccent(coalesce(titulo, '') || ' ' || coalesce(analise ->> 'assunto', '') || ' ' || left(coalesce(transcricao, ''), 1500)))`,
+    ),
+    /** E17 parte 1: título e assunto, minúsculos e sem acento, para o `pg_trgm` achar grafia parecida ("dente" e "dental"). Curto de propósito: trigrama sobre transcrição inteira pesa. */
+    textoCurto: text("texto_curto").generatedAlwaysAs(
+      sql`lower(f_unaccent(coalesce(titulo, '') || ' ' || coalesce(analise ->> 'assunto', '')))`,
+    ),
+    /**
      * "coleta" veio do Apify ou da YouTube Data API, "seed" e exemplo de
      * desenvolvimento, "curadoria" foi posto pela equipe, "meta" veio da
      * Business Discovery ou da Hashtag Search da Meta (E6 parte 3, segunda
@@ -1394,6 +1406,8 @@ export const videos = pgTable(
     index("videos_nicho_publicado").on(t.nichoId, t.publicadoEm),
     index("videos_nicho_fora_da_curva").on(t.nichoId, t.foraDaCurva),
     index("videos_busca_idx").using("gin", t.busca),
+    index("videos_busca_sem_acento_idx").using("gin", t.buscaSemAcento),
+    index("videos_texto_curto_trgm_idx").using("gin", t.textoCurto.op("gin_trgm_ops")),
     /** Janela de 90 dias por conta, usada pelo job `pontuar` (etapa 7). */
     index("videos_conta_publicado").on(t.contaId, t.publicadoEm),
     /** Consulta "subindo hoje" (etapa 7, src/servicos/pesquisa.ts). */
