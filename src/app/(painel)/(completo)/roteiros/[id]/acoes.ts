@@ -51,6 +51,7 @@ export async function marcarGravadoAction(roteiroId: number): Promise<void> {
  */
 export async function desmarcarGravadoAction(roteiroId: number): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   const roteiro = await roteiroDoClienteOuFalha(roteiroId);
   await desmarcarGravado(roteiroId, roteiro.clienteId);
   await desmarcarGravadoNoPlano(roteiroId);
