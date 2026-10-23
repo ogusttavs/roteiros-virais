@@ -85,6 +85,25 @@ describe("AGENDAMENTOS", () => {
     });
   });
 
+  describe("embedarVideos so agenda com EMBEDDINGS_PREENCHER=1 (E17 parte 1)", () => {
+    afterEach(() => {
+      config.embeddings.preencher = false;
+    });
+
+    it("roda todo dia as 07:30, depois dos temas do dia", () => {
+      expect(cronDe(FILAS.embedarVideos)).toBe("30 7 * * *");
+    });
+
+    it("desligado por padrao: a condicao e falsa e o cron nem inscreve", () => {
+      expect(AGENDAMENTOS.find((a) => a.fila === FILAS.embedarVideos)?.condicao?.()).toBe(false);
+    });
+
+    it("ligado: a condicao e verdadeira", () => {
+      config.embeddings.preencher = true;
+      expect(AGENDAMENTOS.find((a) => a.fila === FILAS.embedarVideos)?.condicao?.()).toBe(true);
+    });
+  });
+
   describe("metaContas so agenda com config.coleta.metaAtivo (E6 parte 3, segunda rodada, item 1)", () => {
     afterEach(() => {
       config.coleta.metaAtivo = false;

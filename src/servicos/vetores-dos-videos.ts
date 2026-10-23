@@ -3,7 +3,7 @@
  *
  * Quem entra: vídeo com análise, dos últimos 90 dias (a janela da evidência), sem vetor do modelo atual ou com a ficha mudada (o hash do texto embedado difere do guardado). Os mais recentes primeiro.
  *
- * Três tetos, todos para o job nunca gastar sem querer: vídeos por rodada (`EMBEDDINGS_VIDEOS_POR_RODADA`), dólares por dia somados de `custos_externos` (`EMBEDDINGS_TETO_USD_DIA`) e a primeira
+ * Três tetos, todos para o job nunca gastar sem querer: vídeos por rodada (`EMBEDDINGS_VIDEOS_POR_RODADA`), dólares por dia somados de `custos_externos` (`EMBEDDINGS_TETO_USD_DIA`, com folga de um lote) e a primeira
  * falha da API (a rodada seguinte retoma sozinha, porque a seleção é "o que ainda não tem vetor"). Cada lote grava o custo (`fonte = "voyage"`, em tokens) antes do lote seguinte começar.
  * Recusa gravar vetor simulado em produção.
  */
@@ -126,7 +126,7 @@ export async function preencherVetores(opcoes: OpcoesDoPreenchimento = {}): Prom
   }
 
   for (const lote of emLotes(aFazer, porChamada)) {
-    // O teto de dólar olha o que já foi gasto hoje MAIS o que este lote custaria (estimado antes de chamar), para nunca passar dele.
+    // O teto de dólar olha o que já foi gasto hoje MAIS o que este lote custaria (estimado pelo tamanho do texto, antes de chamar). O custo de verdade só se sabe depois da resposta, então o dia pode passar do teto por, no máximo, um lote.
     const estimativa = custoDosVetoresUsd(lote.reduce((soma, c) => soma + estimarTokens(c.ficha), 0));
     if ((await gastoDeHojeUsd(agora)) + estimativa > tetoUsd) {
       resumo.parouPor = "teto_de_dolar";

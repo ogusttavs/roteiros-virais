@@ -142,6 +142,35 @@ describe("verificarSegredosDeProducao", () => {
       }
     });
   });
+
+  describe("E17: a busca por significado em producao", () => {
+    const base = { NODE_ENV: "production", ...segredosDeVerdade };
+    it("desligada por padrao: sem nenhuma das variaveis, producao sobe como sempre", () => {
+      expect(() => verificarSegredosDeProducao(base)).not.toThrow();
+    });
+    it("EMBEDDINGS_PROVIDER=voyage sem a chave recusa", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, EMBEDDINGS_PROVIDER: "voyage" })).toThrow(/VOYAGE_API_KEY/);
+    });
+    it("EMBEDDINGS_PREENCHER=1 ou BUSCA_POR_SIGNIFICADO=1 com a porta simulada recusa (vetor de mentira na base)", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, EMBEDDINGS_PREENCHER: "1" })).toThrow(/simulada/);
+      expect(() => verificarSegredosDeProducao({ ...base, BUSCA_POR_SIGNIFICADO: "1", EMBEDDINGS_PROVIDER: "mock", VOYAGE_API_KEY: "pa-x" })).toThrow(/simulada/);
+    });
+    it("ligadas com a Voyage e a chave passam, e a chave sozinha ja escolhe a Voyage", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, EMBEDDINGS_PREENCHER: "1", BUSCA_POR_SIGNIFICADO: "1", EMBEDDINGS_PROVIDER: "voyage", VOYAGE_API_KEY: "pa-x" })).not.toThrow();
+      expect(() => verificarSegredosDeProducao({ ...base, EMBEDDINGS_PREENCHER: "1", VOYAGE_API_KEY: "pa-x" })).not.toThrow();
+    });
+    it("fora de producao nao exige nada (desenvolvimento usa a porta simulada)", () => {
+      expect(() => verificarSegredosDeProducao({ NODE_ENV: "development", EMBEDDINGS_PREENCHER: "1", BUSCA_POR_SIGNIFICADO: "1" })).not.toThrow();
+    });
+  });
+});
+
+describe("config.embeddings (tudo desligado por padrao e a porta de teste)", () => {
+  it("nos testes o provedor e sempre o simulado e as duas chaves estao desligadas", () => {
+    expect(config.embeddings.provedor).toBe("mock");
+    expect(config.embeddings.preencher).toBe(false);
+    expect(config.embeddings.buscaAtiva).toBe(false);
+  });
 });
 
 describe("config.cobranca (o portao desligado por padrao e a porta de teste)", () => {
