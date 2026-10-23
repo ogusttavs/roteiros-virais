@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { datasPorDia } from "@/config/datas";
 import { config, hojeISO } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import {
@@ -15,6 +16,7 @@ import { sessaoDoPainel } from "@/lib/ver-como";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoSubindoParaAviso } from "@/servicos/curva";
+import { ramosDaMarcaParaDatasSemFalha } from "@/servicos/datas";
 import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { planoDoDia } from "@/servicos/plano";
@@ -188,6 +190,9 @@ export default async function Planejamento({ searchParams }: Props) {
   const diaVisualizado = validarDiaDaUrl(dia, hoje);
   const ehHoje = diaVisualizado === hoje;
 
+  // E60: o dia marcado com o nome da data (feriado, data que vende, dia do ramo); a base é curta e só vale o que é geral ou do ramo da marca.
+  const ramosDaMarca = await ramosDaMarcaParaDatasSemFalha(cliente);
+
   let cabeca: PropsCabecaPlano;
   let corpo: ReactNode;
 
@@ -227,6 +232,7 @@ export default async function Planejamento({ searchParams }: Props) {
         planoSugeridoDoDia={planoSugeridoDoDia}
         hoje={hoje}
         proximoMarcado={proximoMarcado}
+        datas={dias.length > 0 ? datasPorDia(dias[0].data, dias[dias.length - 1].data, ramosDaMarca) : {}}
       />
     );
   } else if (visao === "dia") {
@@ -312,6 +318,7 @@ export default async function Planejamento({ searchParams }: Props) {
         avisoBriefing={avisoBriefing}
         avisoVideoSubindo={avisoVideoSubindo}
         emAlta={emAlta}
+        datasDoDia={datasPorDia(diaVisualizado, diaVisualizado, ramosDaMarca)[diaVisualizado] ?? []}
       />
     );
   } else {
@@ -333,7 +340,7 @@ export default async function Planejamento({ searchParams }: Props) {
         mes: `/planejamento?visao=mes&dia=${diaVisualizado}`,
       },
     };
-    corpo = <SemanaConteudo dias={dias} />;
+    corpo = <SemanaConteudo dias={dias} datas={datasPorDia(segunda, domingo, ramosDaMarca)} />;
   }
 
   return (

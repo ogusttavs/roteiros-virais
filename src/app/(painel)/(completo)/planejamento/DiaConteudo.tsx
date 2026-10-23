@@ -4,9 +4,11 @@ import { Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import type { DataMarcada } from "@/config/datas";
 import { rotuloParaQue } from "@/config/fichas";
 import type { CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
 import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAtrasado } from "@/servicos/roteiro";
+import { textosDatas } from "@/textos/datas";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
 import { textosRoteiro } from "@/textos/roteiro";
@@ -41,6 +43,8 @@ type Props = {
   avisoVideoSubindo: string | null;
   /** E55 PR 2: o mesmo cartão "Em alta hoje" da aba Hoje (só em hoje). */
   emAlta: DadosEmAlta | null;
+  /** E60: as datas do dia aberto que valem para a marca (feriado, data que vende, dia do ramo); vazia na maioria dos dias. */
+  datasDoDia: DataMarcada[];
 };
 
 const FORMATAR_DIA_DA_SEMANA_COMPLETO = new Intl.DateTimeFormat("pt-BR", { weekday: "long" });
@@ -70,6 +74,7 @@ export function DiaConteudo({
   avisoBriefing,
   avisoVideoSubindo,
   emAlta,
+  datasDoDia,
 }: Props) {
   const router = useRouter();
   const aoAbrirContarAgenda = useAbrirContarAgenda();
@@ -109,6 +114,17 @@ export function DiaConteudo({
   return (
     <>
       {ehHoje && avisoVideoSubindo ? <p className={styles.avisoVideo}>{avisoVideoSubindo}</p> : null}
+
+      {datasDoDia.length > 0 ? (
+        <ul className={styles.datasDoDia} aria-label={textosDatas.legendaDoMes} data-datas-do-dia>
+          {datasDoDia.map((data) => (
+            <li key={data.chave}>
+              <span className={styles.seloData}>{textosDatas.tipo[data.tipo]}</span>
+              <strong>{data.nome}</strong>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {avisoBriefing ? (
         <section className={styles.avisoBriefing} aria-labelledby="t-aviso-briefing">

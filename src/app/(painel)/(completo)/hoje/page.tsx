@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { datasDeHojeEProximas } from "@/config/datas";
 import { rotuloParaQue } from "@/config/fichas";
 import { config, hojeISO } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
@@ -15,6 +16,7 @@ import { sessaoDoPainel } from "@/lib/ver-como";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoSubindoParaAviso } from "@/servicos/curva";
+import { ramosDaMarcaParaDatasSemFalha } from "@/servicos/datas";
 import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { agendaDoDia, atrasados, proximoDiaMarcado, somarDiasISO, semanaDaAgenda } from "@/servicos/roteiro";
@@ -105,6 +107,9 @@ export default async function Hoje({ searchParams }: Props) {
     ehHoje ? grupoEmAberto(cliente.id).catch(() => null) : Promise.resolve(null),
   ]);
 
+  // E60: "hoje é..." e "daqui a N dias é...", só em hoje, só com as datas gerais e as do ramo da marca (a base é curta, em `src/config/datas.ts`).
+  const datas = ehHoje ? datasDeHojeEProximas(hoje, await ramosDaMarcaParaDatasSemFalha(cliente)) : null;
+
   // Enquanto o servidor ainda escreve as versões, não há cartão: ele aparece quando as três ficam prontas.
   const grupoAberto = grupoAbertoBruto && !grupoAbertoBruto.emEscrita ? grupoAbertoBruto : null;
   const versoesProntas: VersoesProntasHoje | null = grupoAberto
@@ -190,6 +195,7 @@ export default async function Hoje({ searchParams }: Props) {
       avisoVideoSubindo={avisoVideoSubindo}
       emAlta={emAlta}
       versoesProntas={versoesProntas}
+      datas={datas}
       marcaAtiva={cliente}
       marcas={marcas}
       nomePessoa={sessao.user.name}
