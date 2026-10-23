@@ -612,6 +612,8 @@ export async function avaliarTema(
     evidenciasFornecidas: evidencias.map((v) => v.id),
     // Achado do Gustavo (06/10/2026): nenhum id de vídeo solto no texto, e sempre "você".
     semIdInterno: true,
+    // 23/10/2026 (prova com chave): nada de "banco do setor", "fora da curva", "nicho", "gancho" na nota que o dono do negócio lê (o prompt 1.14.0 manda; o código confere com a mesma lista).
+    semJargaoDoMotor: true,
     // Hotfix de 22/10/2026: a terceira pessoa deixou de reprovar a nota (o "ela vende" era de OUTRA pessoa do tema, um falso positivo que, duas vezes, derrubou a avaliação e deixou a tela girando).
     // O prompt segue mandando "você"; o que o código acha vira aviso no registro, nunca erro na tela. O roteiro continua como está.
     avisarExtra: (d) => avisosDeTerceiraPessoa(extrairCamposAvaliarTema(d)),
