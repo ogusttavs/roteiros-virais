@@ -10,6 +10,11 @@ export const dynamic = "force-dynamic";
  * assinado do CDN da Meta, que vence em dias. Só para quem está logado (a mesma sessão do painel; o middleware já barra quem não tem cookie e a rota confere a sessão de verdade). Capa de
  * vídeo é dado público da plataforma, igual para todas as marcas, então não há posse a conferir; mesmo assim a resposta é `private`, para nenhum cache compartilhado servir o arquivo
  * a quem não entrou. O cache do navegador é longo: a imagem guardada nunca muda.
+ *
+ * Decisão registrada (revisão do Fable de 22/10/2026, item 7): a rota NÃO confere o setor do vídeo, ao contrário de `/api/imagem-noticia`. Quem está logado pode pedir a capa de qualquer id, mas
+ * é a miniatura pública que a própria plataforma mostra a qualquer pessoa: nenhum dado de marca sai por aqui, só se perde o "só do meu setor". O custo de conferir é uma capa em branco no painel
+ * toda vez que uma tela mostrar um vídeo por um caminho que a conferência não conhece (ramo principal, ramos alternativos, tendências, exemplos de outro ramo). Se a política mudar, o ponto é
+ * este: reaproveitar a conferência de `fotoGuardadaDaNoticia` (`servicos/foto-da-noticia.ts`) usando `videos.nicho_id`.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ videoId: string }> }) {
   const sessao = await sessaoAtual();

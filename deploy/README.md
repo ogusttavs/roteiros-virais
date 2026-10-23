@@ -269,6 +269,16 @@ Entra desligado: sem os quatro dados abaixo no `.env` da VPS, ninguem consegue c
 - **No aplicativo da Meta** (so o Gustavo): a URI `<APP_URL>/api/meta/retorno` em URIs de redirecionamento OAuth validos; o dominio do app em Dominios do aplicativo; a URL `<APP_URL>/api/meta/exclusao` em "URL de solicitacao de exclusao de dados"; a configuracao de login (Login do Facebook para Empresas) com as quatro permissoes; o papel de quem vai testar. O passo a passo esta no corpo do PR.
 - **Rotina**: o job `renovar-contas-ligadas` roda todo dia as 06:20 (renova o que vence em menos de 15 dias e avisa o dono por e-mail, uma vez, quando nao da mais). Rodar uma vez: `npm run job -- renovar-contas-ligadas`.
 
+## As migracoes e o journal do Drizzle
+
+- **Quem manda e o `when`, nao o `idx`.** O migrador aplica, em ordem, as entradas de `drizzle/meta/_journal.json` cuja data (`when`) e maior que a da ultima migracao ja aplicada naquele banco. Entao o `when` de cada entrada nova precisa ser maior que o da anterior; o `drizzle-kit generate` ja faz isso, e quem escrever uma entrada a mao tem de conferir.
+- **O journal pula de `0089` para `0091`, e esta certo.** A `0090` foi gerada numa branch de 22/10/2026 e descartada antes de entrar na `main`; nunca existiu em nenhuma versao em producao. Nao renumerar: a `0091` e as seguintes ja foram aplicadas na VPS, e renumerar trocaria o nome de migracao ja registrada. O `drizzle-kit generate` usa o ultimo `idx` mais um, entao a numeracao segue de onde parou.
+- Regra do deploy sem pedir (`CLAUDE.md` do projeto, regra 14): so migracao de `ADD COLUMN` ou `CREATE TABLE`.
+
+## Limites conhecidos
+
+- **Um processo web so.** A avaliacao do tema livre nao paga duas vezes o toque repetido porque a chamada em curso fica num `Map` na memoria do processo (`AVALIACOES_EM_CURSO` em `src/app/(painel)/(completo)/criar/tema-livre/acoes.ts`). Hoje ha um unico container `web` em producao, entao basta. Se um dia houver mais de um (ou uma troca de container no meio de uma avaliacao), o toque repetido pode pagar duas vezes: a saida e trocar o `Map` por uma trava no banco (`pg_advisory_xact_lock` ou uma linha com a chave e o prazo), como o webhook do Stripe ja faz.
+
 ## O que nunca fazer
 
 Build na VPS; publicar porta; mexer em `/srv/odontotech` ou no bloco do OdontoTech no

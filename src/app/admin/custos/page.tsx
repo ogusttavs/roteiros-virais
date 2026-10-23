@@ -6,7 +6,9 @@ import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { exigirAdmin } from "@/lib/sessao";
 import { custosDoAdmin, desfechoDaPesquisa, pesquisasNaHoraDoAdmin } from "@/servicos/admin-custos";
+import { custoDoFiltroDeNoticias } from "@/servicos/custo-do-filtro-de-noticias";
 import { custosDosLongos } from "@/servicos/custos-dos-longos";
+import { LOTES_POR_RODADA } from "@/servicos/filtro-de-noticias";
 import { dolares, reais } from "@/textos/admin-contas";
 import { textosCustosAdmin as t } from "@/textos/admin-custos";
 
@@ -42,6 +44,11 @@ export default async function CustosDoAdmin() {
   // E52 (PR 2): uma seção nova de leitura; se ela falhar, o resto da aba (e o teto) continua de pé.
   const longos = await custosDosLongos().catch((erro: unknown) => {
     logger.warn({ err: erro }, "admin custos: nao foi possivel ler o custo dos videos longos");
+    return null;
+  });
+  // Revisão do Fable de 22/10/2026 (item 12): outra seção só de leitura; se falhar, o resto da aba continua de pé.
+  const filtro = await custoDoFiltroDeNoticias().catch((erro: unknown) => {
+    logger.warn({ err: erro }, "admin custos: nao foi possivel ler o custo do filtro de noticias");
     return null;
   });
   const hojeBrl = usdParaBrl(c.hoje.usd);
@@ -294,6 +301,51 @@ export default async function CustosDoAdmin() {
           </section>
         ) : null}
       </div>
+
+      {filtro ? (
+        <section className={styles.cartao} aria-labelledby="t-filtro" data-bloco="filtro-de-noticias">
+          <div className={styles.tabelaTitulo}>
+            <h2 id="t-filtro">{t.filtroDeNoticias.titulo}</h2>
+            <span className={styles.quantos}>{t.filtroDeNoticias.legenda}</span>
+          </div>
+          {filtro.dias.length === 0 ? (
+            <p className={styles.semDado}>{t.filtroDeNoticias.vazio}</p>
+          ) : (
+            <ul className={styles.lista} data-lista-do-filtro>
+              <li className={styles.itemCusto} data-resumo-do-filtro>
+                <span className={styles.nomeCusto}>
+                  {t.filtroDeNoticias.resumo(filtro.totalChamadas)}
+                  <span className={styles.detalheCusto}>
+                    {t.filtroDeNoticias.porRamoPorDia(
+                      (filtro.chamadasPorRamoPorDia ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 }),
+                      reais(usdParaBrl(filtro.usdPorRamoPorDia ?? 0)),
+                    )}
+                  </span>
+                </span>
+                <span className={styles.valorCusto}>
+                  {reais(usdParaBrl(filtro.totalUsd))}
+                  <span className={styles.detalheCusto}>{dolares(filtro.totalUsd)}</span>
+                </span>
+                <span />
+              </li>
+              {filtro.dias.map((d) => (
+                <li key={d.dia} className={styles.itemCusto} data-dia-do-filtro={d.dia}>
+                  <span className={styles.nomeCusto}>
+                    {d.dia.slice(8, 10)}/{d.dia.slice(5, 7)}
+                    <span className={styles.detalheCusto}>{t.filtroDeNoticias.dia(d.chamadas, d.ramos)}</span>
+                  </span>
+                  <span className={styles.valorCusto}>
+                    {reais(usdParaBrl(d.usd))}
+                    <span className={styles.detalheCusto}>{dolares(d.usd)}</span>
+                  </span>
+                  <span />
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className={styles.nota}>{t.filtroDeNoticias.nota(LOTES_POR_RODADA)}</p>
+        </section>
+      ) : null}
 
       {/* E54 (parte 4): uma linha por pesquisa na hora, para a prova com a chave real ter onde olhar (o estimado que a tela diz, o medido, o desfecho). */}
       <section className={styles.cartao} aria-labelledby="t-pesquisas" data-bloco="pesquisas-na-hora">
