@@ -884,7 +884,8 @@ async function tentarGerarEVerificar<T>(
    * verificação sem sentido em `geracoes_ia`.
    */
   if (aprovado && Object.keys(campos).length > 0) {
-    const textoJunto = Object.values(campos).join("\n");
+    // 1.9.0: com a conferência de fato (com fontes), as instruções de gravação e de edição vão num bloco à parte, que o critério manda nunca conferir como fato (`montarTextoParaConferir`).
+    const textoJunto = verificarTexto.montarTextoParaConferir(campos, Boolean(params.fontesDosFatos));
     const verificacao = await gerarEstruturado({
       tarefa: "verificarTexto",
       nivel: verificarTexto.nivel,
