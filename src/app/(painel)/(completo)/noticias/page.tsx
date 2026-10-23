@@ -1,6 +1,7 @@
 import { Newspaper } from "lucide-react";
 import { redirect } from "next/navigation";
 
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { pedirFiltroDeNoticias } from "@/servicos/filtro-de-noticias";
@@ -55,7 +56,7 @@ export default async function Noticias() {
   if (!sessao) redirect("/entrar");
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
-  if (!cliente) redirect("/entrar");
+  if (!cliente) redirect(destinoSemMarca(sessao.user.role));
 
   if (!cliente.nichoId) {
     return <EstadoVazio icone={<Newspaper size={24} strokeWidth={1.5} aria-hidden="true" />} frase={textosNoticias.semNicho} />;

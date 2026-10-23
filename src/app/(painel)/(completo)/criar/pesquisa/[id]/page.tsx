@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { enderecoParaMudarOPedido } from "@/lib/pesquisa-na-hora-rotas";
 import { sessaoDoPainel } from "@/lib/ver-como";
@@ -24,7 +25,7 @@ export default async function Pesquisa({ params }: Props) {
   }
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
   if (pesquisaId === null) {
     notFound();

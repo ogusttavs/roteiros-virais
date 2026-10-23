@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { hojeISO } from "@/lib/config";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { classificarMultiplo, formatarMultiplo, formatarViewsCompacto, diasDesde, fraseDiasAtras, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
@@ -46,7 +47,7 @@ export default async function Temas({ searchParams }: Props) {
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   const { data } = await searchParams;

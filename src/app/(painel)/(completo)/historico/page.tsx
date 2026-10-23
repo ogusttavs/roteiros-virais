@@ -1,6 +1,7 @@
 import { History } from "lucide-react";
 import { redirect } from "next/navigation";
 
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { curvasDoHistorico } from "@/servicos/curva";
@@ -20,7 +21,7 @@ export default async function Historico() {
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   const [resumo, roteiros] = await Promise.all([resumoHistorico(cliente.id), roteirosDoCliente(cliente.id)]);

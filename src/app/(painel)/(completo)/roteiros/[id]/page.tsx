@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { hojeISO } from "@/lib/config";
 import { conviteDeInstalarPodeAparecer } from "@/lib/convite-instalar";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
@@ -30,7 +31,7 @@ export default async function Roteiro({ params }: Props) {
 
   const [cliente, marcas] = await Promise.all([clienteAtivoDoUsuario(sessao.user.id), marcasDoUsuario(sessao.user.id)]);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   if (roteiroId === null) {

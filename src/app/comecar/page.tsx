@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { FaixaDoModo } from "@/app/(painel)/_casca/FaixaVerComo";
 import { TrocaMarcaProvider } from "@/app/(painel)/_casca/TrocaMarcaContext";
 import { config } from "@/lib/config";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { blocoInicial, garantirBriefing, lerBriefing } from "@/servicos/briefing";
 import {
@@ -33,7 +34,7 @@ export default async function Comecar() {
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   // E46 PR 2: no "ver como" esta tela nunca é o assistente (ele grava em nome da pessoa) nem um erro: briefing completo vai ao Hoje, e o resto mostra o aviso com a saída do modo.
