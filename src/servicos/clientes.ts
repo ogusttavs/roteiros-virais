@@ -41,6 +41,7 @@ import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { normalizarSite, siteValido, TAMANHO_MAXIMO_DO_SITE } from "@/lib/site-valido";
 import { lerEstadoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
+import { pedirFiltroDeNoticias } from "@/servicos/filtro-de-noticias";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { cancelarPedidoAberto, registrarPedidoDeRamo } from "@/servicos/pedidos-de-ramo";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
@@ -369,6 +370,8 @@ export async function criarMarca(dados: {
   const tipo = dados.tipo ?? "negocio";
   const plano = dados.plano ?? "padrao";
   const [cliente] = await db().insert(clientes).values({ nome: dados.nome, nichoId: dados.nichoId, tipo, plano }).returning();
+  // Fix de 22/10/2026: a conta nasce com as Notícias do ramo já filtradas no mesmo dia.
+  if (cliente.nichoId) void pedirFiltroDeNoticias(cliente.nichoId);
   return cliente;
 }
 
@@ -1021,7 +1024,11 @@ export async function salvarRamoConta(clienteId: number, ramoSlug: string): Prom
   const { nichoId } = await setorParaAMarca(antes.nichoId, ramoSlug);
   const [cliente] = await db().update(clientes).set({ nichoId, ramoOutro: null }).where(eq(clientes.id, clienteId)).returning();
   if (!cliente) throw new ErroCliente("nao foi possivel trocar o ramo; cliente nao encontrado.");
-  if (antes.nichoId !== nichoId) await tirarAlternativoQueViraPrincipal(clienteId, nichoId);
+  if (antes.nichoId !== nichoId) {
+    await tirarAlternativoQueViraPrincipal(clienteId, nichoId);
+    // Fix de 22/10/2026: o ramo novo ganha as Notícias no mesmo dia.
+    void pedirFiltroDeNoticias(nichoId);
+  }
   // Escolheu da lista: o pedido de ramo aberto (o "Não achei o meu" de antes) deixa de valer.
   await cancelarPedidoAberto(clienteId);
   // O setor de onde a marca saiu, se nasceu de um ramo do catálogo e ficou sem marca, para de ser pesquisado (nunca derruba a troca).

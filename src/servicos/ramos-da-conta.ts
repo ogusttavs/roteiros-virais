@@ -12,6 +12,7 @@ import { clientes, nichos, ramosDaConta } from "@/db/schema";
 import { logger } from "@/lib/log";
 import { MAXIMO_DE_RAMOS_ALTERNATIVOS } from "@/lib/ramos-alternativos";
 
+import { pedirFiltroDeNoticias } from "./filtro-de-noticias";
 import { ErroNicho } from "./nichos";
 import { desligarSetorSeSemMarca, garantirNichoDoRamo, nichoDoRamo } from "./ramos";
 
@@ -140,6 +141,8 @@ export async function ligarRamoAlternativo(clienteId: number, slugDoRamo: string
     await desligarSetorSeSemMarca(nicho.id).catch(() => undefined);
     throw new ErroRamosDaConta(`A marca já tem ${MAXIMO_DE_RAMOS_ALTERNATIVOS} ramos alternativos; tire um antes de ligar outro.`);
   }
+  // Fix de 22/10/2026: o ramo ligado ganha as Notícias no mesmo dia.
+  void pedirFiltroDeNoticias(nicho.id);
   return { id: linha.id, nichoId: nicho.id, nome: ramo.nome, ramoSlug: ramo.slug, ligadoEm: linha.ligadoEm };
 }
 

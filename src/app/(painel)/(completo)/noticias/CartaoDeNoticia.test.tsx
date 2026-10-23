@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { CartaoDeNoticia, veiculoEhLongo, type NoticiaNaTela } from "./CartaoDeNoticia";
@@ -45,5 +45,22 @@ describe("o nome do veículo no bloco de tipografia (cartão sem foto)", () => {
     expect(container.querySelector("img")?.getAttribute("src")).toBe("https://s2-g1.glbimg.com/a.jpg");
     expect(container.textContent).toContain("Foto: G1");
     expect(container.querySelector("[class*='semFoto']")).toBeNull();
+  });
+
+  it("a foto guardada do nosso lado usa a rota própria; se não abrir, o cartão cai no quadro com o nome do veículo (nunca um buraco)", () => {
+    const { container } = render(
+      <CartaoDeNoticia noticia={{ ...BASE, imagemUrl: "/api/imagem-noticia/1", imagemCredito: "Foto: G1" }} aoAbrir={() => {}} aoCriarRoteiro={() => {}} />,
+    );
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toBe("/api/imagem-noticia/1");
+    fireEvent.error(img as HTMLImageElement);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("[class*='semFoto']")?.textContent).toContain("G1");
+  });
+
+  it("sem foto nenhuma, o quadro mostra o nome do veículo", () => {
+    const { container } = render(<CartaoDeNoticia noticia={BASE} aoAbrir={() => {}} aoCriarRoteiro={() => {}} />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("[class*='semFoto']")?.textContent).toContain("G1");
   });
 });
