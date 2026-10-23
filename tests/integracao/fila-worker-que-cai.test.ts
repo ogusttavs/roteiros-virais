@@ -28,6 +28,12 @@ async function estadoDoJob(nome: string, id: string): Promise<string | undefined
   return rows[0]?.state;
 }
 
+/** O pg-boss só monitora uma fila a cada 60 s (`monitor_on`); zera o relógio para o teste não depender de quando rodou o anterior. */
+async function monitorar(nome: string): Promise<void> {
+  await db().execute(sql`update pgboss.queue set monitor_on = null where name = ${nome}`);
+  await boss().supervise(nome);
+}
+
 async function limpar(): Promise<void> {
   await boss().deleteAllJobs(LONGA);
   await boss().deleteAllJobs(CURTA);
@@ -154,7 +160,7 @@ describe("o pulso do worker (segunda rede, para o worker que fica fora do ar)", 
 
     // O worker morreu há 10 minutos: o último pulso é antigo.
     await db().execute(sql`update pgboss.job set heartbeat_on = now() - interval '10 minutes' where id = ${id}`);
-    await boss().supervise(LONGA);
+    await monitorar(LONGA);
 
     expect(await estadoDoJob(LONGA, id!)).toBe("failed");
     expect(await enfileirarSemDuplicar(LONGA)).toEqual(expect.any(String));
@@ -165,7 +171,7 @@ describe("o pulso do worker (segunda rede, para o worker que fica fora do ar)", 
     await boss().fetch(LONGA);
     await db().execute(sql`update pgboss.job set heartbeat_on = now() - interval '60 seconds' where id = ${id}`);
 
-    await boss().supervise(LONGA);
+    await monitorar(LONGA);
 
     expect(await estadoDoJob(LONGA, id!)).toBe("active");
   });
