@@ -8,6 +8,9 @@
  *  - **nada que não traga `metadata.produto = roteiros` é lido como nosso, alterado ou reaproveitado**: se o produto de id fixo ou o preço da chave de busca existem sem a
  *    marca, o script para com erro e não toca em nada;
  *  - um preço nosso com valor, moeda ou período diferentes do plano também para com erro (preço do Stripe não muda; criar outro é decisão de quem lê o relatório);
+ *  - **O nome na fatura do cartão (achado 5 da revisão, 23/10/2026).** O Stripe não deixa pôr o descritor no PaymentIntent de uma assinatura; para assinatura ele vem da fatura ou do
+ *    **produto** (`statement_descriptor`, ver `pesquisa/plataformas/docs/stripe/descritor-na-fatura.md`). Como a conta é dividida com o OdontoTech, o descritor da conta não muda: o produto
+ *    do Roteiros (e só ele, que leva a marca) recebe o nome do app em maiúsculas, validado por `descritorDaFatura`. Se o produto nosso já existe com outro descritor, é atualizado.
  *  - **E22 PR 2, item 0c: a configuração do portal do cliente é própria do Roteiros.** A padrão da conta é do OdontoTech (e é a que o Stripe usa se nenhuma for pedida): aqui se acha
  *    (ou cria) uma configuração à parte, com `metadata.produto = roteiros`, só com o que este produto oferece (cartão, faturas, e-mail, cancelar no fim do período; sem trocar de plano,
  *    porque o plano é um só). A configuração do OdontoTech nunca é lida como nossa, alterada nem reaproveitada.
@@ -16,7 +19,7 @@ import { METADATA_PRODUTO, PLANO } from "../src/config/assinatura";
 
 export const PRODUTO_ID = "roteiros_plano_trimestral";
 
-type ProdutoLike = { id: string; metadata?: Record<string, string> | null; livemode?: boolean };
+type ProdutoLike = { id: string; metadata?: Record<string, string> | null; livemode?: boolean; statement_descriptor?: string | null };
 type PrecoLike = {
   id: string;
   product: string | { id: string };
@@ -34,6 +37,7 @@ export interface StripeLike {
   products: {
     retrieve(id: string): Promise<ProdutoLike>;
     create(params: Record<string, unknown>, opcoes?: Record<string, unknown>): Promise<ProdutoLike>;
+    update(id: string, params: Record<string, unknown>, opcoes?: Record<string, unknown>): Promise<ProdutoLike>;
   };
   prices: {
     list(params: Record<string, unknown>): Promise<{ data: PrecoLike[] }>;
@@ -49,8 +53,45 @@ export interface StripeLike {
 
 export class ErroDePreparo extends Error {}
 
-export type Relatorio = { produtoId: string; precoId: string; criouProduto: boolean; criouPreco: boolean; portalId: string; criouPortal: boolean };
-type RelatorioDoPreco = Pick<Relatorio, "produtoId" | "precoId" | "criouProduto" | "criouPreco">;
+export type Relatorio = {
+  produtoId: string;
+  precoId: string;
+  criouProduto: boolean;
+  criouPreco: boolean;
+  portalId: string;
+  criouPortal: boolean;
+  /** O que o cartão do cliente mostra na fatura (o descritor do produto). */
+  descritor: string;
+  /** O produto já existia com outro descritor (ou sem) e foi atualizado. */
+  atualizouDescritor: boolean;
+};
+type RelatorioDoPreco = Pick<Relatorio, "produtoId" | "precoId" | "criouProduto" | "criouPreco" | "descritor" | "atualizouDescritor">;
+
+/**
+ * O que a documentação do Stripe exige de um descritor (descritor-na-fatura.md, baixado em 23/10/2026): só caracteres latinos, de 5 a 22 caracteres, ao menos uma letra, nenhum
+ * de `< > \ ' " *`. Aqui vai além, de propósito: só letras, números e espaços, em maiúsculas, sem acento (a fatura de banco mostra assim mesmo).
+ */
+export const DESCRITOR_MINIMO = 5;
+export const DESCRITOR_MAXIMO = 22;
+
+/** O descritor da fatura a partir do nome do app (`APP_NAME`). Nunca devolve vazio nem fora da regra: se o nome não dá um descritor válido, lança `ErroDePreparo` e nada é enviado. */
+export function descritorDaFatura(nomeDoApp: string | undefined | null): string {
+  const limpo = String(nomeDoApp ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, DESCRITOR_MAXIMO)
+    .trim();
+  if (limpo.length < DESCRITOR_MINIMO || !/[A-Z]/.test(limpo)) {
+    throw new ErroDePreparo(
+      `O nome do app (APP_NAME) nao da um descritor de fatura valido: precisa ter de ${DESCRITOR_MINIMO} a ${DESCRITOR_MAXIMO} caracteres entre letras latinas, numeros e espacos, com ao menos uma letra. Nada foi alterado.`,
+    );
+  }
+  return limpo;
+}
 
 const ehNosso = (m: Record<string, string> | null | undefined) => m?.produto === METADATA_PRODUTO.produto;
 
@@ -79,8 +120,10 @@ export const CONFIGURACAO_DO_PORTAL = {
   },
 } as const;
 
-export async function prepararStripe(stripe: StripeLike): Promise<Relatorio> {
-  const preco = await prepararProdutoEPreco(stripe);
+/** `nomeDoApp` é o `APP_NAME`; o descritor é validado antes de qualquer chamada ao Stripe. */
+export async function prepararStripe(stripe: StripeLike, nomeDoApp: string): Promise<Relatorio> {
+  const descritor = descritorDaFatura(nomeDoApp);
+  const preco = await prepararProdutoEPreco(stripe, descritor);
   const portal = await prepararPortal(stripe);
   return { ...preco, ...portal };
 }
@@ -97,7 +140,14 @@ async function prepararPortal(stripe: StripeLike): Promise<{ portalId: string; c
   return { portalId: criada.id, criouPortal: true };
 }
 
-async function prepararProdutoEPreco(stripe: StripeLike): Promise<RelatorioDoPreco> {
+/** Garante o descritor num produto que JÁ é nosso (quem chama já conferiu a marca). Só escreve se for diferente. */
+async function garantirDescritor(stripe: StripeLike, produto: ProdutoLike, descritor: string): Promise<boolean> {
+  if (produto.statement_descriptor === descritor) return false;
+  await stripe.products.update(produto.id, { statement_descriptor: descritor }, { idempotencyKey: `roteiros-descritor-${produto.id}-${descritor}` });
+  return true;
+}
+
+async function prepararProdutoEPreco(stripe: StripeLike, descritor: string): Promise<RelatorioDoPreco> {
   // 1. O preço primeiro, só lendo: se a chave de busca já é de outro produto (ou de um preço nosso diferente do plano), para antes de criar qualquer coisa.
   const achados = await stripe.prices.list({ lookup_keys: [PLANO.lookupKey], limit: 1 });
   const existente = achados.data[0];
@@ -117,11 +167,18 @@ async function prepararProdutoEPreco(stripe: StripeLike): Promise<RelatorioDoPre
     if (diferente) {
       throw new ErroDePreparo(`O preco ${existente.id} (chave ${PLANO.lookupKey}) existe com valor, moeda, periodo ou produto diferentes do plano. Preco do Stripe nao muda: decida se arquiva este e cria outro. Nada foi alterado.`);
     }
-    return { produtoId: PRODUTO_ID, precoId: existente.id, criouProduto: false, criouPreco: false };
+    // O preço é nosso e do nosso produto: o produto também (retrieve), e o descritor dele é acertado aqui, porque este caminho não chega ao passo 2.
+    const nosso = await stripe.products.retrieve(PRODUTO_ID);
+    if (!ehNosso(nosso.metadata)) {
+      throw new ErroDePreparo(`O produto ${PRODUTO_ID} ja existe na conta, mas sem metadata.produto = roteiros. Nao e nosso: nada foi alterado.`);
+    }
+    const atualizouDescritor = await garantirDescritor(stripe, nosso, descritor);
+    return { produtoId: PRODUTO_ID, precoId: existente.id, criouProduto: false, criouPreco: false, descritor, atualizouDescritor };
   }
 
   // 2. O produto, pelo id fixo (retrieve, nunca busca: a busca do Stripe demora a refletir o que acabou de ser criado).
   let criouProduto = false;
+  let atualizouDescritor = false;
   let produto: ProdutoLike | null = null;
   try {
     produto = await stripe.products.retrieve(PRODUTO_ID);
@@ -132,9 +189,10 @@ async function prepararProdutoEPreco(stripe: StripeLike): Promise<RelatorioDoPre
     if (!ehNosso(produto.metadata)) {
       throw new ErroDePreparo(`O produto ${PRODUTO_ID} ja existe na conta, mas sem metadata.produto = roteiros. Nao e nosso: nada foi alterado.`);
     }
+    atualizouDescritor = await garantirDescritor(stripe, produto, descritor);
   } else {
     produto = await stripe.products.create(
-      { id: PRODUTO_ID, name: PLANO.nomeDoProduto, metadata: { ...METADATA_PRODUTO } },
+      { id: PRODUTO_ID, name: PLANO.nomeDoProduto, statement_descriptor: descritor, metadata: { ...METADATA_PRODUTO } },
       { idempotencyKey: `roteiros-produto-${PRODUTO_ID}` },
     );
     criouProduto = true;
@@ -152,5 +210,5 @@ async function prepararProdutoEPreco(stripe: StripeLike): Promise<RelatorioDoPre
     },
     { idempotencyKey: `roteiros-preco-${PLANO.lookupKey}` },
   );
-  return { produtoId: produto.id, precoId: preco.id, criouProduto, criouPreco: true };
+  return { produtoId: produto.id, precoId: preco.id, criouProduto, criouPreco: true, descritor, atualizouDescritor };
 }

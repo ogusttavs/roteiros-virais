@@ -6,7 +6,8 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/db";
 import { nichos } from "@/db/schema";
-import { boss, existeJobPendente, FILAS, FILAS_POR_EVENTO, garantirBossPronto } from "@/jobs/fila";
+import { enfileirarSemDuplicar } from "@/jobs/disparo";
+import { FILAS, FILAS_POR_EVENTO, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 
 const NOMES_VALIDOS = new Set<string>(Object.values(FILAS));
@@ -81,13 +82,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ nom
     );
   }
 
-  // Dois cliques, ou dois admins: um job igual já na fila (ou rodando) não entra de novo. Vale com e sem `nichoId` (a coleta paga rodaria em dobro).
-  if (await existeJobPendente(nome, nichoId || undefined)) {
-    return NextResponse.json({ ok: true, job: nome, enfileirado: null, duplicado: true }, { status: 202 });
-  }
-
-  // Rede de segurança para dois pedidos no mesmo instante, antes de qualquer um aparecer como pendente: a mesma chave por 30 segundos vira um só.
-  const id = await boss().send(nome, nichoId ? { nichoId } : undefined, { singletonKey: nichoId ? `${nome}-${nichoId}` : nome, singletonSeconds: 30 });
+  // Dois cliques, ou dois admins: um job igual já na fila (ou rodando) não entra de novo, vale com e sem `nichoId` (a coleta paga rodaria em dobro). Não há janela de tempo: um job que terminou não impede o próximo (`src/jobs/disparo.ts`).
+  const id = await enfileirarSemDuplicar(nome, nichoId || undefined);
   if (id === null) return NextResponse.json({ ok: true, job: nome, enfileirado: null, duplicado: true }, { status: 202 });
   return NextResponse.json({ ok: true, job: nome, enfileirado: id, duplicado: false }, { status: 202 });
 }

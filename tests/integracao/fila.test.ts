@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { boss, FILAS, garantirFilas, opcoesDaFila } from "@/jobs/fila";
+import { boss, FILAS, garantirFilas, opcoesDaFila, PULSO_DO_WORKER_S } from "@/jobs/fila";
 
 beforeAll(async () => {
   await boss().start();
@@ -27,13 +27,13 @@ describe("opcoesDaFila", () => {
       // E38 PR 2: ler o Instagram pode esperar a janela da Meta por quase uma hora; com 15 minutos e repeticao leria o site do cliente tres vezes.
       FILAS.entenderMarca,
     ]) {
-      expect(opcoesDaFila(nome)).toEqual({ retryLimit: 0, retryBackoff: false, expireInSeconds: 4 * 60 * 60 });
+      expect(opcoesDaFila(nome)).toEqual({ retryLimit: 0, retryBackoff: false, expireInSeconds: 4 * 60 * 60, heartbeatSeconds: PULSO_DO_WORKER_S });
     }
   });
 
   it("job curto: 2 repeticoes com espera crescente e o prazo de 15 minutos", () => {
     for (const nome of [FILAS.lembrete, FILAS.curvaCliente, FILAS.emailAcompanhamento, FILAS.faxinaVersoes, FILAS.aprenderCliente]) {
-      expect(opcoesDaFila(nome)).toEqual({ retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60 });
+      expect(opcoesDaFila(nome)).toEqual({ retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60, heartbeatSeconds: PULSO_DO_WORKER_S });
     }
   });
 
@@ -50,7 +50,7 @@ describe("garantirFilas", () => {
   it("corrige uma fila que ja existia com as opcoes antigas (2 repeticoes, prazo padrao de 15 minutos)", async () => {
     const b = boss();
     await b.createQueue(FILAS.transcrever, { retryLimit: 2, retryBackoff: true });
-    await b.updateQueue(FILAS.transcrever, { retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60 });
+    await b.updateQueue(FILAS.transcrever, { retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60, heartbeatSeconds: PULSO_DO_WORKER_S });
 
     await garantirFilas();
 

@@ -18,15 +18,25 @@ const O_QUE_PAROU: Record<CausaDaParada, string> = {
   "sem leitura": "todas as tentativas de leitura falharam",
 };
 
-const O_QUE_FAZER: Record<CausaDaParada, string> = {
-  "proxy sem trafego": "Recarregue o pacote do proxy no DataImpulse (US$ 5 = 5 GB). Sem isso nenhum vídeo do YouTube nem do TikTok é lido.",
-  "proxy recusou o acesso": "Confira a senha e o pacote no DataImpulse e o YTDLP_PROXY da máquina.",
-  "proxy fora do ar": "Veja se o DataImpulse está no ar e se a máquina alcança o endereço do proxy.",
-  bloqueio: "Veja se o yt-dlp da máquina está atualizado e se o proxy responde. Não há nada a pagar neste caso.",
-  "sem leitura": "Veja o erro da última rodada da transcrição em Rotinas no admin: ele diz o que falhou nos vídeos tentados.",
-};
+/** Quando o proxy é o túnel do computador do Gustavo (`proxyEhTunel`), "fora do ar" quer dizer túnel fechado. */
+function oQueFazer(causa: CausaDaParada, tunel: boolean): string {
+  switch (causa) {
+    case "proxy sem trafego":
+      return "Recarregue o pacote do proxy com o fornecedor. Sem isso nenhum vídeo do YouTube nem do TikTok é lido.";
+    case "proxy recusou o acesso":
+      return "Confira a senha e o pacote de tráfego com o fornecedor do proxy e o YTDLP_PROXY da máquina.";
+    case "proxy fora do ar":
+      return tunel
+        ? "O túnel do computador do Gustavo está fechado: veja se o computador está ligado e com internet e se a tarefa agendada Roteiros - tunel do YouTube está rodando. O log é o arquivo roteiros-tunel-youtube.log, na pasta LocalAppData do computador."
+        : "Veja se o fornecedor do proxy está no ar e se a máquina alcança o endereço do proxy.";
+    case "bloqueio":
+      return "Veja se o yt-dlp da máquina está atualizado e se o proxy responde. Não há nada a pagar neste caso.";
+    case "sem leitura":
+      return "Veja o erro da última rodada da transcrição em Rotinas no admin: ele diz o que falhou nos vídeos tentados.";
+  }
+}
 
-export type ParadaParaOAviso = { plataforma: Plataforma; causa: CausaDaParada; desde: Date; dias: number };
+export type ParadaParaOAviso = { plataforma: Plataforma; causa: CausaDaParada; desde: Date; dias: number; /** o proxy é o túnel do computador (ver `proxyEhTunel`) */ proxyEhTunel?: boolean };
 
 function desdeQuando(desde: Date, dias: number): string {
   const dia = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(desde);
@@ -44,7 +54,7 @@ export const textosAvisoDeLeitura = {
   titulo: (paradas: ParadaParaOAviso[]) => (paradas.length === 1 ? "A leitura de vídeos de uma rede parou." : "A leitura de vídeos de mais de uma rede parou."),
   /** O bloco de uma rede: o que parou, desde quando e o que fazer. */
   bloco: (p: ParadaParaOAviso) =>
-    `<p><strong>${NOME_DA_REDE[p.plataforma]}</strong>: ${O_QUE_PAROU[p.causa]}, ${desdeQuando(p.desde, p.dias)}.</p><p>O que fazer: ${O_QUE_FAZER[p.causa]}</p>`,
+    `<p><strong>${NOME_DA_REDE[p.plataforma]}</strong>: ${O_QUE_PAROU[p.causa]}, ${desdeQuando(p.desde, p.dias)}.</p><p>O que fazer: ${oQueFazer(p.causa, p.proxyEhTunel === true)}</p>`,
   rodape:
     "Enquanto isso, a fila de leitura deixa de gastar as vagas da noite com a rede parada e lê só as que funcionam. Ela tenta uma leitura de prova por noite na rede parada e volta sozinha quando a leitura funcionar. Este aviso sai uma vez por dia enquanto durar.",
   corpo: (paradas: ParadaParaOAviso[], enderecoDoAdmin: string) =>
