@@ -1,17 +1,18 @@
 "use client";
 
-import { Coins, Cog, Home, Layers, Sparkles, Users, type LucideIcon } from "lucide-react";
+import { Coins, Cog, Home, Layers, Sparkles, UserPlus, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import styles from "./LateralAdmin.module.css";
 
-type Destino = "inicio" | "clientes" | "nichos" | "jobs" | "geracoes" | "custos";
+type Destino = "inicio" | "clientes" | "interessados" | "nichos" | "jobs" | "geracoes" | "custos";
 
 const DESTINOS: { chave: Destino; href: string; Icone: LucideIcon }[] = [
   { chave: "inicio", href: "/admin", Icone: Home },
   { chave: "clientes", href: "/admin/clientes", Icone: Users },
+  { chave: "interessados", href: "/admin/interessados", Icone: UserPlus },
   { chave: "nichos", href: "/admin/nichos", Icone: Layers },
   { chave: "jobs", href: "/admin/jobs", Icone: Cog },
   { chave: "geracoes", href: "/admin/geracoes", Icone: Sparkles },

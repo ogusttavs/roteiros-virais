@@ -673,6 +673,13 @@
       "when": 1792727301145,
       "tag": "0096_busca-por-significado",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1792746746764,
+      "tag": "0097_interessados",
+      "breakpoints": true
     }
   ]
 }

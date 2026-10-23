@@ -23,11 +23,15 @@ import { config } from "@/lib/config";
  * meia-noite, para quem aceitou hoje antes do deploy ver o aceite novo também; precisa ser anterior ao deploy, senão quem aceita logo
  * depois de subir seria perguntado de novo a cada visita até a data chegar.
  */
+/**
+ * E57a (22/10/2026): a política ganhou a seção "Quem pede para testar" (o formulário da página inicial). `VERSAO_TERMOS_EM` NÃO subiu: a seção trata de gente que ainda não tem
+ * conta e não passa pelo aceite do painel, e subir a data faria todo cliente aceitar de novo sem ter mudado nada que o afete. Só `atualizadoEm` (a data que a página mostra) mudou.
+ */
 export const VERSAO_TERMOS_EM = new Date("2026-10-09T14:00:00Z");
 
 export const textosTermos = {
   avisoRevisaoPendente: "texto base, revisão jurídica pendente",
-  atualizadoEm: "atualizado em 9 de outubro de 2026",
+  atualizadoEm: "atualizado em 22 de outubro de 2026",
   voltar: "voltar",
 
   termos: {
@@ -104,7 +108,14 @@ export const textosTermos = {
         ],
       },
       {
-        titulo: "6. Contato",
+        titulo: "6. Quem pede para testar",
+        paragrafos: [
+          "Na página inicial, quem preenche o Quero testar nos dá o nome, o e-mail, o WhatsApp e o ramo do negócio, e guardamos também o dia e a hora em que a pessoa aceitou o nosso contato. Esses dados servem só para a gente falar com você sobre o teste, por WhatsApp ou por e-mail, e só quem administra o produto os vê.",
+          `Ficam guardados por até 12 meses depois do pedido, ou até você pedir para apagar, o que vier primeiro. Para apagar, escreva para ${config.emailContato} dizendo o e-mail que usou no formulário. O endereço de internet do seu aparelho é usado só na hora, para barrar pedidos em excesso, e não fica guardado.`,
+        ],
+      },
+      {
+        titulo: "7. Contato",
         paragrafos: [`Dúvida sobre os seus dados, escreva para ${config.emailContato}.`],
       },
     ],
