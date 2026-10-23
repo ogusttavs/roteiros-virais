@@ -1,0 +1,42 @@
+/** E22 PR 2: o cartão "Sua assinatura" da Conta, no mesmo estilo do cartão de instalar no celular (`InstalarNoCelular.module.css`). */
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  margin-top: var(--espaco-6);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.situacao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin: 0;
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-rotulo);
+  color: var(--cor-texto-suave);
+}
+
+.valor {
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.data {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}

@@ -6,14 +6,17 @@ import { describe, expect, it } from "vitest";
 
 import { PLANO } from "../src/config/assinatura";
 
-import { ErroDePreparo, prepararStripe, PRODUTO_ID, type StripeLike } from "./stripe-preparar-logica";
+import { CONFIGURACAO_DO_PORTAL, ErroDePreparo, prepararStripe, PRODUTO_ID, type StripeLike } from "./stripe-preparar-logica";
 
 type Produto = { id: string; metadata: Record<string, string>; name?: string };
 type Preco = { id: string; active?: boolean; product: string; unit_amount: number; currency: string; lookup_key: string | null; metadata: Record<string, string>; recurring: { interval: string; interval_count: number } };
 
-function stripeDeMentira(inicial: { produtos?: Produto[]; precos?: Preco[] } = {}) {
+type Portal = { id: string; active?: boolean; metadata: Record<string, string>; features?: unknown };
+
+function stripeDeMentira(inicial: { produtos?: Produto[]; precos?: Preco[]; portais?: Portal[] } = {}) {
   const produtos = new Map<string, Produto>((inicial.produtos ?? []).map((p) => [p.id, p]));
   const precos: Preco[] = [...(inicial.precos ?? [])];
+  const portais: Portal[] = [...(inicial.portais ?? [])];
   const chamadas: string[] = [];
   const stripe: StripeLike = {
     products: {
@@ -50,8 +53,22 @@ function stripeDeMentira(inicial: { produtos?: Produto[]; precos?: Preco[] } = {
         return p;
       },
     },
+    billingPortal: {
+      configurations: {
+        async list(params) {
+          chamadas.push(`portal.list active=${String(params.active)}`);
+          return { data: portais.filter((c) => c.active !== false || params.active !== true) };
+        },
+        async create(params) {
+          chamadas.push("portal.create");
+          const c: Portal = { id: `bpc_${portais.length + 1}`, metadata: params.metadata as Record<string, string>, features: params.features };
+          portais.push(c);
+          return c;
+        },
+      },
+    },
   };
-  return { stripe, produtos, precos, chamadas };
+  return { stripe, produtos, precos, portais, chamadas };
 }
 
 describe("prepararStripe", () => {
@@ -64,15 +81,45 @@ describe("prepararStripe", () => {
     expect(f.precos[0]).toMatchObject({ unit_amount: 119_100, currency: "brl", lookup_key: "roteiros_trimestral", recurring: { interval: "month", interval_count: 3 }, metadata: { produto: "roteiros" } });
   });
 
+  it("cria tambem a configuracao PROPRIA do portal, com a nossa marca, sem trocar de plano e cancelando no fim do periodo (item 0c)", async () => {
+    const f = stripeDeMentira();
+    const r = await prepararStripe(f.stripe);
+    expect(r.criouPortal).toBe(true);
+    expect(f.portais).toHaveLength(1);
+    expect(f.portais[0].metadata).toEqual({ produto: "roteiros" });
+    expect(f.portais[0].features).toEqual(CONFIGURACAO_DO_PORTAL.features);
+    const f2 = CONFIGURACAO_DO_PORTAL.features;
+    expect(f2.subscription_update.enabled).toBe(false);
+    expect(f2.subscription_cancel.mode).toBe("at_period_end");
+    expect(f2.payment_method_update.enabled).toBe(true);
+  });
+
+  it("a configuracao padrao da conta (a do OdontoTech, sem a marca) nunca e tomada por nossa: cria a nossa ao lado e nao mexe na dele", async () => {
+    const f = stripeDeMentira({ portais: [{ id: "bpc_odonto", active: true, metadata: {} }, { id: "bpc_odonto2", active: true, metadata: { produto: "odontotech" } }] });
+    const r = await prepararStripe(f.stripe);
+    expect(r).toMatchObject({ criouPortal: true });
+    expect(r.portalId).not.toBe("bpc_odonto");
+    expect(f.portais).toHaveLength(3);
+    expect(f.portais.filter((c) => c.metadata.produto === "roteiros")).toHaveLength(1);
+  });
+
+  it("uma configuracao de portal nossa arquivada nao conta: cria outra", async () => {
+    const f = stripeDeMentira({ portais: [{ id: "bpc_velha", active: false, metadata: { produto: "roteiros" } }] });
+    const r = await prepararStripe(f.stripe);
+    expect(r.criouPortal).toBe(true);
+    expect(r.portalId).not.toBe("bpc_velha");
+  });
+
   it("rodar duas vezes nao cria nada na segunda (idempotente) e devolve os mesmos ids", async () => {
     const f = stripeDeMentira();
     const primeira = await prepararStripe(f.stripe);
     f.chamadas.length = 0;
     const segunda = await prepararStripe(f.stripe);
-    expect(segunda).toEqual({ ...primeira, criouProduto: false, criouPreco: false });
+    expect(segunda).toEqual({ ...primeira, criouProduto: false, criouPreco: false, criouPortal: false });
     expect(f.chamadas.some((c) => c.endsWith("create"))).toBe(false);
     expect(f.precos).toHaveLength(1);
     expect(f.produtos.size).toBe(1);
+    expect(f.portais).toHaveLength(1);
   });
 
   it("produto com o nosso id mas sem a marca: para com erro e nao cria nada", async () => {
@@ -112,7 +159,7 @@ describe("prepararStripe", () => {
     });
     await prepararStripe(f.stripe);
     expect(f.precos.find((p) => p.id === "price_odonto")?.unit_amount).toBe(7990);
-    expect(f.chamadas).toEqual([`prices.list ${JSON.stringify([PLANO.lookupKey])}`, `products.retrieve ${PRODUTO_ID}`, "products.create", "prices.create"]);
+    expect(f.chamadas).toEqual([`prices.list ${JSON.stringify([PLANO.lookupKey])}`, `products.retrieve ${PRODUTO_ID}`, "products.create", "prices.create", "portal.list active=true", "portal.create"]);
   });
 
   it("erro do Stripe que nao e 'nao encontrado' sobe (nao vira 'crie o produto')", async () => {
