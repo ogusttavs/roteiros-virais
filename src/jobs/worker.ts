@@ -47,6 +47,7 @@ import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { type PayloadPesquisaNaHora, rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
+import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
@@ -198,6 +199,9 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.faxinaVersoes, async () => {
     await executarComRegistro(FILAS.faxinaVersoes, () => rodarFaxinaDasVersoes());
+  });
+  await boss().work(FILAS.renovarContasLigadas, async () => {
+    await executarComRegistro(FILAS.renovarContasLigadas, () => rodarRenovarContasLigadas());
   });
   /** Por evento (E27, parte 2, item 2): `reprovarERescrever` manda `{ clienteId }` ao enfileirar. */
   await boss().work<{ clienteId: number }>(FILAS.aprenderCliente, async (job) => {

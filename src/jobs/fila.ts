@@ -65,6 +65,8 @@ export const FILAS = {
   emailAcompanhamento: "email-acompanhamento",
   /** E26 4c: a faxina diaria das versoes do roteiro que ninguem escolheu, em grupos parados ha mais de 30 dias. */
   faxinaVersoes: "faxina-versoes",
+  /** E19 PR 1: a renovacao diaria do acesso das contas de Instagram que as pessoas ligaram (e o aviso quando nao da mais). */
+  renovarContasLigadas: "renovar-contas-ligadas",
   /** Por evento, nao por horario (E27, parte 2, item 2): reprovarERescrever enfileira depois de gravar a reprovacao. */
   aprenderCliente: "aprender-cliente",
   /** Por evento (E38, partes 2 e 3): um perfil citado foi adicionado, ou o perfil da propria marca mudou. */
@@ -144,6 +146,7 @@ const FILAS_CURTAS = new Set<string>([
   FILAS.curvaCliente,
   FILAS.emailAcompanhamento,
   FILAS.faxinaVersoes,
+  FILAS.renovarContasLigadas,
   FILAS.aprenderCliente,
   FILAS.analisarPerfil,
 ]);
