@@ -214,7 +214,9 @@ conferir_login_admin() {
 disparar_job() {
   local chave
   chave=$(grep '^JOBS_API_KEY=' "$ENV_ENSAIO" | cut -d= -f2-)
-  curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE_URL/api/jobs/coleta-noticias" -H "x-jobs-key: $chave"
+  # Corpo e codigo na mesma saida (o codigo na ultima linha): 202 com "duplicado":true quer dizer que NADA entrou
+  # na fila, e esperar uma execucao nova depois disso nunca termina (achado do ensaio de 22/10/2026).
+  curl -s -w '\n%{http_code}\n' -X POST "$BASE_URL/api/jobs/coleta-noticias" -H "x-jobs-key: $chave"
 }
 
 esperar_execucao_ok() {
@@ -235,13 +237,21 @@ esperar_execucao_ok() {
 }
 
 disparar_e_esperar_job() {
-  local desde codigo
+  local desde resposta codigo
   desde=$(date +%s)
-  codigo=$(disparar_job)
+  resposta=$(disparar_job)
+  codigo=$(printf '%s\n' "$resposta" | tail -n 1 | tr -d '[:space:]')
   [ "$codigo" = "202" ] || {
     echo "POST /api/jobs/coleta-noticias devolveu $codigo, esperava 202" >&2
     return 1
   }
+  case "$resposta" in
+    *'"duplicado":false'*) ;;
+    *)
+      echo "POST /api/jobs/coleta-noticias nao enfileirou nada (resposta: $(printf '%s' "$resposta" | head -n 1))" >&2
+      return 1
+      ;;
+  esac
   esperar_execucao_ok "$desde"
 }
 

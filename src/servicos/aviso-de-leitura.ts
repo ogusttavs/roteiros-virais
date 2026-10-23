@@ -11,6 +11,7 @@ import { configuracaoAdmin, user } from "@/db/schema";
 import { config, hojeISO } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { logger } from "@/lib/log";
+import { proxyEhTunel } from "@/lib/proxy-tunel";
 import { textosAvisoDeLeitura } from "@/textos/aviso-leitura";
 
 import { type EstadoDaLeitura, paradasEmLista } from "./leitura-parada";
@@ -54,7 +55,8 @@ export async function avisarLeituraParada(
     return { enviado: false, motivo: "sem destinatario" };
   }
 
-  const itens = paradas.map((p) => ({ ...p, dias: Math.max(0, Math.floor((agora.getTime() - p.desde.getTime()) / DIA_MS)) }));
+  const tunel = proxyEhTunel();
+  const itens = paradas.map((p) => ({ ...p, proxyEhTunel: tunel, dias: Math.max(0, Math.floor((agora.getTime() - p.desde.getTime()) / DIA_MS)) }));
   const assunto = textosAvisoDeLeitura.assunto(itens);
   const html = textosAvisoDeLeitura.corpo(itens, `${config.appUrl}/admin`);
   const resultados = await Promise.allSettled(para.map((email) => enviar({ para: email, assunto, html })));

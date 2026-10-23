@@ -44,6 +44,7 @@ import { rodarLerLongos } from "./ler-longos";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
+import { recolherOrfaosDoWorkerAnterior } from "./orfaos";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { type PayloadPesquisaNaHora, rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
@@ -84,6 +85,8 @@ async function main(): Promise<void> {
 
   await boss().start();
   await garantirFilas();
+  const orfaos = await recolherOrfaosDoWorkerAnterior();
+  if (orfaos.jobs > 0 || orfaos.execucoes > 0) console.log(`worker recolheu o que o anterior deixou: ${orfaos.jobs} job(s) ativo(s), ${orfaos.execucoes} execucao(oes) rodando.`);
   await agendarTudo();
   // Na partida do worker (o que cobre cada deploy): guarda as capas que ainda estao vivas e marca as que venceram.
   await pedirGuardarCapas();

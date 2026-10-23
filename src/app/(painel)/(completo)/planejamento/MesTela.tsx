@@ -4,9 +4,11 @@ import { ChevronRight, Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+import type { DataMarcada } from "@/config/datas";
 import { rotuloParaQue } from "@/config/fichas";
 import type { ItemPlano } from "@/servicos/plano";
 import type { AgendaDoDia, DiaDoMes } from "@/servicos/roteiro";
+import { textosDatas } from "@/textos/datas";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
 import { ConfirmarMoverDia } from "@/ui/componentes/ConfirmarMoverDia";
@@ -31,7 +33,14 @@ type Props = {
   hoje: string;
   /** O dia marcado mais perto, quando o dia selecionado está vazio (dúvida 12: "O mais perto marcado é..."). */
   proximoMarcado: { quando: string; rotuloFormato: string } | null;
+  /** E60: as datas de cada dia da grade (feriado, data que vende, dia do ramo), pela data do dia; só os dias que têm alguma. */
+  datas: Record<string, DataMarcada[]>;
 };
+
+/** O rótulo do dia para o leitor de tela, com o nome da data quando o dia tem uma. */
+function comDatas(rotulo: string, datasDoDia: DataMarcada[] | undefined): string {
+  return datasDoDia ? textosDatas.rotuloDoDiaComData(rotulo, textosDatas.nomesDoDia(datasDoDia)) : rotulo;
+}
 
 const DIAS_DA_SEMANA_CURTO = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
 
@@ -90,6 +99,7 @@ export function MesConteudo({
   planoSugeridoDoDia,
   hoje,
   proximoMarcado,
+  datas,
 }: Props) {
   const router = useRouter();
   const aoAbrirContarAgenda = useAbrirContarAgenda();
@@ -135,12 +145,11 @@ export function MesConteudo({
                   type="button"
                   disabled={ocupado}
                   aria-pressed={dia.data === diaSelecionado}
-                  aria-label={textosHoje.agenda.calendario.diaMesRotulo(
-                    diaMesExtenso(dia.data),
-                    dia.marca.qtdReels,
-                    dia.marca.qtdStories,
-                    dia.atrasado,
+                  aria-label={comDatas(
+                    textosHoje.agenda.calendario.diaMesRotulo(diaMesExtenso(dia.data), dia.marca.qtdReels, dia.marca.qtdStories, dia.atrasado),
+                    datas[dia.data],
                   )}
+                  data-data-do-dia={datas[dia.data] ? textosDatas.nomesDoDia(datas[dia.data]) : undefined}
                   className={[
                     styles.diaMes,
                     dia.foraDoMes ? styles.diaMesFora : "",
@@ -162,6 +171,7 @@ export function MesConteudo({
                     {dia.marca.qtdReels > 1 ? <b className={hojeStyles.contaStory}>{dia.marca.qtdReels}</b> : null}
                     {dia.marca.qtdStories > 0 ? <i className={hojeStyles.marcaStory} aria-hidden="true" /> : null}
                     {dia.marca.qtdStories > 1 ? <b className={hojeStyles.contaStory}>{dia.marca.qtdStories}</b> : null}
+                    {datas[dia.data] ? <i className={styles.marcaData} aria-hidden="true" /> : null}
                   </span>
                 </button>
               );
@@ -180,6 +190,10 @@ export function MesConteudo({
               <i className={styles.legendaAtrasado} aria-hidden="true" />
               {textosHoje.agenda.calendario.legendaAtrasado}
             </span>
+            <span>
+              <i className={styles.marcaData} aria-hidden="true" />
+              {textosDatas.legendaDoMes}
+            </span>
           </p>
           <div className={styles.peMes}>
             <p>{textosHoje.agenda.calendario.aviso}</p>
@@ -197,6 +211,16 @@ export function MesConteudo({
             ? textosHoje.agenda.calendario.hoje(diaMesExtensoMinusculo(diaSelecionado))
             : diaMesExtenso(diaSelecionado)}
         </h2>
+        {datas[diaSelecionado] ? (
+          <ul className={hojeStyles.datasDoDia} aria-label={textosDatas.legendaDoMes} data-datas-do-dia>
+            {datas[diaSelecionado].map((data) => (
+              <li key={data.chave}>
+                <span className={hojeStyles.seloData}>{textosDatas.tipo[data.tipo]}</span>
+                <strong>{data.nome}</strong>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {planoSugeridoDoDia.length > 0 ? (
           <div className={styles.planoDoDia}>
             {planoSugeridoDoDia.map((item) => (

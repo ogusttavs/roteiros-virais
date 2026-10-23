@@ -1644,6 +1644,23 @@ export const assuntosDaMarca = pgTable(
 export type AssuntoDaMarca = typeof assuntosDaMarca.$inferSelect;
 
 /**
+ * Melhoria da E53 (23/10/2026): as palavras de busca que o modelo barato sugeriu para um assunto que não está no catálogo ("sugerir palavras" na folha dos assuntos), guardadas pelo texto
+ * do assunto (sem acento, sem maiúscula) para a mesma pergunta não custar duas vezes, de nenhuma marca. Só palavras de busca de um assunto, nunca dado de uma marca. Vale 90 dias.
+ */
+export const sugestoesDePalavras = pgTable(
+  "sugestoes_de_palavras",
+  {
+    id: id(),
+    /** O assunto como a pessoa escreveu, sem acento, sem maiúscula e com os espaços juntos (`normalizarTexto`). */
+    chave: text("chave").notNull(),
+    palavras: jsonb("palavras").$type<string[]>().notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("sugestoes_de_palavras_chave").on(t.chave)],
+);
+export type SugestaoDePalavras = typeof sugestoesDePalavras.$inferSelect;
+
+/**
  * E53 (parte 3): a notícia de um assunto da marca que deu origem a um roteiro ("Criar roteiro com esta notícia" na capa), guardada como cópia no roteiro: o título, o veículo, o link e o dia. Sem
  * chave estrangeira de propósito: tirar o assunto ou ele expirar só o marca como inativo (a linha da notícia fica), mas excluir a marca apaga tudo em cascata e uma limpeza futura de notícias
  * antigas também apagaria, e o "De onde veio" do roteiro não pode sumir junto. (A do setor tem a chave `roteiros.noticia_id`, que o setor mantém.)

@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, Check, ChevronLeft, ChevronRight, RefreshCw } from
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import type { DataMarcada, DataProxima } from "@/config/datas";
 import { rotuloParaQue } from "@/config/fichas";
 import { dadoOuErro } from "@/lib/resultado-acao";
 import type { CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
@@ -14,6 +15,7 @@ import { textosNav } from "@/textos/nav";
 import { textosRoteiro } from "@/textos/roteiro";
 import { textosVersoesNoHoje } from "@/textos/versoes";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
+import { CartaoDeData } from "@/ui/componentes/CartaoDeData";
 import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
@@ -63,6 +65,8 @@ type Props = {
   emAlta: DadosEmAlta | null;
   /** E26 4b: as versões prontas e não escolhidas (só em hoje). */
   versoesProntas: VersoesProntasHoje | null;
+  /** E60: as datas de hoje e as dos próximos 7 dias que valem para a marca (só em hoje); nulo em outro dia. */
+  datas: { hoje: DataMarcada[]; proximas: DataProxima[] } | null;
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
   nomePessoa: string;
@@ -384,6 +388,7 @@ export function HojeTela({
   avisoVideoSubindo,
   emAlta,
   versoesProntas,
+  datas,
   marcaAtiva,
   marcas,
   nomePessoa,
@@ -599,6 +604,8 @@ export function HojeTela({
               </span>
             </p>
           </section>
+
+          {ehHoje && datas ? <CartaoDeData hoje={datas.hoje} proximas={datas.proximas} variante="hoje" /> : null}
 
           {ehHoje && versoesProntas ? (
             <section className={styles.secaoDia} aria-labelledby="t-versoes-prontas" data-versoes-prontas>

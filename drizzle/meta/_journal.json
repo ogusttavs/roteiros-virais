@@ -694,6 +694,13 @@
       "when": 1792755942743,
       "tag": "0099_temas-dia-noticia-na-tentativa",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1792763388672,
+      "tag": "0100_sugestoes-de-palavras",
+      "breakpoints": true
     }
   ]
 }

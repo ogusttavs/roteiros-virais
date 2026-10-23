@@ -63,7 +63,7 @@ test.describe("o proxy do YouTube no admin", () => {
     await expect(item).toBeVisible();
     await expect(item).toContainText("O proxy do YouTube está sem tráfego");
     await expect(item).toContainText(`desde ${diaDoMes(desde)}`);
-    await expect(item).toContainText("recarregue o pacote no DataImpulse");
+    await expect(item).toContainText("recarregue o pacote do proxy com o fornecedor");
 
     await page.goto("/admin/jobs");
     await expect(page.locator('[data-rotina="transcrever"]')).toContainText(`O proxy do YouTube está sem tráfego desde ${diaDoMes(desde)}: o YouTube e o TikTok esperaram a noite seguinte.`);
