@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { assinaturaPrincipal, assinaturaVale, assinaturasDaMarca } from "@/servicos/assinatura";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
@@ -19,7 +20,7 @@ export default async function Assinar({ searchParams }: { searchParams: Promise<
   const sessao = await sessaoDoPainel();
   if (!sessao) redirect("/entrar");
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
-  if (!cliente) redirect("/comecar");
+  if (!cliente) redirect(destinoSemMarca(sessao.user.role));
 
   const lista = await assinaturasDaMarca(cliente.id);
   const principal = assinaturaPrincipal(lista);

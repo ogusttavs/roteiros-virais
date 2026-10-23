@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { rotuloParaQue } from "@/config/fichas";
 import { config } from "@/lib/config";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import {
@@ -29,7 +30,7 @@ export default async function Versoes({ params }: Props) {
   const sessao = await sessaoDoPainel();
   if (!sessao) redirect("/entrar");
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
-  if (!cliente) redirect("/entrar");
+  if (!cliente) redirect(destinoSemMarca(sessao.user.role));
 
   const { grupo } = await params;
   const todas = GRUPO_VALIDO.test(grupo) ? await versoesDoGrupo(cliente.id, grupo) : [];

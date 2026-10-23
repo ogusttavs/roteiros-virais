@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { FaixaDoModo } from "@/app/(painel)/_casca/FaixaVerComo";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { temCapitulos } from "@/lib/marcas-de-fala";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
@@ -29,7 +30,7 @@ export default async function Gravar({ params }: Props) {
 
   const [cliente, marcas] = await Promise.all([clienteAtivoDoUsuario(sessao.user.id), marcasDoUsuario(sessao.user.id)]);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   if (!Number.isFinite(roteiroId)) {

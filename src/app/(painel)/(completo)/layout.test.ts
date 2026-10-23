@@ -10,6 +10,7 @@ const m = vi.hoisted(() => ({
   briefingOk: true,
   termosEm: new Date("2999-01-01") as Date | null,
   precisaChamada: vi.fn(),
+  semMarca: false,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -19,7 +20,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/ver-como", () => ({ sessaoDoPainel: async () => m.sessao }));
 vi.mock("@/servicos/clientes", () => ({
-  clienteAtivoDoUsuario: async () => ({ id: 7, cortesia: false, ultimoAcessoEm: new Date() }),
+  clienteAtivoDoUsuario: async () => (m.semMarca ? null : { id: 7, cortesia: false, ultimoAcessoEm: new Date() }),
   briefingCompleto: async () => m.briefingOk,
   acessouHoje: () => true,
   registrarAcessoHoje: async () => undefined,
@@ -42,6 +43,7 @@ const { default: LayoutCompleto } = await import("./layout");
 beforeEach(() => {
   m.sessao = { user: { id: "u1", role: "cliente" }, verComo: null };
   m.precisa = false;
+  m.semMarca = false;
   m.briefingOk = true;
   m.termosEm = new Date("2999-01-01");
   m.precisaChamada.mockClear();
@@ -82,6 +84,18 @@ describe("o portao no layout do painel", () => {
     m.precisa = true;
     await expect(LayoutCompleto({ children: null })).resolves.toBeTruthy();
     expect(m.precisaChamada).not.toHaveBeenCalled();
+  });
+
+  it("conta sem marca vai para a tela propria, nunca para /comecar nem /entrar (era o laco)", async () => {
+    m.semMarca = true;
+    await expect(LayoutCompleto({ children: null })).rejects.toThrow("REDIRECT:/sem-marca");
+    expect(m.precisaChamada).not.toHaveBeenCalled();
+  });
+
+  it("admin sem marca vai para /admin, nunca para a tela de conta sem marca", async () => {
+    m.sessao = { user: { id: "a1", role: "admin" }, verComo: null };
+    m.semMarca = true;
+    await expect(LayoutCompleto({ children: null })).rejects.toThrow("REDIRECT:/admin");
   });
 
   it("sem sessao vai para /entrar", async () => {

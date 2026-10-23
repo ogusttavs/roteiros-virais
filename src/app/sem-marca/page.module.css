@@ -1,0 +1,61 @@
+/* A tela da conta sem marca usa o mesmo cartao de vidro de Entrar (`../entrar/page.module.css`). */
+.pagina {
+  composes: pagina from "../entrar/page.module.css";
+}
+
+.envoltorio {
+  composes: envoltorio from "../entrar/page.module.css";
+}
+
+.titulo {
+  composes: titulo from "../entrar/page.module.css";
+}
+
+.explica {
+  margin: var(--espaco-3) 0 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}
+
+.conta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin: var(--espaco-6) 0 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) solid var(--vidro-borda);
+  border-radius: var(--raio-md);
+}
+
+.contaRotulo {
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.contaEmail {
+  overflow-wrap: anywhere;
+}
+
+.acoes {
+  margin-top: var(--espaco-6);
+}
+
+/* "Sair" e a unica acao da tela: botao cheio, com a altura de toque do resto do aplicativo. */
+.sair {
+  width: 100%;
+  min-height: var(--altura-toque);
+  padding: var(--espaco-2) var(--espaco-4);
+  background: var(--cor-acao);
+  border: none;
+  border-radius: var(--raio-md);
+  color: var(--cor-acao-texto);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  cursor: pointer;
+}
+
+.sair:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}

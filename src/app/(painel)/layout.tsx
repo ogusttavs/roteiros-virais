@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { lerEstadoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { senhaEhProvisoria } from "@/servicos/senha";
@@ -52,9 +53,12 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
     clienteAtivoDoUsuario(sessao.user.id),
     marcasDoUsuario(sessao.user.id),
   ]);
-  // Sem marca nenhuma, o layout (completo) redireciona para /comecar ou /entrar;
-  // aqui so evita quebrar a casca com uma lista vazia enquanto isso acontece.
-  const marcaAtiva = marcaAtivaResolvida ?? marcas[0] ?? { id: 0, nome: "" };
+  // Sem marca nenhuma nao ha casca para montar (nem marca para mostrar no avatar): a tela propria da conta sem marca (ou o /admin) toma o lugar, em vez do laco
+  // /hoje > /comecar > /entrar > /hoje que existia aqui.
+  const marcaAtiva = marcaAtivaResolvida ?? marcas[0];
+  if (!marcaAtiva) {
+    redirect(destinoSemMarca(sessao.user.role));
+  }
 
   return (
     <Conexao usuarioId={sessao.user.id} marcaId={marcaAtiva.id} verComo={sessao.verComo !== null}>

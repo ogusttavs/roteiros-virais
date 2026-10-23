@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { marcaPrecisaAssinar } from "@/servicos/assinatura";
 import {
@@ -45,8 +46,12 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
     redirect("/entrar");
   }
 
+  // Sem marca nenhuma nao ha briefing para completar: `/comecar` mandava para `/entrar`, que mandava de volta para `/hoje` (laco). A tela propria (ou `/admin`) quebra o laco.
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
-  if (!cliente || !(await briefingCompleto(cliente.id))) {
+  if (!cliente) {
+    redirect(destinoSemMarca(sessao.user.role));
+  }
+  if (!(await briefingCompleto(cliente.id))) {
     redirect("/comecar");
   }
 

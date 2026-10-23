@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 
 import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { config, hojeISO } from "@/lib/config";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { formatarFonteEData } from "@/lib/formatarNumero";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { noticiaDoAssuntoDaMarca } from "@/servicos/assuntos";
-import { clienteDaSessaoAtual, marcasDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { assuntoPresoDaLista } from "@/servicos/em-alta";
 import { noticiaPorId } from "@/servicos/noticias";
 import { diaPorExtenso } from "@/servicos/noticias-assuntos";
@@ -45,7 +46,10 @@ export default async function TemaLivre({ searchParams }: Props) {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDaSessaoAtual();
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
+  if (!cliente) {
+    redirect(destinoSemMarca(sessao.user.role));
+  }
   const [{ tema, data, noticiaId, noticiaAssuntoId, alta, pergunta }, rascunho, marcas, resultadoTemas, dadosDaPesquisa, longo] = await Promise.all([
     searchParams,
     rascunhoComNotaTemaLivre(sessao.user.id, cliente.id),
