@@ -85,25 +85,6 @@ test.describe("ver como", () => {
     clienteSemBriefing = m.id;
   });
 
-  test.beforeAll(async () => {
-    // E57a: `/` agora leva quem tem sessão ao painel (antes era uma página sem destino). A "outra pessoa" do teste do cookie forjado precisa ser uma cliente de verdade, com marca e
-    // briefing completo: sem marca, /hoje manda para /comecar, que manda para /entrar, que manda para /hoje (um laço que sempre existiu para conta sem marca, e que o teste só não via).
-    const [marcaDela] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, OUTRA));
-    if (marcaDela) return;
-    const [nicho] = await db().insert(nichos).values({ slug: OUTRA, nome: "[teste] Ver como, outra pessoa" }).returning();
-    const [marca] = await db().insert(clientes).values({ usuarioId: OUTRA, nome: "[teste e2e] Marca da Outra Pessoa", nichoId: nicho.id }).returning();
-    await db().insert(membrosMarca).values({ usuarioId: OUTRA, clienteId: marca.id, papel: "dono" });
-    await db().insert(briefings).values({
-      clienteId: marca.id,
-      completo: true,
-      perfil: {
-        fatos: { oQueVende: "bolos", preco: "bolo por R$ 90", clienteIdeal: "mora no bairro", medos: [], frasesDaFala: [], proibicoes: [], cenasFilmaveis: [], concorrentes: [], perfisAdmirados: [] },
-        resumo: "faz bolos por encomenda",
-        referencias: [],
-      },
-    });
-  });
-
   test("o admin liga o modo, vê o painel da pessoa com a faixa, a recusa vale no servidor, e sai", async ({ page }) => {
     await entrar(page, EMAIL_ADMIN, /\/admin\/?$/);
     const roteirosAntes = (await db().select({ total: count() }).from(roteiros).where(eq(roteiros.clienteId, clienteId)))[0].total;

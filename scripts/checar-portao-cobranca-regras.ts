@@ -32,6 +32,7 @@ export const ACOES_LIVRES: Record<string, string> = {
   "src/app/(painel)/_briefing/acoes.ts:listarPerfisCitadosAction": "só lê os perfis citados",
   "src/app/trocar-senha/acoes.ts:trocarSenhaDoPrimeiroAcessoAction": "segurança da conta, sem gasto nenhum, e o primeiro acesso vem antes de qualquer pagamento",
   "src/app/(painel)/(completo)/conta/acoes-senha.ts:trocarSenhaAction": "segurança da conta, sem gasto nenhum: a senha é da pessoa, pague ou não",
+  "src/app/acoes.ts:queroTestarAction": "formulário público da página de entrada (E57a): não há conta nem assinatura, só grava quem pediu para testar, sem IA e sem gasto",
 };
 
 /** Rotas `/api` livres, por caminho do arquivo. */
