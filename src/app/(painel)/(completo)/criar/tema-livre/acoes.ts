@@ -75,7 +75,13 @@ export async function avaliarTemaAction(texto: string, noticiaId?: number, assun
   return emCurso;
 }
 
-/** As avaliações que estão rodando agora neste processo, por marca, texto e contexto (ver `avaliarTemaAction`). */
+/**
+ * As avaliações que estão rodando agora neste processo, por marca, texto e contexto (ver `avaliarTemaAction`).
+ *
+ * Limite conhecido (revisão do Fable de 22/10/2026): isto é memória de UM processo. Hoje há um único container `web` em produção, então o toque repetido espera a chamada em curso e não paga duas
+ * vezes. Com duas instâncias, ou durante a troca de container num deploy, o mesmo texto pode ser avaliado (e pago) duas vezes. Se um dia houver mais de um processo, a saída é trocar o `Map` por uma
+ * trava no banco, como o webhook do Stripe faz (`pg_advisory_xact_lock`). A chave não leva o `usuarioId` de propósito: duas pessoas da mesma marca dividem a chamada.
+ */
 const AVALIACOES_EM_CURSO = new Map<string, Promise<ResultadoAcao<ResultadoAvaliarTema>>>();
 
 async function avaliarEGuardar(
