@@ -52,6 +52,10 @@ ${params.sistemaVariavel ?? ""}`);
   if (params.tarefa === "conferirVideoDoSetor" && params.entrada.includes("[mock:conferir-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
+  // E17 parte 1: o modelo barato que escolhe a prova do tema livre fora do ar; a prova volta a ser a da busca por palavra.
+  if (params.tarefa === "reordenarEvidencia" && params.entrada.includes("[mock:reordenar-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
   if (params.tarefa === "juntarVozes" && params.entrada.includes("[mock:juntar-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
@@ -113,6 +117,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockOrganizarFalaBriefing(entrada);
     case "filtrarEvidenciaPorMarca":
       return mockFiltrarEvidenciaPorMarca(entrada);
+    case "reordenarEvidencia":
+      return mockReordenarEvidencia(entrada);
     case "aindaValeRoteiro":
       return mockAindaValeRoteiro(entrada);
     case "notaDaVersao":
@@ -700,6 +706,13 @@ function mockEntregaDaPesquisa(dados: { id: number; fonte: string; data: string;
   };
 }
 
+/** O texto a conferir inteiro (todas as linhas, até a lista de proibições), sem o bloco das instruções para a pessoa, que o verificador de fato não confere (1.9.0). */
+function textoSemInstrucoes(entrada: string): string {
+  const corpo = /Texto a conferir:\n([\s\S]*?)\n\nProibicoes do cliente:/.exec(entrada)?.[1] ?? extrairCampo(entrada, "Texto a conferir:");
+  const inicio = corpo.indexOf("INSTRUÇÕES PARA A PESSOA");
+  return inicio === -1 ? corpo : corpo.slice(0, inicio);
+}
+
 function mockVerificarTexto(entrada: string, sistemaEstavel = "") {
   const texto = extrairCampo(entrada, "Texto a conferir:") || entrada;
   // O verificador por IA antes reprovava a nota do tema que CITAVA a proibição do cliente (1.7.3); com o tema da própria pessoa (1.8.0) a proibição é aviso e citar não fere. O simulador reprova a menção só quando o pedido não traz essa frase.
@@ -712,7 +725,8 @@ function mockVerificarTexto(entrada: string, sistemaEstavel = "") {
   }
   const gritando = /!{2,}/.test(texto) || texto === texto.toUpperCase();
   // O roteiro não inventa fato: com fontes na entrada, o marcador de teste faz o verificador reprovar o fato fora delas (só o mock; a prova de verdade é a chave real).
-  const inventou = entrada.includes("FONTES (") && texto.includes("[mock:fato-inventado]");
+  // 1.9.0: o que vem depois de "INSTRUÇÕES PARA A PESSOA" (gravação e edição) é ordem à pessoa e nunca conta como fato, como no critério do verificador de verdade.
+  const inventou = entrada.includes("FONTES (") && textoSemInstrucoes(entrada).includes("{mock:fato-inventado}");
   return {
     aprovado: !gritando && !inventou,
     motivo: gritando ? "tom exagerado para o texto de tela" : inventou ? "o texto afirma um fato específico que nada nas fontes sustenta" : null,
@@ -1286,6 +1300,32 @@ function mockClassificarContaDoSetor(entrada: string) {
  * precisaria saber deste filtro novo só para continuar passando como antes.
  */
 const MARCADOR_REPROVA_EVIDENCIA_POR_MARCA = "reprove toda a evidencia por nao combinar com a marca";
+
+/**
+ * E17 parte 1: o mock não entende significado (isso só a chave real mede). Devolve, na ordem da lista, os candidatos que dividem com o tema uma palavra de 5 letras ou mais
+ * pelo começo dela (sem acento), o suficiente para provar o encanamento: chamada, teto, cache e queda para a busca de sempre. "[mock:reordenar-vazio]" no tema devolve
+ * a lista vazia; "[mock:reordenar-tudo]" devolve todos os candidatos (para provar o corte por `limite`). "[mock:reordenar-fora]" derruba a chamada (`gerarMock`).
+ */
+function mockReordenarEvidencia(entrada: string) {
+  const [cabecalho, ...resto] = entrada.split("\n\nVídeos candidatos:\n");
+  const tema = cabecalho.replace(/^Tema: /, "");
+  const item = (id: number, mesmoAssunto: boolean) => ({ id, mesmoAssunto, frase: mesmoAssunto ? "Trata do assunto do tema (simulado)." : "Fala de outro assunto (simulado)." });
+  if (tema.includes("[mock:reordenar-vazio]")) return { motivo: "Nenhum trata do mesmo assunto.", itens: [] };
+  const linhas = resto.join("\n").split("\n").filter((l) => /^id \d+:/.test(l));
+  const idsDasLinhas = linhas.map((l) => Number(l.match(/^id (\d+):/)![1]));
+  if (tema.includes("[mock:reordenar-tudo]")) return { motivo: "Todos servem (simulado).", itens: idsDasLinhas.map((id) => item(id, true)) };
+  // O modelo que contradiz a própria lista: o primeiro candidato é julgado "não" (e deve ser descartado pelo código), o segundo "sim".
+  if (tema.includes("[mock:reordenar-contradiz]")) return { motivo: "Só o segundo trata do assunto (simulado).", itens: [item(idsDasLinhas[0], false), item(idsDasLinhas[1], true)] };
+  const sem = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const palavras = [...new Set(sem(tema).match(/[a-z]{5,}/g) ?? [])];
+  const ids = linhas
+    .filter((l) => {
+      const texto = sem(l);
+      return palavras.some((p) => texto.includes(p.slice(0, 5)));
+    })
+    .map((l) => Number(l.match(/^id (\d+):/)![1]));
+  return { motivo: ids.length > 0 ? "Dividem palavra com o tema (simulado)." : "Nenhum divide palavra com o tema (simulado).", itens: ids.slice(0, 10).map((id) => item(id, true)) };
+}
 
 function mockFiltrarEvidenciaPorMarca(entrada: string) {
   const ids = extrairIds(entrada);

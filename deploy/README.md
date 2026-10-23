@@ -248,7 +248,7 @@ Entra desligada: sem `COBRANCA_ATIVA=1` no `.env` da VPS ninguem e mandado para 
 - **O portal do cliente (E22 PR 2)**: `npm run stripe:preparar` tambem acha ou cria a configuracao do portal PROPRIA do Roteiros (`metadata.produto = roteiros`: cartao, faturas, e-mail e cancelar no fim do periodo; sem trocar de plano). A padrao da conta e do OdontoTech: o app nunca a usa, e sem a nossa o portal nao abre (erro, nao reserva). A chave restrita precisa de permissao de escrita em "Customer portal" e leitura de "Checkout Sessions" e "Subscriptions" (escrita para cancelar/expirar).
 - **Um Checkout por marca**: a sessao aberta fica em `checkouts_stripe` (migracao 0095, so `CREATE TABLE`); o segundo clique em Assinar a reaproveita se o Stripe ainda a diz aberta.
 - **O portao fora do layout**: toda Server Action do painel e toda rota `/api` chama `exigirAssinaturaValida` / `recusaDaCobranca` (`src/lib/portao-cobranca.ts`); `npm run checar-portao-cobranca` (na CI) reprova a que esquecer. Desligado, nada muda.
-- **Apagar uma marca**: so por `npm run marca:apagar -- <id> --confirmo` (cancela a assinatura no Stripe antes e so apaga se o Stripe confirmar). **Nunca apague a linha de `clientes` por SQL**: o `ON DELETE CASCADE` leva a assinatura junto e o Stripe continua cobrando.
+- **Apagar uma marca**: so por `npm run marca:apagar -- <id> --confirmo` (cancela a assinatura no Stripe antes e so apaga se o Stripe confirmar). **Nunca apague a linha de `clientes` por SQL**: sem cancelar no Stripe antes, ele continua cobrando (desde a E22 PR 3 o banco recusa apagar a marca que ainda tem linha em `assinaturas`, `ON DELETE RESTRICT`).
 
 ## O que nunca fazer
 

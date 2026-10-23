@@ -451,13 +451,22 @@ function temPalavraSemAcento(texto: string): boolean {
 
 function problemaDeAcentuacao(texto: string): string | null {
   const semAspas = texto.replace(ENTRE_ASPAS, "");
+  // O texto inteiro sem nenhum acento vem ANTES do conjunto fechado de quatro palavras (22/10/2026): com a ordem de antes, um roteiro todo sem acento ("sofa", "eleicao", "entao") que também
+  // trazia "voce" ou "nao" só reprovava pelo motivo mecânico, `corrigirMecanicamente` acentuava essas quatro palavras e o texto passava com o resto sem acento. Reprovando pelo motivo que
+  // não se corrige por código, a segunda tentativa recebe o motivo certo (ou, na segunda, o ErroIA).
+  if (semAcentoNenhum(semAspas)) return motivoSemNenhumAcento();
   if (temPalavraSemAcento(semAspas)) {
     return MOTIVO_PALAVRA_SEM_ACENTO;
   }
-  if (semAspas.length > MINIMO_CARACTERES_PARA_EXIGIR_ACENTO && !TEM_CARACTERE_ACENTUADO.test(semAspas)) {
-    return `sem acentuacao: mais de ${MINIMO_CARACTERES_PARA_EXIGIR_ACENTO} caracteres sem nenhum acento (H2, achado de 29/09/2026)`;
-  }
   return null;
+}
+
+function semAcentoNenhum(semAspas: string): boolean {
+  return semAspas.length > MINIMO_CARACTERES_PARA_EXIGIR_ACENTO && !TEM_CARACTERE_ACENTUADO.test(semAspas);
+}
+
+function motivoSemNenhumAcento(): string {
+  return `sem acentuacao: mais de ${MINIMO_CARACTERES_PARA_EXIGIR_ACENTO} caracteres sem nenhum acento (H2, achado de 29/09/2026)`;
 }
 
 const PALAVRAS_INICIO_GANCHO = 6;
@@ -875,7 +884,8 @@ async function tentarGerarEVerificar<T>(
    * verificação sem sentido em `geracoes_ia`.
    */
   if (aprovado && Object.keys(campos).length > 0) {
-    const textoJunto = Object.values(campos).join("\n");
+    // 1.9.0: com a conferência de fato (com fontes), as instruções de gravação e de edição vão num bloco à parte, que o critério manda nunca conferir como fato (`montarTextoParaConferir`).
+    const textoJunto = verificarTexto.montarTextoParaConferir(campos, Boolean(params.fontesDosFatos));
     const verificacao = await gerarEstruturado({
       tarefa: "verificarTexto",
       nivel: verificarTexto.nivel,

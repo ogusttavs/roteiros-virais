@@ -40,6 +40,7 @@ import { gerarEstruturado } from "@/ia/cliente";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
 import { registrarGeracao } from "@/ia/registro";
 import { hojeISO } from "@/lib/config";
+import { registrarMarcasPuladas, resumoDasMarcasPuladas, separarMarcasPorAssinatura } from "@/servicos/assinatura-tarefas";
 import { filtrarNoticiasDoRamo, relevantesDoRamo, type NoticiaCandidata } from "@/servicos/filtro-de-noticias";
 import { diaPorExtenso } from "@/servicos/noticias-assuntos";
 import {
@@ -417,21 +418,31 @@ export const MOTIVO_SEM_USO = "sem tema hoje: ninguém gerou roteiro em 3 dias";
  * do setor continuam todos os dias, porque a base não pode envelhecer. Quem abre o Hoje ou o Criar num setor sem tema gera na hora (`opts.aoAbrir`).
  */
 export async function setoresEmUso(agora: Date = new Date()): Promise<Set<number>> {
+  return (await setoresEmUsoComContagem(agora)).setores;
+}
+
+/**
+ * Os setores em uso e quantas marcas ficaram de fora por falta de assinatura (E22 PR 3). Com a cobrança ligada, a marca sem assinatura que vale e sem cortesia não conta para pôr o
+ * setor "em uso": o setor só entra com ao menos uma marca que não precisa assinar. Com a cobrança desligada, é exatamente o critério de sempre.
+ */
+export async function setoresEmUsoComContagem(agora: Date = new Date()): Promise<{ setores: Set<number>; marcasPuladasPorAssinatura: number; idsDasMarcasPuladas: number[] }> {
   const desde = new Date(agora.getTime() - DIAS_DE_USO_PARA_TEMA * 24 * 60 * 60 * 1000);
   const marcasComRoteiro = db()
     .selectDistinct({ clienteId: roteiros.clienteId })
     .from(roteiros)
     .where(gte(roteiros.criadoEm, desde));
   const principais = await db()
-    .selectDistinct({ nichoId: clientes.nichoId })
+    .selectDistinct({ id: clientes.id, nichoId: clientes.nichoId })
     .from(clientes)
     .where(and(eq(clientes.ativo, true), isNotNull(clientes.nichoId), inArray(clientes.id, marcasComRoteiro)));
   const alternativos = await db()
-    .selectDistinct({ nichoId: ramosDaConta.nichoId })
+    .selectDistinct({ id: clientes.id, nichoId: ramosDaConta.nichoId })
     .from(ramosDaConta)
     .innerJoin(clientes, eq(clientes.id, ramosDaConta.clienteId))
     .where(and(eq(clientes.ativo, true), inArray(clientes.id, marcasComRoteiro)));
-  return new Set([...principais, ...alternativos].map((l) => l.nichoId).filter((id): id is number => id !== null));
+  const { liberadas, puladas } = await separarMarcasPorAssinatura([...principais, ...alternativos].map((l) => l.id), { agora });
+  const setores = new Set([...principais, ...alternativos].filter((l) => liberadas.has(l.id)).map((l) => l.nichoId).filter((id): id is number => id !== null));
+  return { setores, marcasPuladasPorAssinatura: puladas.length, idsDasMarcasPuladas: puladas };
 }
 
 export async function rodarTemasDoDia(
@@ -466,7 +477,10 @@ export async function rodarTemasDoDia(
     .where(and(...condicoes));
   // Só a rodada da madrugada (e o tema imediato que a cadeia da análise enfileira) respeita o uso; quem pediu à mão (`forcar`) ou quem abriu a tela (`aoAbrir`) tem tema na hora.
   const respeitaUso = !opts?.forcar && !opts?.aoAbrir;
-  const emUso = respeitaUso ? await setoresEmUso() : null;
+  const uso = respeitaUso ? await setoresEmUsoComContagem() : null;
+  const emUso = uso?.setores ?? null;
+  const marcasPuladasPorAssinatura = uso?.marcasPuladasPorAssinatura ?? 0;
+  registrarMarcasPuladas("temas-do-dia", marcasPuladasPorAssinatura);
   const nichosAtivos = emUso ? todosAtivos.filter((n) => emUso.has(n.id)) : todosAtivos;
   const semUso = todosAtivos.length - nichosAtivos.length;
 
@@ -513,6 +527,7 @@ export async function rodarTemasDoDia(
     falhas,
     // Os setores que ficaram sem tema novo por falta de uso (ninguém gerou roteiro em 3 dias): o admin vê quantos em Rotinas.
     semUso,
+    ...resumoDasMarcasPuladas(marcasPuladasPorAssinatura),
     temasDoMomento,
     motivoSemUso: semUso > 0 ? MOTIVO_SEM_USO : undefined,
     erros: erros.length > 0 ? erros : undefined,

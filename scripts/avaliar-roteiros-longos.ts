@@ -192,7 +192,7 @@ export async function avaliarRoteirosLongos(): Promise<ResultadoAvaliarRoteirosL
           effort: verificarTextoIA.esforco,
           schema: verificarTextoIA.schema,
           sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro", true),
-          entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [], fontes: fontesDe(caso) }),
+          entrada: verificarTextoIA.montarEntrada({ texto: verificarTextoIA.montarTextoParaConferir(campos, true), proibicoes: [], fontes: fontesDe(caso) }),
         }),
       };
     }),
