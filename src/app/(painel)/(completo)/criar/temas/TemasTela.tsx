@@ -174,7 +174,7 @@ export function TemasTela({ temas, evidenciasTemas, fontesNoticias = [], avisoLi
                     abrindo={destino === `tema-${indice}` && abrindo}
                     desabilitado={abrindo}
                     precisaDeRede
-                    onEscolher={() => abrir(`tema-${indice}`, comData(`/criar/objetivo?tema=${indice}`))}
+                    onEscolher={() => abrir(`tema-${indice}`, comData(`/criar/objetivo?tema=${indice}&titulo=${encodeURIComponent(tema.titulo)}`))}
                   />
                 ))}
             </div>

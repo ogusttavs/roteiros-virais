@@ -11,7 +11,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db, getPool } from "@/db";
 import { briefings, clientes, membrosMarca, metricasVideoCliente, nichos, roteiros, temasDia, user, videosCliente, type Cliente, type Objetivo } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
+import { resolverTemaDoPedido, validarOrigemDaTelaDoObjetivo } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
+import { enderecoParaTrocarOObjetivo } from "@/servicos/versoes";
+import { textosHoje } from "@/textos/hoje";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -255,5 +258,60 @@ describe("a linha editorial continua mandando no primeiro lugar", () => {
     if (resultado.status !== "ok") throw new Error("era para haver tema");
     expect(resultado.avisoLinhaEditorial).not.toBeNull();
     expect(resultado.temas.map((t) => t.titulo)).toEqual(["tema de engajamento", "tema de conversao", "tema de alcance"]);
+  });
+});
+
+describe("o clique leva o título do tema, não a posição: a ordem pode mudar entre abrir a lista e clicar", () => {
+  it("a ordem muda depois de a pessoa ver a lista e o roteiro sai do tema que ela tocou", async () => {
+    await contaComDestaque(marcaA, "conversao", 3);
+    // A pessoa abre a lista: conversão, alcance, engajamento. Ela toca no segundo, "tema de alcance" (posição 1).
+    const vista = await ordemDaMarca(marcaA);
+    expect(vista).toEqual(["tema de conversao", "tema de alcance", "tema de engajamento"]);
+    const posicaoTocada = vista.indexOf("tema de alcance");
+    expect(posicaoTocada).toBe(1);
+
+    // Antes do clique chegar, a curva muda: os vídeos de conversão deixam de se destacar e a lista volta à ordem do setor. A posição 1 agora é outro tema.
+    await limparPostados();
+    await contaComDestaque(marcaA, "conversao", 1);
+    expect(await ordemDaMarca(marcaA)).toEqual(ORDEM_DO_SETOR);
+
+    // Pela posição (o pedido antigo), sairia o tema errado; pelo título, sai o tema tocado.
+    const pelaPosicao = await resolverTemaDoPedido(marcaA, { origem: "sugerido", temaIndice: posicaoTocada, objetivo: "alcance" });
+    expect(pelaPosicao.tema).toBe("tema de engajamento");
+    const origem = validarOrigemDaTelaDoObjetivo({ origem: "sugerido", temaIndice: posicaoTocada, temaTitulo: "tema de alcance" });
+    if (origem.origem !== "sugerido") throw new Error("era para ser sugerido");
+    const pelaIdentificacao = await resolverTemaDoPedido(marcaA, { ...origem, objetivo: "alcance" });
+    expect(pelaIdentificacao.tema).toBe("tema de alcance");
+  });
+
+  it("se o tema tocado não está mais na lista, recusa com a frase calma e nunca escolhe outro", async () => {
+    await contaComDestaque(marcaA, "conversao", 3);
+    await db().update(temasDia).set({ temas: [{ titulo: "tema novo", descricao: "d", porQue: "p", evidencias: [1], puxaPara: "alcance" }] }).where(eq(temasDia.nichoId, nichoId));
+    try {
+      await expect(resolverTemaDoPedido(marcaA, { origem: "sugerido", temaIndice: 0, temaTitulo: "tema de alcance", objetivo: "alcance" })).rejects.toThrow(textosHoje.temaMudou);
+    } finally {
+      await db().delete(temasDia).where(eq(temasDia.nichoId, nichoId));
+      await criarTemasDoSetor(nichoId);
+    }
+  });
+
+  it("o título vem do que a pessoa tocou e só vale para o que é da própria lista da marca: o título de outro setor não resolve", async () => {
+    await db().update(temasDia).set({ temas: [{ titulo: "tema so do outro setor", descricao: "d", porQue: "p", evidencias: [1], puxaPara: "alcance" }] }).where(eq(temasDia.nichoId, outroNichoId));
+    try {
+      await expect(resolverTemaDoPedido(marcaC, { origem: "sugerido", temaIndice: 0, temaTitulo: "tema so do outro setor", objetivo: "alcance" })).rejects.toThrow(textosHoje.temaMudou);
+    } finally {
+      await db().delete(temasDia).where(eq(temasDia.nichoId, outroNichoId));
+      await criarTemasDoSetor(outroNichoId);
+    }
+  });
+
+  it("pedido antigo, só com o índice, continua valendo (compatibilidade)", async () => {
+    const antigo = await resolverTemaDoPedido(marcaC, { origem: "sugerido", temaIndice: 2, objetivo: "alcance" });
+    expect(antigo.tema).toBe("tema de conversao");
+  });
+
+  it("Trocar o objetivo volta com o título do tema, para o mesmo tema voltar mesmo com a ordem mudada", () => {
+    const endereco = enderecoParaTrocarOObjetivo({ origem: "sugerido", temaIndice: 1, temaTitulo: "tema de alcance", objetivo: "conversao" }, { tema: "tema de alcance", criadoEm: new Date() });
+    expect(endereco).toBe("/criar/objetivo?tema=1&titulo=tema+de+alcance");
   });
 });
