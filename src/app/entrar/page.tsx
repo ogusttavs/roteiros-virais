@@ -8,7 +8,8 @@ import { FormularioEntrar } from "./FormularioEntrar";
 import { LimparCachesAoEntrar } from "./LimparCachesAoEntrar";
 import styles from "./page.module.css";
 
-export default async function Entrar() {
+export default async function Entrar({ searchParams }: { searchParams: Promise<{ esqueci?: string }> }) {
+  const { esqueci } = await searchParams;
   const sessao = await sessaoAtual();
   if (sessao) {
     redirect(sessao.user.role === "admin" ? "/admin" : "/hoje");
@@ -20,7 +21,7 @@ export default async function Entrar() {
       <div className={styles.envoltorio}>
         <Logo altura={44} />
         <h1 className={styles.titulo}>{textosEntrar.titulo}</h1>
-        <FormularioEntrar />
+        <FormularioEntrar comecarEsquecendo={esqueci === "1"} />
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ import { InstalarNoCelular } from "./InstalarNoCelular";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
 import { TiposDeVideoConta } from "./TiposDeVideoConta";
+import { TrocarSenha } from "./TrocarSenha";
 
 export default async function Conta() {
   const sessao = await sessaoDoPainel();
@@ -93,6 +94,8 @@ export default async function Conta() {
       ) : null}
       <div className={styles.colunaPrincipal}>
         {/* E46 PR 2: no "ver como" nada que inscreve, instala ou sai em nome da pessoa aparece (o aviso de manhã, o convite de instalar e o Sair são do aparelho e da sessão de quem está olhando). */}
+        {/* E58: a senha é de quem está logado; no "ver como" o admin olha e não troca a senha de ninguém. */}
+        {sessao.verComo ? null : <TrocarSenha />}
         {sessao.verComo ? null : <InstalarNoCelular />}
         {sessao.verComo ? null : <AvisoDeManha chavePublica={config.push.publicKey} horaLembrete={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO} ehAdmin={sessao.user.role === "admin"} />}
         <InformacoesDoAparelhoAdmin ehAdmin={sessao.user.role === "admin"} versaoPainel={config.gitSha} />

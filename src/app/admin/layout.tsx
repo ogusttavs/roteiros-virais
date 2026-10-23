@@ -1,8 +1,10 @@
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { BotaoSair } from "@/app/(painel)/(completo)/conta/BotaoSair";
 import { exigirAdmin } from "@/lib/sessao";
 import { contarPedidosAbertos } from "@/servicos/pedidos-de-ramo";
+import { senhaEhProvisoria } from "@/servicos/senha";
 import { textosAdmin } from "@/textos/admin";
 import { Logo, Simbolo } from "@/ui/Logo";
 
@@ -17,6 +19,8 @@ const t = textosAdmin.navegacao;
  */
 export default async function LayoutAdmin({ children }: { children: ReactNode }) {
   const sessao = await exigirAdmin();
+  // E58: um admin cuja senha foi gerada (e nao escolhida por ele) tambem troca antes do resto.
+  if (await senhaEhProvisoria(sessao.user.id)) redirect("/trocar-senha");
   // Quantos pedidos de ramo esperam o admin (E45 PR 2): o número ao lado de "Ramos", sem entrar na lista.
   const pedidosAbertos = await contarPedidosAbertos();
 

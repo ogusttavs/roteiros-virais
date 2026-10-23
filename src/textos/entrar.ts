@@ -21,4 +21,17 @@ export const textosEntrar = {
   /** O link por e-mail nao tem senha: o "e-mail ou senha não conferem" nao serve para ele. */
   erroLink: "não conseguimos mandar o link agora; tente de novo em instantes",
   semConexaoLink: "sem conexão para mandar o link agora; confira a rede e tente de novo",
+  /**
+   * E58, "esqueci a senha": a resposta é a mesma exista ou não a conta (a tela não revela quem tem cadastro), por isso a frase fala em "se esse e-mail tiver uma conta".
+   */
+  esqueciALink: "esqueci a senha",
+  esqueciExplica: "Escreva o seu e-mail. Se ele tiver uma conta, mandamos um link para você escolher uma senha nova.",
+  esqueciBotao: "mandar o link",
+  esqueciMandando: "mandando o link",
+  esqueciVoltar: "voltar para entrar",
+  esqueciEnviado: (email: string) =>
+    `Se ${email} tiver uma conta, o link já está a caminho. Ele vale por 30 minutos e só funciona uma vez. Se não chegar, olhe também a caixa de spam.`,
+  esqueciMandarDeNovo: "mandar de novo",
+  esqueciErro: "não conseguimos mandar o link agora; tente de novo em instantes",
+  esqueciSemConexao: "sem conexão para mandar o link agora; confira a rede e tente de novo",
 };

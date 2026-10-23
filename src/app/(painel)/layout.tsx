@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { config } from "@/lib/config";
 import { lerEstadoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
+import { senhaEhProvisoria } from "@/servicos/senha";
 import { textosNav } from "@/textos/nav";
 import { Nav } from "@/ui/componentes/Nav";
 import { Simbolo } from "@/ui/Logo";
@@ -36,6 +37,11 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
   // E46 PR 2, regra 2: um cookie do "ver como" que sobrou (expirou, ficou sem a sessão do admin, é de outro admin, está estragado, a entrada já fechou) é ignorado e apagado.
   if ((await lerEstadoVerComo()).estado === "limpar") {
     redirect("/api/ver-como/limpar");
+  }
+
+  // E58: quem entrou com a senha provisoria do convite escolhe a dela antes do resto (no "ver como" o admin so olha, e a senha e da pessoa).
+  if (!sessao.verComo && (await senhaEhProvisoria(sessao.user.id))) {
+    redirect("/trocar-senha");
   }
 
   // clienteAtivoDoUsuario resolve pelo cookie marca_ativa (V3, item 2), nao pela
