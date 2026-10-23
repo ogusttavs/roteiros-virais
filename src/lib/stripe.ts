@@ -40,16 +40,42 @@ export type PedidoDeCheckout = {
 export interface PortaStripe {
   /** O preço do plano pela chave de busca; nulo quando não existe ou quando não é deste produto (sem `metadata.produto = roteiros`). */
   precoDoPlano(lookupKey: string): Promise<{ id: string } | null>;
-  criarCheckout(pedido: PedidoDeCheckout): Promise<{ url: string }>;
+  criarCheckout(pedido: PedidoDeCheckout): Promise<{ url: string; sessaoId: string }>;
+  /**
+   * O Checkout que a marca abriu antes, se ainda está aberto (E22 PR 2, item 0b): devolve o endereço dele para o segundo clique reaproveitar. Nulo quando a sessão não existe mais, já foi
+   * paga, expirou, não é deste produto (sem `metadata.produto = roteiros`) ou é de outra marca (`client_reference_id` diferente).
+   */
+  sessaoAberta(sessaoId: string, clienteId: number): Promise<{ url: string } | null>;
+  /** Fecha um Checkout aberto (a marca vai ser apagada). Sessão que já não está aberta, ou já não existe, conta como fechada. */
+  expirarSessao(sessaoId: string): Promise<void>;
+  /** O portal do cliente, com a configuração PRÓPRIA do Roteiros (item 0c): se ela não existe, erro, nunca a configuração padrão da conta (que é do OdontoTech). */
   criarPortal(pedido: { stripeClienteId: string; urlDeVolta: string }): Promise<{ url: string }>;
+  /** Cancela a assinatura agora (item 0d: a marca vai ser apagada). Assinatura que já não existe no Stripe conta como cancelada. */
+  cancelarAssinatura(stripeAssinaturaId: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
 // A porta simulada
 // ---------------------------------------------------------------------------
 
-export type ChamadaSimulada = { metodo: "precoDoPlano" | "criarCheckout" | "criarPortal"; pedido: unknown };
+export type ChamadaSimulada = { metodo: "precoDoPlano" | "criarCheckout" | "sessaoAberta" | "expirarSessao" | "criarPortal" | "cancelarAssinatura"; pedido: unknown };
 export const chamadasSimuladas: ChamadaSimulada[] = [];
+
+/** As sessões de Checkout que a porta simulada abriu (id para marca e se ainda está aberta); os testes fecham uma com `fecharSessaoSimulada` para imitar o pagamento ou a expiração. */
+type EstadoDasSessoes = { sessoes: Map<string, { clienteId: number; aberta: boolean }>; contador: number };
+/** No `globalThis` porque o Next empacota cada rota e cada Server Action à parte: o estado do módulo não é o mesmo entre elas, e o segundo clique de um teste e2e não acharia a sessão do primeiro. */
+const globalDasSessoes = globalThis as typeof globalThis & { __sessoesSimuladasRoteiros?: EstadoDasSessoes };
+const estadoDasSessoes: EstadoDasSessoes = (globalDasSessoes.__sessoesSimuladasRoteiros ??= { sessoes: new Map(), contador: 0 });
+
+export function fecharSessaoSimulada(sessaoId: string): void {
+  const s = estadoDasSessoes.sessoes.get(sessaoId);
+  if (s) s.aberta = false;
+}
+
+export function limparSessoesSimuladas(): void {
+  estadoDasSessoes.sessoes.clear();
+  estadoDasSessoes.contador = 0;
+}
 
 export function criarPortaSimulada(): PortaStripe {
   return {
@@ -59,11 +85,27 @@ export function criarPortaSimulada(): PortaStripe {
     },
     async criarCheckout(pedido) {
       chamadasSimuladas.push({ metodo: "criarCheckout", pedido });
-      return { url: `${config.appUrl}/assinar?simulado=checkout` };
+      estadoDasSessoes.contador += 1;
+      const sessaoId = `cs_simulada_${estadoDasSessoes.contador}`;
+      estadoDasSessoes.sessoes.set(sessaoId, { clienteId: pedido.clienteId, aberta: true });
+      return { url: `${config.appUrl}/assinar?simulado=checkout&sessao=${sessaoId}`, sessaoId };
+    },
+    async sessaoAberta(sessaoId, clienteId) {
+      chamadasSimuladas.push({ metodo: "sessaoAberta", pedido: { sessaoId, clienteId } });
+      const s = estadoDasSessoes.sessoes.get(sessaoId);
+      if (!s || !s.aberta || s.clienteId !== clienteId) return null;
+      return { url: `${config.appUrl}/assinar?simulado=checkout&sessao=${sessaoId}` };
+    },
+    async expirarSessao(sessaoId) {
+      chamadasSimuladas.push({ metodo: "expirarSessao", pedido: sessaoId });
+      fecharSessaoSimulada(sessaoId);
     },
     async criarPortal(pedido) {
       chamadasSimuladas.push({ metodo: "criarPortal", pedido });
       return { url: `${config.appUrl}/assinar?simulado=portal` };
+    },
+    async cancelarAssinatura(stripeAssinaturaId) {
+      chamadasSimuladas.push({ metodo: "cancelarAssinatura", pedido: stripeAssinaturaId });
     },
   };
 }
@@ -77,7 +119,28 @@ export function criarPortaReal(chave: string): PortaStripe {
     throw new ErroStripe("A porta real do Stripe nao existe dentro do Vitest: os testes usam a simulada.");
   }
   if (!chave) throw new ErroStripe("STRIPE_SECRET_KEY nao esta definida.");
-  const stripe = new Stripe(chave, { maxNetworkRetries: 2, timeout: 20_000, appInfo: { name: "roteiros-virais" } });
+  return criarPortaComSdk(new Stripe(chave, { maxNetworkRetries: 2, timeout: 20_000, appInfo: { name: "roteiros-virais" } }));
+}
+
+/** A porta sobre um cliente do SDK já pronto. Separada de `criarPortaReal` para os testes darem um SDK de mentira (sem rede) e provarem as regras da conta dividida. */
+export function criarPortaComSdk(stripe: Stripe): PortaStripe {
+  /** A configuração do portal que é deste produto (criada por `stripe:preparar`, com `metadata.produto = roteiros`). A padrão da conta é do OdontoTech: nunca serve de reserva. */
+  async function configuracaoDoPortal(): Promise<string> {
+    const lista = await stripe.billingPortal.configurations.list({ active: true, limit: 100 });
+    const nossa = lista.data.find((c) => c.metadata?.produto === METADATA_PRODUTO.produto);
+    if (!nossa) throw new ErroStripe("A configuracao do portal do Roteiros nao existe nesta conta (rode npm run stripe:preparar). A padrao da conta nao serve: e do OdontoTech.");
+    return nossa.id;
+  }
+
+  async function cancelar(stripeAssinaturaId: string): Promise<void> {
+    try {
+      await stripe.subscriptions.cancel(stripeAssinaturaId);
+    } catch (erro) {
+      // Já cancelada (ou apagada) no Stripe: o que se queria já aconteceu.
+      if ((erro as { code?: string } | null)?.code === "resource_missing") return;
+      throw erro;
+    }
+  }
 
   return {
     async precoDoPlano(lookupKey) {
@@ -103,12 +166,43 @@ export function criarPortaReal(chave: string): PortaStripe {
         ...(pedido.stripeClienteId ? { customer: pedido.stripeClienteId } : { customer_email: pedido.email }),
       });
       if (!sessao.url) throw new ErroStripe("O Stripe nao devolveu o endereco do Checkout.");
+      return { url: sessao.url, sessaoId: sessao.id };
+    },
+    async sessaoAberta(sessaoId, clienteId) {
+      let sessao: Stripe.Checkout.Session;
+      try {
+        sessao = await stripe.checkout.sessions.retrieve(sessaoId);
+      } catch (erro) {
+        if ((erro as { code?: string } | null)?.code === "resource_missing") return null;
+        throw erro;
+      }
+      if (sessao.status !== "open" || !sessao.url) return null;
+      if (sessao.metadata?.produto !== METADATA_PRODUTO.produto) return null;
+      if (sessao.client_reference_id !== String(clienteId)) return null;
       return { url: sessao.url };
+    },
+    async expirarSessao(sessaoId) {
+      let sessao: Stripe.Checkout.Session;
+      try {
+        sessao = await stripe.checkout.sessions.retrieve(sessaoId);
+      } catch (erro) {
+        if ((erro as { code?: string } | null)?.code === "resource_missing") return;
+        throw erro;
+      }
+      if (sessao.metadata?.produto !== METADATA_PRODUTO.produto) return;
+      if (sessao.status === "open") {
+        await stripe.checkout.sessions.expire(sessaoId);
+        return;
+      }
+      // Paga no meio do caminho (o aviso ainda não chegou ao nosso banco): a assinatura que nasceu dela é cancelada aqui.
+      const assinaturaId = typeof sessao.subscription === "string" ? sessao.subscription : sessao.subscription?.id;
+      if (sessao.status === "complete" && assinaturaId) await cancelar(assinaturaId);
     },
     async criarPortal(pedido) {
-      const sessao = await stripe.billingPortal.sessions.create({ customer: pedido.stripeClienteId, return_url: pedido.urlDeVolta });
+      const sessao = await stripe.billingPortal.sessions.create({ customer: pedido.stripeClienteId, return_url: pedido.urlDeVolta, configuration: await configuracaoDoPortal() });
       return { url: sessao.url };
     },
+    cancelarAssinatura: cancelar,
   };
 }
 

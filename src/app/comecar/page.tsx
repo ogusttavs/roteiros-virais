@@ -14,6 +14,7 @@ import {
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
+import { senhaEhProvisoria } from "@/servicos/senha";
 import { textosVerComo } from "@/textos/ver-como";
 import { ConexaoDaTela } from "@/ui/ConexaoDaTela";
 
@@ -23,6 +24,11 @@ export default async function Comecar() {
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
+  }
+
+  // E58: a senha provisoria do convite se troca antes do Comecar (e de tudo o mais); no "ver como" o admin so olha.
+  if (!sessao.verComo && (await senhaEhProvisoria(sessao.user.id))) {
+    redirect("/trocar-senha");
   }
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);

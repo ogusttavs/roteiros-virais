@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
 import { config } from "@/lib/config";
 import { sessaoDoPainel } from "@/lib/ver-como";
+import { assinaturasDaMarca, ehDonoDaMarca } from "@/servicos/assinatura";
+import { situacaoDaAssinatura } from "@/servicos/assinatura-tela";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
@@ -20,7 +22,9 @@ import { InformacoesDoAparelhoAdmin } from "./InformacoesDoAparelhoAdmin";
 import { InstalarNoCelular } from "./InstalarNoCelular";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
+import { SuaAssinatura } from "./SuaAssinatura";
 import { TiposDeVideoConta } from "./TiposDeVideoConta";
+import { TrocarSenha } from "./TrocarSenha";
 
 export default async function Conta() {
   const sessao = await sessaoDoPainel();
@@ -43,6 +47,11 @@ export default async function Conta() {
   const alternativos = cliente ? await ramosAlternativosDaMarca(cliente.id) : [];
   const tiposDaMarca = cliente ? await formatosDaMarcaComEstado(cliente.id) : [];
   const notaBriefing = briefing?.notaGeral ? Number(briefing.notaGeral) : null;
+  // E22 PR 2: o cartão "Sua assinatura" só aparece com a cobrança ligada ou com assinatura no histórico da marca (desligada e sem assinatura, Conta fica como sempre foi).
+  const assinaturasDaConta = cliente ? await assinaturasDaMarca(cliente.id) : [];
+  const mostrarAssinatura = cliente !== null && (config.cobranca.ativa || assinaturasDaConta.length > 0);
+  const situacaoAssinatura = cliente ? situacaoDaAssinatura(cliente.cortesia, assinaturasDaConta) : null;
+  const donoDaMarca = mostrarAssinatura && cliente && !sessao.verComo ? await ehDonoDaMarca(sessao.user.id, cliente.id) : false;
 
   return (
     <div className={styles.pagina}>
@@ -92,7 +101,10 @@ export default async function Conta() {
         <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
       ) : null}
       <div className={styles.colunaPrincipal}>
+        {mostrarAssinatura && situacaoAssinatura ? <SuaAssinatura situacao={situacaoAssinatura} dono={donoDaMarca} verComo={sessao.verComo !== null} /> : null}
         {/* E46 PR 2: no "ver como" nada que inscreve, instala ou sai em nome da pessoa aparece (o aviso de manhã, o convite de instalar e o Sair são do aparelho e da sessão de quem está olhando). */}
+        {/* E58: a senha é de quem está logado; no "ver como" o admin olha e não troca a senha de ninguém. */}
+        {sessao.verComo ? null : <TrocarSenha />}
         {sessao.verComo ? null : <InstalarNoCelular />}
         {sessao.verComo ? null : <AvisoDeManha chavePublica={config.push.publicKey} horaLembrete={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO} ehAdmin={sessao.user.role === "admin"} />}
         <InformacoesDoAparelhoAdmin ehAdmin={sessao.user.role === "admin"} versaoPainel={config.gitSha} />

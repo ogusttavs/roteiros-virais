@@ -17,6 +17,7 @@ import { db } from "@/db";
 import { aprendizadoCliente, geracoesIA, roteiros } from "@/db/schema";
 import * as aprenderClienteIA from "@/ia/prompts/aprenderCliente";
 import { gerarComVerificacao } from "@/ia/verificador";
+import { marcaPodeReceberTarefa, registrarMarcasPuladas, resumoDasMarcasPuladas } from "@/servicos/assinatura-tarefas";
 import { textoNarrativo } from "@/servicos/roteiro";
 
 import { ErroColeta } from "./execucoes";
@@ -199,6 +200,11 @@ function datasPorMotivo(
 }
 
 export async function rodarAprenderCliente(clienteId: number): Promise<Record<string, unknown>> {
+  // E22 PR 3: marca sem assinatura (cobrança ligada) não gasta IA aprendendo com ela.
+  if (!(await marcaPodeReceberTarefa(clienteId))) {
+    registrarMarcasPuladas("aprender-cliente", 1);
+    return { clienteId, pulado: "assinatura", ...resumoDasMarcasPuladas(1) };
+  }
   const [reprovacoes, edicoes] = await Promise.all([
     reprovacoesDoCliente(clienteId),
     edicoesDoCliente(clienteId),

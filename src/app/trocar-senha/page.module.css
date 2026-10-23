@@ -1,0 +1,27 @@
+/* E58: a tela do primeiro acesso usa o mesmo cartão de vidro de Entrar (`../entrar/page.module.css`). */
+.pagina {
+  composes: pagina from "../entrar/page.module.css";
+}
+
+.envoltorio {
+  composes: envoltorio from "../entrar/page.module.css";
+}
+
+.titulo {
+  composes: titulo from "../entrar/page.module.css";
+}
+
+.forma {
+  composes: forma from "../entrar/page.module.css";
+}
+
+.erroAviso {
+  composes: erroAviso from "../entrar/page.module.css";
+}
+
+.explica {
+  margin: var(--espaco-3) 0 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}

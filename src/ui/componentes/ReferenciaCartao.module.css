@@ -34,6 +34,36 @@
   color: var(--cor-texto-dica);
 }
 
+.semCapa {
+  display: grid;
+  justify-items: center;
+  gap: var(--espaco-2);
+}
+
+/** Sem capa viva: o nome da rede embaixo do play, no mesmo tom discreto do rótulo de data. */
+.redeSemCapa {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1 var(--fonte-mono);
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-rotulo);
+  color: var(--cor-texto-dica);
+}
+
+.verNaRede {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  width: fit-content;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.verNaRede:hover {
+  color: var(--cor-titulo);
+}
+
 .capaImagem {
   width: 100%;
   height: 100%;

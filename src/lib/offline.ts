@@ -15,6 +15,8 @@
 
 import { textosConexao } from "@/textos/conexao";
 
+import { conferirVersaoEmSegundoPlano, ehSinalDeVersaoNova, recarregarPorVersaoNova } from "./versao";
+
 export const PREFIXO_CACHE_PAGINAS = "roteiros-paginas";
 export const CACHE_ESCOPO = "roteiros-escopo";
 export const CHAVE_ESCOPO = "/__escopo";
@@ -83,6 +85,20 @@ export async function registrarEscopo(
 }
 
 /**
+ * O texto do erro parece o de uma queda de rede? So o formato, sem olhar a versao (ver `ehFalhaDeRede`).
+ */
+function pareceFalhaDeRede(erro: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  if (erro instanceof TypeError) return /fetch|network|load failed|conex/i.test(erro.message);
+  return erro instanceof Error && /connection closed/i.test(erro.message);
+}
+
+/** Um pedaco de codigo que nao carregou (webpack): numa rede caida e numa versao nova o erro e o mesmo. */
+function ehFalhaDeCarregarCodigo(erro: unknown): boolean {
+  return erro instanceof Error && (erro.name === "ChunkLoadError" || /loading (css )?chunk \S+ failed/i.test(erro.message));
+}
+
+/**
  * A chamada ao servidor caiu por rede (e nao por erro do servidor)? O `fetch`
  * rejeita com `TypeError` quando a rede cai ("Failed to fetch" no Chrome,
  * "Load failed" no Safari, "NetworkError when attempting to fetch resource" no
@@ -90,11 +106,24 @@ export async function registrarEscopo(
  * `Error("Connection closed.")` (React Flight); `navigator.onLine` falso
  * tambem conta. Um `TypeError` de outra origem (erro de programacao) nao vira
  * "sem conexao": a mensagem confere.
+ *
+ * Efeito colateral de proposito, num lugar so (hotfix de 22/10/2026, `versao.ts`): logo depois de
+ * uma subida, o navegador que ficou com a versao anterior recebe do servidor novo uma resposta que
+ * o codigo velho nao entende, e o erro tem a mesma cara de uma queda de rede ("Connection closed.").
+ * Entao: se o erro mostra que o servidor nao conhece a acao, a pagina recarrega e a resposta e
+ * "nao foi rede"; se parece rede (com o aparelho online) ou e codigo que nao carregou, confere a
+ * versao em segundo plano e recarrega se mudou. Rede caida de verdade: a conferencia tambem falha e
+ * nada acontece.
  */
 export function ehFalhaDeRede(erro: unknown): boolean {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
-  if (erro instanceof TypeError) return /fetch|network|load failed|conex/i.test(erro.message);
-  return erro instanceof Error && /connection closed/i.test(erro.message);
+  if (ehSinalDeVersaoNova(erro)) {
+    recarregarPorVersaoNova();
+    return false;
+  }
+  const rede = pareceFalhaDeRede(erro);
+  const aparelhoOnline = typeof navigator === "undefined" || navigator.onLine !== false;
+  if (aparelhoOnline && (rede || ehFalhaDeCarregarCodigo(erro))) void conferirVersaoEmSegundoPlano();
+  return rede;
 }
 
 /**
@@ -106,6 +135,10 @@ export function ehFalhaDeRede(erro: unknown): boolean {
  * faixa de "Sem conexao".
  */
 export function fraseDeFalha(erro: unknown, padrao: string, aoCair: string = textosConexao.falhaDeRede): string {
+  if (ehSinalDeVersaoNova(erro)) {
+    recarregarPorVersaoNova();
+    return textosConexao.versaoNova;
+  }
   return ehFalhaDeRede(erro) ? aoCair : padrao;
 }
 

@@ -9,9 +9,9 @@ import Stripe from "stripe";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
-import { assinaturas, clientes, eventosStripe, membrosMarca, nichos, user } from "@/db/schema";
+import { assinaturas, checkoutsStripe, clientes, eventosStripe, membrosMarca, nichos, user } from "@/db/schema";
 import { config } from "@/lib/config";
-import { chamadasSimuladas, usarPortaStripe, type EventoDoStripe, type PortaStripe } from "@/lib/stripe";
+import { chamadasSimuladas, limparSessoesSimuladas, usarPortaStripe, type EventoDoStripe, type PortaStripe } from "@/lib/stripe";
 import { listarContasAdmin } from "@/servicos/admin-contas";
 import { trocarCortesiaDaConta } from "@/servicos/admin-trocas";
 import { abrirPortalDaAssinatura, ErroAssinatura, frasesDaAssinatura, iniciarAssinatura, marcaPrecisaAssinar, tratarEventoDoStripe } from "@/servicos/assinatura";
@@ -85,7 +85,21 @@ beforeAll(async () => {
   ]);
 }, 30_000);
 
+/** Uma porta que não faz nada (para os testes trocarem só o método que importa). */
+function portaSemNada(): PortaStripe {
+  return {
+    precoDoPlano: vi.fn(),
+    criarCheckout: vi.fn(),
+    sessaoAberta: vi.fn(),
+    expirarSessao: vi.fn(),
+    criarPortal: vi.fn(),
+    cancelarAssinatura: vi.fn(),
+  };
+}
+
 beforeEach(async () => {
+  await db().delete(checkoutsStripe);
+  limparSessoesSimuladas();
   await db().delete(assinaturas);
   await db().delete(eventosStripe);
   await db().update(clientes).set({ cortesia: false });
@@ -374,7 +388,7 @@ describe("comecar a assinar e o portal", () => {
   });
 
   it("preco nao encontrado no Stripe: frase para a pessoa, nenhum checkout criado", async () => {
-    const porta: PortaStripe = { precoDoPlano: async () => null, criarCheckout: vi.fn(), criarPortal: vi.fn() };
+    const porta: PortaStripe = { ...portaSemNada(), precoDoPlano: async () => null, criarCheckout: vi.fn() };
     usarPortaStripe(porta);
     await expect(iniciarAssinatura(dono, { id: marcaA })).rejects.toThrow(frasesDaAssinatura.semPlano);
     expect(porta.criarCheckout).not.toHaveBeenCalled();
@@ -382,11 +396,11 @@ describe("comecar a assinar e o portal", () => {
 
   it("erro do Stripe vira a frase de 'tente de novo', sem vazar a mensagem tecnica", async () => {
     const porta: PortaStripe = {
+      ...portaSemNada(),
       precoDoPlano: async () => ({ id: "price_x" }),
       criarCheckout: async () => {
         throw new Error("Invalid API Key provided: rk_test_vazou_aqui");
       },
-      criarPortal: vi.fn(),
     };
     usarPortaStripe(porta);
     const erro = await iniciarAssinatura(dono, { id: marcaA }).catch((e) => e);

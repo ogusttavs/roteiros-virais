@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { exigirForaDoVerComo } from "@/lib/ver-como";
 import { adicionarAssunto, ErroAssunto, fixarAssunto, registrarAberturaDeNoticia, removerAssunto } from "@/servicos/assuntos";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
@@ -23,6 +24,7 @@ async function comoAssunto(tarefa: (clienteId: number) => Promise<void>): Promis
 
 export async function acrescentarAssuntoAction(texto: string, palavras: string): Promise<ResultadoAssunto> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   return comoAssunto(async (clienteId) => {
     await adicionarAssunto(clienteId, texto, palavras);
   });
@@ -30,12 +32,14 @@ export async function acrescentarAssuntoAction(texto: string, palavras: string):
 
 export async function tirarAssuntoAction(assuntoId: number): Promise<ResultadoAssunto> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   return comoAssunto((clienteId) => removerAssunto(clienteId, assuntoId));
 }
 
 /** "Manter" fixa o assunto: ele deixa de sair sozinho depois de 30 dias sem notícia aberta. */
 export async function manterAssuntoAction(assuntoId: number): Promise<ResultadoAssunto> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   return comoAssunto((clienteId) => fixarAssunto(clienteId, assuntoId, true));
 }
 
@@ -45,6 +49,7 @@ export async function manterAssuntoAction(assuntoId: number): Promise<ResultadoA
  */
 export async function abrirNoticiaDoAssuntoAction(noticiaId: number): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   const cliente = await clienteDaSessaoAtual();
   try {
     await registrarAberturaDeNoticia(cliente.id, noticiaId);

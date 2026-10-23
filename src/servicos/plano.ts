@@ -425,3 +425,11 @@ export async function marcarGravado(roteiroId: number): Promise<void> {
     .set({ estado: "gravado" })
     .where(and(eq(planoGravacoes.roteiroId, roteiroId), eq(planoGravacoes.estado, "aceito")));
 }
+
+/** O inverso de `marcarGravado`: "Ainda não gravei" devolve o item do plano a "aceito". Sem item gravado ligado a este roteiro, não faz nada. */
+export async function desmarcarGravado(roteiroId: number): Promise<void> {
+  await db()
+    .update(planoGravacoes)
+    .set({ estado: "aceito" })
+    .where(and(eq(planoGravacoes.roteiroId, roteiroId), eq(planoGravacoes.estado, "gravado")));
+}

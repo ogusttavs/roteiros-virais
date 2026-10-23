@@ -5,6 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useTransition } from "react";
 
+import { reagirAErroDeTela } from "@/lib/versao";
 import { textosHoje } from "@/textos/hoje";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { Botao } from "@/ui/componentes/Botao";
@@ -24,6 +25,8 @@ export default function ErroHoje({ error, reset }: { error: Error & { digest?: s
 
   useEffect(() => {
     captureException(error);
+    // Pagina de uma versao anterior depois de uma subida: recarrega sozinha (src/lib/versao.ts).
+    reagirAErroDeTela(error);
   }, [error]);
 
   /**

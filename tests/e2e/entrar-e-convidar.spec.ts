@@ -64,6 +64,12 @@ test("admin entra, cria cliente, cliente entra com a senha gerada e cai em /come
   await paginaCliente.getByLabel("Senha").fill(senha!);
   await paginaCliente.getByRole("button", { name: "entrar", exact: true }).click();
 
+  // E58: a senha do convite e provisoria; antes do resto, a pessoa escolhe a dela.
+  await expect(paginaCliente).toHaveURL(/\/trocar-senha/);
+  await paginaCliente.getByLabel("senha nova", { exact: true }).fill("senha-que-eu-escolhi-1");
+  await paginaCliente.getByLabel("repita a senha nova").fill("senha-que-eu-escolhi-1");
+  await paginaCliente.getByRole("button", { name: "salvar a minha senha" }).click();
+
   await expect(paginaCliente).toHaveURL(/\/comecar/);
   await expect(paginaCliente.getByText("Antes de escrever, a gente precisa te conhecer")).toBeVisible();
 

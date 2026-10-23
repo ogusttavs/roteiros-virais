@@ -7,16 +7,20 @@
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
-import { noticias, roteiros, type Noticia } from "@/db/schema";
+import { imagensNoticia, noticias, roteiros, type Noticia } from "@/db/schema";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
+import { inicioDaJanelaDeNoticias } from "@/lib/janela-de-noticias";
 
 export type PeriodoNoticias = "hoje" | "semana" | "mes";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 const DIAS_POR_PERIODO: Record<PeriodoNoticias, number> = { hoje: 1, semana: 7, mes: 30 };
 
+/** O começo do período, nunca mais antigo que a janela de 7 dias: notícia velha não aparece em período nenhum (o Google News devolve matéria de meses atrás misturada à de hoje). */
 function inicioDoPeriodo(periodo: PeriodoNoticias, agora = new Date()): Date {
-  return new Date(agora.getTime() - DIAS_POR_PERIODO[periodo] * DIA_MS);
+  const doPeriodo = new Date(agora.getTime() - DIAS_POR_PERIODO[periodo] * DIA_MS);
+  const janela = inicioDaJanelaDeNoticias(agora);
+  return doPeriodo > janela ? doPeriodo : janela;
 }
 
 export type NoticiaListada = {
@@ -31,6 +35,8 @@ export type NoticiaListada = {
   /** E53 (foto do setor): a foto do veículo e o crédito ("Foto: G1"), quando o RSS direto do portal trouxe; nulos sem foto. */
   imagemUrl: string | null;
   imagemCredito: string | null;
+  /** A foto da matéria guardada do nosso lado (`/api/imagem-noticia/<id>`): quando existe, a tela usa ela e não o endereço do veículo. */
+  fotoGuardada: boolean;
   /** A marca ativa já transformou esta notícia num roteiro (isolado por marca: outra marca do mesmo setor não conta). */
   virouRoteiro: boolean;
   /** O roteiro mais recente desta marca a partir desta notícia; "Ver o roteiro" leva até ele. */
@@ -48,11 +54,14 @@ export async function noticiasDoSetor(
   periodo: PeriodoNoticias,
   agora = new Date(),
 ): Promise<NoticiaListada[]> {
-  const linhas = await db()
-    .select()
+  // Só a situação da foto, nunca os bytes: a lista não carrega imagem.
+  const achadas = await db()
+    .select({ noticia: noticias, foto: imagensNoticia.situacao })
     .from(noticias)
+    .leftJoin(imagensNoticia, eq(imagensNoticia.noticiaId, noticias.id))
     .where(and(eq(noticias.nichoId, nichoId), eq(noticias.relevante, true), gte(noticias.publicadoEm, inicioDoPeriodo(periodo, agora))))
     .orderBy(desc(noticias.publicadoEm));
+  const linhas = achadas.map((a) => ({ ...a.noticia, fotoGuardada: a.foto === "guardada" }));
 
   if (linhas.length === 0) return [];
 
@@ -80,6 +89,7 @@ export async function noticiasDoSetor(
     angulo: n.angulo,
     imagemUrl: n.imagemUrl,
     imagemCredito: n.imagemCredito,
+    fotoGuardada: n.fotoGuardada,
     virouRoteiro: roteiroMaisRecentePorNoticia.has(n.id),
     roteiroId: roteiroMaisRecentePorNoticia.get(n.id) ?? null,
   }));

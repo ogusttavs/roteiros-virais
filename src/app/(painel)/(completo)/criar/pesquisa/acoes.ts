@@ -4,6 +4,7 @@ import { ehFicha } from "@/config/fichas";
 import type { DestinoDaPesquisa } from "@/db/schema";
 import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
@@ -146,6 +147,7 @@ async function destinoConferido(destino: EntradaDaPesquisa["destino"], usuarioId
 export async function pedirPesquisaAction(entrada: EntradaDaPesquisa): Promise<ResultadoDaPesquisa<{ id: number }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   try {
@@ -189,6 +191,7 @@ export async function confirmarPesquisaAction(
 ): Promise<ResultadoAcao<{ destino: DestinoDaPesquisa | null }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   const pesquisaId = idDoBancoOuNulo(id);
@@ -215,6 +218,7 @@ export async function confirmarPesquisaAction(
 export async function pesquisarDeNovoAction(id: number, profundidade?: string): Promise<ResultadoDaPesquisa<{ id: number }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   const pesquisaId = idDoBancoOuNulo(id);

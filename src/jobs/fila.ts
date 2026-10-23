@@ -19,6 +19,11 @@ export const FILAS = {
   /** Passada leve do meio-dia (E6 parte 3, terceira rodada, item 6); so agenda com config.coleta.coletaMeioDia. */
   coletaMeioDia: "coleta-meio-dia",
   coletaNoticias: "coleta-noticias",
+  /**
+   * O filtro das notícias do ramo e a foto da matéria (fix de 22/10/2026): depois de cada coleta (06:00 e 14:00) para os ramos com marca ativa, e na hora em que uma marca chega num ramo
+   * (briefing terminado, conta criada, ramo trocado, tela de Notícias aberta). `{ nichoId }` roda só aquele ramo; sem nada, todos os ramos com marca ativa.
+   */
+  filtrarNoticias: "filtrar-noticias",
   /** E55: o que está em alta no Brasil (buscas do Google e vídeos do YouTube), compartilhado por todos os setores; de madrugada e ao meio-dia. */
   tendenciasBrasil: "tendencias-brasil",
   contasBase: "contas-base",
@@ -28,6 +33,11 @@ export const FILAS = {
   metaHashtags: "meta-hashtags",
   /** Apify do Instagram, so descoberta de conta nova, semanal (E6 parte 3, segunda rodada, item 4); so agenda com config.coleta.metaAtivo. */
   descobertaInstagram: "descoberta-instagram",
+  /**
+   * Hotfix de 22/10/2026: baixa e guarda a capa dos vídeos do Instagram enquanto o link assinado do CDN vale (`jobs/guardar-capas.ts`). O worker enfileira ao fim de cada coleta que traz capa e na
+   * partida; o cron é a reserva.
+   */
+  guardarCapas: "guardar-capas",
   pontuar: "pontuar",
   vigilancia: "vigilancia",
   transcrever: "transcrever",
@@ -94,6 +104,7 @@ export const FILAS_POR_RAMO = new Set<string>([
   FILAS.coletaYoutube,
   FILAS.coletaApify,
   FILAS.coletaNoticias,
+  FILAS.filtrarNoticias,
   FILAS.metaContas,
   FILAS.metaHashtags,
   FILAS.descobertaInstagram,

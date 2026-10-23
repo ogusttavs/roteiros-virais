@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CircleAlert, Copy, Download, Ellipsis, ExternalLink, Eye, HelpCircle, History, ImageDown, Mic, Music, Newspaper, Pencil, Play, RotateCcw, Scissors, Search, Sparkles, TrendingUp, Type, Video, X } from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, Copy, Download, Ellipsis, ExternalLink, Eye, HelpCircle, History, ImageDown, Mic, Music, Newspaper, Pencil, Play, RotateCcw, Scissors, Search, Sparkles, TrendingUp, Type, Undo2, Video, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -57,6 +57,7 @@ import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 import { SeletorMarcaCelular, type MarcaResumo } from "../../../_casca/SeletorMarcaCelular";
 
 import {
+  desmarcarGravadoAction,
   marcarGravadoAction,
   marcarPostadoAction,
   reprovarERescreverAction,
@@ -297,6 +298,10 @@ export function RoteiroTela({
   const [toast, setToast] = useState(false);
   /** V11, item 5: "Terminei de gravar" no modo gravação manda para cá com `?gravado=1` (o roteiro já vem gravado do servidor; isto é só o toast). */
   const [toastGravado, setToastGravado] = useState(false);
+  /** O aviso logo depois de "Já gravei", com "Desfazer" (achado do uso real em 22/10/2026: tocou sem querer e não havia como voltar). */
+  const [toastJaGravei, setToastJaGravei] = useState(false);
+  /** Depois de desfazer o "Já gravei" (pelo aviso ou pelo menu). */
+  const [toastDesmarcado, setToastDesmarcado] = useState(false);
   /** E40, item 1: depois de salvar uma edição manual. */
   const [toastSalvo, setToastSalvo] = useState(false);
   /** A frase de falha de uma ação sem painel aberto ("Já gravei", o PDF da barra do tablet): sai num Toast de erro. */
@@ -329,6 +334,7 @@ export function RoteiroTela({
   // Uma transição por ação (V7, item 4 do PROXIMO.md): com uma só, "Já gravei" ficava morto e sem motivo
   // durante os até 3 minutos de uma reescrita, e o rótulo "Salvando" aparecia nele sem ser dele.
   const [gravando, iniciarGravacao] = useTransition();
+  const [desfazendoGravado, iniciarDesfazerGravado] = useTransition();
   const [salvandoLink, iniciarSalvarLink] = useTransition();
   const [reescrevendo, iniciarReescrita] = useTransition();
   const [salvandoEdicao, iniciarSalvarEdicao] = useTransition();
@@ -491,6 +497,7 @@ export function RoteiroTela({
       try {
         await marcarGravadoAction(roteiro.id);
         setGravadoEm(new Date());
+        setToastJaGravei(true);
         avisarRedeOk();
       } catch (erro) {
         setErroToast(
@@ -500,6 +507,22 @@ export function RoteiroTela({
             textosRoteiro.erroMarcarGravadoSemRede,
           ),
         );
+      }
+    });
+  }
+
+  /** "Desfazer" do aviso e "Ainda não gravei" do menu: o roteiro volta a não gravado. Só vale enquanto não foi postado (o servidor confere o status de novo). */
+  function desfazerGravado() {
+    if (desfazendoGravado || postado) return;
+    setErroToast(null);
+    iniciarDesfazerGravado(async () => {
+      try {
+        await desmarcarGravadoAction(roteiro.id);
+        setGravadoEm(null);
+        setToastDesmarcado(true);
+        avisarRedeOk();
+      } catch (erro) {
+        setErroToast(tratarFalha(erro, textosRoteiro.erroDesmarcarGravado, textosRoteiro.erroDesmarcarGravadoSemRede));
       }
     });
   }
@@ -1359,6 +1382,23 @@ export function RoteiroTela({
             {textosRoteiro.menu.reescreverMomento}
           </Link>
         ) : null}
+        {gravadoEm && !postado ? (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              fechar();
+              desfazerGravado();
+            }}
+            disabled={desfazendoGravado || semConexao}
+            aria-describedby={descricaoSemRede}
+            className={styles.itemMenu}
+          >
+            <Undo2 size={20} strokeWidth={1.5} aria-hidden="true" />
+            {textosRoteiro.menu.aindaNaoGravei}
+            <MotivoSemRede className={styles.motivoItem} />
+          </button>
+        ) : null}
         <button type="button" role="menuitem" onClick={copiarTexto} className={styles.itemMenu}>
           <Copy size={20} strokeWidth={1.5} aria-hidden="true" />
           {textosRoteiro.menu.copiar}
@@ -1640,7 +1680,17 @@ export function RoteiroTela({
         texto={textosGravacao.gravadoToast}
         aberto={toastGravado}
         onFechar={() => setToastGravado(false)}
+        duracaoMs={6000}
+        acao={{ rotulo: textosRoteiro.desfazerGravado, onClique: desfazerGravado }}
       />
+      <Toast
+        texto={textosRoteiro.gravadoAviso}
+        aberto={toastJaGravei}
+        onFechar={() => setToastJaGravei(false)}
+        duracaoMs={6000}
+        acao={{ rotulo: textosRoteiro.desfazerGravado, onClique: desfazerGravado }}
+      />
+      <Toast texto={textosRoteiro.desmarcadoAviso} aberto={toastDesmarcado} onFechar={() => setToastDesmarcado(false)} />
       <Toast
         texto={textosRoteiro.editando.salvo}
         aberto={toastSalvo}

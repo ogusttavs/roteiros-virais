@@ -29,6 +29,13 @@ import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
 const id = () => integer("id").primaryKey().generatedAlwaysAsIdentity();
 const criadoEm = () => timestamp("criado_em", { withTimezone: true }).notNull().defaultNow();
 
+/** Coluna bytea (Drizzle nao tem um tipo pronto para ela): a capa guardada do video (`capas_video`). */
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
 /** Coluna tsvector (Drizzle nao tem um tipo pronto para ela). */
 const tsvector = customType<{ data: string }>({
   dataType() {
@@ -103,6 +110,18 @@ export const verification = pgTable("verification", {
   expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Quem ainda usa a senha provisoria do convite (E58). Uma linha por pessoa: nasce quando o admin cria o acesso ou gera uma senha nova, some quando a pessoa escolhe a dela
+ * (primeiro acesso, Conta ou "esqueci a senha"). Enquanto existe, o painel leva a pessoa para a tela de trocar a senha antes do resto. Tabela a parte, e nao uma coluna em `user`,
+ * porque `user` e do better-auth e `schema.auth.test.ts` trava as colunas dela contra o pacote.
+ */
+export const senhasProvisorias = pgTable("senhas_provisorias", {
+  usuarioId: text("usuario_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  criadoEm: criadoEm(),
 });
 
 // ---------------------------------------------------------------------------
@@ -1550,6 +1569,38 @@ export const noticias = pgTable("noticias", {
   coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Coluna bytea para a foto da matéria (Drizzle não tem um tipo pronto para ela). */
+const byteaDaFotoDaMateria = customType<{ data: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+/**
+ * A foto da matéria guardada do nosso lado (fix de 22/10/2026, Notícias). O Google News não traz foto no RSS; o job `filtrar-noticias` resolve o link dele até a página do veículo, lê o
+ * `og:image` (ou o `twitter:image`) e baixa a foto UMA vez, só das notícias que o filtro marcou como relevantes e que a capa ainda mostra. Uma linha por notícia: `guardada` com os bytes como
+ * vieram (teto de 1,5 MB, só JPEG, PNG ou WebP, conferidos pelos bytes e não pelo cabeçalho), ou `sem_foto` quando a página não deu foto que servisse (o job tenta de novo no máximo uma vez, por
+ * rede passageira). O crédito é o `noticias.imagem_credito` ("Foto: G1"). Foto de matéria é dado público do veículo, igual para todas as marcas; a rota `/api/imagem-noticia/<noticiaId>`
+ * só serve a quem está logado e é do setor da notícia. Apaga sozinha 14 dias depois.
+ */
+export type SituacaoDaFotoDaMateria = "guardada" | "sem_foto";
+
+export const imagensNoticia = pgTable("imagens_noticia", {
+  noticiaId: integer("noticia_id")
+    .primaryKey()
+    .references(() => noticias.id, { onDelete: "cascade" }),
+  situacao: text("situacao").$type<SituacaoDaFotoDaMateria>().notNull(),
+  /** "image/jpeg", "image/png" ou "image/webp", pelos bytes; nulo em `sem_foto`. */
+  tipo: text("tipo"),
+  bytes: byteaDaFotoDaMateria("bytes"),
+  /** O endereço da foto na página do veículo (para depurar), quando achou. */
+  origem: text("origem"),
+  tentativas: integer("tentativas").notNull().default(1),
+  tentouEm: timestamp("tentou_em", { withTimezone: true }).notNull().defaultNow(),
+  criadoEm: criadoEm(),
+});
+export type ImagemNoticia = typeof imagensNoticia.$inferSelect;
+
 /**
  * E53, assuntos que eu acompanho: até cinco por marca (texto livre mais os termos que a pessoa deu), acompanhados todo dia pelas notícias, nunca por vídeo. O sistema nunca sugere
  * assunto sozinho. Some sozinho depois de 30 dias sem a pessoa abrir uma notícia dele (`ultimoAbertoEm`, ou `criadoEm` se nunca abriu), a não ser que esteja fixado.
@@ -2546,9 +2597,13 @@ export const assinaturas = pgTable(
   "assinaturas",
   {
     id: id(),
+    /**
+     * `restrict`, não `cascade` (E22 PR 3): apagar a marca não leva a assinatura junto, porque o Stripe continuaria cobrando uma conta que não existe mais. O caminho de apagar marca
+     * (`servicos/apagar-marca.ts`) cancela no Stripe e apaga a linha da assinatura antes de apagar a marca; qualquer outro `delete from clientes` é recusado pelo banco.
+     */
     clienteId: integer("cliente_id")
       .notNull()
-      .references(() => clientes.id, { onDelete: "cascade" }),
+      .references(() => clientes.id, { onDelete: "restrict" }),
     status: text("status").$type<StatusAssinatura>().notNull(),
     stripeClienteId: text("stripe_cliente_id").notNull(),
     stripeAssinaturaId: text("stripe_assinatura_id").notNull(),
@@ -2580,6 +2635,49 @@ export const eventosStripe = pgTable(
   (t) => [uniqueIndex("eventos_stripe_evento").on(t.eventoId)],
 );
 export type EventoStripe = typeof eventosStripe.$inferSelect;
+
+/**
+ * A capa do vídeo guardada do nosso lado (hotfix de 22/10/2026). O link da capa do Instagram (`videos.capa_url`) é um link assinado do CDN da Meta e vence em dias; um vídeo coletado em 01/10 já devolvia 403
+ * em 22/10 e a Referência virava um quadro preto. Aqui fica uma linha por vídeo: `guardada` com os bytes do JPEG como vieram (teto de 300 KB, `servicos/capas.ts`), ou `vencida` quando o link já não
+ * abre (sem bytes; a tela mostra o embed ou um quadro neutro, nunca preto); `grande` quando passou do teto e não coube (a tela usa o link enquanto ele vale); `tentando` quando a rede falhou e o job volta
+ * a tentar. Quando uma recoleta traz um link novo (`url_tentada` diferente do `capa_url`), o job tenta de novo, mesmo se a anterior venceu. Capa de vídeo é dado público da plataforma, igual para todas as marcas; a rota `/api/capa/<videoId>` só serve a quem está logado.
+ */
+export type SituacaoDaCapa = "guardada" | "vencida" | "grande" | "tentando";
+
+export const capasVideo = pgTable("capas_video", {
+  videoId: integer("video_id")
+    .primaryKey()
+    .references(() => videos.id, { onDelete: "cascade" }),
+  situacao: text("situacao").$type<SituacaoDaCapa>().notNull(),
+  /** O tipo da imagem como a plataforma devolveu ("image/jpeg"); nulo quando a capa venceu. */
+  tipo: text("tipo"),
+  bytes: bytea("bytes"),
+  /** O link que o job tentou por último; se o `capa_url` do vídeo mudar (recoleta com link novo), vale tentar de novo. */
+  urlTentada: text("url_tentada"),
+  /** Quantas vezes o link já foi tentado sem dar certo por motivo passageiro (rede, 5xx): depois do teto o job desiste e marca vencida. */
+  tentativas: integer("tentativas").notNull().default(0),
+  criadoEm: criadoEm(),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+export type CapaVideo = typeof capasVideo.$inferSelect;
+
+/**
+ * E22 PR 2, item 0b: o Checkout aberto de cada marca. Uma linha por marca (índice único): o segundo clique em "Assinar" reaproveita a sessão que o primeiro abriu em vez de criar
+ * outra (duas sessões abertas deixariam a pessoa pagar duas vezes). Só o id da sessão fica aqui; o endereço do pagamento o Stripe devolve de novo quando a sessão ainda está aberta.
+ */
+export const checkoutsStripe = pgTable(
+  "checkouts_stripe",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    stripeSessaoId: text("stripe_sessao_id").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("checkouts_stripe_cliente").on(t.clienteId)],
+);
+export type CheckoutStripe = typeof checkoutsStripe.$inferSelect;
 
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;

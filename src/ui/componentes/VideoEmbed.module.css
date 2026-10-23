@@ -176,3 +176,18 @@
     animation-duration: 1.6s;
   }
 }
+
+/**
+ * Sem capa viva (hotfix de 22/10/2026: a capa do CDN venceu, ou a plataforma nunca trouxe): nada de quadro preto com o play, que parecia um vídeo quebrado. Um quadro com as cores do painel,
+ * o nome da rede no canto e o play, que continua sendo o toque que carrega o vídeo.
+ */
+.capaJogarSemCapa {
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto-suave);
+  border: var(--largura-borda) solid var(--cor-borda);
+}
+
+.capaJogarSemCapa .tocarIcone {
+  background: var(--cor-titulo);
+  color: var(--cor-superficie);
+}

@@ -12,13 +12,17 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * /api/saude e publica de proposito (etapa 13): healthcheck do Compose,
  * deploy e monitor externo batem nela sem sessao; nao devolve dado.
+ * /api/versao tambem: devolve so o sha do commit em execucao, e o navegador a consulta para saber se a
+ * pagina aberta e de uma versao anterior, inclusive depois que a sessao venceu (`src/lib/versao.ts`).
  * /termos e /privacidade sao publicas (etapa 12, decisao 7): quem ainda nao
  * assina precisa conseguir ler antes de entrar, e a folha de aceite linka
  * para elas de dentro do painel tambem. /dados e publica pelo mesmo motivo
  * (E6 parte 3, item 8): a configuracao do app da Meta pede uma URL de
  * instrucoes de exclusao de dados que qualquer um consiga abrir, sem sessao.
+ * /redefinir-senha (E58) e o destino do link do e-mail de "esqueci a senha":
+ * quem esqueceu a senha nao tem sessao.
  */
-const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/termos", "/privacidade", "/dados"];
+const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/api/versao", "/termos", "/privacidade", "/dados", "/redefinir-senha"];
 
 /**
  * Rotas com autenticacao propria, sem cookie de sessao (etapa 6): o cabecalho

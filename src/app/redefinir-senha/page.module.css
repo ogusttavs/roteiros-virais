@@ -1,0 +1,42 @@
+/* E58: a tela do link do e-mail usa o mesmo cartão de vidro de Entrar (`../entrar/page.module.css`). */
+.pagina {
+  composes: pagina from "../entrar/page.module.css";
+}
+
+.envoltorio {
+  composes: envoltorio from "../entrar/page.module.css";
+}
+
+.titulo {
+  composes: titulo from "../entrar/page.module.css";
+}
+
+.forma {
+  composes: forma from "../entrar/page.module.css";
+}
+
+.erroAviso {
+  composes: erroAviso from "../entrar/page.module.css";
+}
+
+.linkAcao {
+  composes: linkAcao from "../entrar/page.module.css";
+  display: inline-flex;
+  align-items: center;
+}
+
+.confirmacao {
+  composes: confirmacao from "../entrar/page.module.css";
+}
+
+.explica {
+  margin: var(--espaco-3) 0 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}
+
+.irParaEntrar {
+  margin-top: var(--espaco-6);
+  align-self: flex-start;
+}

@@ -1,9 +1,9 @@
 /**
  * Senha inicial legivel (V3, item 5, AdminCliente.dc.html, "Convite mandado":
  * "[exemplo] vento-leve-17-janela"): substantivo, adjetivo, numero de dois
- * digitos, substantivo, separados por hifen. Facil de ler e digitar uma vez,
- * a pessoa troca depois se quiser (nao existe tela de trocar senha ainda,
- * registrado em TODO.md).
+ * digitos, substantivo, separados por hifen. Facil de ler e digitar uma vez;
+ * e provisoria (E58): no primeiro acesso o painel pede a troca por uma que a
+ * pessoa escolhe (`servicos/senha.ts`, `/trocar-senha`).
  */
 import { randomInt } from "node:crypto";
 

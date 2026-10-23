@@ -120,6 +120,8 @@ export const textosReferencias = {
   contaNaoIdentificada: "conta não identificada",
   /** M4, item 1: etiqueta no cartão e na folha de detalhes, quando o vídeo foi lido sem fala. */
   semFala: "Sem fala",
+  /** Hotfix de 22/10/2026: a capa do vídeo venceu e não está guardada; o cartão leva a pessoa ao vídeo na própria rede. */
+  verNaRede: (rede: string) => `Ver no ${rede}`,
 
   // A folha de detalhes ("Por que esse funcionou")
   folhaDetalhesTitulo: "Por que esse funcionou",

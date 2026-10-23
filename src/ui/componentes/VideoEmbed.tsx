@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { textosComuns } from "@/textos/comuns";
 
+import { CapaImagem } from "./CapaImagem";
 import styles from "./VideoEmbed.module.css";
 
 export type VideoEmbedProps = {
@@ -18,7 +19,10 @@ export type VideoEmbedProps = {
   hrefExterno: string;
   /** O embed já carrega começando neste segundo (RoteiroTela, "olha como ele faz aos X"). */
   segundoInicial?: number;
-  /** R2a: a capa do vídeo, para a moldura escurecida do reserva quando a rede não deixa mostrar o embed. */
+  /**
+   * R2a: a capa do vídeo, para a moldura escurecida do reserva quando a rede não deixa mostrar o embed. Pode ser a rota da capa guardada (`/api/capa/<id>`), o link da plataforma, ou `null`
+   * quando a capa venceu (hotfix de 22/10/2026): sem capa viva o vídeo do Instagram monta o embed oficial na hora, que mostra a imagem do próprio post, e os outros ficam num quadro neutro.
+   */
   capaUrl?: string | null;
 };
 
@@ -92,10 +96,13 @@ export function VideoEmbed({ url, alt, rotuloCarregamento, falhou = false, hrefE
   const [idTiktok, setIdTiktok] = useState<string | null>(null);
   const [falhouTiktok, setFalhouTiktok] = useState(false);
   const [falhouInstagram, setFalhouInstagram] = useState(false);
+  const [capaComErro, setCapaComErro] = useState(false);
   const idYoutube = idDoYoutube(url);
   const urlInstagram = urlEmbedInstagram(url);
   const eTiktok = eUrlDoTiktok(url);
   const embedavel = Boolean(idYoutube) || Boolean(urlInstagram) || eTiktok;
+  const capaViva = Boolean(capaUrl) && !capaComErro;
+  const aoFalharACapa = () => setCapaComErro(true);
 
   useEffect(() => {
     if (!tocando || !eTiktok || idTiktok || falhouTiktok) return;
@@ -151,10 +158,7 @@ export function VideoEmbed({ url, alt, rotuloCarregamento, falhou = false, hrefE
     if (rede) {
       return (
         <div className={styles.moldura} aria-label={alt}>
-          {capaUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- url externa (CDN da plataforma), sem otimizacao do Next
-            <img src={capaUrl} alt="" className={styles.capa} />
-          ) : null}
+          {capaViva && capaUrl ? <CapaImagem src={capaUrl} className={styles.capa} aoFalhar={aoFalharACapa} /> : null}
           <span className={[styles.veu, styles.veuForte].join(" ")} aria-hidden="true" />
           <div className={styles.reserva}>
             <p>{t.texto(rede)}</p>
@@ -170,16 +174,32 @@ export function VideoEmbed({ url, alt, rotuloCarregamento, falhou = false, hrefE
 
   if (!embedavel) return null;
 
+  // Instagram sem capa viva (o link da Meta venceu, ou nunca veio): o embed oficial entra na hora, no lugar do quadro preto com o play. Ele mostra a imagem do próprio post e toca com um toque.
+  // Só aqui, na tela de um vídeo; as listas nunca montam um embed por cartão (`ReferenciaCartao`).
+  if (urlInstagram && !capaViva) {
+    return (
+      <iframe
+        className={styles.iframe}
+        src={urlInstagram}
+        title={alt}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    );
+  }
+
   // A capa com o play, antes do toque: nada carrega ainda, nem o oEmbed do TikTok.
   if (!tocando) {
     const rede = nomeDaRede(idYoutube, urlInstagram, eTiktok);
     return (
-      <button type="button" className={styles.capaJogar} onClick={aoTocar} aria-label={tPrevia.tocar(alt)}>
-        {capaUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- url externa (CDN da plataforma), sem otimizacao do Next
-          <img src={capaUrl} alt="" className={styles.capa} />
-        ) : null}
-        <span className={styles.veu} aria-hidden="true" />
+      <button
+        type="button"
+        className={[styles.capaJogar, capaViva ? "" : styles.capaJogarSemCapa].filter(Boolean).join(" ")}
+        onClick={aoTocar}
+        aria-label={tPrevia.tocar(alt)}
+      >
+        {capaViva && capaUrl ? <CapaImagem src={capaUrl} className={styles.capa} aoFalhar={aoFalharACapa} /> : null}
+        {capaViva ? <span className={styles.veu} aria-hidden="true" /> : null}
         {rede ? <span className={styles.redePrevia}>{rede}</span> : null}
         {segundoInicial ? <span className={styles.comeca}>{tPrevia.comeca(segundoInicial)}</span> : null}
         <span className={styles.tocarIcone} aria-hidden="true">
@@ -193,10 +213,7 @@ export function VideoEmbed({ url, alt, rotuloCarregamento, falhou = false, hrefE
   if (eTiktok && !idTiktok) {
     return (
       <div className={styles.moldura} aria-label={alt}>
-        {capaUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- url externa (CDN da plataforma), sem otimizacao do Next
-          <img src={capaUrl} alt="" className={styles.capa} />
-        ) : null}
+        {capaViva && capaUrl ? <CapaImagem src={capaUrl} className={styles.capa} aoFalhar={aoFalharACapa} /> : null}
         <span className={[styles.veu, styles.veuForte].join(" ")} aria-hidden="true" />
         <div className={styles.carregando} role="status">
           <span className={styles.spinner} aria-hidden="true" />

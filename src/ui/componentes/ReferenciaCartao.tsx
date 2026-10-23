@@ -3,8 +3,9 @@
 import { Bookmark, Play } from "lucide-react";
 import { useState } from "react";
 
-import type { TipoConteudo } from "@/db/schema";
+import type { Plataforma, TipoConteudo } from "@/db/schema";
 import { ROTULO_TIPO_CONTEUDO_FILTRAVEL } from "@/ia/enums";
+import { ROTULO_PLATAFORMA } from "@/lib/formatar-video-referencia";
 import type { FaixaMultiplo } from "@/lib/formatarNumero";
 import { formatarVelocidade, formatarViewsExato } from "@/lib/formatarNumero";
 import { textosConexao } from "@/textos/conexao";
@@ -12,12 +13,15 @@ import { textosReferencias } from "@/textos/referencias";
 import { ID_FAIXA_SEM_CONEXAO } from "@/ui/ConexaoContext";
 
 import { Botao } from "./Botao";
+import { CapaImagem } from "./CapaImagem";
 import styles from "./ReferenciaCartao.module.css";
 
 /** Computado uma vez a partir do `VideoReferencia` bruto (`ReferenciasTela`), reaproveitado pelo cartão e pela folha de detalhes. */
 export type VideoFormatado = {
   id: number;
   url: string;
+  /** Hotfix de 22/10/2026: sem capa viva, o cartão diz de que rede é e oferece "Ver no Instagram" em vez de ficar num quadro vazio. */
+  plataforma: Plataforma;
   multiplo: string;
   rotuloMultiplo: string;
   faixaMultiplo: FaixaMultiplo;
@@ -89,6 +93,7 @@ function rotuloTipoConteudo(tipo: TipoConteudo | null): string | null {
 export function ReferenciaCartao({ video, salvo, salvando = false, semRede = false, onVerDetalhes, onSalvar }: Props) {
   const [capaComErro, setCapaComErro] = useState(false);
   const mostrarCapa = video.capaUrl !== null && !capaComErro;
+  const redeSemCapa = !mostrarCapa && video.plataforma !== "youtube" ? ROTULO_PLATAFORMA[video.plataforma] : null;
   const rotuloTipo = rotuloTipoConteudo(video.tipoConteudo);
   const temSelo = video.abaixoDaRegua || rotuloTipo !== null || Boolean(video.ramoNome) || Boolean(video.tipoDeVideo) || Boolean(video.feitoPara);
 
@@ -96,16 +101,13 @@ export function ReferenciaCartao({ video, salvo, salvando = false, semRede = fal
     <article className={styles.cartao}>
       <div className={styles.videoTopo}>
         <span className={styles.capa} aria-hidden="true">
-          {mostrarCapa ? (
-            // eslint-disable-next-line @next/next/no-img-element -- url externa (CDN da plataforma), sem otimizacao do Next
-            <img
-              src={video.capaUrl ?? undefined}
-              alt=""
-              className={styles.capaImagem}
-              onError={() => setCapaComErro(true)}
-            />
+          {mostrarCapa && video.capaUrl ? (
+            <CapaImagem src={video.capaUrl} className={styles.capaImagem} aoFalhar={() => setCapaComErro(true)} />
           ) : (
-            <Play size={24} strokeWidth={1.5} aria-hidden="true" />
+            <span className={styles.semCapa}>
+              <Play size={24} strokeWidth={1.5} aria-hidden="true" />
+              {redeSemCapa ? <span className={styles.redeSemCapa}>{redeSemCapa}</span> : null}
+            </span>
           )}
         </span>
         <div className={styles.multiplo}>
@@ -132,6 +134,11 @@ export function ReferenciaCartao({ video, salvo, salvando = false, semRede = fal
         <span className={styles.nome}>{video.contaNome}</span>
         <span className={styles.quando}>{video.plataformaData}</span>
         {video.semFala ? <span className={styles.semFala}>{textosReferencias.semFala}</span> : null}
+        {redeSemCapa ? (
+          <a href={video.url} target="_blank" rel="noopener noreferrer" className={styles.verNaRede}>
+            {textosReferencias.verNaRede(redeSemCapa)}
+          </a>
+        ) : null}
       </div>
 
       {temSelo ? (

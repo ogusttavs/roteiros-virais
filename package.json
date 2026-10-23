@@ -23,6 +23,7 @@
     "checar-versao-prompt": "tsx scripts/checar-versao-prompt.ts",
     "checar-admin-protegido": "tsx scripts/checar-admin-protegido.ts",
     "checar-ver-como": "tsx scripts/checar-ver-como.ts",
+    "checar-portao-cobranca": "tsx scripts/checar-portao-cobranca.ts",
     "db:up": "docker compose -f compose.dev.yml up -d",
     "db:down": "docker compose -f compose.dev.yml down",
     "db:generate": "drizzle-kit generate",
@@ -32,6 +33,7 @@
     "worker": "tsx src/jobs/worker.ts",
     "job": "tsx src/jobs/rodar.ts",
     "admin:criar": "tsx scripts/criar-admin.ts",
+    "marca:apagar": "tsx scripts/apagar-marca.ts",
     "preencher:nome-contas": "tsx scripts/preencher-nome-contas.ts",
     "preencher:idioma": "tsx scripts/preencher-idioma.ts",
     "preencher:tipo-abertura": "tsx scripts/preencher-tipo-abertura.ts",
@@ -64,7 +66,8 @@
     "capturas:v9c-story": "AI_PROVIDER=mock tsx scripts/capturas-v9c-story.ts",
     "capturas:v12-portas": "AI_PROVIDER=mock tsx scripts/capturas-v12-portas.ts",
     "capturas:e38-pr2": "AI_PROVIDER=mock tsx scripts/capturas-e38-pr2.ts",
-    "capturas:e45-pr1": "AI_PROVIDER=mock tsx scripts/capturas-e45-pr1.ts"
+    "capturas:e45-pr1": "AI_PROVIDER=mock tsx scripts/capturas-e45-pr1.ts",
+    "capturas:e58": "AI_PROVIDER=mock tsx scripts/capturas-e58.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
