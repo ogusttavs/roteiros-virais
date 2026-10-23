@@ -140,7 +140,7 @@ describe("ligado, o modelo barato escolhe a prova em toda busca do Tema livre", 
     ligar(true);
     const crianca = idDe.get("crianca")!;
     gerarEstruturadoMock.mockResolvedValueOnce({
-      dados: { motivo: "O tema pede levar criança ao dentista.", mesmoAssunto: [crianca] },
+      dados: { motivo: "O tema pede levar criança ao dentista.", itens: [{ id: crianca, frase: "Fala da primeira consulta da criança.", mesmoAssunto: true }] },
       modelo: "mock",
       tokensEntrada: 10,
       tokensSaida: 5,
@@ -157,7 +157,7 @@ describe("ligado, o modelo barato escolhe a prova em toda busca do Tema livre", 
     expect(await acha("gengiva sangrando [mock:reordenar-vazio]")).toEqual([]);
   });
 
-  it("a chamada é registrada com cliente, ramo, versão 1.2.0 e o motivo", async () => {
+  it("a chamada é registrada com cliente, ramo, versão 1.3.0, o motivo e a frase de cada vídeo", async () => {
     ligar(true);
     const antes = (await geracoes()).length;
     await acha("quanto custa um implante");
@@ -166,7 +166,7 @@ describe("ligado, o modelo barato escolhe a prova em toda busca do Tema livre", 
     const registrada = linhas[linhas.length - 1];
     expect(registrada.clienteId).toBe(clienteId);
     expect(registrada.ramoId).toBe(nichoId);
-    expect(registrada.versaoPrompt).toBe("1.2.0");
+    expect(registrada.versaoPrompt).toBe("1.3.0");
     expect(typeof (registrada.saida as { motivo: string }).motivo).toBe("string");
     expect(registrada.evidencias).toContain(idDe.get("implante")!);
   });
@@ -175,7 +175,14 @@ describe("ligado, o modelo barato escolhe a prova em toda busca do Tema livre", 
     ligar(true);
     const crianca = idDe.get("crianca")!;
     gerarEstruturadoMock.mockResolvedValueOnce({
-      dados: { motivo: "x", mesmoAssunto: [987654321, crianca, crianca] },
+      dados: {
+        motivo: "x",
+        itens: [
+          { id: 987654321, frase: "Inventado.", mesmoAssunto: true },
+          { id: crianca, frase: "Criança no dentista.", mesmoAssunto: true },
+          { id: crianca, frase: "Repetido.", mesmoAssunto: true },
+        ],
+      },
       modelo: "mock",
       tokensEntrada: 10,
       tokensSaida: 5,
@@ -205,11 +212,26 @@ describe("ligado, o modelo barato escolhe a prova em toda busca do Tema livre", 
     expect((await geracoes()).length).toBe(linhasAntes + 1);
   });
 
+  it("o item que o modelo marca como não é descartado pelo código, e o julgamento inteiro fica no registro", async () => {
+    ligar(true);
+    const linhasAntes = (await geracoes()).length;
+    const encontrados = await acha("tema que o modelo contradiz [mock:reordenar-contradiz]");
+    // Dois itens: o primeiro candidato julgado "não" e o segundo "sim". Só o segundo vira prova.
+    expect(encontrados).toHaveLength(1);
+    const linhas = await geracoes();
+    expect(linhas.length).toBe(linhasAntes + 1);
+    const saida = linhas[linhas.length - 1].saida as { itens: { id: number; mesmoAssunto: boolean; frase: string }[]; mesmoAssunto: number[] };
+    expect(saida.itens).toHaveLength(2);
+    expect(saida.itens[0].mesmoAssunto).toBe(false);
+    expect(saida.mesmoAssunto).toEqual([saida.itens[1].id]);
+    expect(encontrados[0]).toBe(chaveDe.get(saida.itens[1].id));
+  });
+
   it("a chave do cache leva versão, setores, tema sem acento nem caixa e os candidatos", () => {
-    expect(chaveDoCache("1.2.0", [1], "Tema", [1, 2, 3])).toBe(chaveDoCache("1.2.0", [1], "tema", [3, 2, 1]));
-    expect(chaveDoCache("1.2.0", [1], "tema", [1, 2, 3])).not.toBe(chaveDoCache("1.2.0", [1], "tema", [1, 2, 3, 4]));
-    expect(chaveDoCache("1.2.0", [1], "tema", [1, 2])).not.toBe(chaveDoCache("1.2.0", [1, 2], "tema", [1, 2]));
-    expect(chaveDoCache("1.2.0", [1], "tema", [1, 2])).not.toBe(chaveDoCache("1.0.0", [1], "tema", [1, 2]));
+    expect(chaveDoCache("1.3.0", [1], "Tema", [1, 2, 3])).toBe(chaveDoCache("1.3.0", [1], "tema", [3, 2, 1]));
+    expect(chaveDoCache("1.3.0", [1], "tema", [1, 2, 3])).not.toBe(chaveDoCache("1.3.0", [1], "tema", [1, 2, 3, 4]));
+    expect(chaveDoCache("1.3.0", [1], "tema", [1, 2])).not.toBe(chaveDoCache("1.3.0", [1, 2], "tema", [1, 2]));
+    expect(chaveDoCache("1.3.0", [1], "tema", [1, 2])).not.toBe(chaveDoCache("1.0.0", [1], "tema", [1, 2]));
   });
 
   it("modelo fora do ar: vale a busca por palavra de sempre, sem erro e sem registro", async () => {

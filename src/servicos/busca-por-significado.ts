@@ -26,7 +26,7 @@ import { logger } from "@/lib/log";
 
 /** O teto por chamada: nunca mais que isto vai ao modelo, qualquer que seja o tamanho do setor. */
 export const MAXIMO_DE_CANDIDATOS_PARA_IA = 200;
-const MAXIMO_DE_TOKENS_DE_SAIDA = 600;
+const MAXIMO_DE_TOKENS_DE_SAIDA = 1500;
 const DIAS_DO_CACHE = 14;
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -100,8 +100,8 @@ export async function escolherComIA(dados: {
       entrada: reordenarEvidencia.montarEntrada({ tema: dados.tema, candidatos }),
       maxTokens: MAXIMO_DE_TOKENS_DE_SAIDA,
     });
-    // O que fica guardado é a escolha inteira; o corte por `limite` é de quem pergunta, na hora.
-    const escolhidos = idsValidos(resultado.dados.mesmoAssunto, candidatos, candidatos.length);
+    // O código descarta todo item marcado como "não" ou sem frase (`itensDoMesmoAssunto`). O que fica guardado é a escolha inteira; o corte por `limite` é de quem pergunta, na hora.
+    const escolhidos = idsValidos(reordenarEvidencia.itensDoMesmoAssunto(resultado.dados.itens), candidatos, candidatos.length);
 
     await registrarGeracao({
       tarefa: "reordenarEvidencia",
@@ -111,7 +111,8 @@ export async function escolherComIA(dados: {
       clienteId: dados.clienteId,
       entradas: { chave, tema: dados.tema, nichoId: dados.setores[0], setores: dados.setores, candidatos: candidatos.map((c) => c.id) },
       evidencias: escolhidos,
-      saida: { motivo: resultado.dados.motivo, mesmoAssunto: escolhidos },
+      // `mesmoAssunto` são os ids que ficaram depois do descarte do código; `itens` guarda o julgamento inteiro (a frase de cada vídeo), inclusive o que foi descartado.
+      saida: { motivo: resultado.dados.motivo, itens: resultado.dados.itens, mesmoAssunto: escolhidos },
       uso: {
         tokensEntrada: resultado.tokensEntrada,
         tokensSaida: resultado.tokensSaida,

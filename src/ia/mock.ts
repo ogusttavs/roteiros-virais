@@ -1301,9 +1301,13 @@ const MARCADOR_REPROVA_EVIDENCIA_POR_MARCA = "reprove toda a evidencia por nao c
 function mockReordenarEvidencia(entrada: string) {
   const [cabecalho, ...resto] = entrada.split("\n\nVídeos candidatos:\n");
   const tema = cabecalho.replace(/^Tema: /, "");
-  if (tema.includes("[mock:reordenar-vazio]")) return { motivo: "Nenhum trata do mesmo assunto.", mesmoAssunto: [] };
+  const item = (id: number, mesmoAssunto: boolean) => ({ id, mesmoAssunto, frase: mesmoAssunto ? "Trata do assunto do tema (simulado)." : "Fala de outro assunto (simulado)." });
+  if (tema.includes("[mock:reordenar-vazio]")) return { motivo: "Nenhum trata do mesmo assunto.", itens: [] };
   const linhas = resto.join("\n").split("\n").filter((l) => /^id \d+:/.test(l));
-  if (tema.includes("[mock:reordenar-tudo]")) return { motivo: "Todos servem (simulado).", mesmoAssunto: linhas.map((l) => Number(l.match(/^id (\d+):/)![1])) };
+  const idsDasLinhas = linhas.map((l) => Number(l.match(/^id (\d+):/)![1]));
+  if (tema.includes("[mock:reordenar-tudo]")) return { motivo: "Todos servem (simulado).", itens: idsDasLinhas.map((id) => item(id, true)) };
+  // O modelo que contradiz a própria lista: o primeiro candidato é julgado "não" (e deve ser descartado pelo código), o segundo "sim".
+  if (tema.includes("[mock:reordenar-contradiz]")) return { motivo: "Só o segundo trata do assunto (simulado).", itens: [item(idsDasLinhas[0], false), item(idsDasLinhas[1], true)] };
   const sem = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   const palavras = [...new Set(sem(tema).match(/[a-z]{5,}/g) ?? [])];
   const ids = linhas
@@ -1312,7 +1316,7 @@ function mockReordenarEvidencia(entrada: string) {
       return palavras.some((p) => texto.includes(p.slice(0, 5)));
     })
     .map((l) => Number(l.match(/^id (\d+):/)![1]));
-  return { motivo: ids.length > 0 ? "Dividem palavra com o tema (simulado)." : "Nenhum divide palavra com o tema (simulado).", mesmoAssunto: ids };
+  return { motivo: ids.length > 0 ? "Dividem palavra com o tema (simulado)." : "Nenhum divide palavra com o tema (simulado).", itens: ids.slice(0, 10).map((id) => item(id, true)) };
 }
 
 function mockFiltrarEvidenciaPorMarca(entrada: string) {
