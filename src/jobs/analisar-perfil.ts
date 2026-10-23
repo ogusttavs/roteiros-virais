@@ -24,6 +24,7 @@ import * as analisarPerfilCitado from "@/ia/prompts/analisarPerfilCitado";
 import { calcularCustoUsd, registrarGeracao } from "@/ia/registro";
 import { ErroMetaApi, erroMetaEhDaConta } from "@/jobs/meta-api";
 import { logger } from "@/lib/log";
+import { marcaPodeReceberTarefa, registrarMarcasPuladas, resumoDasMarcasPuladas } from "@/servicos/assinatura-tarefas";
 import { perfilDoCliente } from "@/servicos/briefing";
 
 import { upsertConta, upsertVideo } from "./coleta-comum";
@@ -105,6 +106,11 @@ function papelDoPerfil(payload: PayloadAnalisarPerfil): "concorrente" | "admira"
 }
 
 export async function rodarAnalisarPerfil(payload: PayloadAnalisarPerfil): Promise<Record<string, unknown>> {
+  // E22 PR 3: marca sem assinatura (cobrança ligada) não gasta coleta nem IA analisando perfil. Nada é gravado: se ela assinar depois, a pessoa pede a análise de novo.
+  if (!(await marcaPodeReceberTarefa(payload.clienteId))) {
+    registrarMarcasPuladas("analisar-perfil", 1);
+    return { clienteId: payload.clienteId, rede: payload.rede, handle: payload.handle, pulado: "assinatura", ...resumoDasMarcasPuladas(1) };
+  }
   if (payload.rede === "tiktok") {
     await gravarResultado(payload, { existeNaRede: false, motivo: "tiktok_desligado" });
     return { clienteId: payload.clienteId, rede: payload.rede, handle: payload.handle, pulado: "tiktok_suspenso" };
