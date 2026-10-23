@@ -9,7 +9,10 @@ name: roteiros
 
 services:
   roteiros-postgres:
-    image: postgres:16-alpine
+    # E17 parte 1: pgvector (busca por significado). Tag FIXA de proposito: a imagem e Debian (glibc), a ordem do texto nos indices depende da versao do sistema, e trocar de sistema
+    # sem reindexar corrompe os indices (entregaveis/revisoes/e17-escopo.md, secao 4). A troca da imagem sobre o volume que ja existe tem procedimento proprio:
+    # deploy/reindexar-depois-da-troca.sh e deploy/README.md ("Trocar a imagem do banco"). Nunca pelo deploy.sh comum.
+    image: pgvector/pgvector:0.8.7-pg16-bookworm
     container_name: roteiros-postgres
     restart: unless-stopped
     env_file: .env

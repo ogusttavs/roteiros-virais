@@ -652,6 +652,13 @@
       "when": 1792715333941,
       "tag": "0093_imagens-das-noticias",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1792722088542,
+      "tag": "0094_busca-por-significado",
+      "breakpoints": true
     }
   ]
 }

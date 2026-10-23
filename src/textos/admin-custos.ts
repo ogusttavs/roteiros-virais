@@ -48,6 +48,7 @@ export const textosCustosAdmin = {
     resultados: (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} resultados`,
     // Menos de 10 MB tem uma casa (0,4 MB não vira "0 MB"), e quando o arredondamento chega a 1.000 MB já é 1 GB.
     megabytes: (n: number) => (Math.round(n) >= 1000 ? `${(n / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} GB baixados` : `${n.toLocaleString("pt-BR", { maximumFractionDigits: n < 10 ? 1 : 0 })} MB baixados`),
+    tokens: (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} trechos de texto lidos`,
     vezes: (n: number) => (n === 1 ? "1 chamada" : `${n} chamadas`),
     estimado: "valor estimado pelo preço de tabela",
     daApi: "valor que o próprio serviço informou",

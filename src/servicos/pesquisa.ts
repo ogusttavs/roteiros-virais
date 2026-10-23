@@ -34,6 +34,7 @@ import {
 import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
 import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
+import { vizinhosPorSignificado } from "@/servicos/busca-por-significado";
 import { escolherCapa, situacaoDaCapaSql } from "@/servicos/capas";
 import type { FiltroDeFormatosDaMarca } from "@/servicos/formatos";
 import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
@@ -544,6 +545,28 @@ function condicaoDeFormato(formatos: FiltroDeFormatosDaMarca | undefined, exigir
   return sql`(${serve} and ${doTipo})`;
 }
 
+function condicoesBaseDaEvidencia(
+  nichoId: number,
+  regua: ReguaSetor,
+  exigirServeDeModelo: boolean,
+  alternativos: SetorDaBusca[] = [],
+  formatos?: FiltroDeFormatosDaMarca,
+): SQL[] {
+  const condicoes = [
+    // O setor e o piso dele (V9d, item 0b: o piso vem antes do múltiplo, decisão do Gustavo em 25/09/2026; vale para a evidência do tema e
+    // do roteiro tanto quanto para a biblioteca de referências; M3: piso do setor). E45 PR 3: com ramos alternativos, cada setor com o seu piso.
+    ...condicaoDeSetores([{ id: nichoId, pisoViews: regua.pisoViews }, ...alternativos]),
+    gte(videos.publicadoEm, diasAtras(90)),
+    isNotNull(videos.analise),
+    PERTENCE_AO_NICHO,
+    DENTRO_DO_TETO_DE_DURACAO,
+  ];
+  if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+  const porFormato = condicaoDeFormato(formatos, exigirServeDeModelo);
+  if (porFormato) condicoes.push(porFormato);
+  return condicoes;
+}
+
 function condicoesEvidencia(
   nichoId: number,
   texto: string,
@@ -553,6 +576,11 @@ function condicoesEvidencia(
   alternativos: SetorDaBusca[] = [],
   /** E44 PR 1: os formatos ligados da marca; com resposta dela, o corte global de meme e recorte da H4 sai e vale o formato. */
   formatos?: FiltroDeFormatosDaMarca,
+  /**
+   * E17 parte 1: os vídeos mais próximos do texto por significado, do mais perto para o mais longe (`vizinhosPorSignificado`; vazio quando a busca está desligada, que é o padrão). Eles ALARGAM a
+   * cláusula "casa com o texto" (todo o resto continua valendo por cima, em `condicoesBaseDaEvidencia`) e ganham um bônus de relevância de 2 a 3, do mais perto ao mais longe.
+   */
+  idsPorSignificado: number[] = [],
 ): { condicoes: SQL[]; relevancia: SQL<number> } {
   const palavras = palavrasChave(texto);
   const padroes = palavras.map((p) => `%${p}%`);
@@ -573,26 +601,26 @@ function condicoesEvidencia(
           sql`, `,
         )}]::text[]`
       : sql`array[]::text[]`;
-  const condicoes = [
-    // O setor e o piso dele (V9d, item 0b: o piso vem antes do múltiplo, decisão do Gustavo em 25/09/2026; vale para a evidência do tema e
-    // do roteiro tanto quanto para a biblioteca de referências; M3: piso do setor). E45 PR 3: com ramos alternativos, cada setor com o seu piso.
-    ...condicaoDeSetores([{ id: nichoId, pisoViews: regua.pisoViews }, ...alternativos]),
-    gte(videos.publicadoEm, diasAtras(90)),
-    isNotNull(videos.analise),
-    PERTENCE_AO_NICHO,
-    DENTRO_DO_TETO_DE_DURACAO,
-    sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${texto}) or exists (
+  const casaComOTexto = sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${texto}) or exists (
       select 1 from jsonb_array_elements_text(${videos.etiquetas}) as etiqueta(valor)
       where lower(etiqueta.valor) like any (${padroesSql})
-    ))`,
-  ];
-  if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
-  const porFormato = condicaoDeFormato(formatos, exigirServeDeModelo);
-  if (porFormato) condicoes.push(porFormato);
+    ))`;
+  const idsSql =
+    idsPorSignificado.length > 0
+      ? sql`array[${sql.join(
+          idsPorSignificado.map((i) => sql`${i}`),
+          sql`, `,
+        )}]::int[]`
+      : null;
+  const condicoes = [...condicoesBaseDaEvidencia(nichoId, regua, exigirServeDeModelo, alternativos, formatos), idsSql ? sql`(${casaComOTexto} or ${videos.id} = any(${idsSql}))` : casaComOTexto];
 
+  const bonusPorSignificado = idsSql
+    ? sql`+ (case when ${videos.id} = any(${idsSql}) then 2 + (${idsPorSignificado.length}::numeric - array_position(${idsSql}, ${videos.id})) / ${idsPorSignificado.length}::numeric else 0 end)`
+    : sql``;
   const relevancia = sql<number>`(
     (select count(*) from unnest(${palavrasSql}) as palavra where ${videos.busca} @@ plainto_tsquery('portuguese', palavra))
     + (select count(*) from jsonb_array_elements_text(${videos.etiquetas}) as etiqueta(valor) where lower(etiqueta.valor) like any (${padroesSql}))
+    ${bonusPorSignificado}
   )`;
 
   return { condicoes, relevancia };
@@ -633,7 +661,10 @@ export async function evidenciaParaTema(
 ): Promise<VideoEvidenciaTema[]> {
   const regua = await reguaDoSetor(nichoId);
   const proporcaoBrasil = proporcaoBrasilExplicita ?? regua.proporcaoBrasil;
-  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true, await setoresComPiso(alternativos), formatos);
+  const setores = await setoresComPiso(alternativos);
+  // E17 parte 1: desligada por padrao (`BUSCA_POR_SIGNIFICADO`); desligada, devolve [] sem chamar a porta de embeddings e a consulta e a de sempre.
+  const idsPorSignificado = await vizinhosPorSignificado(texto, condicoesBaseDaEvidencia(nichoId, regua, true, setores, formatos));
+  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true, setores, formatos, idsPorSignificado);
   const linhas = await db()
     .select({
       id: videos.id,

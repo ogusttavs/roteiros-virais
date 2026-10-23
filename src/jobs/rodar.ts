@@ -23,6 +23,7 @@ import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { rodarEmailAcompanhamento } from "./email-acompanhamento";
+import { rodarEmbedarVideos } from "./embedar-videos";
 import { rodarEntenderMarca } from "./entender-marca";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
@@ -127,6 +128,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.curvaCliente]: () => rodarCurvaCliente(),
   [FILAS.emailAcompanhamento]: () => rodarEmailAcompanhamento(),
   [FILAS.faxinaVersoes]: () => rodarFaxinaDasVersoes(),
+  [FILAS.embedarVideos]: () => rodarEmbedarVideos(),
   /** Por evento (E54): `npm run job -- pesquisa-na-hora <pesquisaId>` roda uma pesquisa já criada, na hora (busca paga com a chave real). */
   [FILAS.pesquisaNaHora]: () => rodarPesquisaNaHora(Number(process.argv[3])),
   /**

@@ -65,6 +65,8 @@ export const FILAS = {
   emailAcompanhamento: "email-acompanhamento",
   /** E26 4c: a faxina diaria das versoes do roteiro que ninguem escolheu, em grupos parados ha mais de 30 dias. */
   faxinaVersoes: "faxina-versoes",
+  /** E17 parte 1: guarda os vetores da busca por significado dos videos analisados; so agendado com `EMBEDDINGS_PREENCHER=1`. Job longo (chama a API de embeddings em lotes). */
+  embedarVideos: "embedar-videos",
   /** Por evento, nao por horario (E27, parte 2, item 2): reprovarERescrever enfileira depois de gravar a reprovacao. */
   aprenderCliente: "aprender-cliente",
   /** Por evento (E38, partes 2 e 3): um perfil citado foi adicionado, ou o perfil da propria marca mudou. */

@@ -3,7 +3,7 @@
  * dólar (o que a API devolve, ou o preço da data de `config/precos-ia.ts` quando ela não devolve), a unidade medida e, quando se sabe, a execução e o ramo. Registrar nunca derruba o que
  * está sendo feito: se o banco falhar, o gasto só fica sem linha e o log avisa.
  */
-import { precoApifyPorMilResultados, PRECO_GROQ_USD_POR_HORA, PRECO_PROXY_USD_POR_GB, SEGUNDOS_MINIMOS_COBRADOS_GROQ } from "@/config/precos-ia";
+import { precoApifyPorMilResultados, PRECO_GROQ_USD_POR_HORA, PRECO_PROXY_USD_POR_GB, PRECO_VOYAGE_USD_POR_MILHAO_DE_TOKENS, SEGUNDOS_MINIMOS_COBRADOS_GROQ } from "@/config/precos-ia";
 import { db } from "@/db";
 import { custosExternos, type CustoExterno } from "@/db/schema";
 import { contextoDaExecucao } from "@/jobs/contexto-execucao";
@@ -23,6 +23,11 @@ export function custoEstimadoDoApifyUsd(ator: string, resultados: number): numbe
 /** O custo estimado do tráfego do proxy do YouTube: megabytes baixados a US$ por gigabyte (o pacote do DataImpulse; 1 GB = 1.000 MB, como ele conta). */
 export function custoDoProxyUsd(megabytes: number): number {
   return (megabytes / 1000) * PRECO_PROXY_USD_POR_GB;
+}
+
+/** O custo estimado dos vetores da busca por significado: tokens embedados a US$ por milhão (estimativa datada em `config/precos-ia.ts`, ainda não conferida com a Voyage). */
+export function custoDosVetoresUsd(tokens: number): number {
+  return (tokens / 1_000_000) * PRECO_VOYAGE_USD_POR_MILHAO_DE_TOKENS;
 }
 
 type NovoCusto = {

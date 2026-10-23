@@ -231,7 +231,7 @@ export default async function CustosDoAdmin() {
                   <span className={styles.nomeCusto}>
                     {l.rotulo}
                     <span className={styles.detalheCusto}>
-                      {l.unidade === "minutos" ? t.foraDaIA.minutos(l.unidades) : l.unidade === "megabytes" ? t.foraDaIA.megabytes(l.unidades) : t.foraDaIA.resultados(l.unidades)}, {l.unidade === "megabytes" ? null : `${t.foraDaIA.vezes(l.execucoes)}, `}{l.algumEstimado ? t.foraDaIA.estimado : t.foraDaIA.daApi}
+                      {l.unidade === "minutos" ? t.foraDaIA.minutos(l.unidades) : l.unidade === "megabytes" ? t.foraDaIA.megabytes(l.unidades) : l.unidade === "tokens" ? t.foraDaIA.tokens(l.unidades) : t.foraDaIA.resultados(l.unidades)}, {l.unidade === "megabytes" ? null : `${t.foraDaIA.vezes(l.execucoes)}, `}{l.algumEstimado ? t.foraDaIA.estimado : t.foraDaIA.daApi}
                     </span>
                   </span>
                   <span className={styles.valorCusto}>

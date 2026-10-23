@@ -157,6 +157,27 @@ export const config = {
     /** A chave de busca do preço do plano trimestral no Stripe (criado por `scripts/stripe-preparar.ts`). */
     precoLookupKey: "roteiros_trimestral",
   },
+  /**
+   * E17 parte 1, a busca por significado (entregaveis/revisoes/e17-escopo.md). Tudo desligado por padrao: sem as duas chaves abaixo, a evidencia do tema livre e a mesma de sempre e nenhuma
+   * chamada de embeddings acontece.
+   * `provedor`: "mock" (determinístico, testes e desenvolvimento) ou "voyage" (so com `VOYAGE_API_KEY`); sem `EMBEDDINGS_PROVIDER` e sem chave, "mock", e o Vitest forca "mock" sempre.
+   * `preencher` liga o job `embedar-videos` (guarda os vetores); `buscaAtiva` faz `evidenciaParaTema` somar os vizinhos por significado. Ligar na ordem: preencher, esperar a rodada, buscar.
+   */
+  embeddings: {
+    provedor: (env("EMBEDDINGS_PROVIDER") === "mock" || process.env.VITEST ? "mock" : env("EMBEDDINGS_PROVIDER") === "voyage" || env("VOYAGE_API_KEY") ? "voyage" : "mock") as "voyage" | "mock",
+    voyageKey: env("VOYAGE_API_KEY"),
+    modelo: env("EMBEDDINGS_MODELO", "voyage-3.5"),
+    preencher: env("EMBEDDINGS_PREENCHER") === "1",
+    buscaAtiva: env("BUSCA_POR_SIGNIFICADO") === "1",
+    /** Textos por chamada a API (a ficha de um video e curta; 64 cabe folgado no limite de tokens por pedido). */
+    textosPorChamada: envNumero("EMBEDDINGS_TEXTOS_POR_CHAMADA", 64),
+    /** Teto de videos por rodada do job (o que passar espera a rodada seguinte). */
+    videosPorRodada: envNumero("EMBEDDINGS_VIDEOS_POR_RODADA", 500),
+    /** Teto de gasto por dia, em dolar, somado de `custos_externos` (fonte "voyage"): passou disto, o job para ate o dia virar. */
+    tetoUsdPorDia: envNumero("EMBEDDINGS_TETO_USD_DIA", 1),
+    /** Quantos vizinhos por significado a busca soma a evidencia (valor provisorio ate a calibracao com embeddings de verdade, parte 2). */
+    vizinhos: envNumero("BUSCA_POR_SIGNIFICADO_VIZINHOS", 12),
+  },
   /** Contato mostrado em /termos e /privacidade (etapa 12, decisao 7). */
   emailContato: env("EMAIL_CONTATO", "contato@localhost"),
   /**
@@ -363,6 +384,10 @@ export function verificarSegredosDeProducao(
     COBRANCA_ATIVA?: string;
     STRIPE_SECRET_KEY?: string;
     STRIPE_WEBHOOK_SECRET?: string;
+    EMBEDDINGS_PROVIDER?: string;
+    EMBEDDINGS_PREENCHER?: string;
+    BUSCA_POR_SIGNIFICADO?: string;
+    VOYAGE_API_KEY?: string;
   } = process.env,
 ): void {
   if (env.NODE_ENV !== "production") return;
@@ -389,6 +414,22 @@ export function verificarSegredosDeProducao(
     }
     if (!env.STRIPE_WEBHOOK_SECRET) {
       throw new ErroConfiguracao("COBRANCA_ATIVA=1 exige STRIPE_WEBHOOK_SECRET; sem ele o webhook recusa todo evento e a assinatura nunca vira ativa.");
+    }
+  }
+
+  /**
+   * E17 parte 1: a busca por significado e o preenchimento dos vetores nunca ligam com a porta simulada em producao (vetor de mentira na base), e a porta da Voyage nunca liga
+   * sem a chave. Melhor nao subir do que subir assim.
+   */
+  if (env.EMBEDDINGS_PROVIDER === "voyage" && !env.VOYAGE_API_KEY) {
+    throw new ErroConfiguracao("EMBEDDINGS_PROVIDER=voyage exige VOYAGE_API_KEY; sem ela nenhum vetor pode ser gerado.");
+  }
+  if (env.EMBEDDINGS_PREENCHER === "1" || env.BUSCA_POR_SIGNIFICADO === "1") {
+    const usaVoyage = env.EMBEDDINGS_PROVIDER === "voyage" || (env.EMBEDDINGS_PROVIDER !== "mock" && !!env.VOYAGE_API_KEY);
+    if (!usaVoyage || !env.VOYAGE_API_KEY) {
+      throw new ErroConfiguracao(
+        "EMBEDDINGS_PREENCHER=1 e BUSCA_POR_SIGNIFICADO=1 exigem EMBEDDINGS_PROVIDER=voyage com VOYAGE_API_KEY em producao; a porta simulada gravaria vetores de mentira.",
+      );
     }
   }
 

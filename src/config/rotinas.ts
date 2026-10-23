@@ -25,6 +25,7 @@ export const ROTINAS: Rotina[] = [
   { chave: "pesquisa", titulo: "Pesquisar na hora para um vídeo", faz: "Busca, em portais grandes e órgãos oficiais, os dados de verdade que a pessoa pediu antes de escrever um roteiro.", filas: [FILAS.pesquisaNaHora] },
   { chave: "aprender", titulo: "Aprender com as reprovações", faz: "Transforma o que a pessoa reprovou em regras daquela conta.", filas: [FILAS.aprenderCliente] },
   { chave: "faxina", titulo: "Limpar as versões que ninguém escolheu", faz: "Apaga as versões de roteiro que ficaram sem escolha em grupos parados há mais de 30 dias.", filas: [FILAS.faxinaVersoes] },
+  { chave: "significado", titulo: "Guardar o significado dos vídeos", faz: "Guarda, de cada vídeo analisado, o que ele quer dizer, para achar o vídeo parecido mesmo quando o tema usa outras palavras. Fica parada enquanto a chave do serviço de busca por significado não existir.", filas: [FILAS.embedarVideos] },
   { chave: "email", titulo: "Mandar o e-mail de acompanhamento", faz: "Resume o dia do sistema para quem acompanha.", filas: [FILAS.emailAcompanhamento] },
 ];
 
@@ -58,6 +59,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.curvaCliente]: "a medição dos vídeos postados",
   [FILAS.emailAcompanhamento]: "o e-mail de acompanhamento",
   [FILAS.faxinaVersoes]: "a limpeza das versões",
+  [FILAS.embedarVideos]: "a guarda do significado dos vídeos",
   [FILAS.aprenderCliente]: "o aprendizado com as reprovações",
   [FILAS.entenderMarca]: "a leitura da marca",
   [FILAS.analisarPerfil]: "a leitura do perfil",

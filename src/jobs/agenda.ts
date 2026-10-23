@@ -246,6 +246,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "faxina das versoes do roteiro que ninguem escolheu, em grupos parados ha mais de 30 dias (E26 4c), todo dia as 07:15",
   },
   {
+    fila: FILAS.embedarVideos,
+    cron: "30 7 * * *",
+    descricao: "vetores da busca por significado dos videos analisados (E17 parte 1), todo dia as 07:30, depois dos temas do dia; so com EMBEDDINGS_PREENCHER=1",
+    condicao: () => config.embeddings.preencher,
+  },
+  {
     fila: FILAS.emailAcompanhamento,
     cron: "0 8 * * *",
     descricao: "e-mail diario de acompanhamento da viagem para o Fable, todo dia as 08:00",

@@ -71,6 +71,13 @@ export const DATA_PRECO_PROXY = "2026-10-09";
 export const PRECO_PROXY_USD_POR_GB = 1;
 
 /**
+ * Os vetores da busca por significado (E17 parte 1, Voyage AI): cobrado por milhão de tokens do texto embedado. **Estimativa de 22/10/2026 que NÃO foi conferida na página de preços da Voyage** (a conta ainda não
+ * existe, `entregaveis/revisoes/e17-escopo.md`, seção 3): confirmar o valor e o nome do modelo quando a chave chegar e corrigir aqui, com a data. O custo de cada lote é gravado como "estimado".
+ */
+export const DATA_PRECO_VOYAGE = "2026-10-22";
+export const PRECO_VOYAGE_USD_POR_MILHAO_DE_TOKENS = 0.06;
+
+/**
  * E45 PR 3: o que custa por dia manter um setor novo sendo pesquisado (coleta, transcrição, análise e temas), em dólar, medido em 02/10/2026.
  * Aparece no admin antes de ligar um ramo alternativo a uma marca (o setor que ainda não é pesquisado passa a ser, e a conta é diária
  * enquanto ele tiver marca). Mudou a medição, atualiza aqui e a data.

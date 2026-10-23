@@ -35,6 +35,11 @@ const envDeTeste = {
   ORCAMENTO_TRANSCREVER_TOTAL_MIN: "210",
   // O ritmo entre chamadas da Meta (padrao 2 s) so atrapalha o teste.
   META_INTERVALO_MS: "0",
+  // E17 parte 1: a busca por significado e o preenchimento dos vetores nascem desligados e o provedor e sempre o simulado, qualquer coisa que o `.env` local tenha.
+  EMBEDDINGS_PROVIDER: "mock",
+  EMBEDDINGS_PREENCHER: "",
+  BUSCA_POR_SIGNIFICADO: "",
+  VOYAGE_API_KEY: "",
 };
 
 export default defineConfig({

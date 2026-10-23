@@ -12,7 +12,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # E17 parte 1: a mesma imagem de producao (pgvector); a migracao 0094 faz CREATE EXTENSION vector.
+        image: pgvector/pgvector:0.8.7-pg16-bookworm
         env:
           POSTGRES_USER: roteiros
           POSTGRES_PASSWORD: roteiros

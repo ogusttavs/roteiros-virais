@@ -15,6 +15,7 @@ convivencia com o OdontoTech manda). Sem segredo nesta pasta.
 | `compose.prod.yml` | o Compose de producao; vira `/srv/roteiros/docker-compose.yml` |
 | `proxy/` | copia do proxy compartilhado (`/srv/proxy`): Caddy e `Caddyfile` |
 | `deploy.sh` | o deploy, rodado deste Mac |
+| `reindexar-depois-da-troca.sh` | refaz e confere os indices do banco depois de trocar a imagem do Postgres (E17, uma vez; ver "Trocar a imagem do banco") |
 
 As imagens sao construidas pelo GitHub Actions (`.github/workflows/imagem.yml`) a cada
 merge na `main` e publicadas em `ghcr.io/ogusttavs/roteiros-virais/{app,worker,backup}`
@@ -245,6 +246,23 @@ Entra desligada: sem `COBRANCA_ATIVA=1` no `.env` da VPS ninguem e mandado para 
 - **O aviso (webhook)**: no painel do Stripe, um endpoint em `https://<endereco do app>/api/webhooks/stripe` para os eventos `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` e `invoice.payment_failed`; o segredo dele (`whsec_`) vai em `STRIPE_WEBHOOK_SECRET`. A conta e dividida com o OdontoTech: os eventos dele chegam ao mesmo endpoint e sao ignorados (sem `metadata.produto = roteiros`).
 - **Ligar o portao**: marcar as cortesias em `/admin/clientes/<id>` (Ajustes, "Cortesia") antes de pôr `COBRANCA_ATIVA=1` e reiniciar o app.
 - **A prova ponta a ponta em modo teste, com a CLI do Stripe**: no PR da etapa.
+
+## Trocar a imagem do banco (E17 parte 1, uma vez, so com o sim do Gustavo)
+
+O banco passa de `postgres:16-alpine` para `pgvector/pgvector:0.8.7-pg16-bookworm` (a busca por significado precisa do pgvector). **Nao e um deploy comum.** A imagem nova e Debian (glibc), a antiga e Alpine (musl); o banco guarda a ordem do texto em indices, e essa ordem muda de um sistema para o outro. Sem refazer os indices, a busca por e-mail, `id_externo` ou `handle` pode errar e deixar duplicata entrar (medido em 22/10/2026: `bt_index_check` reprovou e uma consulta de faixa devolveu 0 linhas pelo indice contra 7 sem ele). Por isso o `deploy.sh` comum (que sobe o banco e ja migra com o app e o worker de pe) **nao** pode ser o deploy da troca. Detalhe, alternativas e motivos: `../../entregaveis/revisoes/e17-escopo.md`, secao 4.
+
+Procedimento (na VPS, com o Gustavo avisado e o aplicativo parado):
+
+1. `cd /srv/roteiros && docker compose stop roteiros-app roteiros-worker roteiros-backup` (o banco fica de pe).
+2. Backup: `docker compose run --rm roteiros-backup agora` e copiar o dump para fora do volume. Mais o desfazer rapido, com o banco **parado** (`docker compose stop roteiros-postgres`): `docker run --rm -v roteiros_pg:/de -v roteiros_pg_antes:/para alpine cp -a /de/. /para/`. Voltar atras = devolver `postgres:16-alpine` ao compose e apontar o volume para `roteiros_pg_antes`.
+3. Trocar o compose (`deploy.sh` copia o arquivo, mas sem subir nada: copiar a mao `compose.prod.yml` para `/srv/roteiros/docker-compose.yml`) e `docker compose pull roteiros-postgres && docker compose up -d roteiros-postgres`, sem subir o resto.
+4. `deploy/reindexar-depois-da-troca.sh roteiros-postgres roteiros roteiros`. Recusa rodar com o app no ar; confere todos os indices no fim. **So seguir se terminar com "ok".**
+5. `deploy/deploy.sh <sha>` normal (a migracao 0094 cria a extensao e a tabela de vetores).
+6. A conferencia de sempre (saude, `/entrar`, sonda do admin, log, filas) e uma linha em `acessos/DEPLOYS.md`.
+
+Ensaio antes de fazer de verdade (feito pela Central, nao pelo executor): restaurar o dump de producao mais recente num Postgres Alpine, parar, subir a imagem nova sobre o mesmo volume, rodar `reindexar-depois-da-troca.sh` e conferir que passa e que o app sobe em cima. `restaurar.sh` agora exige um destino com pgvector (restaurar num `postgres:16-alpine` comum falha no `CREATE EXTENSION`). **Nunca trocar a tag da imagem (por exemplo para outro Debian) sem repetir os passos 2 a 4.**
+
+Quem desenvolve com o volume local antigo (`compose.dev.yml`): depois do `npm run db:up` com a imagem nova, rode `deploy/reindexar-depois-da-troca.sh roteiros-postgres roteiros_dev roteiros` (uma vez por banco que quiser guardar), ou apague o volume (`npm run db:down -- -v`, depois `npm run db:up` e `npm run db:reset`).
 
 ## O que nunca fazer
 

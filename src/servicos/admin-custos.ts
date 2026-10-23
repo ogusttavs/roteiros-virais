@@ -127,9 +127,10 @@ export const ROTULO_DA_FONTE_EXTERNA: Record<string, string> = {
   groq: "Transcrever os vídeos (Groq)",
   apify: "Buscar vídeos no TikTok e no Instagram (Apify)",
   proxy: "Tráfego do proxy do YouTube (a transcrição)",
+  voyage: "Achar vídeos parecidos pelo significado (Voyage)",
 };
 
-export type LinhaForaDaIA = { fonte: string; rotulo: string; usd: number; unidades: number; unidade: "minutos" | "resultados" | "megabytes"; execucoes: number; algumEstimado: boolean };
+export type LinhaForaDaIA = { fonte: string; rotulo: string; usd: number; unidades: number; unidade: "minutos" | "resultados" | "megabytes" | "tokens"; execucoes: number; algumEstimado: boolean };
 export type LinhaDoRamo = { nichoId: number; nome: string; iaUsd: number; foraUsd: number; usd: number };
 
 export type LinhaDeCusto = { chave: string; rotulo: string; usd: number; vezes: number };

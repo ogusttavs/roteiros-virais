@@ -29,6 +29,7 @@ import { rodarCurvaCliente } from "./curva-cliente";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { desligarComGraca } from "./desligamento";
 import { rodarEmailAcompanhamento } from "./email-acompanhamento";
+import { rodarEmbedarVideos } from "./embedar-videos";
 import { type PayloadEntenderMarca, tratarJobEntenderMarca } from "./entender-marca";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
@@ -198,6 +199,10 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.faxinaVersoes, async () => {
     await executarComRegistro(FILAS.faxinaVersoes, () => rodarFaxinaDasVersoes());
+  });
+  /** E17 parte 1: sem `EMBEDDINGS_PREENCHER=1` o cron nem inscreve; um "rodar agora" do admin com a chave desligada termina ok sem fazer nada. */
+  await boss().work(FILAS.embedarVideos, async () => {
+    await executarComRegistro(FILAS.embedarVideos, () => rodarEmbedarVideos());
   });
   /** Por evento (E27, parte 2, item 2): `reprovarERescrever` manda `{ clienteId }` ao enfileirar. */
   await boss().work<{ clienteId: number }>(FILAS.aprenderCliente, async (job) => {

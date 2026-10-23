@@ -2,7 +2,9 @@
 # Subir: npm run db:up   (docker compose -f compose.dev.yml up -d)
 services:
   postgres:
-    image: postgres:16-alpine
+    # E17 parte 1: pgvector (a migracao 0094 faz CREATE EXTENSION vector). Mesma imagem da producao e da CI. Um volume antigo, criado com o postgres:16-alpine, precisa de
+    # `deploy/reindexar-depois-da-troca.sh` depois da troca (ou apague o volume com `npm run db:down -- -v` e rode `npm run db:reset`): ver deploy/README.md.
+    image: pgvector/pgvector:0.8.7-pg16-bookworm
     container_name: roteiros-postgres
     restart: unless-stopped
     environment:

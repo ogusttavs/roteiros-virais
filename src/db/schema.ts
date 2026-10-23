@@ -21,6 +21,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  vector,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -815,12 +816,12 @@ export const custosExternos = pgTable(
   "custos_externos",
   {
     id: id(),
-    /** De onde veio o gasto: "groq" (transcrição), "apify" (coleta) ou "proxy" (o tráfego do proxy do YouTube, por gigabyte). */
-    fonte: text("fonte").$type<"groq" | "apify" | "proxy">().notNull(),
+    /** De onde veio o gasto: "groq" (transcrição), "apify" (coleta), "proxy" (o tráfego do proxy do YouTube, por gigabyte) ou "voyage" (os vetores da busca por significado, E17, por token). */
+    fonte: text("fonte").$type<"groq" | "apify" | "proxy" | "voyage">().notNull(),
     custoUsd: numeric("custo_usd", { precision: 10, scale: 6 }).notNull().default("0"),
-    /** Quantas unidades a chamada gastou: minutos de áudio na Groq, resultados no Apify, megabytes no proxy. */
+    /** Quantas unidades a chamada gastou: minutos de áudio na Groq, resultados no Apify, megabytes no proxy, tokens na Voyage. */
     unidades: numeric("unidades", { precision: 12, scale: 3 }).notNull().default("0"),
-    unidade: text("unidade").$type<"minutos" | "resultados" | "megabytes">().notNull(),
+    unidade: text("unidade").$type<"minutos" | "resultados" | "megabytes" | "tokens">().notNull(),
     /** O ramo do gasto, quando se sabe (nulo na rodada de todos os ramos e no que não é de ramo). */
     ramoId: integer("ramo_id").references(() => nichos.id, { onDelete: "set null" }),
     /** A execução (`execucoes_job`) em que o gasto aconteceu, quando houve. */
@@ -2656,6 +2657,28 @@ export const capasVideo = pgTable("capas_video", {
   atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 export type CapaVideo = typeof capasVideo.$inferSelect;
+
+/**
+ * E17 parte 1, a busca por significado: o vetor (embedding) da ficha de um vídeo, um por vídeo e por modelo. Tabela à parte de `videos` (larga e reescrita por outros jobs); apagar o vídeo apaga o vetor.
+ * `ficha_hash` é o hash do texto que foi embedado (título, assunto, gancho e etiquetas) mais o modelo: se a análise do vídeo mudar, o hash muda e o job refaz o vetor. A dimensão é fixa em 1024
+ * (`DIMENSOES_DO_VETOR`, o padrão do voyage-3.5); outra dimensão pede migração nova. Sem índice aproximado de propósito (ver `entregaveis/revisoes/e17-escopo.md`): a busca filtra por setor e janela antes de ordenar.
+ * Vetor de vídeo é dado público da plataforma, igual para todas as marcas (nunca guarda texto de cliente; a novidade da marca, E17 parte 2, ganha tabela própria).
+ */
+export const DIMENSOES_DO_VETOR = 1024;
+export const embeddingsVideo = pgTable(
+  "embeddings_video",
+  {
+    videoId: integer("video_id")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    modelo: text("modelo").notNull(),
+    fichaHash: text("ficha_hash").notNull(),
+    vetor: vector("vetor", { dimensions: DIMENSOES_DO_VETOR }).notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("embeddings_video_video_modelo").on(t.videoId, t.modelo)],
+);
+export type EmbeddingVideo = typeof embeddingsVideo.$inferSelect;
 
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;
