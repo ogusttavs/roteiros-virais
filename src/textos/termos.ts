@@ -24,14 +24,16 @@ import { config } from "@/lib/config";
  * depois de subir seria perguntado de novo a cada visita até a data chegar.
  */
 /**
- * E57a (22/10/2026): a política ganhou a seção "Quem pede para testar" (o formulário da página inicial). `VERSAO_TERMOS_EM` NÃO subiu: a seção trata de gente que ainda não tem
- * conta e não passa pelo aceite do painel, e subir a data faria todo cliente aceitar de novo sem ter mudado nada que o afete. Só `atualizadoEm` (a data que a página mostra) mudou.
+ * 23/10/2026 (decisão do Gustavo na madrugada, HISTORICO.md): a cláusula "circula padrão, nunca o que é de cada um" por extenso (o que nunca aparece para outra marca e
+ * o mínimo para uma conclusão circular: 5 marcas, 3 donos, 10 vídeos, nenhuma com mais da metade), junto dos parágrafos de privacidade que entraram sem
+ * subir a versão (o Instagram ligado, E19, e quem pede para testar, E57a). Esta é a única subida de versão para tudo isso: cada pessoa aceita de novo uma
+ * vez. O instante é a meia-noite de Brasília de 23/10, anterior ao deploy.
  */
-export const VERSAO_TERMOS_EM = new Date("2026-10-09T14:00:00Z");
+export const VERSAO_TERMOS_EM = new Date("2026-10-23T03:00:00Z");
 
 export const textosTermos = {
   avisoRevisaoPendente: "texto base, revisão jurídica pendente",
-  atualizadoEm: "atualizado em 22 de outubro de 2026",
+  atualizadoEm: "atualizado em 23 de outubro de 2026",
   voltar: "voltar",
 
   termos: {
@@ -56,7 +58,8 @@ export const textosTermos = {
         titulo: "3. O que aprendemos entre clientes",
         paragrafos: [
           "Cada vídeo que você posta vira um ponto de dado com resultado real, e esse resultado ajuda a melhorar os roteiros de outros clientes, do seu nicho e de outros nichos.",
-          "A regra é fixa: só circula o padrão que funcionou, nunca o roteiro, o vídeo ou os números de um cliente específico. Você nunca vê o roteiro nem os números de outro cliente, e nenhum outro cliente vê os seus. O que chega até você é uma frase como \"vídeos respondendo uma dúvida, com 25 segundos, estão rendendo o dobro no seu setor\", nunca um vídeo, um roteiro ou um número de alguém que dá para identificar.",
+          "A regra é fixa: circula o padrão, nunca o que é seu. Tudo o que você escreve (o briefing, os temas, os roteiros), tudo o que você grava e os números dos seus vídeos nunca aparecem para outra marca, nem com o seu nome nem sem ele. E você nunca vê nada disso de outra marca.",
+          "O que pode circular é só uma conclusão que vale para muita gente e que não deixa saber de quem veio, por exemplo: \"neste setor, abrir o vídeo com uma pergunta rende mais\". E só quando essa conclusão juntar o resultado de pelo menos 5 marcas, de pelo menos 3 donos diferentes, com pelo menos 10 vídeos no total e sem que nenhuma marca sozinha responda por mais da metade deles. Abaixo disso, nada circula.",
         ],
       },
       {
@@ -99,7 +102,7 @@ export const textosTermos = {
       {
         titulo: "4. O que aprendemos entre clientes",
         paragrafos: [
-          "Como explicado nos termos de uso: só circula o padrão que funcionou, nunca o roteiro, o vídeo ou os números de um cliente específico. O resultado dos seus vídeos ajuda a melhorar o sistema para todo mundo, mas ninguém vê o seu roteiro, o seu número ou o seu vídeo além de você.",
+          "Como explicado nos termos de uso: só circula o padrão que funcionou, nunca o roteiro, o vídeo ou os números de um cliente específico. O resultado dos seus vídeos ajuda a melhorar o sistema para todo mundo, mas ninguém vê o seu roteiro, o seu número ou o seu vídeo além de você. E uma conclusão só circula quando juntar o resultado de pelo menos 5 marcas, de pelo menos 3 donos diferentes, sem que nenhuma marca responda por mais da metade dos vídeos usados.",
         ],
       },
       {
