@@ -42,6 +42,11 @@ function itensDeAtencao(inicio: InicioAdmin): ItemDeAtencao[] {
   if (inicio.contas.pararam > 0) itens.push({ chave: "pararam", ...t.atencao.contasPararam(inicio.contas.pararam), href: "/admin/clientes?filtro=parou", rotulo: t.atencao.verContas });
   if (inicio.atencao.creditoDaIA) itens.push({ chave: "credito", ...t.atencao.creditoDaIA(`${diaDoMes(inicio.atencao.creditoDaIA.desde)}, ${horaDoDia(inicio.atencao.creditoDaIA.desde)}`), href: "/admin/custos", rotulo: t.atencao.verCustos });
   if (inicio.atencao.proxy) itens.push({ chave: "proxy", ...t.atencao.proxyParado(inicio.atencao.proxy.motivo, diaDoMes(inicio.atencao.proxy.desde)), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
+  for (const parada of inicio.atencao.leituraParada) {
+    if (parada.causa === "bloqueio" || parada.causa === "sem leitura") {
+      itens.push({ chave: `leitura-${parada.plataforma}`, ...t.atencao.leituraParada(parada.plataforma, parada.causa, diaDoMes(parada.desde)), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
+    }
+  }
   if (inicio.atencao.pedidosDeRamo > 0) itens.push({ chave: "pedidos", ...t.atencao.pedidosDeRamo(inicio.atencao.pedidosDeRamo), href: "/admin/nichos", rotulo: t.atencao.verRamos });
   return itens;
 }

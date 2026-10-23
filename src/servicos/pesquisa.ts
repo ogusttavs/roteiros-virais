@@ -11,7 +11,7 @@
  * (desempate por id), para a mesma consulta não devolver ordens diferentes
  * em execuções iguais.
  */
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, notInArray, or, type SQL, sql } from "drizzle-orm";
 
 import { FORMATOS_SEM_FALA } from "@/config/formatos";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
@@ -168,6 +168,19 @@ function elegivelParaTranscricao(): SQL<unknown> {
   )} or ${lte(videos.proximaTentativaTranscricao, new Date())})`;
 }
 
+/**
+ * Quais redes entram na fila de leitura (achado de 23/10/2026): com o proxy do YouTube parado, os itens do YouTube ocupavam as 160 posições da fila do `transcrever` e o Instagram,
+ * que lê sem proxy, nunca chegava a ser alcançado. `excluir` tira as redes paradas ANTES do corte de tamanho; `so` pede só as redes da tentativa de prova.
+ */
+export type FiltroDeRedes = { excluir?: readonly Plataforma[]; so?: readonly Plataforma[] };
+
+function condicaoDeRedes(filtro?: FiltroDeRedes): SQL<unknown>[] {
+  const condicoes: SQL<unknown>[] = [];
+  if (filtro?.excluir && filtro.excluir.length > 0) condicoes.push(notInArray(videos.plataforma, [...filtro.excluir]));
+  if (filtro?.so) condicoes.push(filtro.so.length > 0 ? inArray(videos.plataforma, [...filtro.so]) : sql`false`);
+  return condicoes;
+}
+
 function mapear(linha: {
   id: number;
   plataforma: Plataforma;
@@ -290,6 +303,7 @@ export async function foraDaCurvaDoNicho(
   limite?: number,
   maxPorConta?: number,
   soElegivelParaTranscricao = false,
+  redes?: FiltroDeRedes,
 ): Promise<VideoRankeado[]> {
   const regua = await reguaDoSetor(nichoId);
   const condicoes = [
@@ -305,6 +319,7 @@ export async function foraDaCurvaDoNicho(
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
   if (soElegivelParaTranscricao) condicoes.push(elegivelParaTranscricao());
+  condicoes.push(...condicaoDeRedes(redes));
 
   if (maxPorConta !== undefined && limite !== undefined) {
     return comTetoPorConta("fora_da_curva", and(...condicoes)!, limite, maxPorConta);
@@ -331,6 +346,7 @@ export async function subindoHoje(
   limite?: number,
   maxPorConta?: number,
   soElegivelParaTranscricao = false,
+  redes?: FiltroDeRedes,
 ): Promise<VideoRankeado[]> {
   const regua = await reguaDoSetor(nichoId);
   const condicoes = [
@@ -346,6 +362,7 @@ export async function subindoHoje(
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
   if (soElegivelParaTranscricao) condicoes.push(elegivelParaTranscricao());
+  condicoes.push(...condicaoDeRedes(redes));
 
   if (maxPorConta !== undefined && limite !== undefined) {
     return comTetoPorConta("velocidade_relativa", and(...condicoes)!, limite, maxPorConta);

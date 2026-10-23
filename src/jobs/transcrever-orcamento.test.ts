@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { FILAS, opcoesDaFila } from "./fila";
-import { orcamentoDoSetor, orcamentosDaConfig } from "./transcrever";
+import { orcamentoDoSetor, orcamentoDoSetorComMarca, orcamentosDaConfig } from "./transcrever";
 
 const MIN = 60_000;
 
@@ -62,5 +62,39 @@ describe("orcamentoDoSetor", () => {
 
   it("zero setores faltando não divide por zero", () => {
     expect(Number.isFinite(orcamentoDoSetor(30 * MIN, 210 * MIN, 0, 0))).toBe(true);
+  });
+});
+
+/** O setor com marca ativa lê mais vídeos por noite e pede mais tempo (23/10/2026), sem tirar a vez dos setores seguintes. */
+describe("orcamentoDoSetorComMarca", () => {
+  it("com folga, o setor com marca tem o orçamento maior inteiro (90 min), e os que faltam ainda têm os 30 min deles reservados", () => {
+    // 3 setores: 210 - 2 x 30 = 150 sobra para este, e o teto dele é 90.
+    expect(orcamentoDoSetorComMarca(90 * MIN, 30 * MIN, 210 * MIN, 0, 3)).toBe(90 * MIN);
+  });
+
+  it("com muitos setores, o maior orçamento encolhe para o que sobra depois de reservar o dos outros (6 setores: 60 min), e a soma fecha no teto", () => {
+    let decorrido = 0;
+    decorrido += orcamentoDoSetorComMarca(90 * MIN, 30 * MIN, 210 * MIN, decorrido, 6);
+    expect(decorrido).toBe(60 * MIN);
+    for (let faltam = 5; faltam >= 1; faltam -= 1) decorrido += orcamentoDoSetor(30 * MIN, 210 * MIN, decorrido, faltam);
+    expect(decorrido).toBe(210 * MIN);
+  });
+
+  it("nunca é menor que o orçamento comum: quando o teto está quase gasto, vale o que o setor comum teria", () => {
+    expect(orcamentoDoSetorComMarca(90 * MIN, 30 * MIN, 210 * MIN, 150 * MIN, 3)).toBe(orcamentoDoSetor(30 * MIN, 210 * MIN, 150 * MIN, 3));
+    expect(orcamentoDoSetorComMarca(90 * MIN, 30 * MIN, 210 * MIN, 210 * MIN, 2)).toBe(0);
+  });
+
+  it("um setor só (a primeira carga): o menor entre o seu orçamento e o teto do job", () => {
+    expect(orcamentoDoSetorComMarca(90 * MIN, 30 * MIN, 210 * MIN, 0, 1)).toBe(90 * MIN);
+    expect(orcamentoDoSetorComMarca(90 * MIN, 30 * MIN, 60 * MIN, 0, 1)).toBe(60 * MIN);
+  });
+
+  it("para um setor sem marca nada muda: com o orçamento próprio igual ao comum, dá o mesmo que orcamentoDoSetor em qualquer ponto da noite", () => {
+    for (const decorrido of [0, 30, 90, 150, 190]) {
+      for (const faltam of [1, 2, 3, 6]) {
+        expect(orcamentoDoSetorComMarca(30 * MIN, 30 * MIN, 210 * MIN, decorrido * MIN, faltam)).toBe(orcamentoDoSetor(30 * MIN, 210 * MIN, decorrido * MIN, faltam));
+      }
+    }
   });
 });

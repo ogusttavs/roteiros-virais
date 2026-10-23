@@ -188,13 +188,22 @@ export const config = {
     notaMinimaTema: 9,
     vigilanciaPorNicho: 50,
     limiarForaDaCurva: 3,
-    transcricoesPorDia: 40,
+    /**
+     * Quantos vídeos o `transcrever` lê por noite em cada setor (era uma constante, 40). Achado de 23/10/2026: o ramo 5 tinha 3.523 vídeos acima do piso e só 109 lidos, e 40 por noite
+     * levariam três meses para esvaziar a fila. O setor com ao menos uma marca ativa (`setoresComMarcaAtiva`) lê `transcricoesPorDiaComMarca` (100); os outros ficam no padrão. Dentro do
+     * teto a fila vai pelos vídeos acima do piso de maior "fora da curva" (e pelos que sobem hoje, antes). O que limita de verdade é o tempo (cerca de 52 s por vídeo do YouTube), por isso o
+     * setor com marca também ganha mais orçamento de tempo (`orcamentoTranscreverPorSetorComMarcaMin`).
+     */
+    transcricoesPorDia: envNumero("TRANSCRICOES_POR_DIA", 40),
+    transcricoesPorDiaComMarca: envNumero("TRANSCRICOES_POR_DIA_COM_MARCA", 100),
     /**
      * Orçamento de tempo do `transcrever` por setor, em minutos (M5c): passou disto, o setor para (o que sobrou fica para
      * a noite seguinte: a fila é por vídeo ainda sem leitura) e o job passa ao próximo setor. Sem isto, um setor lento
      * (o YouTube pelo proxy, 4 minutos por vídeo) comia a madrugada inteira e os setores seguintes ficavam a zero.
      */
     orcamentoTranscreverPorSetorMin: envNumero("ORCAMENTO_TRANSCREVER_SETOR_MIN", 30),
+    /** O mesmo orçamento para o setor com marca ativa, que lê mais vídeos por noite (100 vídeos do YouTube a cerca de 52 s cada pedem uns 90 minutos). Sai do teto do job inteiro, depois de reservar o orçamento comum dos setores que faltam. */
+    orcamentoTranscreverPorSetorComMarcaMin: envNumero("ORCAMENTO_TRANSCREVER_SETOR_COM_MARCA_MIN", 90),
     /**
      * Teto do `transcrever` inteiro, em minutos (M5c): 3h30, abaixo das 4 horas em que a fila dá o job por vencido. O orçamento
      * de cada setor é o menor entre o seu e o que sobra deste teto dividido pelos setores que faltam, então nenhum setor
