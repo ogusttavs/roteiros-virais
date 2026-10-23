@@ -7,7 +7,10 @@
  *  - o produto tem um id fixo (`PRODUTO_ID`): achar é um `retrieve`, nunca uma busca (a busca do Stripe demora a refletir o que acabou de ser criado e duplicaria);
  *  - **nada que não traga `metadata.produto = roteiros` é lido como nosso, alterado ou reaproveitado**: se o produto de id fixo ou o preço da chave de busca existem sem a
  *    marca, o script para com erro e não toca em nada;
- *  - um preço nosso com valor, moeda ou período diferentes do plano também para com erro (preço do Stripe não muda; criar outro é decisão de quem lê o relatório).
+ *  - um preço nosso com valor, moeda ou período diferentes do plano também para com erro (preço do Stripe não muda; criar outro é decisão de quem lê o relatório);
+ *  - **E22 PR 2, item 0c: a configuração do portal do cliente é própria do Roteiros.** A padrão da conta é do OdontoTech (e é a que o Stripe usa se nenhuma for pedida): aqui se acha
+ *    (ou cria) uma configuração à parte, com `metadata.produto = roteiros`, só com o que este produto oferece (cartão, faturas, e-mail, cancelar no fim do período; sem trocar de plano,
+ *    porque o plano é um só). A configuração do OdontoTech nunca é lida como nossa, alterada nem reaproveitada.
  */
 import { METADATA_PRODUTO, PLANO } from "../src/config/assinatura";
 
@@ -25,6 +28,8 @@ type PrecoLike = {
   livemode?: boolean;
 };
 
+type ConfiguracaoDoPortalLike = { id: string; active?: boolean; metadata?: Record<string, string> | null };
+
 export interface StripeLike {
   products: {
     retrieve(id: string): Promise<ProdutoLike>;
@@ -34,11 +39,18 @@ export interface StripeLike {
     list(params: Record<string, unknown>): Promise<{ data: PrecoLike[] }>;
     create(params: Record<string, unknown>, opcoes?: Record<string, unknown>): Promise<PrecoLike>;
   };
+  billingPortal: {
+    configurations: {
+      list(params: Record<string, unknown>): Promise<{ data: ConfiguracaoDoPortalLike[] }>;
+      create(params: Record<string, unknown>, opcoes?: Record<string, unknown>): Promise<ConfiguracaoDoPortalLike>;
+    };
+  };
 }
 
 export class ErroDePreparo extends Error {}
 
-export type Relatorio = { produtoId: string; precoId: string; criouProduto: boolean; criouPreco: boolean };
+export type Relatorio = { produtoId: string; precoId: string; criouProduto: boolean; criouPreco: boolean; portalId: string; criouPortal: boolean };
+type RelatorioDoPreco = Pick<Relatorio, "produtoId" | "precoId" | "criouProduto" | "criouPreco">;
 
 const ehNosso = (m: Record<string, string> | null | undefined) => m?.produto === METADATA_PRODUTO.produto;
 
@@ -51,7 +63,41 @@ function ehErroDeNaoEncontrado(erro: unknown): boolean {
   return e?.code === "resource_missing" || e?.statusCode === 404;
 }
 
+/** A configuração do portal do Roteiros: o que o portal mostra à pessoa. Sem trocar de plano (o plano é um só); cancelar vale no fim do período já pago. */
+export const CONFIGURACAO_DO_PORTAL = {
+  business_profile: { headline: "Sua assinatura" },
+  features: {
+    customer_update: { enabled: true, allowed_updates: ["email", "name"] },
+    invoice_history: { enabled: true },
+    payment_method_update: { enabled: true },
+    subscription_cancel: {
+      enabled: true,
+      mode: "at_period_end",
+      cancellation_reason: { enabled: true, options: ["too_expensive", "missing_features", "switched_service", "unused", "other"] },
+    },
+    subscription_update: { enabled: false },
+  },
+} as const;
+
 export async function prepararStripe(stripe: StripeLike): Promise<Relatorio> {
+  const preco = await prepararProdutoEPreco(stripe);
+  const portal = await prepararPortal(stripe);
+  return { ...preco, ...portal };
+}
+
+/** Acha a configuração do portal que leva a nossa marca (só entre as ativas); se não há, cria. Nunca toca nas outras. */
+async function prepararPortal(stripe: StripeLike): Promise<{ portalId: string; criouPortal: boolean }> {
+  const lista = await stripe.billingPortal.configurations.list({ active: true, limit: 100 });
+  const nossa = lista.data.find((c) => ehNosso(c.metadata));
+  if (nossa) return { portalId: nossa.id, criouPortal: false };
+  const criada = await stripe.billingPortal.configurations.create(
+    { ...CONFIGURACAO_DO_PORTAL, metadata: { ...METADATA_PRODUTO } },
+    { idempotencyKey: "roteiros-portal-v1" },
+  );
+  return { portalId: criada.id, criouPortal: true };
+}
+
+async function prepararProdutoEPreco(stripe: StripeLike): Promise<RelatorioDoPreco> {
   // 1. O preço primeiro, só lendo: se a chave de busca já é de outro produto (ou de um preço nosso diferente do plano), para antes de criar qualquer coisa.
   const achados = await stripe.prices.list({ lookup_keys: [PLANO.lookupKey], limit: 1 });
   const existente = achados.data[0];

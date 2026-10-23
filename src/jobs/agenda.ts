@@ -246,6 +246,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "faxina das versoes do roteiro que ninguem escolheu, em grupos parados ha mais de 30 dias (E26 4c), todo dia as 07:15",
   },
   {
+    fila: FILAS.renovarContasLigadas,
+    cron: "20 6 * * *",
+    descricao: "renovacao do acesso das contas de Instagram ligadas pelas pessoas, e aviso quando nao da mais (E19), todo dia as 06:20",
+  },
+  {
     fila: FILAS.emailAcompanhamento,
     cron: "0 8 * * *",
     descricao: "e-mail diario de acompanhamento da viagem para o Fable, todo dia as 08:00",

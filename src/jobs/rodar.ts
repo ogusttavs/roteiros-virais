@@ -31,6 +31,7 @@ import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { FILAS } from "./fila";
+import { rodarFiltroDeNoticias } from "./filtrar-noticias";
 import { rodarGuardarCapas } from "./guardar-capas";
 import { rodarLembrete } from "./lembrete";
 import { rodarLerLongos } from "./ler-longos";
@@ -40,6 +41,7 @@ import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
+import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
@@ -62,6 +64,11 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.coletaApify]: (execucaoId) => rodarColetaApify(undefined, execucaoId),
   [FILAS.coletaMeioDia]: (execucaoId) => rodarColetaMeioDia(execucaoId),
   [FILAS.coletaNoticias]: () => rodarColetaNoticias(),
+  /** Fix de 22/10/2026: com um número na linha de comando, só aquele ramo; sem, todo ramo com marca ativa. */
+  [FILAS.filtrarNoticias]: () => {
+    const nichoIdArg = process.argv[3];
+    return rodarFiltroDeNoticias(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+  },
   [FILAS.tendenciasBrasil]: () => rodarTendenciasBrasil(),
   [FILAS.contasBase]: () => rodarContasBase(),
   [FILAS.metaContas]: () => rodarMetaContas(),
@@ -121,6 +128,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.curvaCliente]: () => rodarCurvaCliente(),
   [FILAS.emailAcompanhamento]: () => rodarEmailAcompanhamento(),
   [FILAS.faxinaVersoes]: () => rodarFaxinaDasVersoes(),
+  [FILAS.renovarContasLigadas]: () => rodarRenovarContasLigadas(),
   /** Por evento (E54): `npm run job -- pesquisa-na-hora <pesquisaId>` roda uma pesquisa já criada, na hora (busca paga com a chave real). */
   [FILAS.pesquisaNaHora]: () => rodarPesquisaNaHora(Number(process.argv[3])),
   /**

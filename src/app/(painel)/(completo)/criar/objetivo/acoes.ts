@@ -9,6 +9,7 @@ import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import { formatarVideo, legendaSemHashtags } from "@/lib/formatar-video-referencia";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
@@ -26,7 +27,7 @@ import {
   validarQuemAparece,
   type OrigemRoteiro,
 } from "@/servicos/roteiro";
-import { limparNotaDoRascunhoSeForDoTexto } from "@/servicos/temas";
+import { apagarRascunhoSeForDoTexto } from "@/servicos/temas";
 import { gerarVersoes } from "@/servicos/versoes";
 import { textosRoteiro } from "@/textos/roteiro";
 import type { VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
@@ -70,6 +71,7 @@ export async function gerarVersoesAction(
 ): Promise<ResultadoAcao<{ grupo: string }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const cliente = await clienteDaSessaoAtual();
   // Um id que veio e não vale não vira "sem pesquisa" em silêncio: a pessoa pediu a pesquisa, e o roteiro sairia sem ela.
   const pesquisaValida = pesquisaId === undefined || pesquisaId === null ? undefined : idDoBancoOuNulo(pesquisaId);
@@ -94,10 +96,10 @@ export async function gerarVersoesAction(
       perguntaChave: origemValida.origem === "livre" ? chaveDeVozValida(perguntaChave) : undefined,
       pesquisaId: pesquisaValida,
     });
-    // Hotfix de 22/10/2026 (item 3): o roteiro saiu deste assunto seu; a nota guardada deixa de ser "onde a pessoa parou" (a linha "Continuar de onde parou" do Criar some). O texto continua no rascunho.
+    // O roteiro saiu deste assunto seu: o rascunho do Tema livre (texto e nota) some, e a próxima visita começa em branco (pedido do Gustavo em 23/10/2026; antes ficava o texto).
     if (origemValida.origem === "livre") {
       const sessao = await sessaoDoPainel();
-      if (sessao) await limparNotaDoRascunhoSeForDoTexto(sessao.user.id, cliente.id, origemValida.textoTema).catch(() => undefined);
+      if (sessao) await apagarRascunhoSeForDoTexto(sessao.user.id, cliente.id, origemValida.textoTema).catch(() => undefined);
     }
     return { ok: true, dado: { grupo } };
   } catch (falha) {

@@ -70,6 +70,7 @@ import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa, noticiaDeOrigemGuardada, noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
+import { desempenhoDaConta } from "./desempenho-da-conta";
 import { montarEntregaDaPesquisa, paraEntradaDaPesquisa } from "./entrega-da-pesquisa";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { noticiaPorId } from "./noticias";
@@ -779,6 +780,8 @@ async function resolverTema(
   doMomento: TemaDoMomentoGuardado | null;
   pergunta: PerguntaDeOrigemGuardada | null;
   pesquisa: PesquisaDeOrigemGuardada | null;
+  /** Hotfix de 23/10/2026: a notícia de onde o tema do dia nasceu (quando nenhum vídeo o sustenta); vira o ponto de partida do roteiro, como o "Criar vídeo com esta notícia" (E43). Ausente nos pedidos de antes. */
+  noticiaDoTemaId?: number | null;
 }> {
   // E54 (parte 2): a pesquisa que a pessoa aprovou, para qualquer origem (o tema livre, o do dia e o momento), resolvida uma vez.
   let pesquisa: PesquisaDeOrigemGuardada | null = null;
@@ -796,7 +799,7 @@ async function resolverTema(
     // E28 (parte 3): a pergunta do público que a pessoa prendeu, achada de novo nas vozes do setor da marca (a chave do navegador sozinha não vale) UMA vez, junto do tema: as versões de um
     // grupo e as de "Gerar outra" depois são da mesma pergunta, mesmo que a leitura da semana mude no meio (o tema resolvido é o que as versões guardam).
     const pergunta = await perguntaDoPublicoPelaChave(cliente.nichoId, params.perguntaChave);
-    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: assunto ? guardarAssuntoDaLista(assunto) : null, pergunta, pesquisa };
+    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: assunto ? guardarAssuntoDaLista(assunto) : null, pergunta, pesquisa, noticiaDoTemaId: null };
   }
 
   /**
@@ -808,7 +811,7 @@ async function resolverTema(
    */
   if (params.origem === "momento") {
     const resumo = params.momento.oQueEstaAcontecendo.trim().slice(0, 80);
-    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [], doMomento: null, pergunta: null, pesquisa };
+    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [], doMomento: null, pergunta: null, pesquisa, noticiaDoTemaId: null };
   }
 
   const resultado = await temasParaCliente(cliente);
@@ -825,6 +828,8 @@ async function resolverTema(
     doMomento: tema.doMomento ? guardarTemaDoMomento(tema.doMomento, tema.porQue) : null,
     pergunta: null,
     pesquisa,
+    // Tema que nasceu de uma notícia (nenhum vídeo o sustenta): o roteiro parte dela, em vez de só do título.
+    noticiaDoTemaId: tema.evidencias.length === 0 && !tema.doMomento ? ((tema.evidenciasNoticias ?? [])[0] ?? null) : null,
   };
 }
 
@@ -1059,6 +1064,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     modeloNichoLinha,
     roteirosRecentesDoBanco,
     regrasCliente,
+    desempenhoMedido,
     ultimosRoteirosDoBanco,
     marcaCitada,
     vozesDoSetorAtual,
@@ -1071,6 +1077,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     modeloNichoAtual(nichoId),
     historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
     regrasAtivasDoCliente(dados.clienteId),
+    // E16, nível conta: o que rendeu nos vídeos já postados DESTA marca (vazio sem dado suficiente; o roteiro longo não recebe).
+    ehLongo ? Promise.resolve("") : desempenhoDaConta(dados.clienteId),
     ultimosRoteirosParaAbertura(dados.clienteId),
     marcaCitadaPorId(dados.momento?.marcaId, dados.clienteId),
     // E28: o que o público do setor perguntou nos comentários de vídeos do YouTube (sem leitura, com a leitura velha e no roteiro do momento: nada; a cena é a única fonte).
@@ -1293,6 +1301,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       redePrincipal: dados.cliente.redePrincipal,
       duracaoTipicaMaxS: modeloNichoLinha?.modelo.duracaoTipicaS?.max,
       regrasCliente,
+      desempenhoDaConta: desempenhoMedido,
       tipo: dados.cliente.tipo,
       persona: dados.cliente.persona,
       quemAparece: quemApareceResolvido,
@@ -1529,7 +1538,7 @@ export async function montarRoteiro(
   }
 
   // As versões de um mesmo grupo recebem o tema já resolvido uma vez (E26, 4b): "sugerido" é um índice na lista do dia, que muda de um instante para o outro, e "outra versão" tem de ser do mesmo tema.
-  const { tema, evidenciasPrevistas, doMomento, pergunta, pesquisa } = opcoes.temaResolvido ?? (await resolverTema(cliente, params));
+  const { tema, evidenciasPrevistas, doMomento, pergunta, pesquisa, noticiaDoTemaId } = opcoes.temaResolvido ?? (await resolverTema(cliente, params));
   // E55: tendência é para o mesmo dia ("não adianta pegar uma tendência e fazer daqui a uma semana"): o tema do momento não vai para outro dia, e a recusa é do servidor.
   if (doMomento && params.data && params.data !== hojeISO()) {
     throw new ErroRoteiro(textosHoje.emAlta.naoMudaDeDia);
@@ -1544,8 +1553,8 @@ export async function montarRoteiro(
   const ficha = duracao === "longo" ? null : fichaDoPedido;
   const objetivo = fichaDoPedido ? objetivoDaFicha(fichaDoPedido) : params.objetivo;
   // E43: escopada pelo nicho do cliente, nunca confiando num id de outro setor vindo do client.
-  const noticiaLinha =
-    params.noticiaId && cliente.nichoId ? await noticiaPorId(params.noticiaId, cliente.nichoId) : null;
+  const idDaNoticia = params.noticiaId ?? noticiaDoTemaId ?? undefined;
+  const noticiaLinha = idDaNoticia && cliente.nichoId ? await noticiaPorId(idDaNoticia, cliente.nichoId) : null;
   // E53 (parte 3): a notícia de um assunto da marca, no lugar da do setor (uma só ponto de partida por roteiro).
   const noticiaDoAssuntoLinha = !noticiaLinha && params.origem === "livre" && params.noticiaAssuntoId ? await noticiaDoAssuntoDaMarca(clienteId, params.noticiaAssuntoId) : null;
   const noticia = noticiaLinha ? noticiaDoSetorComoPontoDePartida(noticiaLinha) : noticiaDoAssuntoLinha ? noticiaDoAssuntoComoPontoDePartida(noticiaDoAssuntoLinha) : undefined;
@@ -1940,6 +1949,21 @@ export async function marcarGravado(roteiroId: number): Promise<RoteiroLinha> {
     .where(eq(roteiros.id, roteiroId))
     .returning();
   if (!roteiro) throw new ErroRoteiro("roteiro nao encontrado.");
+  return roteiro;
+}
+
+/**
+ * "Ainda não gravei": desfaz um "Já gravei" tocado sem querer (achado do uso real, 22/10/2026). Só volta
+ * quem está `gravado`; um roteiro `postado` (ou ainda `gerado`) nunca é tocado, e a posse entra na própria
+ * condição do UPDATE (marca da sessão), para o dado de outra marca nem existir para esta chamada.
+ */
+export async function desmarcarGravado(roteiroId: number, clienteId: number): Promise<RoteiroLinha> {
+  const [roteiro] = await db()
+    .update(roteiros)
+    .set({ status: "gerado", gravadoEm: null })
+    .where(and(eq(roteiros.id, roteiroId), eq(roteiros.clienteId, clienteId), eq(roteiros.status, "gravado")))
+    .returning();
+  if (!roteiro) throw new ErroRoteiro("roteiro nao esta gravado.");
   return roteiro;
 }
 

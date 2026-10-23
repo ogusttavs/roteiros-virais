@@ -22,6 +22,12 @@
  * contas, nao uma so) para a Meta pelo resto desta rodada, para nao repetir
  * o mesmo erro em cada cliente.
  *
+ * E19 PR 1: ANTES de tudo isso, a marca que ligou o proprio Instagram (`contas_conectadas`, `servicos/conta-conectada.ts`) e lida pelo acesso dela, com o mesmo molde
+ * (lista a midia, casa o codigo curto, guarda o id da midia, depois le so essa midia). O acesso de uma marca nunca le o Instagram de outra: a conta e buscada pelo id da
+ * PROPRIA marca de cada video. O que a conta ligada nao mediu cai para o caminho de sempre (o usuario do sistema da V8, depois o Apify). O acesso que a Meta recusa
+ * (codigo 190 ou 102) ou sem permissao fica gravado na conta ligada, para a tela dizer e a pessoa ligar de novo; e SO dessa marca: nao para a Meta das outras. Limite do
+ * aplicativo (pausa da Meta) continua parando a Meta inteira pelo resto da rodada.
+ *
  * Post do Instagram sem video (foto ou carrossel) volta visualizacao nula em
  * qualquer uma das duas fontes; `gravarMetrica` grava `views: 0` nesse caso,
  * curtidas e comentarios continuam corretos (achado da verificacao original
@@ -32,6 +38,8 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { clientes, consumoApi, metricasVideoCliente, videosCliente, type FonteMedida } from "@/db/schema";
 import { config, hojeISO } from "@/lib/config";
+import { registrarMarcasPuladas, resumoDasMarcasPuladas, separarMarcasPorAssinatura } from "@/servicos/assinatura-tarefas";
+import { contaParaLeitura, erroDaContaPara, registrarErroDaConta, registrarLeituraDaConta } from "@/servicos/conta-conectada";
 import { estaNaHoraDeMedir, shortcodeDoPermalink, videosParaMedir, type VideoParaMedir } from "@/servicos/curva";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 
@@ -201,41 +209,70 @@ async function medirInstagramApify(videos: VideoParaMedir[], agora: Date, erros:
   return medidos;
 }
 
-type ResultadoInstagramMeta = { medidos: number; restantes: VideoParaMedir[]; indisponivel: boolean };
+type ResultadoInstagramMeta = {
+  medidos: number;
+  restantes: VideoParaMedir[];
+  /** Token do SISTEMA vencido ou limite do aplicativo: quem chama para de tentar a Meta pelo resto da rodada. */
+  indisponivel: boolean;
+  /** Acesso da CONTA LIGADA que a Meta recusou ou sem permissao: a frase a guardar na conta; so vale para essa marca. */
+  erroDaConta?: string;
+};
+
+/**
+ * Como tratar um erro da Meta. Com o acesso de uma conta ligada (`comAcessoDaConta`), 190 e 102 (acesso recusado) e a falta de permissao sao problema DAQUELA conta: viram frase
+ * para ela e param so a leitura dela. Sem ele (token do sistema, V8), qualquer 190 ou limite afeta todas as contas. Limite do aplicativo (4, 17, 32, 613) e a pausa da Meta
+ * valem para as duas vias.
+ */
+function classificarErroDaMeta(erro: unknown, comAcessoDaConta: boolean): { tipo: "conta"; frase: string } | { tipo: "global" } | { tipo: "outro" } {
+  if (!(erro instanceof ErroMetaApi)) return { tipo: "outro" };
+  if (comAcessoDaConta) {
+    const frase = erroDaContaPara(erro.codigo);
+    if (frase) return { tipo: "conta", frase };
+  }
+  return erroMetaEhTokenOuLimite(erro) ? { tipo: "global" } : { tipo: "outro" };
+}
 
 /**
  * Mede a Instagram de UM cliente pela Graph API da Meta (V8, item 2). Devolve
  * os que nao deu para medir por essa via (`restantes`, seguem para o
  * Apify) e `indisponivel` quando o motivo foi token vencido ou limite de
  * taxa: quem chama para de tentar a Meta pelo resto da rodada (o erro afeta
- * todas as contas, nao so esta).
+ * todas as contas, nao so esta). `tokenDaConta` (E19 PR 1): le pelo acesso da conta ligada
+ * da propria marca em vez do usuario do sistema.
  */
 async function medirInstagramMeta(
   videos: VideoParaMedir[],
   igId: string,
   agora: Date,
   erros: string[],
+  tokenDaConta?: string,
 ): Promise<ResultadoInstagramMeta> {
   const semMediaId = videos.filter((v) => !v.metaMediaId);
   const comMediaId = videos.filter((v) => v.metaMediaId);
   const restantes: VideoParaMedir[] = [];
+  const origem = tokenDaConta === undefined ? "meta" : "meta, conta ligada";
   let medidos = 0;
 
   if (semMediaId.length > 0) {
     let midiaPorCodigo: Map<string, MetaMediaItem> | null = null;
     try {
-      const midias = await buscarMediaDaConta(igId);
+      const midias = await buscarMediaDaConta(igId, 10, tokenDaConta);
       midiaPorCodigo = new Map();
       for (const item of midias) {
         const codigo = item.permalink ? shortcodeDoPermalink(item.permalink) : null;
         if (codigo) midiaPorCodigo.set(codigo, item);
       }
     } catch (erro) {
-      if (erro instanceof ErroMetaApi && erroMetaEhTokenOuLimite(erro)) {
-        erros.push(`instagram (meta) listar midia da conta ${igId}: token ou limite atingido: ${erro.message}`);
+      const tipo = classificarErroDaMeta(erro, tokenDaConta !== undefined);
+      if (tipo.tipo === "conta") {
+        erros.push(`instagram (${origem}) listar midia da conta ${igId}: acesso recusado ou sem permissao`);
+        return { medidos: 0, restantes: videos, indisponivel: false, erroDaConta: tipo.frase };
+      }
+      if (tipo.tipo === "global") {
+        erros.push(`instagram (${origem}) listar midia da conta ${igId}: token ou limite atingido: ${(erro as Error).message}`);
         return { medidos: 0, restantes: videos, indisponivel: true };
       }
-      erros.push(`instagram (meta) listar midia da conta ${igId}: ${erro instanceof Error ? erro.message : String(erro)}`);
+      erros.push(`instagram (${origem}) listar midia da conta ${igId}: ${erro instanceof Error ? erro.message : String(erro)}`);
     }
 
     for (const video of semMediaId) {
@@ -258,7 +295,7 @@ async function medirInstagramMeta(
   for (let i = 0; i < comMediaId.length; i += 1) {
     const video = comMediaId[i];
     try {
-      const item = await buscarMediaPorId(video.metaMediaId!);
+      const item = await buscarMediaPorId(video.metaMediaId!, tokenDaConta);
       await gravarMetrica(
         video,
         { views: item.total_views_count ?? 0, likes: item.like_count ?? 0, comentarios: item.comments_count ?? 0 },
@@ -267,12 +304,18 @@ async function medirInstagramMeta(
       );
       medidos += 1;
     } catch (erro) {
-      if (erro instanceof ErroMetaApi && erroMetaEhTokenOuLimite(erro)) {
-        erros.push(`instagram (meta) ${video.idExterno}: token ou limite atingido: ${erro.message}`);
+      const tipo = classificarErroDaMeta(erro, tokenDaConta !== undefined);
+      if (tipo.tipo === "conta") {
+        erros.push(`instagram (${origem}) ${video.idExterno}: acesso recusado ou sem permissao`);
+        restantes.push(...comMediaId.slice(i));
+        return { medidos, restantes, indisponivel: false, erroDaConta: tipo.frase };
+      }
+      if (tipo.tipo === "global") {
+        erros.push(`instagram (${origem}) ${video.idExterno}: token ou limite atingido: ${(erro as Error).message}`);
         restantes.push(...comMediaId.slice(i));
         return { medidos, restantes, indisponivel: true };
       }
-      erros.push(`instagram (meta) ${video.idExterno}: ${erro instanceof Error ? erro.message : String(erro)}`);
+      erros.push(`instagram (${origem}) ${video.idExterno}: ${erro instanceof Error ? erro.message : String(erro)}`);
       restantes.push(video);
     }
   }
@@ -281,15 +324,21 @@ async function medirInstagramMeta(
 }
 
 /**
- * Orquestra o Instagram de todos os clientes devidos (V8, itens 1 e 2): um
- * cliente por vez, Meta primeiro quando tem (ou consegue) `meta_ig_id`,
- * Apify no que sobrar. `metaIndisponivel` para de tentar a Meta assim que um
- * erro de token ou de limite acontecer, pelo resto desta chamada.
+ * Orquestra o Instagram de todos os clientes devidos (V8, itens 1 e 2; E19 PR 1): um
+ * cliente por vez, primeiro pela conta que a PROPRIA marca ligou (se ligou), depois pela Meta
+ * com o usuario do sistema quando tem (ou consegue) `meta_ig_id`, e o Apify no que sobrar.
+ * `metaIndisponivel` para de tentar a Meta pelo token do sistema assim que um erro de token ou de
+ * limite acontecer, pelo resto desta chamada; `limiteDaMeta` (limite do aplicativo) para as duas vias.
  */
-async function medirInstagram(videos: VideoParaMedir[], agora: Date, erros: string[]): Promise<{ medidosMeta: number; medidosApify: number }> {
-  if (videos.length === 0) return { medidosMeta: 0, medidosApify: 0 };
+async function medirInstagram(
+  videos: VideoParaMedir[],
+  agora: Date,
+  erros: string[],
+): Promise<{ medidosMeta: number; medidosContaLigada: number; medidosApify: number }> {
+  if (videos.length === 0) return { medidosMeta: 0, medidosContaLigada: 0, medidosApify: 0 };
 
   let metaIndisponivel = !config.coleta.metaAtivo;
+  let limiteDaMeta = false;
   const porCliente = new Map<number, VideoParaMedir[]>();
   for (const video of videos) {
     if (!porCliente.has(video.clienteId)) porCliente.set(video.clienteId, []);
@@ -306,11 +355,30 @@ async function medirInstagram(videos: VideoParaMedir[], agora: Date, erros: stri
       );
 
   let medidosMeta = 0;
+  let medidosContaLigada = 0;
   const restantesParaApify: VideoParaMedir[] = [];
 
   for (const [clienteId, videosDoCliente] of porCliente) {
-    if (metaIndisponivel) {
-      restantesParaApify.push(...videosDoCliente);
+    let pendentes = videosDoCliente;
+
+    // 1) A conta que a propria marca ligou: o acesso dela, so para os videos dela (`clienteId` e o da marca de cada video).
+    if (!limiteDaMeta) {
+      const conta = await contaParaLeitura(clienteId, agora);
+      if (conta) {
+        const resultado = await medirInstagramMeta(pendentes, conta.igId, agora, erros, conta.token);
+        medidosMeta += resultado.medidos;
+        medidosContaLigada += resultado.medidos;
+        pendentes = resultado.restantes;
+        if (resultado.erroDaConta) await registrarErroDaConta(conta.id, resultado.erroDaConta, agora);
+        else if (resultado.medidos > 0) await registrarLeituraDaConta(conta.id, agora);
+        if (resultado.indisponivel) limiteDaMeta = true;
+      }
+    }
+    if (pendentes.length === 0) continue;
+
+    // 2) O usuario do sistema (V8), quando a Meta esta ativa e disponivel.
+    if (metaIndisponivel || limiteDaMeta) {
+      restantesParaApify.push(...pendentes);
       continue;
     }
 
@@ -321,27 +389,32 @@ async function medirInstagram(videos: VideoParaMedir[], agora: Date, erros: stri
       // `resolverMetaIgId` so relanca erro de token ou de limite (afeta todos os clientes, nao so este).
       erros.push(`instagram (meta) resolver a conta do cliente ${clienteId}: token ou limite atingido: ${erro instanceof Error ? erro.message : String(erro)}`);
       metaIndisponivel = true;
-      restantesParaApify.push(...videosDoCliente);
+      restantesParaApify.push(...pendentes);
       continue;
     }
     if (!igId) {
-      restantesParaApify.push(...videosDoCliente);
+      restantesParaApify.push(...pendentes);
       continue;
     }
 
-    const resultado = await medirInstagramMeta(videosDoCliente, igId, agora, erros);
+    const resultado = await medirInstagramMeta(pendentes, igId, agora, erros);
     medidosMeta += resultado.medidos;
     restantesParaApify.push(...resultado.restantes);
     if (resultado.indisponivel) metaIndisponivel = true;
   }
 
   const medidosApify = await medirInstagramApify(restantesParaApify, agora, erros);
-  return { medidosMeta, medidosApify };
+  return { medidosMeta, medidosContaLigada, medidosApify };
 }
 
 export async function rodarCurvaCliente(agora = new Date()): Promise<Record<string, unknown>> {
   const candidatos = await videosParaMedir(agora);
-  const devidos = candidatos.filter((v) => estaNaHoraDeMedir(v.postadoEm, v.ultimaColeta, agora));
+  // E22 PR 3: marca sem assinatura (cobrança ligada) não é medida (Meta, Apify e YouTube são chamadas por ela). O que já foi medido fica guardado; se ela assinar de novo, volta a ser medida.
+  // Só conta como pulada a marca que teria vídeo para medir nesta hora.
+  const naHora = candidatos.filter((v) => estaNaHoraDeMedir(v.postadoEm, v.ultimaColeta, agora));
+  const { liberadas, puladas } = await separarMarcasPorAssinatura(naHora.map((v) => v.clienteId), { agora });
+  registrarMarcasPuladas("curva-cliente", puladas.length);
+  const devidos = naHora.filter((v) => liberadas.has(v.clienteId));
 
   const porPlataforma = {
     youtube: devidos.filter((v) => v.plataforma === "youtube"),
@@ -352,7 +425,11 @@ export async function rodarCurvaCliente(agora = new Date()): Promise<Record<stri
   const erros: string[] = [];
   const medidosYoutube = await medirYoutube(porPlataforma.youtube, agora, erros);
   const medidosTiktok = await medirTiktok(porPlataforma.tiktok, agora, erros);
-  const { medidosMeta: medidosInstagramMeta, medidosApify: medidosInstagramApify } = await medirInstagram(
+  const {
+    medidosMeta: medidosInstagramMeta,
+    medidosContaLigada: medidosInstagramContaLigada,
+    medidosApify: medidosInstagramApify,
+  } = await medirInstagram(
     porPlataforma.instagram,
     agora,
     erros,
@@ -361,9 +438,11 @@ export async function rodarCurvaCliente(agora = new Date()): Promise<Record<stri
   return {
     candidatos: candidatos.length,
     devidos: devidos.length,
+    ...resumoDasMarcasPuladas(puladas.length),
     medidosYoutube,
     medidosTiktok,
     medidosInstagramMeta,
+    medidosInstagramContaLigada,
     medidosInstagramApify,
     erros: erros.length > 0 ? erros : undefined,
   };

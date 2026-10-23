@@ -5,6 +5,7 @@ import { ehFicha } from "@/config/fichas";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo } from "@/db/schema";
 import { caminhoDeVoltaValido } from "@/lib/caminho-de-volta";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { filtroDeFormatosDaMarca } from "@/servicos/formatos";
@@ -82,7 +83,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   if (!cliente.nichoId) {

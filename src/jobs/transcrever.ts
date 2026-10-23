@@ -53,6 +53,13 @@
  * passam por ele, ficam parados no resto do job inteiro, em todos os setores, com o motivo no resumo (`youtubePausadoMotivo`), sem gastar o orçamento do setor e sem marcar o
  * vídeo como falha dele (nenhuma nova tentativa nem `falhaDeInfraEm`: ele volta à fila na noite seguinte); (3) o job mede o que baixou (`megabytesBaixados`, `megabytesPeloProxy`)
  * e grava o custo estimado do tráfego por setor (`custos_externos`, fonte `proxy`).
+ *
+ * Leitura que não trava (achado de 23/10/2026, ramo 5: de 3.523 vídeos acima do piso nos últimos 90 dias só 109 tinham análise, porque a transcrição do YouTube parou em 02/10 com o proxy sem
+ * tráfego e ninguém viu por 20 dias; o Instagram, que lê sem proxy, quase não era alcançado porque os itens do YouTube ocupavam as 160 posições da fila). Três coisas: (1) o estado de cada rede
+ * (parada ou não, por quê e desde quando) é gravado no resumo da rodada (`leituraParada`, `servicos/leitura-parada.ts`) e a rodada seguinte o lê; (2) enquanto uma rede está parada, a fila
+ * sai SEM ela (o corte de tamanho acontece depois de tirá-la) e entra só uma tentativa de prova por rede no começo da rodada: se ela funciona, a rede volta na hora e a fila é refeita
+ * completa; (3) o teto de vídeos lidos por noite e o orçamento de tempo do setor com marca ativa são maiores (`transcricoesPorDiaComMarca`, `orcamentoTranscreverPorSetorComMarcaMin`).
+ * O aviso ao admin (Início e e-mail uma vez por dia) sai do estado gravado: `servicos/aviso-de-leitura.ts`.
  */
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -65,9 +72,19 @@ import { baixarLegendaYoutube, ErroLegendaTempoLimite } from "@/jobs/legendas-yo
 import { ehUrlDoYoutube, ErroDoProxy, type MotivoDoProxy, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
+import { avisarLeituraParada, type ResultadoDoAviso } from "@/servicos/aviso-de-leitura";
 import { custoDoProxyUsd, registrarCustoExterno } from "@/servicos/custos-externos";
-import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
+import {
+  type CausaDaParada,
+  ehCausaDoProxy,
+  estadoAtualDaLeitura,
+  type ObservacaoDaRodada,
+  PLATAFORMAS_LIDAS,
+  proximoEstadoDaLeitura,
+} from "@/servicos/leitura-parada";
+import { type FiltroDeRedes, foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
 import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
+import { setoresComMarcaAtiva } from "@/servicos/ramos-com-marca";
 import { MAX_POR_CONTA, selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
 
 import { midiaUrlFresca } from "./coleta-comum";
@@ -122,7 +139,9 @@ function comMidiaFrescaComoDesempate<T extends { id: number }>(
   });
 }
 
-async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
+type InfoDoVideo = { url: string; urlParaBaixar: string; plataforma: Plataforma; duracaoS: number | null; idioma: string | null };
+
+async function candidatosDoNicho(nichoId: number, tetoDiario: number, redes?: FiltroDeRedes) {
   const tamanhoFila = tetoDiario * FATOR_FILA;
   // V2b, item 10: o teto por conta entra aqui, na consulta, antes do LIMIT
   // (`maxPorConta`), não só depois em `limitarPorConta`; sem isso, quando as
@@ -136,15 +155,15 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   // vagas de uma conta podiam ir inteiras para vídeo que `selecionarParaTranscrever` já descartava,
   // e a conta nunca oferecia um 3º vídeo livre.
   const [prioritarios, estruturais] = await Promise.all([
-    subindoHoje(nichoId, tamanhoFila, MAX_POR_CONTA, true),
-    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila, MAX_POR_CONTA, true),
+    subindoHoje(nichoId, tamanhoFila, MAX_POR_CONTA, true, redes),
+    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila, MAX_POR_CONTA, true, redes),
   ]);
 
   const idsUnicos = [...new Set([...prioritarios.map((v) => v.id), ...estruturais.map((v) => v.id)])];
   if (idsUnicos.length === 0) {
     return {
       selecionados: [] as number[],
-      porId: new Map<number, { url: string; urlParaBaixar: string; plataforma: Plataforma; duracaoS: number | null; idioma: string | null }>(),
+      porId: new Map<number, InfoDoVideo>(),
     };
   }
 
@@ -371,6 +390,8 @@ const MAX_PROXY_FORA_SEGUIDOS = 3;
 export type OpcoesTranscrever = {
   agora?: () => number;
   orcamentoPorSetorMs?: number;
+  /** O orçamento do setor com marca ativa (o padrão vem de `config.regras.orcamentoTranscreverPorSetorComMarcaMin`). */
+  orcamentoPorSetorComMarcaMs?: number;
   orcamentoTotalMs?: number;
 };
 
@@ -392,6 +413,18 @@ export function orcamentoDoSetor(porSetorMs: number, totalMs: number, decorridoM
   return Math.min(porSetorMs, Math.floor(restante / Math.max(1, setoresQueFaltam)));
 }
 
+/**
+ * O orçamento do setor com marca ativa, que lê mais vídeos por noite e pede mais tempo (100 vídeos do YouTube a cerca de 52 s cada são uns 90 minutos). Sai do teto do job inteiro DEPOIS de
+ * reservar o orçamento comum de cada setor que ainda falta, então nenhum setor seguinte perde a vez; e nunca é menor que o orçamento comum (`orcamentoDoSetor`). Pura, para testar sem relógio.
+ * `setoresQueFaltam` conta o atual, como em `orcamentoDoSetor`.
+ */
+export function orcamentoDoSetorComMarca(proprioMs: number, porSetorMs: number, totalMs: number, decorridoMs: number, setoresQueFaltam: number): number {
+  const restante = Math.max(0, totalMs - decorridoMs);
+  const reserva = Math.max(0, setoresQueFaltam - 1) * porSetorMs;
+  const comum = orcamentoDoSetor(porSetorMs, totalMs, decorridoMs, setoresQueFaltam);
+  return Math.min(proprioMs, Math.max(comum, restante - reserva));
+}
+
 /** Bytes em megabytes decimais (1 MB = 1.000.000 bytes, como o proxy conta), com duas casas. */
 function megabytes(bytes: number): number {
   return Number((bytes / 1_000_000).toFixed(2));
@@ -407,6 +440,7 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
   const agora = opcoes.agora ?? Date.now;
   const daConfig = orcamentosDaConfig();
   const porSetorMs = opcoes.orcamentoPorSetorMs ?? daConfig.porSetorMs;
+  const porSetorComMarcaMs = opcoes.orcamentoPorSetorComMarcaMs ?? config.regras.orcamentoTranscreverPorSetorComMarcaMin * 60_000;
   const totalMs = opcoes.orcamentoTotalMs ?? daConfig.totalMs;
   const inicioDoJob = agora();
 
@@ -414,6 +448,19 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
   if (nichoId !== undefined) condicoes.push(eq(nichos.id, nichoId));
   // Ordem fixa por id: a mesma de sempre, sem depender da ordem em que o banco devolve as linhas.
   const nichosAtivos = await db().select().from(nichos).where(and(...condicoes)).orderBy(nichos.id);
+  // Os setores com marca ativa leem mais por noite (`transcricoesPorDiaComMarca`) e ganham mais tempo; os outros ficam no padrão.
+  const setoresComMarca = await setoresComMarcaAtiva();
+  // O que a rodada anterior deixou: as redes cuja leitura estava parada ficam fora da fila (só uma tentativa de prova por rede).
+  const estadoAnterior = await estadoAtualDaLeitura();
+  const paradasAgora = new Map<Plataforma, CausaDaParada>();
+  for (const rede of PLATAFORMAS_LIDAS) {
+    const parada = estadoAnterior[rede];
+    if (parada) paradasAgora.set(rede, parada.causa);
+  }
+  /** As redes cuja tentativa de prova já foi posta na fila desta rodada (uma por rede, no primeiro setor que tem vídeo dela). */
+  const sondasFeitas = new Set<Plataforma>();
+  /** O que cada tentativa de prova mostrou, para o resumo. */
+  const sondas: Record<string, "voltou" | "continua parada"> = {};
 
   let porLegenda = 0;
   let porGroq = 0;
@@ -428,10 +475,20 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
 
   const tentativas: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };
   const sucessos: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };
+  /** Falhas do VÍDEO por rede (download, Groq, tempo limite): o proxy que recusa não entra, não é falha do vídeo. Base do "sem leitura" em `leitura-parada.ts`. */
+  const falhasPorRede: Record<Plataforma, number> = { youtube: 0, tiktok: 0, instagram: 0 };
+  /** Falhas do YouTube que são bloqueio do robô ou download pendurado, para dizer `bloqueio` e não `sem leitura`. */
+  let falhasDeBloqueioNoYoutube = 0;
+  /** Quantas vezes o proxy respondeu nesta rodada: uma leitura boa, ou um vídeo que falhou por culpa dele mesmo (o robô barrado, um vídeo privado). */
+  let proxyRespondeuVezes = 0;
+  let freioNoYoutube = false;
+  let freioNoTiktok = false;
   let youtubePausado = false;
   let tiktokPausado = false;
   /** O proxy falhou nesta noite (o primeiro que falhou): vale para o job inteiro e para todos os setores, e é o que o resumo diz. */
   let proxyParado: { motivo: MotivoDoProxy; desde: Date } | null = null;
+  /** O proxy já foi tirado da fila desta rodada (o primeiro setor em que ele falhou refez a fila; os seguintes já saem sem ele). */
+  let proxyJaForaDaFila = false;
   /** Vídeos que o proxy recusou, contados à parte (não somam em `falhas`: não são falha do vídeo). */
   let falhasPorProxy = 0;
   /** Falhas "fora do ar" seguidas, sem um download bom no meio (zera a cada YouTube ou TikTok que sai). */
@@ -442,14 +499,41 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
   const setoresParadosPeloOrcamento: { slug: string; ficaramParaDepois: number }[] = [];
   /** Quanto cada setor levou, em segundos (para calibrar o orçamento olhando o resumo, sem abrir log). */
   const segundosPorSetor: Record<string, number> = {};
+  /** O teto de vídeos lidos por noite de cada setor, para o resumo mostrar quem leu com o teto maior. */
+  const tetoPorSetor: Record<string, number> = {};
+  let estadoNovo = estadoAnterior;
+  let aviso: ResultadoDoAviso | undefined;
 
   try {
     for (const [indiceDoSetor, nicho] of nichosAtivos.entries()) {
       definirRamoDoContexto(nicho.id);
       const inicioDoSetor = agora();
-      const orcamentoMs = orcamentoDoSetor(porSetorMs, totalMs, inicioDoSetor - inicioDoJob, nichosAtivos.length - indiceDoSetor);
-      const tetoDiario = config.regras.transcricoesPorDia;
-      const { selecionados, porId } = await candidatosDoNicho(nicho.id, tetoDiario);
+      const comMarca = setoresComMarca.has(nicho.id);
+      const setoresQueFaltam = nichosAtivos.length - indiceDoSetor;
+      const orcamentoMs = comMarca
+        ? orcamentoDoSetorComMarca(porSetorComMarcaMs, porSetorMs, totalMs, inicioDoSetor - inicioDoJob, setoresQueFaltam)
+        : orcamentoDoSetor(porSetorMs, totalMs, inicioDoSetor - inicioDoJob, setoresQueFaltam);
+      const tetoDiario = comMarca ? config.regras.transcricoesPorDiaComMarca : config.regras.transcricoesPorDia;
+      tetoPorSetor[nicho.slug] = tetoDiario;
+
+      // A fila deste setor sai SEM as redes paradas: o corte de tamanho vem depois de tirá-las, então as vagas da noite vão para quem funciona.
+      const excluidasNoNicho = new Set<Plataforma>(paradasAgora.keys());
+      const inicial = await candidatosDoNicho(nicho.id, tetoDiario, { excluir: [...excluidasNoNicho] });
+      const porId = new Map(inicial.porId);
+      // Uma tentativa de prova por rede parada, no começo da rodada, com o melhor vídeo dela neste setor.
+      const sondasDoNicho = new Map<number, Plataforma>();
+      for (const rede of PLATAFORMAS_LIDAS) {
+        if (!paradasAgora.has(rede) || sondasFeitas.has(rede)) continue;
+        const daSonda = await candidatosDoNicho(nicho.id, 1, { so: [rede] });
+        const idDaSonda = daSonda.selecionados[0];
+        if (idDaSonda === undefined) continue;
+        sondasFeitas.add(rede);
+        sondasDoNicho.set(idDaSonda, rede);
+        for (const [id, info] of daSonda.porId) porId.set(id, info);
+      }
+      let fila = [...sondasDoNicho.keys(), ...inicial.selecionados];
+      /** Os vídeos já tentados neste setor, para refazer a fila (uma rede voltou ou parou no meio) sem repetir nenhum. */
+      const tentados = new Set<number>();
 
       let sucessosNoNicho = 0;
       let falhasSeguidasBotYoutube = 0;
@@ -458,7 +542,8 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
       let tiktokPausadoNoNicho = false;
       let bytesDoProxyNoSetor = 0;
 
-      for (const [indiceDoVideo, videoId] of selecionados.entries()) {
+      for (let indiceDoVideo = 0; indiceDoVideo < fila.length; indiceDoVideo += 1) {
+        const videoId = fila[indiceDoVideo];
         if (sucessosNoNicho >= tetoDiario) break;
 
         // O orçamento do setor acabou: o que sobrou da fila fica para a noite seguinte (a fila é por vídeo ainda sem leitura, então
@@ -467,7 +552,7 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
         if (agora() - inicioDoSetor >= orcamentoMs) {
           setoresParadosPeloOrcamento.push({
             slug: nicho.slug,
-            ficaramParaDepois: selecionados.slice(indiceDoVideo).filter((id) => porId.has(id)).length,
+            ficaramParaDepois: fila.slice(indiceDoVideo).filter((id) => porId.has(id)).length,
           });
           break;
         }
@@ -480,16 +565,22 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
         const passaPeloProxy = info.plataforma === "youtube" || info.plataforma === "tiktok";
         if (passaPeloProxy && proxyParado) continue;
         tentativas[info.plataforma] = (tentativas[info.plataforma] ?? 0) + 1;
+        tentados.add(videoId);
+        let resultadoDoVideo: ResultadoVideo | null = null;
 
         try {
           const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS, info.idioma, (bytes) => {
             bytesBaixados[info.plataforma] = (bytesBaixados[info.plataforma] ?? 0) + bytes;
             if (passaPeloProxy) bytesDoProxyNoSetor += bytes;
           });
+          resultadoDoVideo = resultado;
           if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
             sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
             sucessosNoNicho += 1;
-            if (passaPeloProxy) proxyForaSeguidos = 0;
+            if (passaPeloProxy) {
+              proxyForaSeguidos = 0;
+              proxyRespondeuVezes += 1;
+            }
             if (info.plataforma === "youtube") falhasSeguidasBotYoutube = 0;
             if (info.plataforma === "tiktok") falhasSeguidasTiktok = 0;
 
@@ -509,8 +600,12 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
             }
           } else if (resultado.tipo === "falhou") {
             // O proxy respondeu (o vídeo é que falhou): não era engasgo de conexão, a contagem do "fora do ar" recomeça.
-            if (passaPeloProxy) proxyForaSeguidos = 0;
+            if (passaPeloProxy) {
+              proxyForaSeguidos = 0;
+              proxyRespondeuVezes += 1;
+            }
             falhas += 1;
+            falhasPorRede[info.plataforma] += 1;
             erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
             if (info.plataforma === "tiktok") {
               falhasSeguidasTiktok += 1;
@@ -519,14 +614,19 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
           } else if (resultado.tipo === "falhouYoutubeBot") {
             // O YouTube respondeu pelo proxy (e barrou o robô): o proxy não está fora do ar.
             proxyForaSeguidos = 0;
+            proxyRespondeuVezes += 1;
             falhas += 1;
             falhasYoutubeBot += 1;
+            falhasPorRede.youtube += 1;
+            falhasDeBloqueioNoYoutube += 1;
             erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
             falhasSeguidasBotYoutube += 1;
             if (falhasSeguidasBotYoutube >= MAX_FALHAS_SEGUIDAS_FREIO) youtubePausadoNoNicho = true;
           } else if (resultado.tipo === "falhouTempoLimite") {
             falhas += 1;
             falhasPorTempoLimite += 1;
+            falhasPorRede[info.plataforma] += 1;
+            if (info.plataforma === "youtube") falhasDeBloqueioNoYoutube += 1;
             erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
             // Dez vídeos seguidos pendurados na mesma plataforma é o proxy (ou o próprio YouTube) fora do ar: o mesmo freio do bloqueio.
             if (info.plataforma === "youtube") {
@@ -540,6 +640,7 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
           }
         } catch (erro) {
           falhas += 1;
+          falhasPorRede[info.plataforma] += 1;
           erros.push(`video ${videoId} / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
         }
 
@@ -551,6 +652,55 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
         // `audio.ts` e `video.ts`), não por host; `ehUrlDoYoutube` ficou só
         // para esta pausa.
         if (ehUrlDoYoutube(info.url) && !proxyParado) await pausaEntreVideosYoutube();
+
+        // A fila é refeita (sem repetir nenhum vídeo já tentado) quando o mapa das redes paradas muda no meio do setor: a rede da tentativa de prova voltou, o proxy caiu agora, ou o freio
+        // de dez falhas ligou. Sem isto, as vagas continuariam nos itens da rede errada.
+        let refazerFila = false;
+        const redeDaSonda = sondasDoNicho.get(videoId);
+        if (redeDaSonda && resultadoDoVideo) {
+          const causaDaSonda = paradasAgora.get(redeDaSonda);
+          const eDoProxy = causaDaSonda !== undefined && ehCausaDoProxy(causaDaSonda);
+          // Voltou: leu um vídeo, ou (rede parada pelo proxy) o proxy respondeu e foi o vídeo que falhou.
+          const voltou =
+            resultadoDoVideo.tipo === "legenda" ||
+            resultadoDoVideo.tipo === "groq" ||
+            (eDoProxy && (resultadoDoVideo.tipo === "falhou" || resultadoDoVideo.tipo === "falhouYoutubeBot"));
+          if (voltou) {
+            sondas[redeDaSonda] = "voltou";
+            for (const rede of eDoProxy ? (["youtube", "tiktok"] as const) : ([redeDaSonda] as const)) {
+              paradasAgora.delete(rede);
+              excluidasNoNicho.delete(rede);
+            }
+            refazerFila = true;
+          } else {
+            sondas[redeDaSonda] = "continua parada";
+          }
+        }
+        if (proxyParado && !proxyJaForaDaFila) {
+          proxyJaForaDaFila = true;
+          for (const rede of ["youtube", "tiktok"] as const) {
+            paradasAgora.set(rede, proxyParado.motivo);
+            excluidasNoNicho.add(rede);
+            sondasFeitas.add(rede);
+          }
+          refazerFila = true;
+        }
+        if (youtubePausadoNoNicho && !excluidasNoNicho.has("youtube")) {
+          excluidasNoNicho.add("youtube");
+          freioNoYoutube = true;
+          refazerFila = true;
+        }
+        if (tiktokPausadoNoNicho && !excluidasNoNicho.has("tiktok")) {
+          excluidasNoNicho.add("tiktok");
+          freioNoTiktok = true;
+          refazerFila = true;
+        }
+        if (refazerFila) {
+          const nova = await candidatosDoNicho(nicho.id, tetoDiario, { excluir: [...excluidasNoNicho] });
+          for (const [id, infoNova] of nova.porId) porId.set(id, infoNova);
+          fila = nova.selecionados.filter((id) => !tentados.has(id));
+          indiceDoVideo = -1;
+        }
       }
 
       if (youtubePausadoNoNicho || proxyParado) youtubePausado = true;
@@ -563,6 +713,25 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
       segundosPorSetor[nicho.slug] = Math.round((agora() - inicioDoSetor) / 1000);
     }
     restaurarRamoDoContexto();
+
+    // O estado de cada rede que esta rodada deixa para a seguinte e para o Início do admin (sem tabela nova: vai no resumo da execução).
+    const observacao: ObservacaoDaRodada = {
+      sucessos: { youtube: sucessos.youtube, tiktok: sucessos.tiktok, instagram: sucessos.instagram },
+      falhas: falhasPorRede,
+      falhasDeBloqueioNoYoutube,
+      proxyParado: proxyParado?.motivo ?? null,
+      freio: { youtube: freioNoYoutube, tiktok: freioNoTiktok },
+      proxyRespondeu: proxyRespondeuVezes > 0,
+    };
+    estadoNovo = proximoEstadoDaLeitura(estadoAnterior, observacao, new Date());
+    // O e-mail ao admin sai só da rodada de todos os setores (a de um setor só, a "primeira carga", não fala pela noite inteira), uma vez por dia; falha de e-mail nunca derruba a leitura.
+    if (nichoId === undefined) {
+      try {
+        aviso = await avisarLeituraParada(estadoNovo);
+      } catch (erro) {
+        logger.error({ err: erro }, "nao foi possivel avisar o admin da leitura parada");
+      }
+    }
   } finally {
     /**
      * M5b, item 1: a ordem dos jobs da madrugada, encadeada (achado da conferência de 02/10, com a
@@ -612,6 +781,12 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
     // O motivo e o instante em que o proxy parou, para o admin dizer "o proxy do YouTube está sem tráfego desde ..." (cartão da rotina e Início).
     youtubePausadoMotivo: proxyParado?.motivo,
     proxyPausadoDesde: proxyParado?.desde.toISOString(),
+    // O estado de cada rede para a rodada seguinte e para o Início (`servicos/leitura-parada.ts`); sempre presente, vazio quando tudo lê.
+    leituraParada: estadoNovo,
+    // Quanto cada setor podia ler nesta noite (o setor com marca ativa lê mais), e o que a tentativa de prova de cada rede parada mostrou.
+    tetoPorSetor,
+    sondasDeProva: Object.keys(sondas).length > 0 ? sondas : undefined,
+    avisoDeLeitura: aviso,
     segundosPorSetor,
     setoresParadosPeloOrcamento: setoresParadosPeloOrcamento.length > 0 ? setoresParadosPeloOrcamento : undefined,
     erros: erros.length > 0 ? erros : undefined,

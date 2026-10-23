@@ -145,13 +145,9 @@ describe("noticiasDoSetor: filtro por periodo", () => {
     expect(lista.map((n) => n.titulo)).toEqual(["[teste] noticia de hoje", "[teste] noticia da semana, nao hoje"]);
   });
 
-  it("'mes' traz as tres, nunca a de outro setor", async () => {
+  it("'mes' nunca passa da janela de 7 dias: a de 20 dias não aparece em período nenhum (fix de 22/10/2026)", async () => {
     const lista = await noticiasDoSetor(nichoId, clienteId, "mes", AGORA);
-    expect(lista.map((n) => n.titulo)).toEqual([
-      "[teste] noticia de hoje",
-      "[teste] noticia da semana, nao hoje",
-      "[teste] noticia do mes, fora da semana",
-    ]);
+    expect(lista.map((n) => n.titulo)).toEqual(["[teste] noticia de hoje", "[teste] noticia da semana, nao hoje"]);
   });
 
   it("traz url, fonte, resumo e angulo tal como gravados, com nulo quando nao ha", async () => {
@@ -198,7 +194,7 @@ describe("noticiasDoSetor: 'virou roteiro' isolado por marca", () => {
   });
 
   it("duas versoes da mesma noticia: 'virou roteiro' aponta para o roteiro mais recente", async () => {
-    const [noticiaDoMes] = await db().select().from(noticias).where(porTitulo("[teste] noticia do mes, fora da semana"));
+    const [noticiaDoMes] = await db().select().from(noticias).where(porTitulo("[teste] noticia da semana, nao hoje"));
 
     await db()
       .insert(roteiros)
@@ -225,7 +221,7 @@ describe("noticiasDoSetor: 'virou roteiro' isolado por marca", () => {
       .returning();
 
     const lista = await noticiasDoSetor(nichoId, clienteId, "mes", AGORA);
-    const linha = lista.find((n) => n.titulo === "[teste] noticia do mes, fora da semana");
+    const linha = lista.find((n) => n.titulo === "[teste] noticia da semana, nao hoje");
     expect(linha).toMatchObject({ virouRoteiro: true, roteiroId: maisRecente.id });
   });
 });

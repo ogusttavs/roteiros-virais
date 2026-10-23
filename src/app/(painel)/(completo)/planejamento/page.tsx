@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { config, hojeISO } from "@/lib/config";
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import {
   classificarMultiplo,
   diasDesde,
@@ -178,7 +179,7 @@ export default async function Planejamento({ searchParams }: Props) {
 
   const [cliente, marcas] = await Promise.all([clienteAtivoDoUsuario(sessao.user.id), marcasDoUsuario(sessao.user.id)]);
   if (!cliente) {
-    redirect("/entrar");
+    redirect(destinoSemMarca(sessao.user.role));
   }
 
   const hoje = hojeISO();

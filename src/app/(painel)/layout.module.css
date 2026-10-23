@@ -35,17 +35,35 @@
  * vista (`Nav.module.css`). Some inteira na tela com barra de ações própria
  * (o Roteiro, `data-barra-acoes-propria`), para uma não flutuar sobre a
  * outra (`:has()`, como o design descreve).
+ *
+ * Duas camadas (achado do Gustavo, 23/10/2026: no Safari do iPhone, com a barra de endereço à vista, a cápsula encolhida ficou parada no meio da tela
+ * depois de rolar até o fim). `.barraInferior` é só o ponto de ancoragem: `position: fixed` com `left`/`right`/`bottom` e NADA mais que mexa na geometria dele
+ * (sem `transform`, sem `backdrop-filter`, sem transição de tamanho, altura constante). O vidro, a largura que anima e o `transform` da seleção ficam em `.capsula`,
+ * um elemento comum dentro dele. Antes, o próprio elemento fixo centrava com `transform: translateX(-50%)`, tinha `backdrop-filter` e animava a `width`: no iOS
+ * o elemento fixo com `transform` e camada de desfoque que muda de tamanho enquanto a barra do Safari recolhe é o caso em que o WebKit perde a âncora de baixo.
  */
 .barraInferior {
   position: fixed;
-  /* Passo 16: SEMPRE centrada do mesmo jeito (left 50% e translateX); o que anima é só a largura. Antes animava left e right e trocava o transform de uma vez
-     ao encolher, e a cápsula pulava meio corpo para o lado antes de deslizar. */
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 1.5rem);
-  max-width: 26rem;
+  left: 0;
+  right: 0;
   bottom: calc(var(--espaco-2) + env(safe-area-inset-bottom, 0px));
   z-index: 30;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  /* O mesmo respiro lateral de antes (a cápsula tinha `width: calc(100% - 1.5rem)`). */
+  padding-inline: 0.75rem;
+  box-sizing: border-box;
+  /* Só a cápsula recebe o toque; a faixa de ancoragem, que cobre a largura toda, deixa passar para o conteúdo. */
+  pointer-events: none;
+}
+
+.capsula {
+  pointer-events: auto;
+  flex: none;
+  /* Passo 16: a cápsula é SEMPRE centrada do mesmo jeito (`justify-content: center` do pai); o que anima é só a largura. */
+  width: 100%;
+  max-width: 26rem;
   padding: 0.25rem;
   box-sizing: border-box;
   border-radius: var(--raio-pill);
@@ -57,11 +75,11 @@
   transition: width var(--duracao-capsula) var(--curva-mola);
 }
 /* Encolhida: quatro lugares de 3.25rem (52 px) e o respiro. Continua grade de frações: a largura manda, as colunas acompanham. */
-.barraInferior.encolhida {
+.barraInferior.encolhida .capsula {
   width: calc(4 * 3.25rem + 0.5rem + 2px);
 }
 @media (prefers-reduced-motion: reduce) {
-  .barraInferior {
+  .capsula {
     transition: none;
   }
 }

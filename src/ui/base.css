@@ -15,6 +15,10 @@
 html {
   -webkit-text-size-adjust: 100%;
   color-scheme: light;
+  /* 23/10/2026: o fundo também no `<html>`, não só no `<body>` (que o navegador empresta ao canvas): o Safari do iPhone pinta a faixa de cima e a de baixo do sistema com o que está
+     na borda da tela, e o `theme-color` (`CorDaBarraDoSistema.tsx`, `layout.tsx`) é a mesma cor. Assim o fundo vai até a borda, atrás da ilha e da barra de gesto, e a faixa do
+     sistema não destoa nem na rolagem elástica. O conteúdo respeita `env(safe-area-inset-*)` (`viewport-fit=cover`, `layout.tsx`). */
+  background-color: var(--cor-fundo);
 }
 
 html[data-tema="escuro"] {

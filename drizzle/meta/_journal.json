@@ -645,6 +645,55 @@
       "when": 1792713680465,
       "tag": "0092_capas-do-video",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1792715333941,
+      "tag": "0093_imagens-das-noticias",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1792718818873,
+      "tag": "0094_checkouts-stripe",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1792722911362,
+      "tag": "0095_assinatura-restrict",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792727301145,
+      "tag": "0096_busca-por-significado",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1792746746764,
+      "tag": "0097_interessados",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1792749037344,
+      "tag": "0098_conta-conectada",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1792755942743,
+      "tag": "0099_temas-dia-noticia-na-tentativa",
+      "breakpoints": true
     }
   ]
 }

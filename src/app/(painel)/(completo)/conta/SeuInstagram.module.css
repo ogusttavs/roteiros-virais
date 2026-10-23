@@ -1,0 +1,186 @@
+/** E19 PR 2: o cartão "Seu Instagram" da Conta, no mesmo estilo de "Instalar no celular" (`InstalarNoCelular.module.css`) e de "Sua assinatura". */
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  margin-top: var(--espaco-6);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.explica {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}
+
+.nota {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-rodape);
+  text-wrap: pretty;
+}
+
+.convite,
+.ligada,
+.escolher,
+.confirma {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+/* A frase da volta do diálogo: uma faixa calma, verde quando ligou, âmbar quando não deu (nunca vermelho: a pessoa não errou). */
+.retornoOk,
+.retornoAviso {
+  margin: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}
+
+.retornoOk {
+  background: var(--cor-positivo-fundo);
+  color: var(--cor-positivo);
+}
+
+.retornoAviso {
+  background: var(--cor-atencao-fundo);
+  color: var(--cor-atencao);
+}
+
+.dados {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  margin: 0;
+}
+
+.dado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-rotulo);
+  color: var(--cor-texto-suave);
+}
+
+.valor {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  overflow-wrap: anywhere;
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+  text-wrap: pretty;
+}
+
+.erroDaConta,
+.erro {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidata {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-divisor);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.candidataNome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  min-width: 0;
+}
+
+.pagina {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.acoes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--espaco-4);
+}
+
+/* O botão de ligar é um link (a ligação é uma ida à Meta, não uma ação do servidor): mesma cara do botão primário de `Botao.module.css`. */
+.ligar {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--altura-toque);
+  padding: 0 var(--espaco-5);
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ligar:hover {
+  background: var(--cor-acao-hover);
+}
+
+.ligar:active {
+  background: var(--cor-acao-pressionada);
+}
+
+.cancelar {
+  padding: var(--espaco-2) 0;
+  min-height: var(--altura-toque);
+  background: none;
+  border: none;
+  color: var(--cor-acao);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.cancelar:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}

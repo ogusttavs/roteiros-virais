@@ -20,6 +20,11 @@ export const DIAS_DA_CAPA = 3;
 export const DIAS_PARA_AVISAR_QUE_SAI = 20;
 const FUSO = "America/Sao_Paulo";
 
+/** Onde a tela busca a foto guardada de uma notícia do setor (`app/api/imagem-noticia/[id]/route.ts`). */
+export function enderecoDaFotoDaNoticia(noticiaId: number): string {
+  return `/api/imagem-noticia/${noticiaId}`;
+}
+
 export type NoticiaDaCapa = {
   /** "s-12" (do setor) ou "a-5" (de um assunto): única na lista. */
   chave: string;
@@ -97,8 +102,9 @@ export async function capaDoDia(cliente: { id: number; nichoId: number | null },
           resumo: n.resumo,
           url: enderecoHttpsSeguro(n.url),
           // E53 (foto do setor): a foto do RSS direto do portal, revalidada na saída como a dos assuntos; sem ela, o bloco de tipografia.
-          imagemUrl: enderecoHttpsSeguro(n.imagemUrl),
-          imagemCredito: enderecoHttpsSeguro(n.imagemUrl) ? n.imagemCredito : null,
+          // A foto guardada do nosso lado (a da página da matéria) vale mais que o endereço do veículo: nunca expira nem depende de a página deixar embutir.
+          imagemUrl: n.fotoGuardada ? enderecoDaFotoDaNoticia(n.id) : enderecoHttpsSeguro(n.imagemUrl),
+          imagemCredito: n.fotoGuardada || enderecoHttpsSeguro(n.imagemUrl) ? n.imagemCredito : null,
           roteiroId: n.roteiroId,
         },
       });

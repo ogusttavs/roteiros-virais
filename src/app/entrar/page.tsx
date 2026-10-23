@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
+import { destinoDaSessao } from "@/lib/destino-sem-marca";
 import { sessaoAtual } from "@/lib/sessao";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { textosEntrar } from "@/textos/entrar";
 import { Logo } from "@/ui/Logo";
 
@@ -12,7 +14,8 @@ export default async function Entrar({ searchParams }: { searchParams: Promise<{
   const { esqueci } = await searchParams;
   const sessao = await sessaoAtual();
   if (sessao) {
-    redirect(sessao.user.role === "admin" ? "/admin" : "/hoje");
+    // Com sessao e sem marca, "/hoje" mandava de volta para ca (laco): `destinoDaSessao` leva a conta sem marca a tela propria.
+    redirect(destinoDaSessao(sessao.user.role, Boolean(await clienteAtivoDoUsuario(sessao.user.id))));
   }
 
   return (

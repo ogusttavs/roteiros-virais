@@ -1,0 +1,9 @@
+.icone {
+  margin-right: var(--espaco-1, 4px);
+  vertical-align: -3px;
+}
+
+.erro {
+  color: var(--cor-erro, inherit);
+  font-size: 0.875rem;
+}

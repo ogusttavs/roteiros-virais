@@ -14,13 +14,16 @@ import { and, desc, eq, sql } from "drizzle-orm";
 
 import { DIAS_DE_FOLGA_DA_RENOVACAO, METADATA_PRODUTO } from "@/config/assinatura";
 import { db } from "@/db";
-import { assinaturas, clientes, eventosStripe, membrosMarca, type Assinatura, type Cliente, type StatusAssinatura } from "@/db/schema";
+import { assinaturas, checkoutsStripe, clientes, eventosStripe, membrosMarca, type Assinatura, type Cliente, type StatusAssinatura } from "@/db/schema";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { portaStripe, type EventoDoStripe } from "@/lib/stripe";
 
 /** Erro de regra da assinatura, com a frase que a pessoa pode ler. */
 export class ErroAssinatura extends Error {}
+
+/** Status em que a assinatura ainda existe e pode cobrar no Stripe (mesmo quando o acesso já não vale). */
+const STATUS_VIVOS_NO_STRIPE: StatusAssinatura[] = ["active", "trialing", "past_due", "unpaid", "paused"];
 
 // ---------------------------------------------------------------------------
 // O portão
@@ -70,7 +73,8 @@ export async function marcaPrecisaAssinar(cliente: Pick<Cliente, "id" | "cortesi
 // Começar a assinar e abrir o portal (as ações chamam estas)
 // ---------------------------------------------------------------------------
 
-async function ehDonoDaMarca(usuarioId: string, clienteId: number): Promise<boolean> {
+/** Só o dono da marca assina e abre o portal; as telas usam a mesma pergunta para decidir se mostram os botões. */
+export async function ehDonoDaMarca(usuarioId: string, clienteId: number): Promise<boolean> {
   const [linha] = await db()
     .select({ papel: membrosMarca.papel })
     .from(membrosMarca)
@@ -81,36 +85,58 @@ async function ehDonoDaMarca(usuarioId: string, clienteId: number): Promise<bool
 export const frasesDaAssinatura = {
   soODono: "Só quem criou a conta pode assinar. Peça para essa pessoa fazer isto.",
   jaAssinada: "Esta conta já tem uma assinatura ativa.",
+  emAndamento: "Esta conta já tem uma assinatura, só falta acertar o cartão. Abra a gestão da assinatura para atualizar o cartão.",
   semPlano: "Não deu para abrir o pagamento agora. Tente de novo daqui a pouco.",
   semAssinatura: "Esta conta ainda não tem uma assinatura para gerenciar.",
   falhou: "Não deu para abrir o pagamento agora. Tente de novo daqui a pouco.",
+  naoCancelou: "Não deu para cancelar a assinatura desta conta no Stripe, então a conta não foi apagada. Nada mudou: tente de novo, ou cancele a assinatura no painel do Stripe antes.",
 } as const;
 
 /**
  * Cria a sessão do Checkout do plano trimestral para a marca e devolve o endereço. Só o dono assina; marca com assinatura que vale não assina de novo; o preço sai do Stripe pela
  * chave de busca (e só vale se for deste produto). O "ver como" nunca chega aqui (a ação recusa antes).
+ *
+ * **Um Checkout aberto por marca (E22 PR 2, item 0b).** O segundo clique (duas abas, dois toques, o botão "voltar" do navegador) reaproveita a sessão que o primeiro abriu, em vez de criar
+ * outra: duas sessões abertas deixariam a pessoa pagar duas vezes. A sessão fica em `checkouts_stripe` (uma linha por marca); antes de reaproveitar, o Stripe confirma que ela ainda
+ * está aberta (se foi paga, expirou ou sumiu, abre outra). O cadeado por marca faz dois cliques ao mesmo tempo passarem um de cada vez.
  */
 export async function iniciarAssinatura(usuario: { id: string; email: string }, cliente: Pick<Cliente, "id">, agora: Date = new Date()): Promise<{ url: string }> {
   if (!(await ehDonoDaMarca(usuario.id, cliente.id))) throw new ErroAssinatura(frasesDaAssinatura.soODono);
 
   const lista = await assinaturasDaMarca(cliente.id);
   if (lista.some((a) => assinaturaVale(a, agora))) throw new ErroAssinatura(frasesDaAssinatura.jaAssinada);
+  // Uma assinatura que o Stripe ainda considera viva (cartão recusado, ou aviso de renovação que não chegou) não deixa abrir OUTRA: a pessoa seria cobrada duas vezes. Ela atualiza o
+  // cartão no portal; se o Stripe desistir de cobrar, a assinatura vira `canceled` e aí sim assina de novo.
+  if (lista.some((a) => STATUS_VIVOS_NO_STRIPE.includes(a.status))) throw new ErroAssinatura(frasesDaAssinatura.emAndamento);
 
   try {
     const porta = portaStripe();
-    const preco = await porta.precoDoPlano(config.cobranca.precoLookupKey);
-    if (!preco) {
-      logger.error({ clienteId: cliente.id, lookupKey: config.cobranca.precoLookupKey }, "assinatura: o preco do plano nao existe no Stripe (rode scripts/stripe-preparar.ts)");
-      throw new ErroAssinatura(frasesDaAssinatura.semPlano);
-    }
-    return await porta.criarCheckout({
-      precoId: preco.id,
-      clienteId: cliente.id,
-      // Reaproveita o cliente do Stripe de uma assinatura antiga da mesma marca (cartão e histórico já lá).
-      stripeClienteId: lista[0]?.stripeClienteId ?? null,
-      email: usuario.email,
-      urlDeSucesso: `${config.appUrl}/assinar?assinou=1`,
-      urlDeCancelar: `${config.appUrl}/assinar`,
+    return await db().transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`checkout-da-marca-${cliente.id}`}))`);
+      const [aberto] = await tx.select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, cliente.id));
+      if (aberto) {
+        const viva = await porta.sessaoAberta(aberto.stripeSessaoId, cliente.id);
+        if (viva) return { url: viva.url };
+      }
+      const preco = await porta.precoDoPlano(config.cobranca.precoLookupKey);
+      if (!preco) {
+        logger.error({ clienteId: cliente.id, lookupKey: config.cobranca.precoLookupKey }, "assinatura: o preco do plano nao existe no Stripe (rode scripts/stripe-preparar.ts)");
+        throw new ErroAssinatura(frasesDaAssinatura.semPlano);
+      }
+      const nova = await porta.criarCheckout({
+        precoId: preco.id,
+        clienteId: cliente.id,
+        // Reaproveita o cliente do Stripe de uma assinatura antiga da mesma marca (cartão e histórico já lá).
+        stripeClienteId: lista[0]?.stripeClienteId ?? null,
+        email: usuario.email,
+        urlDeSucesso: `${config.appUrl}/assinar?assinou=1`,
+        urlDeCancelar: `${config.appUrl}/assinar`,
+      });
+      await tx
+        .insert(checkoutsStripe)
+        .values({ clienteId: cliente.id, stripeSessaoId: nova.sessaoId })
+        .onConflictDoUpdate({ target: checkoutsStripe.clienteId, set: { stripeSessaoId: nova.sessaoId, criadoEm: new Date() } });
+      return { url: nova.url };
     });
   } catch (erro) {
     if (erro instanceof ErroAssinatura) throw erro;
@@ -131,6 +157,44 @@ export async function abrirPortalDaAssinatura(usuario: { id: string }, cliente: 
     logger.error({ err: erro, clienteId: cliente.id }, "assinatura: o Stripe falhou ao abrir o portal");
     throw new ErroAssinatura(frasesDaAssinatura.falhou);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Apagar a marca (E22 PR 2, item 0d)
+// ---------------------------------------------------------------------------
+
+/** Status em que a assinatura já acabou de vez (nada mais a cobrar no Stripe). */
+const STATUS_ACABADOS: StatusAssinatura[] = ["canceled", "incomplete_expired"];
+
+/** O que há para cancelar no Stripe quando uma marca vai ser apagada: as assinaturas que ainda não acabaram e o Checkout que ficou aberto. */
+export type AlvosDoCancelamento = { assinaturaIds: string[]; sessaoId: string | null };
+
+/**
+ * Lê (sem mexer em nada) o que o Stripe precisa cancelar antes de a marca sumir. Tem de rodar ANTES do `DELETE` da marca: o `ON DELETE CASCADE` leva as linhas de `assinaturas` e de
+ * `checkouts_stripe` junto, e com elas o único registro de quais assinaturas do Stripe eram dela.
+ */
+export async function alvosDoCancelamento(clienteId: number, executor: Pick<ReturnType<typeof db>, "select"> = db()): Promise<AlvosDoCancelamento> {
+  const lista = await executor.select().from(assinaturas).where(eq(assinaturas.clienteId, clienteId)).orderBy(desc(assinaturas.criadoEm), desc(assinaturas.id));
+  const [aberto] = await executor.select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, clienteId));
+  return { assinaturaIds: lista.filter((a) => !STATUS_ACABADOS.includes(a.status)).map((a) => a.stripeAssinaturaId), sessaoId: aberto?.stripeSessaoId ?? null };
+}
+
+/**
+ * Cancela no Stripe o que `alvosDoCancelamento` achou: primeiro fecha o Checkout aberto (se a pessoa pagasse depois de a marca sumir, o Stripe cobraria e o aviso não acharia a conta),
+ * depois cancela cada assinatura. Se o Stripe falhar em qualquer uma, **lança `ErroAssinatura`** e quem chama não pode apagar a marca. Sem alvo, não chama o Stripe nenhuma vez
+ * (nada muda para quem nunca assinou). Devolve quantas assinaturas cancelou.
+ */
+export async function cancelarNoStripe(clienteId: number, alvos: AlvosDoCancelamento): Promise<number> {
+  if (alvos.assinaturaIds.length === 0 && !alvos.sessaoId) return 0;
+  try {
+    const porta = portaStripe();
+    if (alvos.sessaoId) await porta.expirarSessao(alvos.sessaoId);
+    for (const id of alvos.assinaturaIds) await porta.cancelarAssinatura(id);
+  } catch (erro) {
+    logger.error({ err: erro, clienteId }, "assinatura: o Stripe falhou ao cancelar a assinatura de uma marca que ia ser apagada; a marca nao foi apagada");
+    throw new ErroAssinatura(frasesDaAssinatura.naoCancelou);
+  }
+  return alvos.assinaturaIds.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -348,8 +412,18 @@ async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Da
 
   // `canceled` e `incomplete_expired` são finais: reassinar cria OUTRA assinatura no Stripe, nunca reabre a antiga. Um evento atrasado, ou do mesmo segundo, não a ressuscita.
   if (atual.status === "canceled" || atual.status === "incomplete_expired") return;
-  // Evento mais velho que o último que escreveu aqui: o mais novo já valeu.
-  if (eventoEm.getTime() < atual.ultimoEventoEm.getTime()) return;
+  // Evento mais velho que o último que escreveu aqui: o mais novo já valeu para o status, mas não pode ser jogado fora inteiro (o Stripe entrega em paralelo: o checkout, mais novo,
+  // pode chegar antes da assinatura e deixar a linha sem período e sem preço). Só preenche o que está vazio; nunca mexe no status nem em `ultimoEventoEm`.
+  if (eventoEm.getTime() < atual.ultimoEventoEm.getTime()) {
+    const vazios = {
+      ...(!atual.stripeClienteId && m.stripeClienteId ? { stripeClienteId: m.stripeClienteId } : {}),
+      ...(!atual.stripePrecoId && m.stripePrecoId ? { stripePrecoId: m.stripePrecoId } : {}),
+      ...(!atual.periodoInicio && m.periodoInicio ? { periodoInicio: m.periodoInicio } : {}),
+      ...(!atual.periodoFim && m.periodoFim ? { periodoFim: m.periodoFim } : {}),
+    };
+    if (Object.keys(vazios).length > 0) await tx.update(assinaturas).set({ ...vazios, atualizadoEm: new Date() }).where(eq(assinaturas.id, atual.id));
+    return;
+  }
 
   // O `created` do Stripe tem resolução de um segundo, então dois eventos do mesmo segundo (o cadastro: assinatura criada `incomplete`, fatura paga `active`) podem chegar em qualquer ordem.
   // Quem já saiu de `incomplete` nunca volta a ele (o Stripe não faz isso), e o desempate fica sem depender da ordem de chegada.

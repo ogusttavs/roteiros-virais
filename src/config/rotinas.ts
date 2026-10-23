@@ -9,7 +9,7 @@ export type Rotina = { chave: string; titulo: string; faz: string; filas: string
 export const ROTINAS: Rotina[] = [
   { chave: "buscar", titulo: "Buscar vídeos novos", faz: "Procura, em cada rede, os vídeos novos das contas que a gente acompanha.", filas: [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaMeioDia, FILAS.contasBase, FILAS.metaContas, FILAS.metaHashtags, FILAS.descobertaInstagram] },
   { chave: "capas", titulo: "Guardar a capa dos vídeos", faz: "Baixa a imagem de capa dos vídeos do Instagram enquanto o link da rede ainda abre, para a referência não aparecer vazia depois.", filas: [FILAS.guardarCapas] },
-  { chave: "noticias", titulo: "Ler as notícias do ramo", faz: "Junta as notícias do dia de cada ramo.", filas: [FILAS.coletaNoticias] },
+  { chave: "noticias", titulo: "Ler as notícias do ramo", faz: "Junta as notícias do dia de cada ramo, separa as que importam para quem tem negócio ali e guarda a foto de cada matéria.", filas: [FILAS.coletaNoticias, FILAS.filtrarNoticias] },
   { chave: "tendencias", titulo: "Ver o que está em alta no Brasil", faz: "Junta as buscas e os vídeos em alta no país, para todos os ramos, e põe o tema do momento no dia de cada ramo.", filas: [FILAS.tendenciasBrasil] },
   { chave: "pontuar", titulo: "Ver quais vídeos estão indo bem", faz: "Compara cada vídeo com a conta dele e separa os que passaram da média.", filas: [FILAS.pontuar, FILAS.vigilancia] },
   { chave: "transcrever", titulo: "Transcrever", faz: "Escreve o que é dito nos vídeos que passaram no filtro.", filas: [FILAS.transcrever] },
@@ -25,6 +25,7 @@ export const ROTINAS: Rotina[] = [
   { chave: "pesquisa", titulo: "Pesquisar na hora para um vídeo", faz: "Busca, em portais grandes e órgãos oficiais, os dados de verdade que a pessoa pediu antes de escrever um roteiro.", filas: [FILAS.pesquisaNaHora] },
   { chave: "aprender", titulo: "Aprender com as reprovações", faz: "Transforma o que a pessoa reprovou em regras daquela conta.", filas: [FILAS.aprenderCliente] },
   { chave: "faxina", titulo: "Limpar as versões que ninguém escolheu", faz: "Apaga as versões de roteiro que ficaram sem escolha em grupos parados há mais de 30 dias.", filas: [FILAS.faxinaVersoes] },
+  { chave: "instagram-ligado", titulo: "Renovar o acesso dos Instagram ligados", faz: "Renova, antes de vencer, o acesso que as pessoas deram ao próprio Instagram, e avisa o dono da conta quando não dá mais para renovar.", filas: [FILAS.renovarContasLigadas] },
   { chave: "email", titulo: "Mandar o e-mail de acompanhamento", faz: "Resume o dia do sistema para quem acompanha.", filas: [FILAS.emailAcompanhamento] },
 ];
 
@@ -34,6 +35,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.coletaApify]: "a coleta do TikTok e do Instagram",
   [FILAS.coletaMeioDia]: "a coleta do meio-dia",
   [FILAS.coletaNoticias]: "a leitura das notícias",
+  [FILAS.filtrarNoticias]: "a escolha das notícias que importam",
   [FILAS.tendenciasBrasil]: "a leitura do que está em alta no Brasil",
   [FILAS.contasBase]: "a base das contas novas",
   [FILAS.metaContas]: "a leitura do Instagram pela Meta",
@@ -57,6 +59,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.curvaCliente]: "a medição dos vídeos postados",
   [FILAS.emailAcompanhamento]: "o e-mail de acompanhamento",
   [FILAS.faxinaVersoes]: "a limpeza das versões",
+  [FILAS.renovarContasLigadas]: "a renovação do acesso aos Instagram ligados",
   [FILAS.aprenderCliente]: "o aprendizado com as reprovações",
   [FILAS.entenderMarca]: "a leitura da marca",
   [FILAS.analisarPerfil]: "a leitura do perfil",

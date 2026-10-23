@@ -234,7 +234,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
         schema: verificarTextoIA.schema,
         sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro", true),
         entrada: verificarTextoIA.montarEntrada({
-          texto: Object.values(campos).join("\n"),
+          texto: verificarTextoIA.montarTextoParaConferir(campos, true),
           proibicoes: [],
           fontes: montarFontesDosFatos({ perfilCompilado: caso.perfilCompilado, camadaExclusiva: caso.camadaExclusiva, tema: caso.tema, evidencias: caso.evidencias }),
         }),

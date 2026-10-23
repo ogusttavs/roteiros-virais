@@ -37,6 +37,7 @@ import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { boss, FILAS, garantirFilas } from "./fila";
+import { rodarFiltroDeNoticias } from "./filtrar-noticias";
 import { rodarGuardarCapas } from "./guardar-capas";
 import { rodarLembrete } from "./lembrete";
 import { rodarLerLongos } from "./ler-longos";
@@ -47,6 +48,7 @@ import { recolherOrfaosDoWorkerAnterior } from "./orfaos";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { type PayloadPesquisaNaHora, rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
+import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
@@ -111,6 +113,17 @@ async function main(): Promise<void> {
   });
   await boss().work<{ nichoId?: number }>(FILAS.coletaNoticias, async (job) => {
     await executarComRegistro(FILAS.coletaNoticias, () => rodarColetaNoticias(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
+    // Fix de 22/10/2026: o filtro das notícias roda logo depois de cada coleta (06:00 e 14:00), para os ramos com marca ativa, sem esperar o `temas-do-dia`. Com `nichoId` (coletar agora num
+    // ramo), só aquele ramo. Falha em enfileirar nunca derruba a coleta que já terminou.
+    try {
+      const nichoId = job[0]?.data?.nichoId;
+      await boss().send(FILAS.filtrarNoticias, nichoId ? { nichoId } : undefined, { singletonKey: nichoId ? `filtrar-noticias-${nichoId}` : "filtrar-noticias", singletonSeconds: 300 });
+    } catch (erro) {
+      console.error("worker: nao foi possivel enfileirar o filtro das noticias:", erro);
+    }
+  });
+  await boss().work<{ nichoId?: number }>(FILAS.filtrarNoticias, async (job) => {
+    await executarComRegistro(FILAS.filtrarNoticias, () => rodarFiltroDeNoticias(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work(FILAS.tendenciasBrasil, async () => {
     await executarComRegistro(FILAS.tendenciasBrasil, () => rodarTendenciasBrasil());
@@ -189,6 +202,9 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.faxinaVersoes, async () => {
     await executarComRegistro(FILAS.faxinaVersoes, () => rodarFaxinaDasVersoes());
+  });
+  await boss().work(FILAS.renovarContasLigadas, async () => {
+    await executarComRegistro(FILAS.renovarContasLigadas, () => rodarRenovarContasLigadas());
   });
   /** Por evento (E27, parte 2, item 2): `reprovarERescrever` manda `{ clienteId }` ao enfileirar. */
   await boss().work<{ clienteId: number }>(FILAS.aprenderCliente, async (job) => {

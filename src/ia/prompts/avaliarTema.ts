@@ -82,7 +82,12 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * gente ("este tema esbarra no que você disse no briefing: ...") e o que cuidar; o encaixe não despenca a 3 só por isso (a pessoa já escolheu o tema), vale 6 ou 7 com o aviso. Quem ataca ou ofende
  * gente, promete o que não pode cumprir ou usa calão continua sem passar (o verificador). A regra do pilar "encaixe" sobre a lista "o que este cliente já reprovou" não muda.
  */
-export const versao = "1.12.0";
+/**
+ * 1.13.0 (E16, nível conta): o sistema estável ganha, quando a marca já tem pelo menos 8 vídeos postados e medidos, o bloco "O que funcionou nos vídeos que este cliente já postou" (`desempenhoDaConta`): por objetivo, tipo
+ * de abertura, duração e horário, quanto rendeu em relação ao normal da própria conta. Serve de desempate no encaixe e na chance de gerar cliente; nunca baixa a nota de um tema só porque aquele tipo de vídeo rendeu menos. Sem o
+ * bloco (hoje, todas as contas) o sistema é idêntico ao da 1.12.0.
+ */
+export const versao = "1.13.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -126,6 +131,8 @@ export function montarSistemaEstavel(dados: {
   persona: Persona;
   /** A memória do cliente (E27, parte 2): `regrasAtivasDoCliente`, ordenada por contagem. Vazia sem nenhuma regra ainda. */
   regrasCliente: { regra: string; contagem: number }[];
+  /** E16, nível conta: o que rendeu mais ou menos nos vídeos já postados DESTA marca (`desempenhoDaConta`). Vazio ou ausente sem dado suficiente. */
+  desempenhoDaConta?: string;
 }): string {
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
@@ -133,6 +140,12 @@ export function montarSistemaEstavel(dados: {
           .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
           .join("\n")}`
       : "";
+  const blocoDesempenhoDaConta = dados.desempenhoDaConta
+    ? `
+
+O que funcionou nos vídeos que este cliente já postou (medido contra o normal da própria conta dele). É tendência dele, não prova: serve de desempate no encaixe e na chance de gerar cliente. Nunca baixe a nota de um tema só porque aquele tipo de vídeo rendeu menos, e nunca cite estes números na justificativa:
+${dados.desempenhoDaConta}`
+    : "";
 
   return `Você avalia um tema de vídeo proposto por um dono de pequeno negócio, em cinco
 pilares de 0 a 10, cada um com uma frase de justificativa (a nota final é a média dos cinco,
@@ -200,7 +213,7 @@ construir audiência").
 ${textoPersona(dados.persona)}
 
 Perfil do cliente:
-${dados.perfilCompilado}${blocoRegrasCliente}
+${dados.perfilCompilado}${blocoRegrasCliente}${blocoDesempenhoDaConta}
 
 Modelo do nicho:
 ${dados.modeloNicho}

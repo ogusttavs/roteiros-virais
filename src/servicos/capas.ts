@@ -112,8 +112,8 @@ async function lerAteOTeto(resposta: Response, teto: number): Promise<Buffer | "
   return Buffer.concat(partes);
 }
 
-/** Baixa a capa de um link. Nunca lança: o que deu errado vira um dos quatro resultados, e o job decide o que gravar. */
-export async function baixarCapa(url: string, buscar: typeof fetch = fetch, teto: number = TETO_DA_CAPA_BYTES): Promise<ResultadoDoDownload> {
+/** Baixa a capa de um link. `buscar` é obrigatório de propósito: em produção é o `buscarComAgenteSeguro` (guarda de DNS, `jobs/busca-segura.ts`), nunca o `fetch` global. Nunca lança: o que deu errado vira um dos quatro resultados, e o job decide o que gravar. */
+export async function baixarCapa(url: string, buscar: typeof fetch, teto: number = TETO_DA_CAPA_BYTES): Promise<ResultadoDoDownload> {
   if (!urlDeCapaBaixavel(url)) return { tipo: "vencida" };
   try {
     const resposta = await buscar(url, { redirect: "manual", signal: AbortSignal.timeout(TEMPO_LIMITE_DA_CAPA_MS), headers: { accept: "image/*" } });

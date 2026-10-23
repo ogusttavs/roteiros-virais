@@ -18,6 +18,12 @@ const baseURL = `http://localhost:${porta}`;
  */
 const SEGREDO_E2E = "e2e-teste-nao-e-producao-".padEnd(32, "0");
 
+/**
+ * E19 PR 2: a porta do servidor local que faz o papel do diálogo e da Graph API da Meta (`tests/fixtures/meta-simulada.ts`). `tests/e2e/seu-instagram.spec.ts` sobe o
+ * simulador nesta porta; o aplicativo só fala com ele por causa de `META_SIMULADOR_E2E` abaixo (que só vale com `MODO_E2E=1`).
+ */
+const portaMeta = Number(process.env.PLAYWRIGHT_META_PORTA ?? 4747);
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
@@ -55,6 +61,9 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   use: {
     baseURL,
+    // O navegador da suíte no fuso de quem usa o app (22/10/2026): o runner da CI roda em UTC, e das 21:00 à meia-noite de Brasília
+    // o "hoje" do navegador já era amanhã enquanto o do servidor (hojeISO, America/Sao_Paulo) ainda era hoje; a agenda.spec caía só nesse horário.
+    timezoneId: "America/Sao_Paulo",
     // Em CI, o rastro de toda tentativa que falha (item 0c, 29/09/2026): "on-first-retry" so gravava
     // a segunda tentativa, e a corrida de referencias.spec.ts que estamos cacando as vezes passa na
     // segunda, levando o rastro da primeira embora. Localmente continua leve.
@@ -127,6 +136,16 @@ export default defineConfig({
       STRIPE_SECRET_KEY: "",
       STRIPE_WEBHOOK_SECRET: "whsec_e2e_nao_e_um_segredo_de_verdade",
       COBRANCA_ATIVA: "",
+      /**
+       * E19 PR 2: a ligação do Instagram LIGADA no e2e, mas só contra a Meta simulada (nenhum destes dados é de verdade; o aplicativo da Meta de verdade nunca é tocado). A chave que
+       * cifra o acesso é de 32 bytes fixos e só de teste. `META_APP_APROVADO` fica vazio de propósito: a tela mostra o aviso de que a ligação direta ainda abre para poucas pessoas.
+       */
+      META_APP_ID: "1000000000000001",
+      META_APP_SECRET: "segredo-do-app-so-de-teste-e2e",
+      META_LOGIN_CONFIG_ID: "2000000000000002",
+      META_TOKEN_CHAVE: Buffer.alloc(32, 7).toString("base64"),
+      META_APP_APROVADO: "",
+      META_SIMULADOR_E2E: `http://127.0.0.1:${portaMeta}`,
       GROQ_API_KEY: "",
       APIFY_TOKEN: "",
       YOUTUBE_API_KEY: "",

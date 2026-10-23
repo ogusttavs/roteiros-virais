@@ -1,8 +1,10 @@
 import { Newspaper } from "lucide-react";
 import { redirect } from "next/navigation";
 
+import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { pedirFiltroDeNoticias } from "@/servicos/filtro-de-noticias";
 import { capaDoDia, type CapaDoDia, type NoticiaDaCapa } from "@/servicos/noticias-do-dia";
 import { textosNoticias } from "@/textos/noticias";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -10,6 +12,8 @@ import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 import type { NoticiaNaTela } from "./CartaoDeNoticia";
 import { NoticiasTela } from "./NoticiasTela";
 
+/** Com menos notícias que isto nos últimos dias, abrir a tela pede o filtro do ramo. */
+const NOTICIAS_PARA_TELA_CHEIA = 6;
 const FUSO = "America/Sao_Paulo";
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -52,7 +56,7 @@ export default async function Noticias() {
   if (!sessao) redirect("/entrar");
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
-  if (!cliente) redirect("/entrar");
+  if (!cliente) redirect(destinoSemMarca(sessao.user.role));
 
   if (!cliente.nichoId) {
     return <EstadoVazio icone={<Newspaper size={24} strokeWidth={1.5} aria-hidden="true" />} frase={textosNoticias.semNicho} />;
@@ -66,6 +70,9 @@ export default async function Noticias() {
   } catch {
     falha = true;
   }
+
+  // Tela magra (poucas notícias nos últimos dias): pede o filtro do ramo agora, em vez de a pessoa esperar a próxima coleta. No máximo um pedido por ramo a cada 30 minutos, e o ver como nunca pede.
+  if (!falha && sessao.verComo === null && capa.deHoje.length + capa.deOntem.length < NOTICIAS_PARA_TELA_CHEIA) void pedirFiltroDeNoticias(cliente.nichoId, 1800);
 
   return (
     <NoticiasTela

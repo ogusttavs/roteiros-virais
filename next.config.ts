@@ -24,7 +24,15 @@ const nextConfig: NextConfig = {
    * chega ao aparelho na visita seguinte, sem esperar o cache vencer.
    */
   async headers() {
-    return [{ source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }] }];
+    return [
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }] },
+      /**
+       * O link do e-mail de "esqueci a senha" leva o código na query string (`?token=`, o fluxo padrão do better-auth, E58). `no-referrer` nessas páginas fecha o
+       * vazamento pelo cabeçalho `Referer` para qualquer endereço aonde a pessoa vá a partir delas (revisão do Fable, 22/10/2026, achado 13). Só nelas: o projeto não tem
+       * cabeçalhos globais (o Caddy é compartilhado com o OdontoTech) e as telas com imagem de fora já escolhem a própria política em cada `<img>`.
+       */
+      { source: "/redefinir-senha/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+    ];
   },
 };
 

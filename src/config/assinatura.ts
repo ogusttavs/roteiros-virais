@@ -1,6 +1,6 @@
 /**
  * E22 PR 1, a assinatura pelo Stripe: o plano único (decisão do Gustavo em 22/10/2026). Um plano só, o trimestral: R$ 1.191,00 a cada 3 meses (R$ 397 por mês), em reais,
- * sem taxa de adesão, só cartão. A conta do Stripe é a da GetOrbita, dividida com o OdontoTech: tudo que este produto cria ou lê leva `metadata.produto = roteiros`, e
+ * sem taxa de adesão, só cartão. A conta do Stripe é a da empresa, dividida com o OdontoTech: tudo que este produto cria ou lê leva `metadata.produto = roteiros`, e
  * nada sem essa marca é tocado ou tratado.
  */
 

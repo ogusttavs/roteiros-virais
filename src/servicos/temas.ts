@@ -33,6 +33,7 @@ import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
+import { desempenhoDaConta } from "./desempenho-da-conta";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { avisoLinhaEditorial, fraseAvisoLinhaEditorial } from "./linha-editorial";
 import { diaPorExtenso } from "./noticias-assuntos";
@@ -455,6 +456,19 @@ export async function guardarNotaNoRascunho(usuarioId: string, clienteId: number
 }
 
 /** O roteiro saiu deste tema: a nota guardada deixa de ser "onde a pessoa parou" (o texto continua no rascunho). Só apaga se a nota é deste mesmo texto. */
+/**
+ * O roteiro saiu deste assunto (pedido do Gustavo, 23/10/2026: "cliquei para criar um novo com o meu tema e ainda estava o texto do outro roteiro"): o rascunho do Tema livre
+ * some inteiro, texto e nota, e a próxima visita começa em branco. Só apaga se o rascunho ainda é deste mesmo texto (a pessoa pode ter começado outro em outra aba).
+ */
+export async function apagarRascunhoSeForDoTexto(usuarioId: string, clienteId: number, texto: string): Promise<void> {
+  const [linha] = await db()
+    .select({ texto: rascunhosTemaLivre.texto })
+    .from(rascunhosTemaLivre)
+    .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
+  if (!linha || marcaDoTexto(linha.texto) !== marcaDoTexto(texto)) return;
+  await apagarRascunhoTemaLivre(usuarioId, clienteId);
+}
+
 export async function limparNotaDoRascunhoSeForDoTexto(usuarioId: string, clienteId: number, texto: string): Promise<void> {
   await db()
     .update(rascunhosTemaLivre)
@@ -528,7 +542,7 @@ export async function avaliarTema(
 
   // E45 PR 3: o tema livre olha o ramo principal e os alternativos que o admin ligou (o modelo do nicho continua sendo o do principal).
   const alternativosDaMarca = await ramosAlternativosDaMarca(cliente.id);
-  const [evidencias, modeloNicho, regrasCliente, [nicho]] = await Promise.all([
+  const [evidencias, modeloNicho, regrasCliente, desempenhoMedido, [nicho]] = await Promise.all([
     evidenciaParaTema(
       cliente.nichoId,
       texto,
@@ -536,9 +550,12 @@ export async function avaliarTema(
       undefined,
       alternativosDaMarca.map((a) => a.nichoId),
       await filtroDeFormatosDaMarca(cliente.id),
+      { clienteId: cliente.id },
     ),
     modeloNichoAtual(cliente.nichoId),
     regrasAtivasDoCliente(cliente.id),
+    // E16, nível conta: o que rendeu nos vídeos já postados DESTA marca (vazio sem dado suficiente).
+    desempenhoDaConta(cliente.id),
     db().select({ criadoEm: nichos.criadoEm }).from(nichos).where(eq(nichos.id, cliente.nichoId)),
   ]);
 
@@ -569,6 +586,7 @@ export async function avaliarTema(
       modeloNicho: formatarModeloNicho(modeloNicho?.modelo ?? null),
       persona: cliente.persona,
       regrasCliente,
+      desempenhoDaConta: desempenhoMedido,
     }),
     entrada: avaliarTemaIA.montarEntrada({
       tema: texto,

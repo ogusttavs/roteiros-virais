@@ -19,6 +19,14 @@ export type EvidenciaTema = {
   parecidos: number;
 };
 
+/** Hotfix de 23/10/2026: de onde veio um tema que nasceu de uma notícia do setor (quando nenhum vídeo o sustenta). */
+export type FonteNoticiaTema = {
+  titulo: string;
+  veiculo: string | null;
+  /** "hoje" / "ontem" / "há N dias" (`textosHoje.temaDeNoticia.quando`). */
+  quando: string;
+};
+
 type Props = {
   /** Ex.: "para te chamarem". */
   rotulo: string;
@@ -26,6 +34,8 @@ type Props = {
   porque: string;
   /** `null` quando não há vídeo de evidência: o bloco não aparece (`BRIEF.md`, sem número inventado). */
   evidencia: EvidenciaTema | null;
+  /** O tema nasceu de uma notícia do setor: o cartão diz qual, no lugar do bloco do vídeo. Só vale quando `evidencia` é nula. */
+  fonteNoticia?: FonteNoticiaTema | null;
   /** O tema recomendado do dia: marca e botão preenchido em vez de linha (design v2, Hoje.Normal). */
   primario?: boolean;
   rotuloBotao: string;
@@ -44,6 +54,7 @@ export function TemaCartao({
   tema,
   porque,
   evidencia,
+  fonteNoticia = null,
   primario = false,
   rotuloBotao,
   onEscolher,
@@ -79,6 +90,14 @@ export function TemaCartao({
           {evidencia.parecidos > 0 ? (
             <span className={styles.evidenciaLinha}>{textosHoje.evidenciaParecidos(evidencia.parecidos)}</span>
           ) : null}
+        </div>
+      ) : fonteNoticia ? (
+        <div className={styles.evidencia} data-fonte-noticia>
+          <span className={styles.evidenciaLinha}>
+            <b>{textosHoje.temaDeNoticia.rotulo}</b>
+          </span>
+          <span className={styles.evidenciaLinha}>{fonteNoticia.titulo}</span>
+          <span className={styles.evidenciaLinha}>{textosHoje.temaDeNoticia.veiculoEQuando(fonteNoticia.veiculo, fonteNoticia.quando)}</span>
         </div>
       ) : null}
       <div className={styles.rodape}>

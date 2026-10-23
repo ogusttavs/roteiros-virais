@@ -179,12 +179,59 @@ test.describe("aceite dos termos no primeiro acesso", () => {
     await expect(page.getByRole("heading", { name: "Antes de entrar" })).not.toBeVisible();
   });
 
+  /**
+   * 23/10/2026: a versao com a clausula "circula padrao, nunca o que e de cada um". Quem aceitou a de 09/10 (a anterior) ve a folha de novo UMA vez; aceitar nao
+   * perde nada (o resto das preferencias fica como estava) e nao pergunta mais.
+   */
+  test("a versao de 23/10 pede aceite de novo de quem aceitou a de 09/10, uma vez so, sem perder o resto das preferencias", async ({ page }) => {
+    const id = "e2e-aceite-termos-versao-0910";
+    const email = "e2e-aceite-termos-versao-0910@exemplo.teste";
+    const [existe] = await db().select({ id: user.id }).from(user).where(eq(user.id, id));
+    if (!existe) {
+      const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
+      await db().insert(user).values({ id, name: "[teste] Aceite Termos 09/10", email });
+      await db()
+        .insert(account)
+        .values({ id: `${id}-credential`, issuer: "local:credential", accountId: id, providerId: "credential", userId: id, password: await hashPassword(SENHA) });
+      const [cliente] = await db().insert(clientes).values({ usuarioId: id, nome: "[teste] Aceite Termos 09/10", nichoId: nicho.id }).returning();
+      await db().insert(membrosMarca).values({ usuarioId: id, clienteId: cliente.id, papel: "dono" });
+      await db().insert(briefings).values({ clienteId: cliente.id, completo: true });
+    }
+    // Aceitou a versao de 09/10 (a anterior) no dia 22, com uma hora do lembrete escolhida por ele: aceitar de novo nao pode mexer nela.
+    const aceitouAntes = new Date("2026-10-22T15:00:00Z");
+    await db()
+      .insert(preferenciasUsuario)
+      .values({ usuarioId: id, aceitouTermosEm: aceitouAntes, horaLembrete: "07:30" })
+      .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { aceitouTermosEm: aceitouAntes, horaLembrete: "07:30" } });
+
+    await entrar(page, email);
+    await expect(page).toHaveURL(/\/hoje/);
+    await expect(page.getByRole("heading", { name: "Antes de entrar" })).toBeVisible();
+    await page.getByRole("button", { name: "li e aceito" }).click();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Antes de entrar" })).not.toBeVisible();
+
+    const [depois] = await db().select().from(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, id));
+    expect(depois.aceitouTermosEm!.getTime()).toBeGreaterThan(new Date("2026-10-23T03:00:00Z").getTime());
+    expect(depois.horaLembrete).toBe("07:30");
+  });
+
+  test("a pagina dos termos traz a clausula do que circula entre marcas", async ({ page }) => {
+    await page.goto("/termos");
+    await expect(page.getByText("circula o padrão, nunca o que é seu")).toBeVisible();
+    await expect(page.getByText("pelo menos 5 marcas, de pelo menos 3 donos diferentes")).toBeVisible();
+    await expect(page.getByText("Abaixo disso, nada circula.")).toBeVisible();
+  });
+
   test("as paginas publicas dizem que o site e os videos recentes sao lidos, o que guardamos e o que e apagado", async ({ page }) => {
     const leitura = "lemos até cinco páginas públicas do site e os títulos dos vídeos mais recentes";
     const guardamos = "o que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou";
 
     await page.goto("/termos");
-    await expect(page.getByText("atualizado em 9 de outubro de 2026")).toBeVisible();
+    await expect(page.getByText("atualizado em 23 de outubro de 2026")).toBeVisible();
     await expect(page.getByText(leitura)).toBeVisible();
 
     await page.goto("/privacidade");

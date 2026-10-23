@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { puxaParaEnum } from "../enums";
 
-import { montarEntrada, montarSistemaEstavel, schema } from "./temasDoDia";
+import { MARCADOR_COMPLETAR_COM_NOTICIAS, montarEntrada, montarSistemaEstavel, schema, versao } from "./temasDoDia";
 
 /** `puxaParaEnum.options[0]`, não o texto literal: `checar-texto` varre todo `.ts` de `src/ia/prompts/`, testes inclusive, e os três valores são jargão (regra 6 do projeto) fora deste enum interno. */
 const TEMA_EXEMPLO = {
@@ -124,5 +124,43 @@ describe("as vozes do público na entrada (E28)", () => {
     expect(schema.parse({ temas: [base] }).temas[0].perguntaNumero).toBeNull();
     expect(schema.parse({ temas: [{ ...base, perguntaNumero: 2 }] }).temas[0].perguntaNumero).toBe(2);
     expect(schema.safeParse({ temas: [{ ...base, perguntaNumero: "um" }] }).success).toBe(false);
+  });
+});
+
+/** Hotfix de 23/10/2026 (versão 1.9.0): o segundo modo da entrada, para completar o dia com notícias quando falta vídeo de prova. */
+describe("montarEntrada, modo completarComNoticias (1.9.0)", () => {
+  const NOTICIAS = [
+    { id: 11, titulo: "Seminários gratuitos sobre branding", resumo: "resumo um" },
+    { id: 12, titulo: "Empresas de tecnologia vendidas", resumo: "resumo dois" },
+  ];
+
+  it("a versão do prompt subiu", () => {
+    expect(versao).toBe("1.9.0");
+  });
+
+  it("lista as notícias com o id, pede um tema por notícia sem vídeo de prova e não traz a regra da prova nem lista de vídeos", () => {
+    const entrada = montarEntrada({ subindoHoje: [], noticias: NOTICIAS, minimoBrasilEmTres: 2, completarComNoticias: { vagas: 2, jaTem: [] } });
+    expect(entrada).toContain("noticia 11: Seminários gratuitos sobre branding: resumo um");
+    expect(entrada).toContain("noticia 12: Empresas de tecnologia vendidas: resumo dois");
+    expect(entrada).toContain(MARCADOR_COMPLETAR_COM_NOTICIAS);
+    expect(entrada).toContain("até 2 temas");
+    expect(entrada).toContain('"evidenciasNoticias"');
+    expect(entrada).toContain("nunca acrescente número, nome, data ou fato que não esteja neles");
+    expect(entrada).not.toContain("Regra da prova");
+    expect(entrada).not.toContain("Subindo hoje");
+    expect(entrada.endsWith("acentuação correta do português (você, não, já, também, é, está).")).toBe(true);
+  });
+
+  it("uma vaga fala no singular e os temas que o dia já tem entram para o modelo não repetir o assunto", () => {
+    const entrada = montarEntrada({ subindoHoje: [], noticias: NOTICIAS, completarComNoticias: { vagas: 1, jaTem: ["Tema que já existe"] } });
+    expect(entrada).toContain("até 1 tema,");
+    expect(entrada).toContain('não repita o assunto deles: "Tema que já existe"');
+  });
+
+  it("o modo comum não muda: a lista de vídeos e a regra da prova continuam lá", () => {
+    const entrada = montarEntrada({ subindoHoje: [], noticias: NOTICIAS, minimoBrasilEmTres: 2 });
+    expect(entrada).toContain("Subindo hoje");
+    expect(entrada).toContain("Regra da prova");
+    expect(entrada).not.toContain(MARCADOR_COMPLETAR_COM_NOTICIAS);
   });
 });
