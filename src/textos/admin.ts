@@ -141,6 +141,30 @@ export const textosAdmin = {
     semDado: "sem dado ainda",
     vazioForaDaCurva: "nenhum vídeo fora da curva ainda; o job pontuar roda todo dia, depois das coletas.",
     /** E28, parte 4: o que o público do setor disse nos comentários dos vídeos mais vistos da semana (a leitura roda no domingo, só no YouTube neste primeiro corte). */
+    /** A faxina das contas fora do setor (22/10/2026): as contas que saíram do ramo por falarem de outro assunto, com o motivo, e a volta. */
+    contasForaDoSetor: {
+      titulo: "contas fora do setor",
+      ajuda:
+        "contas que falam de outro assunto neste ramo. Elas saíram da lista de vigilância e os vídeos delas deixaram de valer como referência, tema e o que o público pergunta, aqui e só aqui. Nada foi apagado: os vídeos continuam guardados e a conta continua valendo em outro ramo em que ela seja do setor.",
+      vazio: "nenhuma conta fora do setor neste ramo.",
+      colunaMotivo: "motivo",
+      colunaQuando: "desde",
+      colunaQuem: "quem decidiu",
+      colunaAcao: "ação",
+      porRotina: "a conferência",
+      aMao: "você",
+      voltar: "voltar para o setor",
+      voltando: "voltando",
+      tirar: "tirar do setor",
+      tirando: "tirando",
+      conferirAgora: "conferir as contas agora",
+      conferindo: "pedindo a conferência",
+      sucessoConferir: "pedido; a conferência das contas deste ramo começa em instantes",
+      duplicadoConferir: "já tem uma conferência rodando para este ramo",
+      erroConferir: (mensagem: string) => `não conseguimos pedir a conferência: ${mensagem}`,
+      erroAcao: "não conseguimos mudar a conta agora; tente de novo",
+      conferirAjuda: "roda sozinha todo domingo de madrugada. Confere os vídeos mais vistos de cada conta do ramo e tira a conta em que a maioria é de outro assunto.",
+    },
     vozes: {
       titulo: "vozes do público",
       /** "de 840 comentários de 12 vídeos do YouTube, lidos em 11 de outubro". */

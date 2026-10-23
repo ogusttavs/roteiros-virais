@@ -29,6 +29,9 @@
  * idioma principal "outro" nunca é vigiada, mesmo com taxa alta (fica de
  * fora do ranking desde o `WHERE`, não só perde posição). A semente
  * continua sempre vigiada qualquer que seja o idioma, é escolha de gente.
+ *
+ * Faxina das contas fora do setor (22/10/2026): a conta marcada em `contas_fora_do_setor` para o PRÓPRIO ramo dela (marca ativa, automática ou à mão) nunca é vigiada, nem sendo
+ * semente. "Voltar para o setor" tira a marca e ela volta ao tratamento de sempre.
  */
 import { sql } from "drizzle-orm";
 
@@ -36,6 +39,15 @@ import { db } from "@/db";
 import { config } from "@/lib/config";
 
 const MINIMO_VIDEOS_VIGILANCIA = 8;
+
+/**
+ * A conta esta marcada como fora do setor do proprio ramo (`contas_fora_do_setor`, marca ativa): a faxina das contas (22/10/2026) tira ela da lista de vigilancia, mesmo sendo
+ * conta semente. `alias` e o nome da tabela `contas` na consulta (`contas` no UPDATE, `c` no ranking). A mesma conta marcada em OUTRO ramo nao mexe aqui (a vigilancia e do ramo da conta).
+ */
+function marcadaForaDoRamo(alias: "contas" | "c") {
+  const tabela = sql.raw(alias);
+  return sql`EXISTS (SELECT 1 FROM contas_fora_do_setor cfs WHERE cfs.conta_id = ${tabela}.id AND cfs.nicho_id = ${tabela}.nicho_id AND cfs.desfeita_em IS NULL)`;
+}
 
 export async function rodarVigilancia(): Promise<Record<string, unknown>> {
   /**
@@ -49,10 +61,10 @@ export async function rodarVigilancia(): Promise<Record<string, unknown>> {
    * O reset e o ranking abaixo valem só para as outras contas.
    */
   const reset = await db().execute(
-    sql`UPDATE contas SET vigiada = false WHERE NOT (origem IN ('curadoria', 'pesquisa') AND removida_em IS NULL)`,
+    sql`UPDATE contas SET vigiada = false WHERE NOT (origem IN ('curadoria', 'pesquisa') AND removida_em IS NULL AND NOT ${marcadaForaDoRamo("contas")})`,
   );
   await db().execute(
-    sql`UPDATE contas SET vigiada = true WHERE origem IN ('curadoria', 'pesquisa') AND removida_em IS NULL`,
+    sql`UPDATE contas SET vigiada = true WHERE origem IN ('curadoria', 'pesquisa') AND removida_em IS NULL AND NOT ${marcadaForaDoRamo("contas")}`,
   );
 
   const marcadas = await db().execute(sql`
@@ -83,8 +95,10 @@ export async function rodarVigilancia(): Promise<Record<string, unknown>> {
       -- Semente nunca conta no teto de 50 por nicho e plataforma (item 2; M2: tambem "pesquisa"), a
       -- nao ser que tenha sido tirada (removida_em, M2 item 3), ai volta a disputar como qualquer outra.
       -- Idioma "outro" nunca e vigiada (V2b, item 7): fora do ranking desde o WHERE, nao so perde posicao.
-      WHERE NOT (c.origem IN ('curadoria', 'pesquisa') AND c.removida_em IS NULL)
+      WHERE NOT (c.origem IN ('curadoria', 'pesquisa') AND c.removida_em IS NULL AND NOT ${marcadaForaDoRamo("c")})
         AND c.idioma_principal IS DISTINCT FROM 'outro'
+        -- Faxina das contas fora do setor (22/10/2026): conta marcada fora do ramo dela nao disputa o ranking, nem sendo semente.
+        AND NOT ${marcadaForaDoRamo("c")}
     )
     UPDATE contas c
     SET vigiada = true

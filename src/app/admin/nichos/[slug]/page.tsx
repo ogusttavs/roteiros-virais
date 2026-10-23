@@ -21,6 +21,7 @@ import {
   ultimaPesquisaDeSetor,
   videosPorId,
 } from "@/servicos/admin-coleta";
+import { listarContasForaDoSetor } from "@/servicos/contas-fora-do-setor";
 import { listarPerfisIndicados } from "@/servicos/perfis-analisados";
 import { estatisticasDoSetor, foraDaCurvaDoNicho, reguaDoSetor, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
 import { longosDoSetor, longosLidosNaSemana, medidaDosLongos } from "@/servicos/videos-longos";
@@ -28,6 +29,7 @@ import { vozesParaOAdmin, vozesValidas } from "@/servicos/vozes-do-publico";
 import { textosAdmin } from "@/textos/admin";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
+import { BotaoTirarDoSetor, ContasForaDoSetor } from "./ContasForaDoSetor";
 import styles from "./page.module.css";
 import { PainelNicho } from "./PainelNicho";
 import { VideosLongosDoSetor } from "./VideosLongosDoSetor";
@@ -101,6 +103,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
     ultimaPesquisa,
     passo,
     perfisIndicados,
+    contasForaDoSetor,
   ] = await Promise.all([
     foraDaCurvaDoNicho(nicho.id, 90, 30),
     subindoHoje(nicho.id, 30),
@@ -115,6 +118,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
     ultimaPesquisaDeSetor(nicho.id),
     passoDoSetor(nicho.id),
     listarPerfisIndicados(nicho.id),
+    listarContasForaDoSetor(nicho.id),
   ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
@@ -320,6 +324,8 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         )}
       </section>
 
+      <ContasForaDoSetor nichoId={nicho.id} slug={slug} contas={contasForaDoSetor} />
+
       <section className={styles.secao}>
         <div className={styles.tituloComContagem}>
           <h2>{t.vigilanciaTitulo}</h2>
@@ -339,6 +345,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
                   <th>{t.colunaOrigem}</th>
                   <th>{t.colunaUltimaLeituraApi}</th>
                   <th>{t.colunaAviso}</th>
+                  <th>{t.contasForaDoSetor.colunaAcao}</th>
                 </tr>
               </thead>
               <tbody>
@@ -362,6 +369,9 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
                       {conta.contaIndisponivelNaMeta
                         ? t.avisoContaIndisponivelNaMeta
                         : (conta.avisoColeta ?? t.semDado)}
+                    </td>
+                    <td>
+                      <BotaoTirarDoSetor contaId={conta.id} nichoId={nicho.id} slug={slug} handle={conta.handle} />
                     </td>
                   </tr>
                 ))}

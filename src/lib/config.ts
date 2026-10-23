@@ -211,6 +211,17 @@ export const config = {
     notaMinimaBriefing: 8,
     notaMinimaTema: 9,
     vigilanciaPorNicho: 50,
+    /**
+     * A faxina das contas fora do setor (22/10/2026, `jobs/faxina-de-contas.ts`): uma conta é marcada "fora do setor" num ramo quando a MAIORIA (mais da metade) dos vídeos conferidos
+     * dela naquele ramo é de outro assunto, e só com pelo menos `faxinaContaMinimoDeVideos` vídeos conferidos (abaixo disso a conta não é decidida: pode ter começado agora). A amostra de cada conta
+     * são os `faxinaContaAmostra` vídeos mais vistos dela acima do piso do ramo, dos últimos `faxinaJanelaDias` dias (os que viram referência). `faxinaVideosPorRodada` é o teto de vídeos
+     * perguntados à IA por ramo em cada rodada (a conferência fica guardada; o que não coube, fica para a rodada seguinte ou para o "rodar agora").
+     */
+    faxinaContaMinimoDeVideos: 5,
+    faxinaContaAmostra: 8,
+    faxinaContaProporcaoFora: 0.5,
+    faxinaJanelaDias: 90,
+    faxinaVideosPorRodada: 500,
     limiarForaDaCurva: 3,
     /**
      * Quantos vídeos o `transcrever` lê por noite em cada setor (era uma constante, 40). Achado de 23/10/2026: o ramo 5 tinha 3.523 vídeos acima do piso e só 109 lidos, e 40 por noite

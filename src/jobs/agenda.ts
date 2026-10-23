@@ -161,6 +161,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     chave: "meio-dia",
   },
   {
+    fila: FILAS.faxinaDeContas,
+    cron: "10 4 * * 0",
+    descricao:
+      "faxina das contas fora do setor por ramo (confere os videos mais vistos de cada conta e tira da vigilancia e das referencias a que for de outro assunto), todo domingo as 04:10, junto da base lenta e antes da vigilancia (04:30) e dos comentarios (04:45)",
+  },
+  {
     fila: FILAS.vigilancia,
     cron: "30 4 * * *",
     descricao: "lista de vigilancia, todo dia as 04:30",
