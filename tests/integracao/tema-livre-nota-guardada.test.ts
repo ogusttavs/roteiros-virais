@@ -16,7 +16,7 @@ import { db, getPool } from "@/db";
 import { briefings, clientes, geracoesIA, membrosMarca, nichos, ramosDaConta, rascunhosTemaLivre, user, type PerfilCompilado } from "@/db/schema";
 import { verificarLocalmente } from "@/ia/verificador";
 import { sessaoAtual } from "@/lib/sessao";
-import { limparNotaDoRascunhoSeForDoTexto, marcaDoTexto, notaGuardadaDoTexto, rascunhoComNotaTemaLivre, VALIDADE_DA_NOTA_GUARDADA_MS } from "@/servicos/temas";
+import { apagarRascunhoSeForDoTexto, limparNotaDoRascunhoSeForDoTexto, marcaDoTexto, notaGuardadaDoTexto, rascunhoComNotaTemaLivre, VALIDADE_DA_NOTA_GUARDADA_MS } from "@/servicos/temas";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { avaliarTemaAction, descartarTemaLivreAction, salvarRascunhoAction } from "../../src/app/(painel)/(completo)/criar/tema-livre/acoes";
@@ -232,5 +232,15 @@ describe("a nota do tema não reprova à toa e a falha vira frase calma (item 4)
   it("a falha da IA chega como resultado com a frase calma (nunca uma exceção que deixa a tela girando)", async () => {
     const r = await avaliarTemaAction("um tema qualquer [mock:erro-sobrecarga]");
     expect(r).toEqual({ ok: false, erro: "Não conseguimos fazer isso agora. Tente de novo em um minuto." });
+  });
+
+  it("depois do roteiro, o rascunho do mesmo texto some inteiro; o de outro texto fica", async () => {
+    const [marca] = await db().select({ id: clientes.id }).from(clientes).limit(1);
+    await db().delete(rascunhosTemaLivre);
+    await db().insert(rascunhosTemaLivre).values({ usuarioId: "nota-guardada-dono", clienteId: marca.id, texto: "Meu tema da eleição", atualizadoEm: new Date() });
+    await apagarRascunhoSeForDoTexto("nota-guardada-dono", marca.id, "outro texto qualquer");
+    expect(await db().select().from(rascunhosTemaLivre)).toHaveLength(1);
+    await apagarRascunhoSeForDoTexto("nota-guardada-dono", marca.id, "meu  tema da eleicao");
+    expect(await db().select().from(rascunhosTemaLivre)).toHaveLength(0);
   });
 });
