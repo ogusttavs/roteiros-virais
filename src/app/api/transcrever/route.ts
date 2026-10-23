@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { logger } from "@/lib/log";
+import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { sessaoAtual } from "@/lib/sessao";
 import { MENSAGEM_VER_COMO_DESLIGADO, modoVerComoLigado } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
@@ -57,6 +58,9 @@ export async function POST(request: Request) {
   if (!cliente) {
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
   }
+  // E22 PR 2, item 0a: a transcrição gasta a Groq em nome da marca; marca que precisa assinar não gasta (402). A gravação do briefing, antes do pagamento, segue livre.
+  const recusaCobranca = await recusaDaCobranca({ soDepoisDoBriefing: true });
+  if (recusaCobranca) return recusaCobranca;
 
   let forma: FormData;
   try {

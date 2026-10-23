@@ -1,5 +1,6 @@
 "use server";
 
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { exigirForaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { desfavoritar, favoritar } from "@/servicos/referencias";
@@ -7,12 +8,14 @@ import { desfavoritar, favoritar } from "@/servicos/referencias";
 /** `/referencias` (brief-frontend.md 6.6). O cliente sempre vem da sessão, nunca de um parâmetro. */
 export async function favoritarAction(videoId: number): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   const cliente = await clienteDaSessaoAtual();
   await favoritar(cliente.id, videoId);
 }
 
 export async function desfavoritarAction(videoId: number): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   const cliente = await clienteDaSessaoAtual();
   await desfavoritar(cliente.id, videoId);
 }

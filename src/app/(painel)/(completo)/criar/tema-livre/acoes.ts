@@ -4,6 +4,7 @@ import type { Cliente } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
 import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida } from "@/servicos/assuntos";
@@ -19,6 +20,7 @@ import { textosTemaLivre } from "@/textos/tema-livre";
  */
 export async function salvarRascunhoAction(texto: string): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
@@ -47,6 +49,7 @@ export async function salvarRascunhoAction(texto: string): Promise<void> {
  */
 export async function avaliarTemaAction(texto: string, noticiaId?: number, assuntoEmAlta?: string, noticiaAssuntoId?: number, perguntaChave?: string): Promise<ResultadoAcao<ResultadoAvaliarTema>> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
@@ -109,6 +112,7 @@ async function avaliarEGuardar(
  */
 export async function descartarTemaLivreAction(): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");

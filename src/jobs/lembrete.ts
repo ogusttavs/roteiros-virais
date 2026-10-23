@@ -46,6 +46,7 @@ import { config, hojeISO, horaAtualISO } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { logger } from "@/lib/log";
 import { enviarPush } from "@/lib/push";
+import { registrarMarcasPuladas, resumoDasMarcasPuladas, separarMarcasPorAssinatura } from "@/servicos/assinatura-tarefas";
 import { acessouHoje } from "@/servicos/clientes";
 import { planoDoDia } from "@/servicos/plano";
 import {
@@ -83,6 +84,8 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
   let jaReceberam = 0;
   let semMarcaPendente = 0;
   let enviadosPorPush = 0;
+  /** E22 PR 3: as marcas que não entraram no aviso por falta de assinatura (a pessoa cairia em `/assinar` ao tocar nele). */
+  const marcasPuladas = new Set<number>();
   const erros: string[] = [];
 
   for (const candidato of candidatos) {
@@ -104,11 +107,14 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       .where(eq(membrosMarca.usuarioId, candidato.usuarioId))
       // Estável: o aviso fala da primeira marca com o assunto do momento, e a ordem do banco sem ORDER BY muda de um dia para o outro.
       .orderBy(clientes.nome, clientes.id);
-    const variasMarcas = marcasDoCandidato.filter((marca) => marca.ativo).length > 1;
+    const { liberadas, puladas } = await separarMarcasPorAssinatura(marcasDoCandidato.filter((marca) => marca.ativo).map((marca) => marca.id), { agora });
+    for (const id of puladas) marcasPuladas.add(id);
+    const variasMarcas = marcasDoCandidato.filter((marca) => marca.ativo && liberadas.has(marca.id)).length > 1;
 
     const nomesPendentes: MarcaPendente[] = [];
     for (const marca of marcasDoCandidato) {
       if (!marca.ativo) continue;
+      if (!liberadas.has(marca.id)) continue;
       if (acessouHoje(marca.ultimoAcessoEm, agora)) continue;
       const temasDaMarca = marca.nichoId ? await temasDoDiaOuRecente(marca.nichoId, hoje, agora) : null;
       if (!temasDaMarca) continue;
@@ -168,9 +174,11 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
     }
   }
 
+  registrarMarcasPuladas("lembrete", marcasPuladas.size);
   return {
     horaAtual,
     candidatos: candidatos.length,
+    ...resumoDasMarcasPuladas(marcasPuladas.size),
     enviados,
     enviadosPorPush,
     jaReceberam,
