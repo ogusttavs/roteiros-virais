@@ -706,6 +706,13 @@ function mockEntregaDaPesquisa(dados: { id: number; fonte: string; data: string;
   };
 }
 
+/** O texto a conferir inteiro (todas as linhas, até a lista de proibições), sem o bloco das instruções para a pessoa, que o verificador de fato não confere (1.9.0). */
+function textoSemInstrucoes(entrada: string): string {
+  const corpo = /Texto a conferir:\n([\s\S]*?)\n\nProibicoes do cliente:/.exec(entrada)?.[1] ?? extrairCampo(entrada, "Texto a conferir:");
+  const inicio = corpo.indexOf("INSTRUÇÕES PARA A PESSOA");
+  return inicio === -1 ? corpo : corpo.slice(0, inicio);
+}
+
 function mockVerificarTexto(entrada: string, sistemaEstavel = "") {
   const texto = extrairCampo(entrada, "Texto a conferir:") || entrada;
   // O verificador por IA antes reprovava a nota do tema que CITAVA a proibição do cliente (1.7.3); com o tema da própria pessoa (1.8.0) a proibição é aviso e citar não fere. O simulador reprova a menção só quando o pedido não traz essa frase.
@@ -718,7 +725,8 @@ function mockVerificarTexto(entrada: string, sistemaEstavel = "") {
   }
   const gritando = /!{2,}/.test(texto) || texto === texto.toUpperCase();
   // O roteiro não inventa fato: com fontes na entrada, o marcador de teste faz o verificador reprovar o fato fora delas (só o mock; a prova de verdade é a chave real).
-  const inventou = entrada.includes("FONTES (") && texto.includes("{mock:fato-inventado}");
+  // 1.9.0: o que vem depois de "INSTRUÇÕES PARA A PESSOA" (gravação e edição) é ordem à pessoa e nunca conta como fato, como no critério do verificador de verdade.
+  const inventou = entrada.includes("FONTES (") && textoSemInstrucoes(entrada).includes("{mock:fato-inventado}");
   return {
     aprovado: !gritando && !inventou,
     motivo: gritando ? "tom exagerado para o texto de tela" : inventou ? "o texto afirma um fato específico que nada nas fontes sustenta" : null,

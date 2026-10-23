@@ -33,6 +33,7 @@ import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
+import { desempenhoDaConta } from "./desempenho-da-conta";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { avisoLinhaEditorial, fraseAvisoLinhaEditorial } from "./linha-editorial";
 import { diaPorExtenso } from "./noticias-assuntos";
@@ -528,7 +529,7 @@ export async function avaliarTema(
 
   // E45 PR 3: o tema livre olha o ramo principal e os alternativos que o admin ligou (o modelo do nicho continua sendo o do principal).
   const alternativosDaMarca = await ramosAlternativosDaMarca(cliente.id);
-  const [evidencias, modeloNicho, regrasCliente, [nicho]] = await Promise.all([
+  const [evidencias, modeloNicho, regrasCliente, desempenhoMedido, [nicho]] = await Promise.all([
     evidenciaParaTema(
       cliente.nichoId,
       texto,
@@ -540,6 +541,8 @@ export async function avaliarTema(
     ),
     modeloNichoAtual(cliente.nichoId),
     regrasAtivasDoCliente(cliente.id),
+    // E16, nível conta: o que rendeu nos vídeos já postados DESTA marca (vazio sem dado suficiente).
+    desempenhoDaConta(cliente.id),
     db().select({ criadoEm: nichos.criadoEm }).from(nichos).where(eq(nichos.id, cliente.nichoId)),
   ]);
 
@@ -570,6 +573,7 @@ export async function avaliarTema(
       modeloNicho: formatarModeloNicho(modeloNicho?.modelo ?? null),
       persona: cliente.persona,
       regrasCliente,
+      desempenhoDaConta: desempenhoMedido,
     }),
     entrada: avaliarTemaIA.montarEntrada({
       tema: texto,
