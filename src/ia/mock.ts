@@ -52,6 +52,10 @@ ${params.sistemaVariavel ?? ""}`);
   if (params.tarefa === "conferirVideoDoSetor" && params.entrada.includes("[mock:conferir-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
+  // Melhoria da E53: o modelo barato que sugere as palavras de busca de um assunto fora do ar; a folha dos assuntos diz que não deu e a pessoa escreve as palavras.
+  if (params.tarefa === "sugerirPalavrasDoAssunto" && params.entrada.includes("[mock:sugerir-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
   // E17 parte 1: o modelo barato que escolhe a prova do tema livre fora do ar; a prova volta a ser a da busca por palavra.
   if (params.tarefa === "reordenarEvidencia" && params.entrada.includes("[mock:reordenar-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
@@ -141,6 +145,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockTemaDoMomento(entrada);
     case "conferirPremissa":
       return mockConferirPremissa(entrada);
+    case "sugerirPalavrasDoAssunto":
+      return mockSugerirPalavrasDoAssunto(entrada);
     case "pesquisaNaHora":
       // A busca na web não é saída estruturada: ela tem a própria porta (`busca-na-web.ts`, simulada em `mock-busca.ts`).
       throw new ErroIA('a tarefa "pesquisaNaHora" nao usa saida estruturada; use buscarNaWeb()');
@@ -847,6 +853,17 @@ function mockTemaDoMomento(entrada: string) {
 }
 
 /** E53: um resumo curto a partir do título que a entrada traz (sem inventar nada além dele). */
+/**
+ * As palavras de busca de um assunto, determinadas pelo próprio texto do assunto: ele mesmo, cada palavra de quatro letras ou mais, "<assunto> hoje" e "notícias de <assunto>". De 3 a 5
+ * palavras, que é o que o schema real aceita.
+ */
+function mockSugerirPalavrasDoAssunto(entrada: string) {
+  const assunto = /<assunto>\s*([\s\S]*?)\s*<\/assunto>/.exec(entrada)?.[1]?.trim() || "assunto";
+  const soltas = assunto.split(/\s+/).filter((palavra) => palavra.length >= 4);
+  const palavras = [...new Set([assunto, ...soltas, `${assunto} hoje`, `notícias de ${assunto}`].map((p) => p.slice(0, 40)))];
+  return { palavras: palavras.slice(0, 5) };
+}
+
 function mockResumirNoticia(entrada: string) {
   const titulo = /Título: (.*)/.exec(entrada)?.[1]?.trim() ?? "a notícia";
   return { resumo: `Resumo: ${titulo}.` };

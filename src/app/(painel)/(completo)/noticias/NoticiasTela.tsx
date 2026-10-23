@@ -9,6 +9,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import { abrirNoticiaDoAssuntoAction } from "./acoes";
+import type { AssuntoEmAltaNaFolha } from "./CampoDeAssunto";
 import { CartaoDeNoticia, type NoticiaNaTela } from "./CartaoDeNoticia";
 import { FolhaDosAssuntos, type AssuntoNaFolha } from "./FolhaDosAssuntos";
 import styles from "./NoticiasTela.module.css";
@@ -20,6 +21,8 @@ type Props = {
   deHoje: NoticiaNaTela[];
   deOntem: NoticiaNaTela[];
   assuntos: AssuntoNaFolha[];
+  /** O que está em alta no Brasil agora, para o campo do assunto sugerir. */
+  emAlta: AssuntoEmAltaNaFolha[];
   novasDesdeOntem: number;
   /** A coleta ou a leitura falhou; o que já estava guardado continua (se houver). */
   falha: boolean;
@@ -47,7 +50,7 @@ function passa(n: NoticiaNaTela, filtro: Filtro): boolean {
  * `/noticias` (E53, passo 20): a capa do dia. A data, a linha dos assuntos que a pessoa acompanha (com "Editar", que abre a folha), as pílulas de origem, o destaque com a foto grande e os
  * cartões. Sem notícia nova hoje, o aviso e as de ontem embaixo. Abrir o original ou pedir o roteiro de uma notícia de assunto mantém o assunto vivo (a recusa do "ver como" é ignorada).
  */
-export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, assuntos, novasDesdeOntem, falha, somenteLeitura }: Props) {
+export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, assuntos, emAlta, novasDesdeOntem, falha, somenteLeitura }: Props) {
   const router = useRouter();
   const [folhaAberta, setFolhaAberta] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>("tudo");
@@ -188,6 +191,7 @@ export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, ass
         aberto={folhaAberta}
         aoFechar={fecharFolha}
         assuntos={assuntos}
+        emAlta={emAlta}
         somenteLeitura={somenteLeitura}
         aoAcrescentar={(assunto) => setChegando({ assunto, quando: quandoChega(new Date()) })}
       />
