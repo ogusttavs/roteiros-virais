@@ -66,6 +66,17 @@ export function temaTemProvaSuficiente(
   return motivoSemProva(idsEvidenciaVideo, videosPorId, agora, janelaDias, proporcaoBrasil, regrasPorSetor) === null;
 }
 
+/**
+ * Hotfix de 23/10/2026: a prova de vídeo ainda PODE existir com estes candidatos? Condição necessária, sem olhar janela nem país: pelo menos `MINIMO_VIDEOS_PROVA` vídeos na lista e pelo menos
+ * `MINIMO_CONTAS_PROVA` contas diferentes entre os que têm dono (vídeo sem dono conta como vídeo, nunca como conta). Se nem isto vale, nenhum tema de vídeo passa, e chamar o modelo forte para
+ * propor temas de vídeo (duas vezes) é gasto à toa: o setor 5 de 22 e 23/10 tinha 5 vídeos de uma conta só e os três temas das duas chamadas foram barrados por "1 conta".
+ */
+export function provaDeVideoEhPossivel(candidatos: { contaId?: number | null }[], semDono: number = 0): boolean {
+  if (candidatos.length + semDono < MINIMO_VIDEOS_PROVA) return false;
+  const contasDistintas = new Set(candidatos.map((c) => c.contaId).filter((id): id is number => id !== null && id !== undefined));
+  return contasDistintas.size >= MINIMO_CONTAS_PROVA;
+}
+
 /** Quantos brasileiros a prova pede entre `total` vídeos, pela régua do setor (nunca mais que a maioria simples). */
 export function minimoBrasileirosNaProva(total: number, proporcaoBrasil: number): number {
   const pelaMaioria = Math.floor(total / 2) + 1;

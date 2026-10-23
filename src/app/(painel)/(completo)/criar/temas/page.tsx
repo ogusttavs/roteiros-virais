@@ -6,12 +6,13 @@ import { classificarMultiplo, formatarMultiplo, formatarViewsCompacto, diasDesde
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
+import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { evidenciaResumoPorIds, setorAindaLendo, setorSemBase, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { pedirTemaDeHoje, temasParaCliente, type ResultadoTemasHoje } from "@/servicos/temas";
 import { perguntasDaTelaSemFalha } from "@/servicos/vozes-do-publico";
 import { textosHoje } from "@/textos/hoje";
-import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
+import type { EvidenciaTema, FonteNoticiaTema } from "@/ui/componentes/TemaCartao";
 
 import { avisoSemTema } from "./aviso-sem-tema";
 import { TemasTela } from "./TemasTela";
@@ -61,6 +62,20 @@ export default async function Temas({ searchParams }: Props) {
   const evidenciasTemas = await Promise.all(
     temas.map((tema) => evidenciaResumoPorIds(tema.evidencias).then(paraEvidenciaTema)),
   );
+  // Hotfix de 23/10/2026: o tema que nasceu de uma notícia (nenhum vídeo o sustenta) diz qual; o cartão mostra isto no lugar do bloco do vídeo.
+  const fontesNoticias = await Promise.all(
+    temas.map(async (tema): Promise<FonteNoticiaTema | null> => {
+      const idNoticia = tema.evidencias.length === 0 && !tema.doMomento ? (tema.evidenciasNoticias ?? [])[0] : undefined;
+      if (idNoticia === undefined) return null;
+      const noticia = await noticiaDeOrigemDoRoteiro(idNoticia).catch(() => null);
+      if (!noticia) return null;
+      return {
+        titulo: noticia.titulo,
+        veiculo: noticia.fonte,
+        quando: textosHoje.temaDeNoticia.quando(noticia.publicadoEm ? diasDesde(noticia.publicadoEm) : 0),
+      };
+    }),
+  );
   // O que se sabe do ramo quando não há tema (E45 PR 2): sem setor e com pedido de ramo aberto, o ramo está sendo conferido; com setor sem vídeo
   // nenhum, está começando a ser pesquisado; com vídeo e sem análise, está sendo lido.
   const estadoDoRamo =
@@ -85,6 +100,7 @@ export default async function Temas({ searchParams }: Props) {
     <TemasTela
       temas={temas}
       evidenciasTemas={evidenciasTemas}
+      fontesNoticias={fontesNoticias}
       avisoLinhaEditorial={resultado.status === "ok" ? resultado.avisoLinhaEditorial : null}
       aviso={aviso}
       gerando={gerando}

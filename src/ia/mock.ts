@@ -888,6 +888,21 @@ function mockTemasDoDia(entrada: string) {
   const numerosDasVozes = [...entrada.matchAll(/^(?:pergunta|reclamação|pedido) (\d+) \|/gm)].map((m) => Number(m[1]));
   const perguntaDoPrimeiro = entrada.includes("[mock:numero-inexistente]") ? 99 : (numerosDasVozes[0] ?? null);
 
+  // Hotfix de 23/10/2026: o modo "completar com notícias" (`MARCADOR_COMPLETAR_COM_NOTICIAS`, `prompts/temasDoDia.ts`): um tema por notícia da lista (até três), sem vídeo, com título que não colide com o dos temas de vídeo.
+  if (entrada.includes("Pedido desta rodada: completar o dia com notícias")) {
+    return {
+      temas: idsNoticias.slice(0, 3).map((idNoticia, i) => ({
+        titulo: `tema de noticia simulado ${i + 1}`,
+        descricao: "tema nascido de uma noticia relevante do setor",
+        porQue: "a noticia saiu esta semana e importa a quem tem este negocio",
+        evidencias: [],
+        evidenciasNoticias: [idNoticia],
+        puxaPara: puxaPara[i % puxaPara.length],
+        perguntaNumero: null,
+      })),
+    };
+  }
+
   if (entrada.includes(MARCADOR_EVIDENCIA_INVENTADA_TEMA)) {
     return {
       temas: [0, 1, 2].map((i) => ({

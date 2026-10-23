@@ -40,6 +40,7 @@ import { gerarEstruturado } from "@/ia/cliente";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
 import { registrarGeracao } from "@/ia/registro";
 import { hojeISO } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { registrarMarcasPuladas, resumoDasMarcasPuladas, separarMarcasPorAssinatura } from "@/servicos/assinatura-tarefas";
 import { filtrarNoticiasDoRamo, relevantesDoRamo, type NoticiaCandidata } from "@/servicos/filtro-de-noticias";
 import { diaPorExtenso } from "@/servicos/noticias-assuntos";
@@ -50,7 +51,8 @@ import {
   semDonoComAnalise,
   subindoHojeComAnalise,
 } from "@/servicos/pesquisa";
-import { buscarVideosParaProva, janelaDeProva, minimoBrasileirosNaProva, motivoSemProva } from "@/servicos/prova-tema";
+import { buscarVideosParaProva, janelaDeProva, minimoBrasileirosNaProva, motivoSemProva, provaDeVideoEhPossivel } from "@/servicos/prova-tema";
+import { listaDeTendenciasDeAgora, temasQueAindaValem } from "@/servicos/tendencias";
 import { vozesDoSetor, vozesParaOPrompt, type VozNumerada } from "@/servicos/vozes-do-publico";
 
 import { atualizarTemaDoMomento } from "./tema-do-momento";
@@ -59,6 +61,9 @@ const VINTE_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 /** Quantas notícias relevantes, no máximo, vão como evidência na chamada forte dos temas. */
 const LIMITE_NOTICIAS_NO_TEMA = 12;
 const LIMITE_SUBINDO = 30;
+/** Hotfix de 23/10/2026: quantas notícias relevantes da semana o modelo vê quando a notícia completa o dia (as mais recentes primeiro). */
+const LIMITE_NOTICIAS_PARA_COMPLETAR = 15;
+const SETE_DIAS_MS = 7 * VINTE_QUATRO_HORAS_MS;
 
 type NichoAtivo = { id: number; slug: string; nome: string; termos: string[]; criadoEm: Date };
 
@@ -185,6 +190,97 @@ async function filtrarTemasComProva(
 const TEMAS_POR_DIA = 3;
 
 /**
+ * Hotfix de 23/10/2026 ("os temas de hoje só tá vindo 1"): o ramo com pouco vídeo de prova fechava o dia sem tema de verdade (o setor 5 tinha 5 vídeos, todos da mesma conta, e a prova pede
+ * 2 contas; a regra não mudou). Quando os temas com prova de vídeo não fecham o dia, o que falta é completado com temas ancorados numa notícia relevante recente do setor (fonte que o projeto já
+ * aceita, E43). O tema guarda só o id da notícia em `evidenciasNoticias` (`evidencias` fica vazio: nenhum vídeo é citado como prova) e a tela diz de onde ele veio. Nunca inventa: o código só
+ * aceita tema que cita uma notícia que foi de fato enviada, uma notícia por tema, sem repetir título. Falha da chamada nunca derruba o que o dia já tem.
+ */
+export function aceitarTemasDeNoticia(
+  temas: TemaDoDia[],
+  idsValidosNoticias: Set<number>,
+  jaTem: TemaDoDia[],
+  vagas: number,
+): TemaDoDia[] {
+  const titulos = new Set(jaTem.map((t) => t.titulo.trim().toLowerCase()));
+  const noticiasUsadas = new Set(jaTem.flatMap((t) => t.evidenciasNoticias ?? []));
+  const aceitos: TemaDoDia[] = [];
+  for (const tema of temas) {
+    if (aceitos.length >= vagas) break;
+    const titulo = tema.titulo.trim();
+    if (titulo === "" || titulos.has(titulo.toLowerCase())) continue;
+    const idNoticia = (tema.evidenciasNoticias ?? []).find((id) => idsValidosNoticias.has(id) && !noticiasUsadas.has(id));
+    if (idNoticia === undefined) continue;
+    titulos.add(titulo.toLowerCase());
+    noticiasUsadas.add(idNoticia);
+    // Só o que um tema de notícia carrega: nenhuma pergunta do público nem assunto em alta, e nenhum vídeo citado como prova.
+    aceitos.push({ titulo, descricao: tema.descricao, porQue: tema.porQue, evidencias: [], evidenciasNoticias: [idNoticia], puxaPara: tema.puxaPara });
+  }
+  return aceitos;
+}
+
+/** Os temas da linha do dia sem os do momento cujo assunto já saiu da lista de agora (só consulta a lista quando há tema do momento). */
+async function temasQueAindaValemAgora(temas: TemaDoDia[]): Promise<TemaDoDia[]> {
+  if (!temas.some((t) => t.doMomento)) return temas;
+  return temasQueAindaValem(temas, await listaDeTendenciasDeAgora());
+}
+
+async function completarComNoticias(dados: {
+  nicho: NichoAtivo;
+  sistemaEstavel: string;
+  noticias: NoticiaCandidata[];
+  jaTem: TemaDoDia[];
+  vagas: number;
+}): Promise<TemaDoDia[]> {
+  const usadas = new Set(dados.jaTem.flatMap((t) => t.evidenciasNoticias ?? []));
+  const disponiveis = dados.noticias.filter((n) => !usadas.has(n.id));
+  if (dados.vagas <= 0 || disponiveis.length === 0) return [];
+
+  try {
+    const resultado = await gerarEstruturado({
+      tarefa: "temasDoDia",
+      nivel: temasDoDiaIA.nivel,
+      effort: temasDoDiaIA.esforco,
+      schema: temasDoDiaIA.schema,
+      sistemaEstavel: dados.sistemaEstavel,
+      entrada: temasDoDiaIA.montarEntrada({
+        subindoHoje: [],
+        noticias: disponiveis.map((n) => ({ id: n.id, titulo: n.titulo, resumo: n.resumo ?? "" })),
+        completarComNoticias: { vagas: dados.vagas, jaTem: dados.jaTem.map((t) => t.titulo) },
+      }),
+    });
+
+    const temas: TemaDoDia[] = resultado.dados.temas.map((t) => ({
+      titulo: t.titulo,
+      descricao: t.descricao,
+      porQue: t.porQue,
+      evidencias: t.evidencias,
+      evidenciasNoticias: t.evidenciasNoticias,
+      puxaPara: t.puxaPara,
+    }));
+    const aceitos = aceitarTemasDeNoticia(temas, new Set(disponiveis.map((n) => n.id)), dados.jaTem, dados.vagas);
+
+    await registrarGeracao({
+      tarefa: "temasDoDia",
+      versaoPrompt: temasDoDiaIA.versao,
+      modelo: resultado.modelo,
+      nivel: temasDoDiaIA.nivel,
+      entradas: { nichoId: dados.nicho.id, modo: "completarComNoticias", noticias: disponiveis.length, vagas: dados.vagas, aceitos: aceitos.length },
+      saida: resultado.dados,
+      uso: {
+        tokensEntrada: resultado.tokensEntrada,
+        tokensSaida: resultado.tokensSaida,
+        tokensCacheLeitura: resultado.tokensCacheLeitura,
+        tokensCacheEscrita: resultado.tokensCacheEscrita,
+      },
+    });
+    return aceitos;
+  } catch (erro) {
+    logger.warn({ err: erro, nichoId: dados.nicho.id }, "nao foi possivel completar os temas do dia com noticias");
+    return [];
+  }
+}
+
+/**
  * E55: o tema "do momento" (`doMomento`) vive na mesma linha do dia, mas não é um dos temas com prova de vídeo: gerar os três de novo nunca o apaga (ele sai quando o assunto sai da lista de
  * tendências, `tema-do-momento.ts`), e a contagem de "já tem tema" olha só os temas de verdade.
  */
@@ -239,15 +335,21 @@ export async function podeSobrescreverTemasDoDia(nichoId: number, temasNovos: Te
 
 async function gerarTemasDoNicho(
   nicho: NichoAtivo,
-): Promise<{ status: "gerado" | "sem_evidencia" | "sem_prova" | "sem_novidade" | "mantido"; temasSemProva: number }> {
-  const [regua, subindo, semDono, existente] = await Promise.all([
+): Promise<{ status: "gerado" | "sem_evidencia" | "sem_prova" | "sem_novidade" | "mantido"; temasSemProva: number; deNoticia: number }> {
+  const [regua, subindo, semDono, noticiasDaSemana, existente] = await Promise.all([
     reguaDoSetor(nicho.id),
     // Hotfix de 02/10/2026: brasileiro primeiro na lista que o modelo recebe, senão o tema não tem
     // como montar a prova num setor com muita conta de fora.
     subindoHojeComAnalise(nicho.id, LIMITE_SUBINDO, { brasilPrimeiro: true }),
     semDonoComAnalise(nicho.id),
+    // Hotfix de 23/10/2026: as notícias relevantes da semana, que completam o dia quando falta vídeo de prova (as mais recentes primeiro).
+    relevantesDoRamo(nicho.id, { coletadasDesde: new Date(Date.now() - SETE_DIAS_MS), limite: LIMITE_NOTICIAS_PARA_COMPLETAR }),
     db()
-      .select({ temas: temasDia.temas, candidatosNaUltimaTentativa: temasDia.candidatosNaUltimaTentativa })
+      .select({
+        temas: temasDia.temas,
+        candidatosNaUltimaTentativa: temasDia.candidatosNaUltimaTentativa,
+        noticiaMaisNovaNaTentativa: temasDia.noticiaMaisNovaNaTentativa,
+      })
       .from(temasDia)
       .where(and(eq(temasDia.nichoId, nicho.id), eq(temasDia.data, hojeISO())))
       .then((linhas) => linhas[0]),
@@ -262,19 +364,31 @@ async function gerarTemasDoNicho(
    * forte para um setor que continuava sem o vídeo a mais que faltava.
    */
   const candidatosAgora = subindo.length + semDono.length;
+  /**
+   * Hotfix de 23/10/2026: notícia nova passa a contar (ela completa o dia quando falta vídeo de prova). Uma linha de antes do hotfix (`noticiaMaisNovaNaTentativa` nulo) tenta uma vez com notícia,
+   * se o setor tem alguma relevante na semana.
+   */
+  const noticiaMaisNovaAgora = noticiasDaSemana.reduce<number | null>((maior, n) => (maior === null || n.id > maior ? n.id : maior), null);
+  const chegouNoticiaNova =
+    noticiaMaisNovaAgora !== null &&
+    (existente?.noticiaMaisNovaNaTentativa === null || existente?.noticiaMaisNovaNaTentativa === undefined || noticiaMaisNovaAgora > existente.noticiaMaisNovaNaTentativa);
   if (
     existente &&
     semOMomento(existente.temas).length === 0 &&
     existente.candidatosNaUltimaTentativa !== null &&
-    candidatosAgora <= existente.candidatosNaUltimaTentativa
+    candidatosAgora <= existente.candidatosNaUltimaTentativa &&
+    !chegouNoticiaNova
   ) {
-    return { status: "sem_novidade", temasSemProva: 0 };
+    return { status: "sem_novidade", temasSemProva: 0, deNoticia: 0 };
   }
 
   const noticiasRelevantes = await noticiasRelevantesDoDia(nicho);
+  // O filtro acima pode ter marcado notícias novas agora: as da semana valem pelas duas listas (sem repetir id), as de hoje primeiro.
+  const idsDeHoje = new Set(noticiasRelevantes.map((n) => n.id));
+  const noticiasParaCompletar = [...noticiasRelevantes, ...noticiasDaSemana.filter((n) => !idsDeHoje.has(n.id))].slice(0, LIMITE_NOTICIAS_PARA_COMPLETAR);
 
-  if (subindo.length === 0 && semDono.length === 0 && noticiasRelevantes.length === 0) {
-    return { status: "sem_evidencia", temasSemProva: 0 };
+  if (subindo.length === 0 && semDono.length === 0 && noticiasRelevantes.length === 0 && noticiasParaCompletar.length === 0) {
+    return { status: "sem_evidencia", temasSemProva: 0, deNoticia: 0 };
   }
 
   const modeloNicho = await modeloNichoAtual(nicho.id);
@@ -309,15 +423,19 @@ async function gerarTemasDoNicho(
     vozes: vozesDoPublico,
   };
 
-  let tentativa = await tentarGerarTemas(parametrosTentativa);
-  if (!tentativa.valido) {
-    tentativa = await tentarGerarTemas(parametrosTentativa);
+  // Sem como existir prova de vídeo (menos de 3 vídeos, ou todos de uma conta só), as duas chamadas de vídeo seriam gasto à toa (todo tema seria barrado), e o dia vai direto para a notícia.
+  const temVideo = provaDeVideoEhPossivel(subindo, semDono.length);
+  let primeira: Awaited<ReturnType<typeof filtrarTemasComProva>> = { temasComProva: [], temasSemProva: 0, barrados: [] };
+  if (temVideo) {
+    let tentativa = await tentarGerarTemas(parametrosTentativa);
     if (!tentativa.valido) {
-      throw new Error("tema sem evidencia valida depois de refazer a chamada uma vez");
+      tentativa = await tentarGerarTemas(parametrosTentativa);
+      if (!tentativa.valido) {
+        throw new Error("tema sem evidencia valida depois de refazer a chamada uma vez");
+      }
     }
+    primeira = await filtrarTemasComProva(tentativa.temas, nicho, new Date(), regua.proporcaoBrasil);
   }
-
-  const primeira = await filtrarTemasComProva(tentativa.temas, nicho, new Date(), regua.proporcaoBrasil);
   let temasComProva = primeira.temasComProva;
   let temasSemProva = primeira.temasSemProva;
 
@@ -328,7 +446,7 @@ async function gerarTemasDoNicho(
    * somam, até três. Só refaz quando existe vídeo na lista (tema só de notícia nunca tem prova, e
    * refazer não mudaria isso).
    */
-  if (temasComProva.length < TEMAS_POR_DIA && idsValidos.size > 0) {
+  if (temVideo && temasComProva.length < TEMAS_POR_DIA) {
     const jaAprovados = temasComProva.map((t) => `"${t.titulo}"`).join(", ");
     const ajuste = [
       "Segunda tentativa. Na primeira, estes temas foram descartados por não cumprirem a regra da prova:",
@@ -355,6 +473,28 @@ async function gerarTemasDoNicho(
     }
   }
 
+  /**
+   * Hotfix de 23/10/2026: o que a prova de vídeo não fechou é completado com temas ancorados numa notícia relevante recente do setor. A vaga do tema do momento (E55) que já está na linha
+   * do dia não é tomada: o dia fecha três ao todo. Só o que sobrar sem notícia que sirva fica vazio (último recurso: menos de três, e a tela diz isso com calma).
+   */
+  // Só o tema do momento que ainda vale (o assunto segue na lista de agora) ocupa vaga: o que já saiu da lista é tirado logo depois por `atualizarTemaDoMomento`, e contá-lo deixaria o dia com dois.
+  const existentesQueValem = existente ? await temasQueAindaValemAgora(existente.temas) : [];
+  const vagasDeNoticia = TEMAS_POR_DIA - existentesQueValem.filter((t) => t.doMomento).length - temasComProva.length;
+  let deNoticia = 0;
+  if (vagasDeNoticia > 0) {
+    const daNoticia = await completarComNoticias({
+      nicho,
+      sistemaEstavel,
+      noticias: noticiasParaCompletar,
+      jaTem: temasComProva,
+      vagas: vagasDeNoticia,
+    });
+    deNoticia = daNoticia.length;
+    temasComProva = [...temasComProva, ...daNoticia];
+    temasSemProva = Math.max(0, temasSemProva - deNoticia);
+  }
+  const noticiaMaisNovaGravada = noticiasParaCompletar.reduce<number | null>((maior, n) => (maior === null || n.id > maior ? n.id : maior), null);
+
   if (temasComProva.length === 0) {
     /**
      * M5b, item 3: marca a tentativa (nunca por cima de um dia que já tinha tema de verdade; essa
@@ -366,29 +506,35 @@ async function gerarTemasDoNicho(
       const momentoQueJaEstava = existente ? existente.temas.filter((t) => t.doMomento) : [];
       await db()
         .insert(temasDia)
-        .values({ nichoId: nicho.id, data: hojeISO(), temas: momentoQueJaEstava, candidatosNaUltimaTentativa: candidatosAgora })
+        .values({
+          nichoId: nicho.id,
+          data: hojeISO(),
+          temas: momentoQueJaEstava,
+          candidatosNaUltimaTentativa: candidatosAgora,
+          noticiaMaisNovaNaTentativa: noticiaMaisNovaGravada,
+        })
         .onConflictDoUpdate({
           target: [temasDia.nichoId, temasDia.data],
-          set: { temas: momentoQueJaEstava, candidatosNaUltimaTentativa: candidatosAgora },
+          set: { temas: momentoQueJaEstava, candidatosNaUltimaTentativa: candidatosAgora, noticiaMaisNovaNaTentativa: noticiaMaisNovaGravada },
         });
     }
-    return { status: "sem_prova", temasSemProva };
+    return { status: "sem_prova", temasSemProva, deNoticia: 0 };
   }
 
   if (!(await podeSobrescreverTemasDoDia(nicho.id, temasComProva))) {
-    return { status: "mantido", temasSemProva };
+    return { status: "mantido", temasSemProva, deNoticia: 0 };
   }
 
-  const temasDaLinha = comOMomentoQueJaEstava(temasComProva, existente?.temas ?? []);
+  const temasDaLinha = comOMomentoQueJaEstava(temasComProva, existentesQueValem);
   await db()
     .insert(temasDia)
-    .values({ nichoId: nicho.id, data: hojeISO(), temas: temasDaLinha })
+    .values({ nichoId: nicho.id, data: hojeISO(), temas: temasDaLinha, noticiaMaisNovaNaTentativa: noticiaMaisNovaGravada })
     .onConflictDoUpdate({
       target: [temasDia.nichoId, temasDia.data],
-      set: { temas: temasDaLinha },
+      set: { temas: temasDaLinha, noticiaMaisNovaNaTentativa: noticiaMaisNovaGravada },
     });
 
-  return { status: "gerado", temasSemProva };
+  return { status: "gerado", temasSemProva, deNoticia };
 }
 
 /**
@@ -463,6 +609,7 @@ export async function rodarTemasDoDia(
         semProva: 0,
         semNovidade: 0,
         temasSemProva: 0,
+        deNoticia: 0,
         falhas: 0,
         jaTinhaTemaHoje: true,
       };
@@ -490,6 +637,7 @@ export async function rodarTemasDoDia(
   let semProva = 0;
   let semNovidade = 0;
   let temasSemProva = 0;
+  let deNoticia = 0;
   let falhas = 0;
   const erros: string[] = [];
   const temasDoMomento: Record<string, number> = {};
@@ -505,6 +653,7 @@ export async function rodarTemasDoDia(
         erros.push(`tema do momento do nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
       }
       temasSemProva += resultado.temasSemProva;
+      deNoticia += resultado.deNoticia;
       if (resultado.status === "gerado") gerados += 1;
       else if (resultado.status === "mantido") mantidos += 1;
       else if (resultado.status === "sem_prova") semProva += 1;
@@ -524,6 +673,8 @@ export async function rodarTemasDoDia(
     semProva,
     semNovidade,
     temasSemProva,
+    // Hotfix de 23/10/2026: quantos temas do dia nasceram de notícia (completam o que a prova de vídeo não fechou).
+    deNoticia,
     falhas,
     // Os setores que ficaram sem tema novo por falta de uso (ninguém gerou roteiro em 3 dias): o admin vê quantos em Rotinas.
     semUso,

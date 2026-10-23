@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { motivoSemProva, temaTemProvaSuficiente, type RegraDoSetor, type VideoParaProva } from "./prova-tema";
+import { motivoSemProva, provaDeVideoEhPossivel, temaTemProvaSuficiente, type RegraDoSetor, type VideoParaProva } from "./prova-tema";
 
 const AGORA = new Date("2026-10-03T12:00:00Z");
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -154,5 +154,30 @@ describe("temaTemProvaSuficiente com regras por setor", () => {
     const videos = new Map<number, VideoParaProva>([video(1, 9, true), video(2, 9, true), video(3, 9, true)].map((v) => [v.id, v]));
     expect(temaTemProvaSuficiente([1, 2, 3], videos, AGORA, 7, 0.7)).toBe(true);
     expect(temaTemProvaSuficiente([1, 2, 3], videos, AGORA, 7, 0.7, new Map())).toBe(true);
+  });
+});
+
+/** Hotfix de 23/10/2026: o setor 5 tinha 5 vídeos, todos da mesma conta; nenhum tema de vídeo podia passar, e o modelo forte foi chamado duas vezes à toa. */
+describe("provaDeVideoEhPossivel", () => {
+  it("cinco vídeos de uma conta só: a prova não pode existir", () => {
+    expect(provaDeVideoEhPossivel([1, 2, 3, 4, 5].map(() => ({ contaId: 73435 })))).toBe(false);
+  });
+
+  it("três vídeos de duas contas: pode existir", () => {
+    expect(provaDeVideoEhPossivel([{ contaId: 1 }, { contaId: 1 }, { contaId: 2 }])).toBe(true);
+  });
+
+  it("menos de três vídeos não prova nada, mesmo de contas diferentes", () => {
+    expect(provaDeVideoEhPossivel([{ contaId: 1 }, { contaId: 2 }])).toBe(false);
+  });
+
+  it("vídeo sem dono conta como vídeo, nunca como conta", () => {
+    expect(provaDeVideoEhPossivel([{ contaId: 1 }, { contaId: null }, { contaId: null }])).toBe(false);
+    expect(provaDeVideoEhPossivel([{ contaId: 1 }, { contaId: 2 }], 1)).toBe(true);
+    expect(provaDeVideoEhPossivel([{ contaId: 1 }], 5)).toBe(false);
+  });
+
+  it("lista vazia: não", () => {
+    expect(provaDeVideoEhPossivel([])).toBe(false);
   });
 });
