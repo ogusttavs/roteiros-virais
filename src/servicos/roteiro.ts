@@ -1944,6 +1944,21 @@ export async function marcarGravado(roteiroId: number): Promise<RoteiroLinha> {
 }
 
 /**
+ * "Ainda não gravei": desfaz um "Já gravei" tocado sem querer (achado do uso real, 22/10/2026). Só volta
+ * quem está `gravado`; um roteiro `postado` (ou ainda `gerado`) nunca é tocado, e a posse entra na própria
+ * condição do UPDATE (marca da sessão), para o dado de outra marca nem existir para esta chamada.
+ */
+export async function desmarcarGravado(roteiroId: number, clienteId: number): Promise<RoteiroLinha> {
+  const [roteiro] = await db()
+    .update(roteiros)
+    .set({ status: "gerado", gravadoEm: null })
+    .where(and(eq(roteiros.id, roteiroId), eq(roteiros.clienteId, clienteId), eq(roteiros.status, "gravado")))
+    .returning();
+  if (!roteiro) throw new ErroRoteiro("roteiro nao esta gravado.");
+  return roteiro;
+}
+
+/**
  * O domínio da URL diz a plataforma; o formato do caminho diz o id externo
  * (etapa 11, decisão 5). Sem reconhecer nenhum dos dois, grava só a URL e
  * deixa o resto nulo: a medição da curva por API oficial é da fase 3.
