@@ -1,0 +1,141 @@
+/**
+ * O campo "Assunto" que sugere enquanto a pessoa digita (melhoria da E53, 23/10/2026). O campo, o rótulo e a ajuda são os do `Campo` (Campo.module.css); aqui só a lupa, a lista que abre
+ * embaixo e as linhas dela, no mesmo vocabulário da busca de ramo (`BuscaDeRamo.module.css`): a lista fica em fluxo, dentro da folha, e empurra o que está embaixo (nunca cobre o campo
+ * das palavras nem some atrás do teclado do celular).
+ */
+.caixa {
+  position: relative;
+}
+
+.lupa {
+  position: absolute;
+  top: calc(var(--altura-toque) / 2);
+  left: var(--espaco-3);
+  transform: translateY(-50%);
+  color: var(--cor-texto-dica);
+  pointer-events: none;
+}
+
+/* `.caixa .entrada` (duas classes) para ganhar do `padding` do Campo em qualquer ordem de carga do CSS. */
+.caixa .entrada {
+  width: 100%;
+  padding-left: calc(var(--espaco-3) + 18px + var(--espaco-2));
+  /* O X de apagar fica no canto direito. */
+  padding-right: var(--altura-toque);
+  text-overflow: ellipsis;
+}
+
+.limpar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.limpar:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.lista {
+  display: grid;
+  gap: var(--espaco-1);
+  max-height: min(45vh, 22rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--espaco-1);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+}
+
+.opcoes {
+  display: grid;
+  gap: 2px;
+}
+
+.linha {
+  display: grid;
+  gap: 2px;
+}
+
+.cabecalhoDoGrupo {
+  padding: var(--espaco-2) var(--espaco-3) 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cor-texto-dica);
+}
+
+.opcao {
+  display: grid;
+  gap: 2px;
+  min-height: var(--altura-toque);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-sm);
+  color: var(--cor-titulo);
+  cursor: pointer;
+}
+
+/* O marcado: fundo de seleção e contorno, e o nome na cor de destaque (o mesmo da busca de ramo). */
+.opcaoAtiva {
+  background: var(--cor-selecao-suave);
+  box-shadow: inset 0 0 0 var(--largura-borda) var(--cor-selecao-borda);
+}
+
+.opcaoAtiva .nome {
+  color: var(--cor-destaque);
+}
+
+.nome {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  overflow-wrap: anywhere;
+}
+
+.alta {
+  flex: none;
+  color: var(--cor-destaque);
+}
+
+.palavras {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.semResultado {
+  margin: 0;
+  padding: var(--espaco-3);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+/* "Sugerir palavras": a frase e o botão embaixo do campo, quebrando em duas linhas no celular. */
+.sugerir {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2) var(--espaco-3);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.sugerir > span {
+  flex: 1 1 14rem;
+}

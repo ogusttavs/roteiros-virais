@@ -33,6 +33,7 @@ const { reprovarERescreverAction } = await import("@/app/(painel)/(completo)/rot
 const { favoritarAction } = await import("@/app/(painel)/(completo)/referencias/acoes");
 const { salvarRascunhoAction: salvarRascunhoDoOnboarding } = await import("@/app/comecar/acoes");
 const { organizarFalaBriefingAction } = await import("@/app/(painel)/_briefing/acoes");
+const { sugerirPalavrasAction } = await import("@/app/(painel)/(completo)/noticias/acoes");
 const { POST: transcrever } = await import("@/app/api/transcrever/route");
 const { GET: pdf } = await import("@/app/api/roteiros/[id]/pdf/route");
 const { GET: imagem } = await import("@/app/api/roteiros/[id]/imagem/route");
@@ -130,6 +131,7 @@ const ACOES_QUE_GASTAM: Array<[string, () => Promise<unknown>]> = [
   ["avaliarRespostaAction do Briefing (nota da resposta)", () => avaliarRespostaDoBriefing("p1", "uma resposta")],
   ["reprovarERescreverAction (reescrever o roteiro)", () => reprovarERescreverAction(1, [] as never)],
   ["organizarFalaBriefingAction (IA sobre a fala)", () => organizarFalaBriefingAction("p1", "texto falado")],
+  ["sugerirPalavrasAction (palavras do assunto das Notícias)", () => sugerirPalavrasAction("feira de adoção")],
   ["avaliarRespostaAction do onboarding, com o briefing completo", () => avaliarRespostaDoBriefing("p1", "x")],
 ];
 

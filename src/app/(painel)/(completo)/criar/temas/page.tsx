@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 
+import { datasDeHojeEProximas } from "@/config/datas";
 import { hojeISO } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { classificarMultiplo, formatarMultiplo, formatarViewsCompacto, diasDesde, fraseDiasAtras, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { ramosDaMarcaParaDatasSemFalha } from "@/servicos/datas";
 import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
 import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
@@ -95,6 +97,8 @@ export default async function Temas({ searchParams }: Props) {
   const aviso = gerando ? null : soSobrouOMomento ? textosHoje.emAlta.soOMomento : avisoSemTema(resultado, new Date(), estadoDoRamo);
   // E28 (parte 3b): o que o público do setor perguntou nos comentários esta semana, depois dos três temas (nulo, sem erro, no setor sem leitura).
   const perguntas = await perguntasDaTelaSemFalha(cliente.nichoId);
+  // E60: a data que vem aí (de hoje até 7 dias) como ponto de partida, com a fonte dita na tela. Sem IA e sem pesquisa: é a data do calendário da marca.
+  const datas = datasDeHojeEProximas(hojeISO(), await ramosDaMarcaParaDatasSemFalha(cliente));
 
   return (
     <TemasTela
@@ -108,6 +112,7 @@ export default async function Temas({ searchParams }: Props) {
       dataInicial={dataInicial}
       emAlta={emAlta}
       perguntas={perguntas}
+      datas={datas}
     />
   );
 }

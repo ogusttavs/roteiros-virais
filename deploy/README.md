@@ -236,12 +236,21 @@ achado por `PPid` em `/proc/<pid>/status`, nunca por nome de processo: a imagem 
 sair sozinho e reinicia o container de verdade: o critério é `RestartCount` subindo (0
 para 1 ou mais) e o log mostrando "worker no ar" de novo.
 
+**O que o worker novo faz com o que o morto deixou (22/10/2026).** Um `kill -9` no meio de um
+job deixa a linha dele `active` no pg-boss e a execução "rodando" em `execucoes_job`. Ao subir,
+o worker (`src/jobs/orfaos.ts`) dá os `active` como falhos e fecha as execuções presas; isso
+vale porque existe um worker só (o Compose para o antigo antes de criar o novo): nunca suba
+um segundo `roteiros-worker`. Como segunda rede, toda fila tem pulso (`heartbeatSeconds` 180):
+sem pulso, o monitor do pg-boss dá o job como falho em 3 a 4 minutos. O disparo de fora
+(`POST /api/jobs/<nome>`, `src/jobs/disparo.ts`) só recusa quando já há um igual na fila ou
+rodando; não há janela de tempo, e o ensaio agora reprova um `202` com `"duplicado":true`.
+
 ## A assinatura pelo Stripe (E22 PR 1)
 
 Entra desligada: sem `COBRANCA_ATIVA=1` no `.env` da VPS ninguem e mandado para `/assinar`, mesmo com o resto no ar.
 
 - **Variaveis** (`.env.example`, bloco "Assinatura pelo Stripe"): `STRIPE_SECRET_KEY` (chave restrita), `STRIPE_WEBHOOK_SECRET` e `COBRANCA_ATIVA`. Com `COBRANCA_ATIVA=1` em producao o app recusa subir sem as duas primeiras (`verificarSegredosDeProducao`).
-- **O produto e o preco** (uma vez por modo, teste e producao): `npm run stripe:preparar` com a chave do modo certo. Idempotente; so cria o que leva `metadata.produto = roteiros` (produto `roteiros_plano_trimestral`, preco com a chave de busca `roteiros_trimestral`: R$ 1.191,00 a cada 3 meses). A chave de producao pede `--producao`.
+- **O produto e o preco** (uma vez por modo, teste e producao): `npm run stripe:preparar` com a chave do modo certo. Idempotente; so cria o que leva `metadata.produto = roteiros` (produto `roteiros_plano_trimestral`, preco com a chave de busca `roteiros_trimestral`: R$ 1.191,00 a cada 3 meses). A chave de producao pede `--producao`. **O nome na fatura do cartao (23/10/2026):** o mesmo comando poe no produto `roteiros_plano_trimestral` o `statement_descriptor` vindo de `APP_NAME` em maiusculas, sem acento, so letras, numeros e espacos, de 5 a 22 caracteres (hoje `KLAKI`); se o produto ja existe com outro descritor (ou sem), so ele e atualizado, e so se levar `metadata.produto = roteiros`. O descritor da conta, que e do OdontoTech tambem, nao muda. Para assinatura o Stripe nao aceita descritor no PaymentIntent nem sufixo no Checkout: vem da fatura ou do produto (`pesquisa/plataformas/docs/stripe/descritor-na-fatura.md`). Trocar o nome do app depois: mudar `APP_NAME` e rodar o comando de novo. Aplicar: `APP_NAME=Klaki STRIPE_SECRET_KEY=<chave do modo> npm run stripe:preparar` (modo teste) e o mesmo com a chave de producao e `-- --producao`.
 - **O aviso (webhook)**: no painel do Stripe, um endpoint em `https://<endereco do app>/api/webhooks/stripe` para os eventos `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` e `invoice.payment_failed`; o segredo dele (`whsec_`) vai em `STRIPE_WEBHOOK_SECRET`. A conta e dividida com o OdontoTech: os eventos dele chegam ao mesmo endpoint e sao ignorados (sem `metadata.produto = roteiros`).
 - **Ligar o portao**: marcar as cortesias em `/admin/clientes/<id>` (Ajustes, "Cortesia") antes de pôr `COBRANCA_ATIVA=1` e reiniciar o app.
 - **A prova ponta a ponta em modo teste, com a CLI do Stripe**: no PR da etapa.

@@ -66,6 +66,26 @@ export const textosNoticias = {
   fechar: "Fechar",
   verComoDesligado: "No modo ver como, só a pessoa muda os assuntos dela.",
 
+  // O assunto que sugere enquanto a pessoa digita (melhoria da E53, 23/10/2026).
+  sugestoesAria: "Assuntos que combinam com o que você escreveu",
+  grupoEmAlta: "Em alta agora no Brasil",
+  grupoLista: "Assuntos da nossa lista",
+  emAltaMarca: "Em alta agora",
+  assuntoEscolhido: (nome: string, quantas: number) => `${nome} escolhido, com ${quantas} ${quantas === 1 ? "palavra pronta" : "palavras prontas"}.`,
+  resultadosAssunto: (quantos: number) => `${quantos} ${quantos === 1 ? "assunto combina" : "assuntos combinam"}.`,
+  nenhumAssunto: (texto: string) => `Não achamos "${texto}" na nossa lista.`,
+  ajudaAssuntoVazio: "Comece a escrever e a gente mostra assuntos com as palavras já prontas.",
+  sugerirPalavras: "Sugerir palavras",
+  sugerindo: "Pensando nas palavras",
+  sugerirAjuda: "Não está na lista? A gente sugere as palavras que ajudam a achar as notícias.",
+  palavrasDaLista: "Palavras prontas da nossa lista. Mexa nelas se quiser.",
+  palavrasEmAlta: "Palavras do que está em alta. Mexa nelas se quiser.",
+  palavrasSugeridas: "Palavras que a gente sugeriu. Confira e mexa se quiser.",
+  erroSugerir: "Não deu para sugerir as palavras agora. Escreva você mesmo, separadas por vírgula.",
+  erroSugerirLimite: "Você já pediu muitas sugestões hoje. Escreva as palavras você mesmo ou tente de novo amanhã.",
+  erroSugerirCurto: "Escreva o assunto antes de pedir as palavras.",
+  limparAssunto: "Apagar o assunto",
+
   // Erros.
   erroTitulo: "Não deu para buscar as notícias de hoje",
   erroFrase: "Estas são as que já estavam guardadas.",

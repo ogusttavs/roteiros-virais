@@ -29,6 +29,7 @@ import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
+import { rodarFaxinaDeContas } from "./faxina-de-contas";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { FILAS } from "./fila";
 import { rodarFiltroDeNoticias } from "./filtrar-noticias";
@@ -77,6 +78,11 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.guardarCapas]: () => rodarGuardarCapas(),
   [FILAS.pontuar]: () => rodarPontuar(),
   [FILAS.vigilancia]: () => rodarVigilancia(),
+  /** Faxina das contas fora do setor: com um número na linha de comando, só aquele ramo; sem, todo ramo ativo (o cron semanal). */
+  [FILAS.faxinaDeContas]: () => {
+    const nichoIdArg = process.argv[3];
+    return rodarFaxinaDeContas(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+  },
   [FILAS.transcrever]: () => {
     const nichoIdArg = process.argv[3];
     return rodarTranscrever(nichoIdArg === undefined ? undefined : Number(nichoIdArg));

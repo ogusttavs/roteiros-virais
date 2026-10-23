@@ -14,7 +14,7 @@ describe("os textos do proxy parado no admin", () => {
     const sem = textosInicioAdmin.atencao.proxyParado("proxy sem trafego", "3 de outubro");
     expect(sem.titulo).toBe("O proxy do YouTube está sem tráfego");
     expect(sem.detalhe).toContain("desde 3 de outubro");
-    expect(sem.detalhe).toContain("recarregue o pacote no DataImpulse");
+    expect(sem.detalhe).toContain("recarregue o pacote do proxy com o fornecedor");
 
     const recusou = textosInicioAdmin.atencao.proxyParado("proxy recusou o acesso", "3 de outubro");
     expect(recusou.titulo).toBe("O proxy do YouTube recusou o acesso");
@@ -24,6 +24,23 @@ describe("os textos do proxy parado no admin", () => {
     const fora = textosInicioAdmin.atencao.proxyParado("proxy fora do ar", "3 de outubro");
     expect(fora.titulo).toBe("O proxy do YouTube não está respondendo");
     expect(fora.detalhe).not.toContain("recarregue");
+    expect(fora.detalhe).toContain("fornecedor do proxy");
+    expect(fora.detalhe).not.toContain("túnel");
+  });
+
+  it("com o túnel do computador, proxy fora do ar diz que o túnel está fechado e onde ver o log", () => {
+    const fora = textosInicioAdmin.atencao.proxyParado("proxy fora do ar", "3 de outubro", true);
+    expect(fora.detalhe).toContain("túnel do computador do Gustavo está fechado");
+    expect(fora.detalhe).toContain("roteiros-tunel-youtube.log");
+    expect(fora.detalhe).not.toContain("fornecedor");
+    // os outros motivos seguem neutros mesmo com o túnel
+    expect(textosInicioAdmin.atencao.proxyParado("proxy recusou o acesso", "3 de outubro", true).detalhe).toContain("fornecedor do proxy");
+  });
+
+  it("nenhum motivo cita um fornecedor pelo nome", () => {
+    for (const tunel of [false, true]) {
+      for (const motivo of MOTIVOS) expect(JSON.stringify(textosInicioAdmin.atencao.proxyParado(motivo, "3 de outubro", tunel))).not.toMatch(/dataimpulse/i);
+    }
   });
 
   it("o cartao da rotina abre com o mesmo titulo do Inicio, para cada motivo", () => {

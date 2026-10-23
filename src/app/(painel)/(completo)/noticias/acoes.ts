@@ -6,6 +6,8 @@ import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { exigirForaDoVerComo } from "@/lib/ver-como";
 import { adicionarAssunto, ErroAssunto, fixarAssunto, registrarAberturaDeNoticia, removerAssunto } from "@/servicos/assuntos";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
+import { ErroSugestaoDePalavras, sugerirPalavrasDoAssunto } from "@/servicos/palavras-do-assunto";
+import { textosNoticias } from "@/textos/noticias";
 
 export type ResultadoAssunto = { ok: true } | { ok: false; erro: string };
 
@@ -55,6 +57,27 @@ export async function abrirNoticiaDoAssuntoAction(noticiaId: number): Promise<vo
     await registrarAberturaDeNoticia(cliente.id, noticiaId);
   } catch (erro) {
     if (erro instanceof ErroAssunto) return;
+    throw erro;
+  }
+}
+
+export type ResultadoSugestao = { ok: true; palavras: string[] } | { ok: false; erro: string };
+
+/**
+ * "Sugerir palavras" na folha dos assuntos: o modelo barato propõe de 3 a 6 palavras de busca para um assunto que não está no catálogo (custo de centavos, com cache pelo texto e teto por marca por
+ * dia). Gasta IA em nome da marca, então passa pelo "ver como" (recusa) e pelo portão da cobrança antes de qualquer outra coisa. Não muda nada do que é da pessoa: só devolve a sugestão.
+ */
+export async function sugerirPalavrasAction(texto: string): Promise<ResultadoSugestao> {
+  await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
+  const cliente = await clienteDaSessaoAtual();
+  try {
+    const { palavras } = await sugerirPalavrasDoAssunto(cliente.id, texto);
+    return { ok: true, palavras };
+  } catch (erro) {
+    if (erro instanceof ErroSugestaoDePalavras) {
+      return { ok: false, erro: erro.motivo === "limite_do_dia" ? textosNoticias.erroSugerirLimite : erro.motivo === "assunto_curto" ? textosNoticias.erroSugerirCurto : textosNoticias.erroSugerir };
+    }
     throw erro;
   }
 }

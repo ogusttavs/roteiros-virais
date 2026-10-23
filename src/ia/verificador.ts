@@ -7,7 +7,7 @@
  */
 import type { CartaoStory, EstiloRoteiro, Ficha, FormatoRoteiro, TipoAbertura } from "@/db/schema";
 import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
-import { EMOJI, encontrarProblemas, MOTIVO_EMOJI, MOTIVO_TRAVESSAO } from "@/lib/regras-de-texto";
+import { EMOJI, encontrarJargaoDoMotor, encontrarProblemas, MOTIVO_EMOJI, MOTIVO_TRAVESSAO } from "@/lib/regras-de-texto";
 import { dadosForaDasFontes } from "@/servicos/conferencia-da-pesquisa";
 
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
@@ -127,6 +127,11 @@ export function verificarLocalmente(
     semIdInterno?: boolean;
     soSegundaPessoa?: boolean;
     /**
+     * A nota do tema (23/10/2026): nenhuma palavra que o motor usa por dentro e o cliente não entende ("banco do setor",
+     * "fora da curva", "nicho", "gancho", "elemento que prende", "evidência"; `JARGAO_DO_MOTOR`), além do jargão de sempre.
+     */
+    semJargaoDoMotor?: boolean;
+    /**
      * V4, item 5, roteiro sem vício: a primeira palavra do gancho (sem
      * acento, minúscula) não pode repetir a de nenhum dos últimos 5
      * roteiros do cliente ("Espera", "Para", "Olha" são o vício que motivou
@@ -233,6 +238,9 @@ export function verificarLocalmente(
     const semAcento = problemaDeAcentuacao(valor);
     if (semAcento) {
       motivos.push(`${nomeCampo}: ${semAcento}`);
+    }
+    if (opcoes.semJargaoDoMotor) {
+      for (const problema of encontrarJargaoDoMotor(valor)) motivos.push(`${nomeCampo}: ${problema}`);
     }
     if (opcoes.semIdInterno) {
       const id = acharIdSolto(valor);
@@ -654,6 +662,8 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   /** A nota do tema: sem id solto e só em segunda pessoa (ver `verificarLocalmente`). */
   semIdInterno?: boolean;
   soSegundaPessoa?: boolean;
+  /** A nota do tema: sem as palavras do motor ("banco do setor", "fora da curva", "nicho"...; ver `verificarLocalmente`). */
+  semJargaoDoMotor?: boolean;
   /**
    * Decisão do Gustavo, 22/10/2026: quando o tema é da PRÓPRIA pessoa (Tema livre), as proibições do briefing dela são preferências e viram aviso, nunca bloqueio, na avaliação do tema e no roteiro que
    * sai dele. Ligado, a conferência local não reprova a proibição escrita no texto e o `verificarTexto` troca o critério da proibição pelo de aviso (continua barrando atacar ou ofender gente, prometer
@@ -805,6 +815,7 @@ function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados
     ganchosRecentes: params.ganchosRecentes,
     semIdInterno: params.semIdInterno,
     soSegundaPessoa: params.soSegundaPessoa,
+    semJargaoDoMotor: params.semJargaoDoMotor,
     ganchosUltimos5: params.ganchosUltimos5,
     tipoAberturaAtual: params.extrairTipoAbertura?.(dados),
     tipoAberturaAnterior: params.tipoAberturaAnterior,

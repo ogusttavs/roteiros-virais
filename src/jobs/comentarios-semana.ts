@@ -22,7 +22,7 @@
 import { and, desc, eq, gte, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { comentariosVideo, contas, nichos, videos, type ComentariosAnalise, type ConferenciaDoSetor, type Plataforma } from "@/db/schema";
+import { comentariosVideo, contas, nichos, videos, type ComentariosAnalise, type Plataforma } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as conferirVideoDoSetorIA from "@/ia/prompts/conferirVideoDoSetor";
 import * as juntarVozesIA from "@/ia/prompts/juntarVozes";
@@ -38,8 +38,9 @@ import {
   vozesSemOModelo,
   type ComentarioNumerado,
 } from "@/servicos/comentarios-do-publico";
+import { conferirLoteDoSetor, pertenceSegundoABase, type VideoParaConferir } from "@/servicos/conferencia-do-setor";
 import { normalizarComentariosYoutube } from "@/servicos/normalizadores/comentarios-youtube";
-import { DENTRO_DO_TETO_DE_DURACAO, incluirSeed, PERTENCE_AO_NICHO, reguaDoSetor } from "@/servicos/pesquisa";
+import { CONTA_DO_SETOR, DENTRO_DO_TETO_DE_DURACAO, incluirSeed, PERTENCE_AO_NICHO, reguaDoSetor } from "@/servicos/pesquisa";
 import { classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
 
 import { consumoDeHoje, LIMITE_DIARIO_UNIDADES, registrarConsumo } from "./coleta-youtube";
@@ -65,22 +66,8 @@ type DepsComentarios = {
 type VideoParaLer = { id: number; idExterno: string; titulo: string | null };
 type SetorParaLer = { id: number; nome: string; descricao: string | null; termos: string[] };
 
-/** O candidato com o que a base já sabe dele sobre o setor, para decidir se vale conferir. */
-type Candidato = VideoParaLer & {
-  descricao: string | null;
-  fala: string | null;
-  /** `analise.pertenceAoNicho`, quando a análise em lote já passou por ele: 'true' ou 'false' (o 'false' nem chega aqui, `PERTENCE_AO_NICHO`). */
-  analisePertence: string | null;
-  conferencia: ConferenciaDoSetor | null;
-};
-
-/** O que a base sabe: a análise do vídeo manda; senão, a conferência barata feita pela versão atual do prompt; senão, ainda não se sabe. */
-function pertenceSegundoABase(c: Candidato): boolean | undefined {
-  if (c.analisePertence === "true") return true;
-  if (c.analisePertence === "false") return false;
-  if (c.conferencia && c.conferencia.versao === conferirVideoDoSetorIA.versao) return c.conferencia.pertence;
-  return undefined;
-}
+/** O candidato com o que a base já sabe dele sobre o setor, para decidir se vale conferir (`servicos/conferencia-do-setor.ts`). */
+type Candidato = VideoParaLer & VideoParaConferir;
 
 /**
  * Hotfix de 22/10/2026: o vídeo só tem os comentários lidos se for do setor. Os vídeos que a base ainda não sabe (a coleta por termo e
@@ -104,37 +91,9 @@ async function conferirDoSetor(setor: SetorParaLer, candidatos: Candidato[], ago
     const lote = candidatos.filter((c) => !tentados.has(c.id)).slice(0, conferirVideoDoSetorIA.VIDEOS_POR_CHAMADA);
     if (lote.length === 0) break;
     for (const c of lote) tentados.add(c.id);
-    const numerados = lote.map((c, i) => ({ numero: i + 1, titulo: c.titulo, descricao: c.descricao, fala: c.fala }));
     try {
-      const resultado = await gerarEstruturado({
-        tarefa: "conferirVideoDoSetor",
-        nivel: conferirVideoDoSetorIA.nivel,
-        effort: conferirVideoDoSetorIA.esforco,
-        schema: conferirVideoDoSetorIA.schema,
-        sistemaEstavel: conferirVideoDoSetorIA.montarSistemaEstavel(),
-        entrada: conferirVideoDoSetorIA.montarEntrada({ setor: setor.nome, descricaoDoSetor: setor.descricao, termos: setor.termos, videos: numerados }),
-      });
-      for (const resposta of resultado.dados.videos) {
-        const video = lote[resposta.numero - 1];
-        if (!video || pertence.has(video.id)) continue;
-        const conferencia: ConferenciaDoSetor = { pertence: resposta.pertence, motivo: resposta.motivo.slice(0, 200), versao: conferirVideoDoSetorIA.versao, em: agora.toISOString() };
-        await db().update(videos).set({ conferenciaSetor: conferencia }).where(eq(videos.id, video.id));
-        pertence.set(video.id, resposta.pertence);
-      }
-      await registrarGeracao({
-        tarefa: "conferirVideoDoSetor",
-        versaoPrompt: conferirVideoDoSetorIA.versao,
-        modelo: resultado.modelo,
-        nivel: conferirVideoDoSetorIA.nivel,
-        entradas: { nichoId: setor.id, videos: lote.map((c) => c.id) },
-        saida: resultado.dados,
-        uso: {
-          tokensEntrada: resultado.tokensEntrada,
-          tokensSaida: resultado.tokensSaida,
-          tokensCacheLeitura: resultado.tokensCacheLeitura,
-          tokensCacheEscrita: resultado.tokensCacheEscrita,
-        },
-      });
+      const resultado = await conferirLoteDoSetor(setor, lote, agora);
+      for (const [videoId, pertenceAoSetor] of resultado.pertence) pertence.set(videoId, pertenceAoSetor);
     } catch (erro) {
       // A IA fora: o resto do setor não insiste (seria a mesma falha por lote), e esses vídeos ficam sem leitura até a próxima rodada.
       erros.push(`conferencia do setor "${setor.nome}": ${erro instanceof Error ? erro.message : String(erro)}`);
@@ -293,7 +252,8 @@ async function refazerVozes(nicho: { id: number; nome: string }, agora: Date): P
   const linhas = await db()
     .select({ videoId: videos.id, plataforma: videos.plataforma, analise: videos.comentariosAnalise })
     .from(videos)
-    .where(and(eq(videos.nichoId, nicho.id), isNotNull(videos.comentariosAnalise), gte(videos.comentariosColetadosEm, desde)));
+    // Faxina das contas fora do setor: a leitura de um vídeo de conta marcada depois da leitura também sai das vozes.
+    .where(and(eq(videos.nichoId, nicho.id), isNotNull(videos.comentariosAnalise), gte(videos.comentariosColetadosEm, desde), CONTA_DO_SETOR));
   const leituras = linhas.filter(
     (l): l is { videoId: number; plataforma: Plataforma; analise: ComentariosAnalise } => l.analise !== null,
   );

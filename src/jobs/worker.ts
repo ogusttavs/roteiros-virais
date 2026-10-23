@@ -35,6 +35,7 @@ import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
+import { rodarFaxinaDeContas } from "./faxina-de-contas";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarFiltroDeNoticias } from "./filtrar-noticias";
@@ -44,6 +45,7 @@ import { rodarLerLongos } from "./ler-longos";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
+import { recolherOrfaosDoWorkerAnterior } from "./orfaos";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { type PayloadPesquisaNaHora, rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
@@ -84,6 +86,8 @@ async function main(): Promise<void> {
 
   await boss().start();
   await garantirFilas();
+  const orfaos = await recolherOrfaosDoWorkerAnterior();
+  if (orfaos.jobs > 0 || orfaos.execucoes > 0) console.log(`worker recolheu o que o anterior deixou: ${orfaos.jobs} job(s) ativo(s), ${orfaos.execucoes} execucao(oes) rodando.`);
   await agendarTudo();
   // Na partida do worker (o que cobre cada deploy): guarda as capas que ainda estao vivas e marca as que venceram.
   await pedirGuardarCapas();
@@ -147,6 +151,10 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.vigilancia, async () => {
     await executarComRegistro(FILAS.vigilancia, rodarVigilancia);
+  });
+  /** Faxina das contas fora do setor: sem `nichoId`, todo ramo ativo (o cron semanal); com, só aquele ramo. */
+  await boss().work<{ nichoId?: number }>(FILAS.faxinaDeContas, async (job) => {
+    await executarComRegistro(FILAS.faxinaDeContas, () => rodarFaxinaDeContas(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   /** M2, item 0a2 da revisão do PR #73: com `nichoId`, só aquele setor (a cadeia da primeira carga). */
   await boss().work<{ nichoId?: number }>(FILAS.transcrever, async (job) => {
