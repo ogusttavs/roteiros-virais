@@ -45,7 +45,8 @@ export type OpcoesDaBusca = {
   buscar?: BuscarLeitor;
 };
 
-export type RespostaLida = { bytes: Uint8Array; truncado: boolean };
+/** `enderecoFinal` é o endereço de onde os bytes vieram, depois dos redirecionamentos: um endereço relativo dentro do conteúdo (o `og:image` de uma página) se resolve contra ele, não contra o inicial. */
+export type RespostaLida = { bytes: Uint8Array; truncado: boolean; enderecoFinal: string };
 
 /** Baixa o começo de um endereço (até `limiteBytes`), seguindo redirecionamentos só para destinos que passam na mesma guarda. */
 export async function lerComGuarda(inicial: string, opcoes: OpcoesDaBusca): Promise<RespostaLida> {
@@ -67,7 +68,7 @@ export async function lerComGuarda(inicial: string, opcoes: OpcoesDaBusca): Prom
       continue;
     }
     if (resposta.status < 200 || resposta.status >= 300) throw new ErroBuscaSegura(`respondeu ${resposta.status}`);
-    if (!resposta.body) return { bytes: new Uint8Array(), truncado: false };
+    if (!resposta.body) return { bytes: new Uint8Array(), truncado: false, enderecoFinal: atual.href };
     const leitor = resposta.body.getReader();
     const pedacos: Uint8Array[] = [];
     let lidos = 0;
@@ -91,7 +92,14 @@ export async function lerComGuarda(inicial: string, opcoes: OpcoesDaBusca): Prom
       junto.set(p.subarray(0, cabe), posicao);
       posicao += cabe;
     }
-    return { bytes: junto, truncado };
+    return { bytes: junto, truncado, enderecoFinal: atual.href };
   }
   throw new ErroBuscaSegura("redirecionamentos demais");
 }
+
+/**
+ * O `fetch` com a guarda de DNS da coleta (`criarAgenteSeguro`: o IP que o nome resolve precisa ser público), para quem faz um GET simples e cuida do resto sozinho (hoje, o download da capa
+ * do vídeo, `servicos/capas.ts`, que já só aceita domínios de uma lista fechada: esta é a segunda camada, caso um dia a lista ganhe um domínio errado). Não segue redirecionamento sozinho
+ * se quem chama pedir `redirect: "manual"`.
+ */
+export const buscarComAgenteSeguro: typeof fetch = ((url, init) => undiciFetch(url as string, { ...(init as object), dispatcher: agente() }) as unknown) as typeof fetch;
