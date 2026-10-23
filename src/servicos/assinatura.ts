@@ -14,7 +14,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 
 import { DIAS_DE_FOLGA_DA_RENOVACAO, METADATA_PRODUTO } from "@/config/assinatura";
 import { db } from "@/db";
-import { assinaturas, clientes, eventosStripe, membrosMarca, type Assinatura, type Cliente, type StatusAssinatura } from "@/db/schema";
+import { assinaturas, checkoutsStripe, clientes, eventosStripe, membrosMarca, type Assinatura, type Cliente, type StatusAssinatura } from "@/db/schema";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { portaStripe, type EventoDoStripe } from "@/lib/stripe";
@@ -84,11 +84,16 @@ export const frasesDaAssinatura = {
   semPlano: "Não deu para abrir o pagamento agora. Tente de novo daqui a pouco.",
   semAssinatura: "Esta conta ainda não tem uma assinatura para gerenciar.",
   falhou: "Não deu para abrir o pagamento agora. Tente de novo daqui a pouco.",
+  naoCancelou: "Não deu para cancelar a assinatura desta conta no Stripe, então a conta não foi apagada. Nada mudou: tente de novo, ou cancele a assinatura no painel do Stripe antes.",
 } as const;
 
 /**
  * Cria a sessão do Checkout do plano trimestral para a marca e devolve o endereço. Só o dono assina; marca com assinatura que vale não assina de novo; o preço sai do Stripe pela
  * chave de busca (e só vale se for deste produto). O "ver como" nunca chega aqui (a ação recusa antes).
+ *
+ * **Um Checkout aberto por marca (E22 PR 2, item 0b).** O segundo clique (duas abas, dois toques, o botão "voltar" do navegador) reaproveita a sessão que o primeiro abriu, em vez de criar
+ * outra: duas sessões abertas deixariam a pessoa pagar duas vezes. A sessão fica em `checkouts_stripe` (uma linha por marca); antes de reaproveitar, o Stripe confirma que ela ainda
+ * está aberta (se foi paga, expirou ou sumiu, abre outra). O cadeado por marca faz dois cliques ao mesmo tempo passarem um de cada vez.
  */
 export async function iniciarAssinatura(usuario: { id: string; email: string }, cliente: Pick<Cliente, "id">, agora: Date = new Date()): Promise<{ url: string }> {
   if (!(await ehDonoDaMarca(usuario.id, cliente.id))) throw new ErroAssinatura(frasesDaAssinatura.soODono);
@@ -98,19 +103,32 @@ export async function iniciarAssinatura(usuario: { id: string; email: string }, 
 
   try {
     const porta = portaStripe();
-    const preco = await porta.precoDoPlano(config.cobranca.precoLookupKey);
-    if (!preco) {
-      logger.error({ clienteId: cliente.id, lookupKey: config.cobranca.precoLookupKey }, "assinatura: o preco do plano nao existe no Stripe (rode scripts/stripe-preparar.ts)");
-      throw new ErroAssinatura(frasesDaAssinatura.semPlano);
-    }
-    return await porta.criarCheckout({
-      precoId: preco.id,
-      clienteId: cliente.id,
-      // Reaproveita o cliente do Stripe de uma assinatura antiga da mesma marca (cartão e histórico já lá).
-      stripeClienteId: lista[0]?.stripeClienteId ?? null,
-      email: usuario.email,
-      urlDeSucesso: `${config.appUrl}/assinar?assinou=1`,
-      urlDeCancelar: `${config.appUrl}/assinar`,
+    return await db().transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`checkout-da-marca-${cliente.id}`}))`);
+      const [aberto] = await tx.select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, cliente.id));
+      if (aberto) {
+        const viva = await porta.sessaoAberta(aberto.stripeSessaoId, cliente.id);
+        if (viva) return { url: viva.url };
+      }
+      const preco = await porta.precoDoPlano(config.cobranca.precoLookupKey);
+      if (!preco) {
+        logger.error({ clienteId: cliente.id, lookupKey: config.cobranca.precoLookupKey }, "assinatura: o preco do plano nao existe no Stripe (rode scripts/stripe-preparar.ts)");
+        throw new ErroAssinatura(frasesDaAssinatura.semPlano);
+      }
+      const nova = await porta.criarCheckout({
+        precoId: preco.id,
+        clienteId: cliente.id,
+        // Reaproveita o cliente do Stripe de uma assinatura antiga da mesma marca (cartão e histórico já lá).
+        stripeClienteId: lista[0]?.stripeClienteId ?? null,
+        email: usuario.email,
+        urlDeSucesso: `${config.appUrl}/assinar?assinou=1`,
+        urlDeCancelar: `${config.appUrl}/assinar`,
+      });
+      await tx
+        .insert(checkoutsStripe)
+        .values({ clienteId: cliente.id, stripeSessaoId: nova.sessaoId })
+        .onConflictDoUpdate({ target: checkoutsStripe.clienteId, set: { stripeSessaoId: nova.sessaoId, criadoEm: new Date() } });
+      return { url: nova.url };
     });
   } catch (erro) {
     if (erro instanceof ErroAssinatura) throw erro;
@@ -131,6 +149,35 @@ export async function abrirPortalDaAssinatura(usuario: { id: string }, cliente: 
     logger.error({ err: erro, clienteId: cliente.id }, "assinatura: o Stripe falhou ao abrir o portal");
     throw new ErroAssinatura(frasesDaAssinatura.falhou);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Apagar a marca (E22 PR 2, item 0d)
+// ---------------------------------------------------------------------------
+
+/** Status em que a assinatura já acabou de vez (nada mais a cobrar no Stripe). */
+const STATUS_ACABADOS: StatusAssinatura[] = ["canceled", "incomplete_expired"];
+
+/**
+ * Antes de apagar uma marca: cancela no Stripe toda assinatura dela que ainda não acabou e fecha o Checkout que ficou aberto. O `ON DELETE CASCADE` apagaria as linhas daqui e o Stripe
+ * continuaria cobrando uma conta que não existe mais. Se o Stripe falhar em qualquer uma, **lança e a marca não deve ser apagada** (quem chama só apaga depois de esta função voltar).
+ * Devolve quantas assinaturas cancelou. Marca sem assinatura nem Checkout aberto não chama o Stripe nenhuma vez (nada muda para quem nunca assinou).
+ */
+export async function cancelarAssinaturasDaMarca(clienteId: number): Promise<number> {
+  const lista = await assinaturasDaMarca(clienteId);
+  const vivas = lista.filter((a) => !STATUS_ACABADOS.includes(a.status));
+  const [aberto] = await db().select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, clienteId));
+  if (vivas.length === 0 && !aberto) return 0;
+  try {
+    const porta = portaStripe();
+    // Primeiro fecha o Checkout aberto (se a pessoa pagasse depois de a marca sumir, o Stripe cobraria e o aviso não acharia a conta); depois cancela as assinaturas.
+    if (aberto) await porta.expirarSessao(aberto.stripeSessaoId);
+    for (const a of vivas) await porta.cancelarAssinatura(a.stripeAssinaturaId);
+  } catch (erro) {
+    logger.error({ err: erro, clienteId }, "assinatura: o Stripe falhou ao cancelar a assinatura de uma marca que ia ser apagada; a marca nao foi apagada");
+    throw new ErroAssinatura(frasesDaAssinatura.naoCancelou);
+  }
+  return vivas.length;
 }
 
 // ---------------------------------------------------------------------------

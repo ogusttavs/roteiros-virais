@@ -2657,6 +2657,24 @@ export const capasVideo = pgTable("capas_video", {
 });
 export type CapaVideo = typeof capasVideo.$inferSelect;
 
+/**
+ * E22 PR 2, item 0b: o Checkout aberto de cada marca. Uma linha por marca (índice único): o segundo clique em "Assinar" reaproveita a sessão que o primeiro abriu em vez de criar
+ * outra (duas sessões abertas deixariam a pessoa pagar duas vezes). Só o id da sessão fica aqui; o endereço do pagamento o Stripe devolve de novo quando a sessão ainda está aberta.
+ */
+export const checkoutsStripe = pgTable(
+  "checkouts_stripe",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    stripeSessaoId: text("stripe_sessao_id").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("checkouts_stripe_cliente").on(t.clienteId)],
+);
+export type CheckoutStripe = typeof checkoutsStripe.$inferSelect;
+
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;
 export type ExecucaoJob = typeof execucoesJob.$inferSelect;

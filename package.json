@@ -32,6 +32,7 @@
     "worker": "tsx src/jobs/worker.ts",
     "job": "tsx src/jobs/rodar.ts",
     "admin:criar": "tsx scripts/criar-admin.ts",
+    "marca:apagar": "tsx scripts/apagar-marca.ts",
     "preencher:nome-contas": "tsx scripts/preencher-nome-contas.ts",
     "preencher:idioma": "tsx scripts/preencher-idioma.ts",
     "preencher:tipo-abertura": "tsx scripts/preencher-tipo-abertura.ts",
