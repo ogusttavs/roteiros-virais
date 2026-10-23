@@ -164,7 +164,7 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
         effort: verificarTextoIA.esforco,
         schema: verificarTextoIA.schema,
         sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro", true),
-        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [], fontes: montarFontesDosFatos({ perfilCompilado: caso.perfilCompilado, camadaExclusiva: caso.camadaExclusiva, tema: caso.tema, momento: caso.momento, marcaCitada: caso.marcaCitada, evidencias: caso.evidencias }) }),
+        entrada: verificarTextoIA.montarEntrada({ texto: verificarTextoIA.montarTextoParaConferir(campos, true), proibicoes: [], fontes: montarFontesDosFatos({ perfilCompilado: caso.perfilCompilado, camadaExclusiva: caso.camadaExclusiva, tema: caso.tema, momento: caso.momento, marcaCitada: caso.marcaCitada, evidencias: caso.evidencias }) }),
       }),
     })),
   });
