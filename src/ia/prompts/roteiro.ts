@@ -308,14 +308,14 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * dado suficiente, hoje todas) o sistema é idêntico ao da 2.21.0. O schema de saída não muda.
  */
 /**
- * 2.22.0 (E59, 22/10/2026, ideia do Gustavo): o "como editar" pode pedir uma prova visual com imagem de OUTRO (tela dividida, foto ou print com a fonte na tela, trecho curto de vídeo público de uma pessoa
+ * 2.23.0 (E59, 22/10/2026, ideia do Gustavo; a 2.22.0 é do PR da E16, que entra antes, por isso a E59 pulou para a 2.23.0): o "como editar" pode pedir uma prova visual com imagem de OUTRO (tela dividida, foto ou print com a fonte na tela, trecho curto de vídeo público de uma pessoa
  * conhecida) quando o tema ganha com isso (comparar, reagir, comentar uma notícia ou uma fala pública). Duas partes. **Um**, a regra nova `R-ROTEIRO-20` (e a `R-CONF-10`, que proíbe nome de candidato e de partido
  * e exige quem grava no quadro) entram no bloco estável pela tabela da seção 11 (`regras-copy-roteiro.ts`, versão 1.2.0). **Dois**, a ENTRADA ganha o bloco "Prova visual com imagem de outro" só quando o critério em
  * código (`lib/prova-visual-de-outro.ts`) liga: o banco mostra o recurso nos vídeos do ramo, ou o tema cita pessoa pública, fala pública ou notícia; sem o bloco a entrada é a de antes. A sugestão é aberta e
  * pelo papel, nunca pelo nome ("duas figuras eleitorais muito conhecidas"); quem grava escolhe as pessoas e continua no quadro, comentando. O SCHEMA NÃO MUDOU (a sugestão mora em `edicao.recursos` e na cena que
  * a usa): o do roteiro curto está sem folga na gramática da API.
  */
-export const versao = "2.22.0";
+export const versao = "2.23.0";
 
 /**
  * E59: o bloco da entrada que liga a prova visual com imagem de outro (`R-ROTEIRO-20`). Só entra quando `motivosDaProvaVisualDeOutro` devolve algum motivo; sem motivo, nada entra e a regra do sistema
