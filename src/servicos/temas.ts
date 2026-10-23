@@ -38,6 +38,7 @@ import { filtroDeFormatosDaMarca } from "./formatos";
 import { avisoLinhaEditorial, fraseAvisoLinhaEditorial } from "./linha-editorial";
 import { diaPorExtenso } from "./noticias-assuntos";
 import { noticiasQueTocamOTema } from "./noticias-do-tema";
+import { objetivoQueRendeNaConta, ordenarTemasPeloQueRende } from "./ordem-dos-temas";
 import { assuntoEmAltaDaLista, listaDeTendenciasDeAgora, temasQueAindaValem, tendenciasQueTocamOTema } from "./tendencias";
 import { listaDePlataformas, perguntaDoPublicoPelaChave } from "./vozes-do-publico";
 
@@ -266,12 +267,17 @@ export async function temasParaCliente(cliente: Cliente, data: string = hojeISO(
 
   if (!cliente.nichoId) return { status: "sem_tema", constancia };
 
-  const [encontrado, historico] = await Promise.all([
+  const [achado, historico, objetivoQueRende] = await Promise.all([
     temasDoDiaOuRecente(cliente.nichoId, data),
     historicoDeObjetivos(cliente.id),
+    objetivoQueRendeNaConta(cliente.id),
   ]);
 
-  if (!encontrado) return { status: "sem_tema", constancia };
+  if (!achado) return { status: "sem_tema", constancia };
+
+  // E16 PR 4: a lista e o texto são do setor; só a ordem é da marca, pelo objetivo que mais rendeu na conta dela (sem dado suficiente, a ordem é a do setor). A linha editorial, abaixo, mexe depois
+  // e pode puxar um tema para o primeiro lugar por falta de variedade: ela manda no primeiro lugar, e o resto segue a ordem da conta.
+  const encontrado = { ...achado, temas: ordenarTemasPeloQueRende(achado.temas, objetivoQueRende) };
 
   const aviso = avisoLinhaEditorial(historico, cliente.persona);
   if (!aviso) {
