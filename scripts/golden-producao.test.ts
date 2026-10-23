@@ -1,6 +1,6 @@
 /**
  * Os golden sets pelo caminho de produção (pedido do Fable): 1ª tentativa de todos, conferência local e do `verificarTexto` com fontes, e só os reprovados refazem com o motivo; "reprovado nas duas"
- * é o `ErroIA`. Em mock, com o marcador `[mock:fato-inventado]` (o mock do `verificarTexto` reprova o fato fora das fontes).
+ * é o `ErroIA`. Em mock, com o marcador `{mock:fato-inventado}` (o mock do `verificarTexto` reprova o fato fora das fontes).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -69,8 +69,8 @@ afterEach(() => {
 describe("rodarComoEmProducao", () => {
   it("o que aprova de primeira não faz 2ª tentativa; o que reprova refaz com o motivo e o lembrete por último; o que reprova nas duas conta como ErroIA", async () => {
     const ok = caso({ rotulo: "tema ok", textoPorTentativa: () => "olha o que acontece com a mancha" });
-    const corrige = caso({ rotulo: "tema que corrige", textoPorTentativa: (n) => (n === 0 ? "o Uli está do meu lado [mock:fato-inventado]" : "olha o que acontece com a mancha") });
-    const teima = caso({ rotulo: "tema que teima", textoPorTentativa: () => "o Uli está do meu lado [mock:fato-inventado]" });
+    const corrige = caso({ rotulo: "tema que corrige", textoPorTentativa: (n) => (n === 0 ? "o Uli está do meu lado {mock:fato-inventado}" : "olha o que acontece com a mancha") });
+    const teima = caso({ rotulo: "tema que teima", textoPorTentativa: () => "o Uli está do meu lado {mock:fato-inventado}" });
     const producao = await rodarComoEmProducao<Saida>({ rotulo: "teste", lembreteFinal: roteiroIA.LEMBRETE_ACENTUACAO, casos: [ok, corrige, teima] });
 
     expect(producao.map((p) => p.tentativas)).toEqual([1, 2, 2]);
