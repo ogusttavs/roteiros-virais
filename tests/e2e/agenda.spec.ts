@@ -194,7 +194,8 @@ test.describe("/hoje, a Agenda", () => {
       .getByRole("button", { name: "Quero esse" })
       .first()
       .click();
-    await expect(page).toHaveURL(new RegExp(`/criar/objetivo\\?tema=0&data=${dia}$`));
+    // Desde o E16 PR 4 o clique leva o titulo do tema (a ordem muda com a marca; o indice sozinho nao identifica).
+    await expect(page).toHaveURL(new RegExp(`/criar/objetivo\\?tema=0&titulo=tema%20do%20dia%20marcado&data=${dia}$`));
 
     await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
 

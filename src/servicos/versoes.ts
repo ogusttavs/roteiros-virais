@@ -395,7 +395,10 @@ export function enderecoParaTrocarOObjetivo(pedido: ParametrosGerarRoteiro, grup
   } else if (pedido.origem === "sugerido") {
     if (pedido.temaChave) consulta.set("momento", pedido.temaChave);
     // O índice é o da lista do dia em que o grupo foi escrito: de outro dia, ele apontaria para outro tema, e o tema é que a pessoa quer de volta.
-    else if (hojeISO(grupo.criadoEm) === hojeISO()) consulta.set("tema", String(pedido.temaIndice));
+    else if (hojeISO(grupo.criadoEm) === hojeISO()) {
+      consulta.set("tema", String(pedido.temaIndice));
+      if (pedido.temaTitulo) consulta.set("titulo", pedido.temaTitulo);
+    }
     else consulta.set("livre", grupo.tema);
   } else {
     return "/criar";
