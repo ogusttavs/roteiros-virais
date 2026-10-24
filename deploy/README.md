@@ -9,8 +9,8 @@ convivencia com o OdontoTech manda). Sem segredo nesta pasta.
 |---|---|
 | `Dockerfile` | imagem do app web (Next standalone) |
 | `Dockerfile.worker` | imagem do worker (pg-boss, yt-dlp, ffmpeg) |
-| `Dockerfile.backup` | imagem do backup (pg_dump diario, rclone opcional) |
-| `backup/backup.sh` | o script do backup |
+| `Dockerfile.backup` | imagem do backup (pg_dump diario, rclone opcional para o bucket) |
+| `backup/backup.sh` | o script do backup: dump diario (vai ao bucket) e dump de deploy (so no volume), com retencao nos dois lugares |
 | `backup/restaurar.sh` | restaura um dump do `backup.sh` num banco vazio (etapa 13) |
 | `compose.prod.yml` | o Compose de producao; vira `/srv/roteiros/docker-compose.yml` |
 | `proxy/` | copia do proxy compartilhado (`/srv/proxy`): Caddy e `Caddyfile` |
@@ -122,6 +122,48 @@ ssh getorbita-vps 'docker logs --tail 100 roteiros-worker'
 ssh getorbita-vps 'docker exec roteiros-backup /usr/local/bin/backup.sh agora'
 ssh getorbita-vps 'docker run --rm -v roteiros_backups:/b alpine ls -la /b'
 ```
+
+### Backup: o que vai para onde (23/10/2026)
+
+Dois tipos de dump, os dois casam com `roteiros-*.sql.gz` (o que o ensaio e o `restaurar.sh` leem):
+
+| Tipo | Nome | Quem faz | Vai ao Backblaze | Fica no volume |
+|---|---|---|---|---|
+| diario | `roteiros-AAAA-MM-DD-HHMM.sql.gz` | o laco do servico, as 06:00 UTC (`backup.sh diario` faz um na hora) | sim | 30 dias (`BACKUP_RETENCAO_DIAS`) |
+| de deploy | `roteiros-AAAA-MM-DD-HHMM-deploy.sql.gz` | `backup.sh agora`, o que o deploy chama antes de subir | nao (so com `agora --enviar`) | 3 dias (`BACKUP_RETENCAO_DEPLOY_DIAS`) |
+
+Por que: num dia de muitos deploys cada `agora` mandava mais um dump de uns 385 MB e o bucket
+(teto gratis de 10 GB) encheu; o envio passou a falhar com `403 storage_cap_exceeded` e o
+`agora` saia com erro, o que travava o deploy. Agora:
+
+- `agora` so sai com erro se o `pg_dump` local falhar. Bucket cheio, fora do ar ou sem credencial
+  nunca derruba o deploy; o log mostra `ERRO` e o dump local fica guardado.
+- Depois de enviar o diario, o script apaga do bucket os dumps com mais de `BACKUP_REMOTO_DIAS`
+  dias (padrao 14) com `rclone delete --min-age ... --b2-hard-delete`. No B2 o apagar comum so
+  esconde a versao e ela continua contando no espaco; `--b2-hard-delete` tira de verdade
+  (fonte: `pesquisa/plataformas/docs/rclone/b2-backblaze.md`, baixada em 23/10/2026). Os filtros
+  deixam de fora o arquivo que acabou de subir e tudo que nao seja `roteiros-*.sql.gz`. Em
+  seguida roda `rclone backend cleanup-hidden` para limpar versoes escondidas por apagamentos
+  antigos. A poda roda mesmo se o envio falhou (com o bucket cheio e ela que abre espaco).
+- `BACKUP_REMOTO_DIAS`, `BACKUP_RETENCAO_DIAS` e `BACKUP_RETENCAO_DEPLOY_DIAS` precisam ser inteiros
+  de 1 em diante; valor torto volta ao padrao com um aviso no log (um `0` apagaria o dump novo).
+- Os nomes antigos (sem `-deploy`) contam como diarios e saem do volume em 30 dias; quem quiser
+  liberar o espaco antes apaga a mao os que nao forem das 06:00.
+
+Comandos do dia a dia na VPS (a imagem nova so existe depois do deploy; `agora` com a imagem antiga
+ainda manda para o bucket):
+
+```bash
+ssh getorbita-vps 'docker exec roteiros-backup /usr/local/bin/backup.sh podar-remoto'   # so a poda do bucket, sem dump
+ssh getorbita-vps 'docker exec roteiros-backup /usr/local/bin/backup.sh agora --enviar'  # dump de deploy que tambem vai ao bucket
+ssh getorbita-vps 'docker exec roteiros-backup /usr/local/bin/backup.sh diario'          # um diario na hora, com envio e poda
+ssh getorbita-vps 'docker exec roteiros-backup sh -c "rclone size \$BACKUP_RCLONE_REMOTE; rclone lsl \$BACKUP_RCLONE_REMOTE"'  # quanto o bucket guarda
+```
+
+Testes: `scripts/backup-so-diario.test.ts` roda o script com `pg_dump` e `rclone` de mentira
+(quem foi chamado, com que argumentos, o que sobrou no volume). O ensaio
+(`deploy/ensaio/ensaiar.sh`) roda `agora` e `diario` e confere os dois nomes no volume; ele nao
+tem bucket, entao o envio e a poda so sao provados pelo teste e pela conferencia na VPS.
 
 A senha do primeiro admin foi gerada e gravada a mao pelo Fable, uma vez so, no deploy de
 05/09/2026, em `/srv/roteiros/admin-inicial.senha` (`600`); o Gustavo le, guarda num
