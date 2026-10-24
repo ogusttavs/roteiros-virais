@@ -374,4 +374,6 @@ export const textosHoje = {
     /** O assunto do momento saiu da lista entre a pessoa abrir a tela e escrever o roteiro: a frase da tela, no lugar de um tema errado ou de um erro técnico. */
     saiuNaHora: "O assunto saiu do que está em alta antes de o roteiro sair. Escolha outro tema ou escreva o seu.",
   },
+  /** A lista de temas mudou entre a pessoa tocar num tema e o roteiro sair e aquele tema não está mais nela: a frase calma, no lugar de escrever o roteiro de outro tema. */
+  temaMudou: "A lista de temas mudou e esse tema não está mais nela. Volte aos temas e escolha de novo.",
 };

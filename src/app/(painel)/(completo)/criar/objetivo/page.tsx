@@ -15,7 +15,7 @@ import { perguntaDoPublicoPelaChave } from "@/servicos/vozes-do-publico";
 import { ObjetivoTela } from "./ObjetivoTela";
 
 type Props = {
-  searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string; momento?: string; pergunta?: string; pesquisa?: string }>;
+  searchParams: Promise<{ tema?: string; titulo?: string; livre?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string; momento?: string; pergunta?: string; pesquisa?: string }>;
 };
 
 /**
@@ -36,7 +36,7 @@ export default async function Objetivo({ searchParams }: Props) {
     redirect(destinoSemMarca(sessao.user.role));
   }
 
-  const { tema, livre, data, noticiaId, noticiaAssuntoId, alta, momento, pergunta, pesquisa } = await searchParams;
+  const { tema, titulo, livre, data, noticiaId, noticiaAssuntoId, alta, momento, pergunta, pesquisa } = await searchParams;
   const resultado = await temasParaCliente(cliente);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
   // E49 PR 1: com tema do dia, a ficha recomendada vem do `puxaPara` e do texto dele; sem tema (tema livre), vem da linha editorial ("pelo que você tem postado").
@@ -81,12 +81,18 @@ export default async function Objetivo({ searchParams }: Props) {
     }
   } else {
     // E55 PR 2b: vindo de um cartão "Em alta hoje", o tema é o do assunto (`?momento=<chave>`): se o assunto saiu da lista, a pessoa volta ao Criar em vez de cair em outro tema na mesma posição.
-    const indice = momento && resultado.status === "ok" ? resultado.temas.findIndex((t) => t.doMomento?.chave === momento) : Number(tema);
+    // A ordem dos temas é da marca e pode mudar entre abrir a lista e clicar (E16 PR 4): com o título do tema no endereço, o tema é o que a pessoa tocou, ou nenhum; o índice só vale em endereço antigo, sem título.
+    const indice =
+      momento && resultado.status === "ok"
+        ? resultado.temas.findIndex((t) => t.doMomento?.chave === momento)
+        : titulo && resultado.status === "ok"
+          ? resultado.temas.findIndex((t) => !t.doMomento && t.titulo === titulo)
+          : Number(tema);
     const temaDoDia = resultado.status === "ok" ? resultado.temas[indice] : undefined;
     if (!temaDoDia) {
       redirect("/criar");
     }
-    origem = momento ? { origem: "sugerido", temaIndice: indice, temaChave: momento } : { origem: "sugerido", temaIndice: indice };
+    origem = momento ? { origem: "sugerido", temaIndice: indice, temaChave: momento } : { origem: "sugerido", temaIndice: indice, temaTitulo: temaDoDia.titulo };
     temaEscolhidoTexto = temaDoDia.titulo;
     fichaRecomendada = fichaRecomendadaParaTema(temaDoDia);
     recomendadaPor = "tema";

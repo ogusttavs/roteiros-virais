@@ -126,7 +126,12 @@ export type OrigemDaTelaDoObjetivo = Extract<OrigemRoteiro, { origem: "sugerido"
 export function validarOrigemDaTelaDoObjetivo(valor: unknown): OrigemDaTelaDoObjetivo {
   const v = (valor ?? {}) as Record<string, unknown>;
   if (v.origem === "sugerido" && typeof v.temaIndice === "number" && Number.isInteger(v.temaIndice) && v.temaIndice >= 0) {
-    return { origem: "sugerido", temaIndice: v.temaIndice, temaChave: typeof v.temaChave === "string" && v.temaChave.length > 0 ? v.temaChave : undefined };
+    return {
+      origem: "sugerido",
+      temaIndice: v.temaIndice,
+      temaChave: typeof v.temaChave === "string" && v.temaChave.length > 0 ? v.temaChave : undefined,
+      temaTitulo: typeof v.temaTitulo === "string" && v.temaTitulo.length > 0 && v.temaTitulo.length <= 500 ? v.temaTitulo : undefined,
+    };
   }
   if (v.origem === "livre" && typeof v.textoTema === "string") {
     return { origem: "livre", textoTema: v.textoTema };
@@ -389,7 +394,11 @@ export type OrigemRoteiro =
    * `temaChave` (E55 PR 2b): a chave do assunto do momento, quando o tema veio de um cartão "Em alta hoje". O índice é a posição na lista de hoje e muda se o assunto sai ou outro entra na vaga;
    * com a chave, o tema é o do assunto que a pessoa viu, ou nenhum (`textosHoje.emAlta.saiuNaHora`), nunca outro.
    */
-  | { origem: "sugerido"; temaIndice: number; temaChave?: string }
+  /**
+   * `temaTitulo` (E16 PR 4): o título exato do tema do dia que a pessoa tocou. A ordem dos temas é da marca e muda quando uma medição nova cruza o limiar, então o índice não é identificação:
+   * com o título, o tema é o que a pessoa viu, ou nenhum (`textosHoje.temaMudou`), nunca outro. O índice fica só para o pedido antigo, sem título.
+   */
+  | { origem: "sugerido"; temaIndice: number; temaChave?: string; temaTitulo?: string }
   | { origem: "livre"; textoTema: string }
   /**
    * V9a, item 1: a pessoa contou o momento (por áudio ou por texto) em vez
@@ -819,9 +828,14 @@ async function resolverTema(
   if (resultado.status !== "ok") {
     throw new ErroRoteiro("nao ha tema do dia disponivel para este cliente.");
   }
-  const tema = params.temaChave ? resultado.temas.find((t) => t.doMomento?.chave === params.temaChave) : resultado.temas[params.temaIndice];
+  // A identificação do tema, da mais firme para a mais fraca: a chave do assunto em alta, o título exato do tema do dia, e só por último o índice (pedido antigo, sem título).
+  const tema = params.temaChave
+    ? resultado.temas.find((t) => t.doMomento?.chave === params.temaChave)
+    : params.temaTitulo
+      ? resultado.temas.find((t) => !t.doMomento && t.titulo === params.temaTitulo)
+      : resultado.temas[params.temaIndice];
   if (!tema) {
-    throw new ErroRoteiro(params.temaChave ? textosHoje.emAlta.saiuNaHora : "tema nao encontrado para o indice pedido.");
+    throw new ErroRoteiro(params.temaChave ? textosHoje.emAlta.saiuNaHora : params.temaTitulo ? textosHoje.temaMudou : "tema nao encontrado para o indice pedido.");
   }
   return {
     tema: tema.titulo,
