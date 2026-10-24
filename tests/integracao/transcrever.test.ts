@@ -21,6 +21,10 @@ vi.mock("@/jobs/legendas-youtube", async (importarOriginal) => {
   const original = await importarOriginal<typeof import("@/jobs/legendas-youtube")>();
   return { ...original, baixarLegendaYoutube: vi.fn() };
 });
+vi.mock("@/jobs/legenda-youtube", async (importarOriginal) => {
+  const original = await importarOriginal<typeof import("@/jobs/legenda-youtube")>();
+  return { ...original, baixarLegendaJson3: vi.fn() };
+});
 vi.mock("@/jobs/audio", async (importarOriginal) => {
   const original = await importarOriginal<typeof import("@/jobs/audio")>();
   return { ...original, baixarAudio: vi.fn(), apagarAudio: vi.fn() };
@@ -41,6 +45,7 @@ vi.mock("@/lib/config", async (importarOriginal) => {
   };
 });
 
+import { baixarLegendaJson3 } from "@/jobs/legenda-youtube";
 import { baixarLegendaYoutube, ErroLegendaDoProxy, ErroLegendaTempoLimite } from "@/jobs/legendas-youtube";
 import { apagarAudio, baixarAudio, ErroAudio, ErroAudioDoProxy, ErroAudioTempoLimite } from "@/jobs/audio";
 import { ErroGroq, ErroGroqTempoLimite, transcreverAudio } from "@/jobs/groq-api";
@@ -139,6 +144,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.mocked(baixarLegendaYoutube).mockReset();
+  vi.mocked(baixarLegendaJson3).mockReset();
   vi.mocked(baixarAudio).mockReset();
   vi.mocked(apagarAudio).mockReset().mockResolvedValue(undefined);
   vi.mocked(transcreverAudio).mockReset();
@@ -147,6 +153,7 @@ beforeEach(() => {
 afterEach(async () => {
   await db().delete(videos).where(eq(videos.nichoId, nichoId));
   config.regras.transcricoesPorDia = 2;
+  config.transcricao.legendaPrimeiro = false;
 });
 
 describe("rodarTranscrever", () => {
@@ -1224,5 +1231,111 @@ describe("rodarTranscrever, hotfix do proxy: o proxy que falha pausa o job intei
     const totalUsd = linhas.reduce((soma, l) => soma + Number(l.custoUsd), 0);
     expect(totalMb).toBeCloseTo(7.5, 2);
     expect(totalUsd).toBeCloseTo(0.0075, 5);
+  });
+});
+
+describe("rodarTranscrever, a legenda do YouTube antes do audio (TRANSCRICAO_LEGENDA_PRIMEIRO)", () => {
+  beforeEach(() => {
+    config.transcricao.legendaPrimeiro = true;
+  });
+
+  it("legenda manual do YouTube vira a transcricao, grava a fonte e nao chama o antigo, o audio nem a Groq", async () => {
+    await criarVideo("yt-legenda-manual", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), duracaoS: 60 });
+    vi.mocked(baixarLegendaJson3).mockResolvedValue({ texto: LEGENDA_LONGA, fonte: "legenda-manual", idioma: "pt" });
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.transcritosPorLegenda).toBe(1);
+    expect(resumo.transcritosPorLegendaManual).toBe(1);
+    expect(resumo.transcritosPorGroq).toBe(0);
+    expect(baixarLegendaJson3).toHaveBeenCalledWith(expect.stringContaining("yt-legenda-manual"), 60, "pt");
+    expect(baixarLegendaYoutube).not.toHaveBeenCalled();
+    expect(baixarAudio).not.toHaveBeenCalled();
+    expect(transcreverAudio).not.toHaveBeenCalled();
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-legenda-manual"));
+    expect(linha.transcricao).toBe(LEGENDA_LONGA);
+    expect(linha.fonteTranscricao).toBe("legenda-manual");
+    expect(linha.transcritoEm).not.toBeNull();
+    expect(linha.idiomaConfirmado).toBe(true);
+  });
+
+  it("legenda automatica conta como legenda, mas nao como manual", async () => {
+    await criarVideo("yt-legenda-auto", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), duracaoS: 60 });
+    vi.mocked(baixarLegendaJson3).mockResolvedValue({ texto: LEGENDA_LONGA, fonte: "legenda-automatica", idioma: "pt" });
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.transcritosPorLegenda).toBe(1);
+    expect(resumo.transcritosPorLegendaManual).toBe(0);
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-legenda-auto"));
+    expect(linha.fonteTranscricao).toBe("legenda-automatica");
+  });
+
+  it("sem legenda (ou curta demais) cai para o audio e a Groq, e a fonte gravada e groq", async () => {
+    await criarVideo("yt-sem-legenda-json3", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), duracaoS: 120 });
+    vi.mocked(baixarLegendaJson3).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.transcritosPorLegenda).toBe(0);
+    expect(resumo.transcritosPorGroq).toBe(1);
+    expect(baixarAudio).toHaveBeenCalledTimes(1);
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-sem-legenda-json3"));
+    expect(linha.transcricao).toBe("texto transcrito pela groq");
+    expect(linha.fonteTranscricao).toBe("groq");
+  });
+
+  it("TikTok e Instagram nunca tentam a legenda do YouTube", async () => {
+    await criarVideo("tt-sem-legenda-json3", { plataforma: "tiktok", velocidadeRelativa: 3, publicadoEm: diasAtras(3), duracaoS: 30 });
+    await criarVideo("ig-sem-legenda-json3", { plataforma: "instagram", velocidadeRelativa: 2, publicadoEm: diasAtras(3), duracaoS: 30 });
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarLegendaJson3).not.toHaveBeenCalled();
+    expect(resumo.transcritosPorGroq).toBe(2);
+  });
+
+  it("o tempo limite da legenda marca nova tentativa em 3 dias e nao tenta o audio", async () => {
+    await criarVideo("yt-legenda-lenta", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), duracaoS: 60 });
+    vi.mocked(baixarLegendaJson3).mockRejectedValue(new ErroLegendaTempoLimite("o yt-dlp passou de 90 s buscando a legenda"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.falhasPorTempoLimite).toBe(1);
+    expect(baixarAudio).not.toHaveBeenCalled();
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-legenda-lenta"));
+    expect(linha.transcricao).toBeNull();
+    expect(linha.proximaTentativaTranscricao).not.toBeNull();
+    expect(linha.falhaDeInfraEm).not.toBeNull();
+  });
+
+  it("o proxy recusando na legenda para o YouTube sem marcar falha no video", async () => {
+    await criarVideo("yt-legenda-proxy", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), duracaoS: 60 });
+    vi.mocked(baixarLegendaJson3).mockRejectedValue(new ErroLegendaDoProxy("proxy sem trafego", "proxy sem trafego: a legenda passou pelo proxy e ele recusou"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.falhasPorProxy).toBeGreaterThan(0);
+    expect(baixarAudio).not.toHaveBeenCalled();
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-legenda-proxy"));
+    expect(linha.proximaTentativaTranscricao).toBeNull();
+    expect(linha.transcricao).toBeNull();
+  });
+
+  it("desligada (TRANSCRICAO_LEGENDA_PRIMEIRO=0), volta ao caminho antigo: a funcao nova nem e chamada", async () => {
+    config.transcricao.legendaPrimeiro = false;
+    await criarVideo("yt-flag-desligada", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), duracaoS: 60 });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.transcritosPorLegenda).toBe(1);
+    expect(baixarLegendaJson3).not.toHaveBeenCalled();
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-flag-desligada"));
+    expect(linha.fonteTranscricao).toBe("legenda-automatica");
   });
 });
