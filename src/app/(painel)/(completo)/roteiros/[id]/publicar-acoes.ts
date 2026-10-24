@@ -55,10 +55,10 @@ export async function iniciarPublicacaoAction(roteiroId: number, dados: DadosPar
 }
 
 /**
- * A tela pergunta como está uma publicação (e, se o vídeo já estiver pronto, é esta pergunta que o publica, se o worker ainda não o fez). Só o dono; só da marca da sessão; o "ver como" nunca,
+ * A tela pergunta como está uma publicação (e, se o vídeo já estiver pronto, é esta pergunta que o publica, se o worker ainda não o fez). Devolve também em quantos segundos perguntar de novo: a tela obedece a esse número. Só o dono; só da marca da sessão; o "ver como" nunca,
  * porque a conferência pode publicar.
  */
-export async function conferirPublicacaoAction(publicacaoId: number): Promise<ResultadoAcao<{ vista: VistaDaPublicacao }>> {
+export async function conferirPublicacaoAction(publicacaoId: number): Promise<ResultadoAcao<{ vista: VistaDaPublicacao; reconferirEmSeg: number | null }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   const sessao = await sessaoDoPainel();
@@ -71,10 +71,10 @@ export async function conferirPublicacaoAction(publicacaoId: number): Promise<Re
   const resultado = await conferirPublicacao(id, { clienteId: quem.clienteId });
   if (!resultado.vista) return { ok: false, erro: fraseDeRecusa("nao-achou") };
   if (resultado.vista.estado === "publicada") revalidatePath("/roteiros");
-  return { ok: true, dado: { vista: resultado.vista } };
+  return { ok: true, dado: { vista: resultado.vista, reconferirEmSeg: resultado.reconferirEmSeg } };
 }
 
-/** "Cancelar o envio": só enquanto o vídeo ainda está subindo. Libera o roteiro para tentar de novo. */
+/** "Cancelar": enquanto o vídeo está subindo ou esperando o Instagram prepará-lo (não depois de mandado publicar). Libera o roteiro para tentar de novo. */
 export async function cancelarEnvioAction(publicacaoId: number): Promise<ResultadoAcao<{ vista: VistaDaPublicacao }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };

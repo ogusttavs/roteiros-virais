@@ -40,7 +40,7 @@ vi.mock("@/lib/log", () => {
   return { logger: { info: guardar, warn: guardar, error: guardar, debug: guardar, trace: guardar, fatal: guardar } };
 });
 
-import { ENVIO_PARADO_APOS_MS, PUBLICANDO_PARADO_APOS_MS } from "@/config/publicacao";
+import { ENVIO_PARADO_APOS_MS, PREPARO_DA_META_PRAZO_MS, PUBLICANDO_PARADO_APOS_MS } from "@/config/publicacao";
 import { db, getPool } from "@/db";
 import { clientes, contasConectadas, membrosMarca, nichos, publicacoes, roteiros, user, videosCliente } from "@/db/schema";
 import { config } from "@/lib/config";
@@ -480,6 +480,21 @@ describe("iniciarPublicacao", () => {
     expect(antiga).toMatchObject({ estado: "falhou", motivo: fraseDeFalha("envio-parado") });
   });
 
+  it("uma publicação presa em processando (a fila caiu, ninguém confere) não tranca o roteiro: passado o prazo da Meta vira falha e o novo envio passa", async () => {
+    const id = await iniciarEEnviar(roteiroA);
+    expect((await linha(id)).estado).toBe("processando");
+    // Antes do prazo ainda reserva.
+    const quase = new Date(agoraFixo.getTime() + PREPARO_DA_META_PRAZO_MS - 1000);
+    expect(await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA }), { ...deps(), agora: () => quase })).toMatchObject({ ok: false, codigo: "em-andamento" });
+    expect((await linha(id)).estado).toBe("processando");
+    // Passou o prazo: o antigo vira falha com a frase de "demorou" (em língua de gente) e o novo abre.
+    const depois = new Date(agoraFixo.getTime() + PREPARO_DA_META_PRAZO_MS + 1000);
+    const nova = await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA }), { ...deps(), agora: () => depois });
+    expect(nova.ok).toBe(true);
+    expect(await linha(id)).toMatchObject({ estado: "falhou", motivo: fraseDeFalha("demorou") });
+    expect(dasChamadas("publicar")).toHaveLength(0);
+  });
+
   it("a Meta recusa abrir o envio: a publicação fica falhada com a frase, e o roteiro fica livre para tentar de novo", async () => {
     instalarMeta({ erroNoContainer: { code: 100, subcode: 2207032 } });
     const r = await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA }), deps());
@@ -609,6 +624,33 @@ describe("receberVideo", () => {
     await db().update(publicacoes).set({ estado: "publicada" }).where(eq(publicacoes.id, outra.publicacaoId));
     expect(await cancelarEnvio("pi-dono-a", marcaA, outra.publicacaoId)).toMatchObject({ estado: "publicada" });
   });
+
+  it("cancelar também vale enquanto a Meta prepara o vídeo: vira falha \"cancelada\", nada é publicado e o roteiro fica livre", async () => {
+    instalarMeta({ status: ["IN_PROGRESS"] });
+    const id = await iniciarEEnviar(roteiroA);
+    expect((await linha(id)).estado).toBe("processando");
+    // Só o dono, só da própria marca.
+    expect(await cancelarEnvio("pi-dono-b", marcaB, id)).toBeNull();
+    expect(await cancelarEnvio("pi-membro-a", marcaA, id)).toBeNull();
+    expect((await linha(id)).estado).toBe("processando");
+    expect(await cancelarEnvio("pi-dono-a", marcaA, id)).toMatchObject({ estado: "falhou", motivo: fraseDeFalha("cancelada") });
+    expect(fraseDeFalha("cancelada")).toContain("Nada foi publicado");
+    expect((await linha(id)).terminadaEm).toBeTruthy();
+    // A conferência que chegar depois não faz nada (nem publica).
+    chamadas.length = 0;
+    expect((await conferirPublicacao(id, deps())).vista?.estado).toBe("falhou");
+    expect(chamadas).toHaveLength(0);
+    expect(dasChamadas("publicar")).toHaveLength(0);
+    // O roteiro está livre.
+    expect((await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA }), deps())).ok).toBe(true);
+  });
+
+  it("depois de mandar publicar (publicando) não cancela: o pedido já saiu e pode ter dado certo", async () => {
+    const id = await iniciarEEnviar(roteiroA);
+    await db().update(publicacoes).set({ estado: "publicando" }).where(eq(publicacoes.id, id));
+    expect(await cancelarEnvio("pi-dono-a", marcaA, id)).toMatchObject({ estado: "publicando", motivo: null });
+    expect((await linha(id)).estado).toBe("publicando");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -616,19 +658,76 @@ describe("receberVideo", () => {
 // ---------------------------------------------------------------------------
 
 describe("conferirPublicacao", () => {
-  it("a Meta ainda prepara: pergunta de novo em 10, 20, 30, 45 e 60 segundos; passando disso, falha dizendo que demorou", async () => {
+  const em = (segundos: number) => ({ agora: () => new Date(agoraFixo.getTime() + segundos * 1000), agendar: vi.fn(async () => undefined) });
+
+  it("o prazo é de tempo, não de contagem: nove perguntas em 54 segundos (a tela de antes) não reprovam, e a Meta só desiste depois de 6 minutos", async () => {
     instalarMeta({ status: ["IN_PROGRESS"] });
     const id = await iniciarEEnviar(roteiroA);
-    const esperas: (number | null)[] = [];
-    for (let i = 0; i < 12; i += 1) {
-      const r = await conferirPublicacao(id, deps());
-      esperas.push(r.reconferirEmSeg);
-      if (r.reconferirEmSeg === null) break;
+    for (let i = 0; i < 9; i += 1) {
+      const r = await conferirPublicacao(id, em(i * 6));
+      expect(r.vista?.estado).toBe("processando");
+      expect(r.reconferirEmSeg).not.toBeNull();
     }
-    expect(esperas.slice(0, 5)).toEqual([10, 20, 30, 45, 60]);
-    expect(esperas.at(-1)).toBeNull();
+    expect(dasChamadas("status")).toHaveLength(9);
+    // Dez, vinte, cem perguntas seguidas no mesmo minuto: ainda processando, o relógio é que manda.
+    for (let i = 0; i < 20; i += 1) expect((await conferirPublicacao(id, em(59))).vista?.estado).toBe("processando");
+    expect(await linha(id)).toMatchObject({ estado: "processando", motivo: null });
+    // Passou o prazo e a Meta ainda diz "preparando": falha dizendo que demorou, sem nunca publicar.
+    const r = await conferirPublicacao(id, em(PREPARO_DA_META_PRAZO_MS / 1000));
+    expect(r).toMatchObject({ reconferirEmSeg: null, vista: { estado: "falhou", motivo: fraseDeFalha("demorou") } });
     expect(await linha(id)).toMatchObject({ estado: "falhou", motivo: fraseDeFalha("demorou") });
     expect(dasChamadas("publicar")).toHaveLength(0);
+  });
+
+  it("seguindo o reconferirEmSeg que o servidor devolve: 10, 20, 30, 45 e 60 segundos, no máximo uma pergunta por minuto depois disso, e a última no prazo de 6 minutos", async () => {
+    instalarMeta({ status: ["IN_PROGRESS"] });
+    const id = await iniciarEEnviar(roteiroA);
+    const esperas: number[] = [];
+    const instantes: number[] = [];
+    let t = 0;
+    for (let i = 0; i < 40; i += 1) {
+      const r = await conferirPublicacao(id, em(t));
+      instantes.push(t);
+      if (r.reconferirEmSeg === null) break;
+      esperas.push(r.reconferirEmSeg);
+      t += r.reconferirEmSeg;
+    }
+    expect(esperas.slice(0, 5)).toEqual([10, 20, 30, 45, 60]);
+    // A última espera é cortada para cair no prazo; fora ela, nunca passa de 60 s.
+    expect(Math.max(...esperas)).toBe(60);
+    expect(instantes.at(-1)).toBe(PREPARO_DA_META_PRAZO_MS / 1000);
+    // Cerca de dez perguntas em 6 minutos, não nove em um.
+    expect(dasChamadas("status").length).toBeGreaterThanOrEqual(8);
+    expect(dasChamadas("status").length).toBeLessThanOrEqual(11);
+    expect(await linha(id)).toMatchObject({ estado: "falhou", motivo: fraseDeFalha("demorou") });
+  });
+
+  it("pronto na última pergunta, mesmo depois dos 6 minutos: publica (o prazo só vale para quem ainda está preparando)", async () => {
+    instalarMeta({ status: ["FINISHED"] });
+    const id = await iniciarEEnviar(roteiroA);
+    const r = await conferirPublicacao(id, em(PREPARO_DA_META_PRAZO_MS / 1000 + 120));
+    expect(r.vista?.estado).toBe("publicada");
+    expect(dasChamadas("publicar")).toHaveLength(1);
+  });
+
+  it("a conferência não mexe no relógio do prazo, e a Meta pedir para esperar (2207027) também não o reinicia", async () => {
+    instalarMeta({ status: ["IN_PROGRESS", "FINISHED"], erroAoPublicar: { code: 9007, subcode: 2207027 } });
+    const id = await iniciarEEnviar(roteiroA);
+    const inicial = (await linha(id)).atualizadaEm.getTime();
+    await conferirPublicacao(id, em(30));
+    expect((await linha(id)).atualizadaEm.getTime()).toBe(inicial);
+    const r = await conferirPublicacao(id, em(120));
+    expect(r.vista?.estado).toBe("processando");
+    expect(dasChamadas("publicar")).toHaveLength(1);
+    expect(await linha(id)).toMatchObject({ estado: "processando", conferencias: 2 });
+    expect((await linha(id)).atualizadaEm.getTime()).toBe(inicial);
+  });
+
+  it("uma pergunta que a Meta devolve com limite de pedidos também conta só pelo relógio", async () => {
+    instalarMeta({ status: [{ erro: { code: 4 } }] });
+    const id = await iniciarEEnviar(roteiroA);
+    for (let i = 0; i < 12; i += 1) expect((await conferirPublicacao(id, em(i * 5))).vista?.estado).toBe("processando");
+    expect((await conferirPublicacao(id, em(PREPARO_DA_META_PRAZO_MS / 1000))).vista).toMatchObject({ estado: "falhou", motivo: fraseDeFalha("demorou") });
   });
 
   it("Reels pronto: publica uma vez, guarda o link e liga ao roteiro (o postei vira automático, com a curva já apontando para a mídia)", async () => {
@@ -939,6 +1038,31 @@ describe("as ações da tela", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.dado.vista.estado).toBe("publicada");
   });
+
+  it("a conferência da tela devolve em quantos segundos perguntar de novo (a folha obedece a esse número); terminada, devolve nulo", async () => {
+    instalarMeta({ status: ["IN_PROGRESS", "IN_PROGRESS", "FINISHED"] });
+    const id = await iniciarEEnviar(roteiroA);
+    // A ação usa o relógio de verdade: o vídeo acabou de subir.
+    await db().update(publicacoes).set({ atualizadaEm: new Date() }).where(eq(publicacoes.id, id));
+    entrar("pi-dono-a");
+    const primeira = await conferirPublicacaoAction(id);
+    expect(primeira).toMatchObject({ ok: true, dado: { reconferirEmSeg: 10 } });
+    const segunda = await conferirPublicacaoAction(id);
+    expect(segunda).toMatchObject({ ok: true, dado: { reconferirEmSeg: 20 } });
+    const terceira = await conferirPublicacaoAction(id);
+    expect(terceira).toMatchObject({ ok: true, dado: { reconferirEmSeg: null, vista: { estado: "publicada" } } });
+  });
+
+  it("cancelar pela tela enquanto a Meta prepara: o dono cancela; o membro e a marca de fora não", async () => {
+    instalarMeta({ status: ["IN_PROGRESS"] });
+    const id = await iniciarEEnviar(roteiroA);
+    entrar("pi-membro-a");
+    expect(await cancelarEnvioAction(id)).toMatchObject({ ok: false });
+    entrar("pi-dono-b");
+    expect(await cancelarEnvioAction(id)).toMatchObject({ ok: false, erro: fraseDeRecusa("nao-achou") });
+    entrar("pi-dono-a");
+    expect(await cancelarEnvioAction(id)).toMatchObject({ ok: true, dado: { vista: { estado: "falhou", motivo: fraseDeFalha("cancelada") } } });
+  });
 });
 
 describe("a rota PUT /api/publicar/[id]/video", () => {
@@ -956,6 +1080,35 @@ describe("a rota PUT /api/publicar/[id]/video", () => {
     expect(resposta.status).toBe(200);
     expect(await resposta.json()).toEqual({ ok: true });
     expect(dasChamadas("envio")[0]).toMatchObject({ token: TOKEN_A, bytes: 5 });
+    expect((await linha(inicio.publicacaoId)).estado).toBe("processando");
+  });
+
+  it("um corpo grande e lento (24 MB em pedaços de 1 MB, um a cada 40 ms) passa inteiro, em fluxo e sem prazo próprio da rota: o limite está no servidor do Node, não aqui", async () => {
+    const megas = 24;
+    const tamanho = megas * 1_000_000;
+    const inicio = await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA, tamanhoBytes: tamanho }), deps());
+    if (!inicio.ok) throw new Error("nao iniciou");
+    entrar("pi-dono-a");
+    let enviados = 0;
+    const lento = new ReadableStream<Uint8Array>({
+      async pull(controle) {
+        if (enviados >= megas) return controle.close();
+        await new Promise((r) => setTimeout(r, 40));
+        enviados += 1;
+        controle.enqueue(new Uint8Array(1_000_000));
+      },
+    });
+    const pedidoLento = new Request(`http://localhost/api/publicar/${inicio.publicacaoId}/video`, {
+      method: "PUT",
+      headers: { "content-type": "video/mp4", "content-length": String(tamanho) },
+      body: lento,
+      duplex: "half",
+    } as RequestInit);
+    const comeco = Date.now();
+    const resposta = await enviarVideoRota(pedidoLento, { params: Promise.resolve({ id: String(inicio.publicacaoId) }) });
+    expect(resposta.status).toBe(200);
+    expect(Date.now() - comeco).toBeGreaterThanOrEqual(megas * 30);
+    expect(dasChamadas("envio")[0].bytes).toBe(tamanho);
     expect((await linha(inicio.publicacaoId)).estado).toBe("processando");
   });
 
