@@ -708,6 +708,13 @@
       "when": 1792774883824,
       "tag": "0101_contas-fora-do-setor",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1792792153212,
+      "tag": "0102_publicar-no-instagram",
+      "breakpoints": true
     }
   ]
 }

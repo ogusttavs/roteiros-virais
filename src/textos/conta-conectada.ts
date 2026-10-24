@@ -35,7 +35,12 @@ export const textosLigacao = {
     /** O que a ligação faz, antes de ligar (sem ligação, dono). */
     explica: "Ligue o seu Instagram e a gente passa a ler os números de cada vídeo seu direto dele, sem você precisar mandar nada.",
     oQueLemos: "O que lemos: o nome da sua conta e, de cada vídeo, quantas pessoas viram, curtiram, comentaram e compartilharam.",
-    oQueNunca: "O que nunca fazemos: postar por você nem ler as suas mensagens.",
+    oQueNunca: "O que nunca fazemos: ler as suas mensagens nem postar sem você pedir.",
+    /** E56 PR 1: a publicação pelo aplicativo é sempre um pedido da pessoa, vídeo por vídeo. */
+    oQuePublicamos: "O que fazemos só quando você pedir: publicar no seu Instagram o vídeo que você escolher, na tela do roteiro.",
+    /** Conta ligada antes da E56 (ou com a configuração da Meta ainda sem a publicação): a leitura funciona, a publicação pede ligar de novo. */
+    publicarFalta: "Para publicar por aqui, ligue o Instagram de novo e libere a publicação.",
+    publicarLiberada: "Publicar por aqui: liberado.",
     ligar: "Ligar o meu Instagram",
     ligarDeNovo: "Ligar de novo",
     /** Aplicativo ainda em teste na Meta (só quem tem papel nele passa pelo diálogo): dito com calma, sob o botão. */

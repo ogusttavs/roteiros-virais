@@ -29,6 +29,7 @@ import {
   ErroMetaLogin,
   lerSignedRequest,
   lerState,
+  permissoesDoToken,
   permissoesQueFaltam,
   provaDoSegredo,
   trocarCodigoPorToken,
@@ -280,6 +281,17 @@ describe("as chamadas a Graph API (fetch simulado)", () => {
       }),
     );
     expect(await permissoesQueFaltam("EAAlongo")).toEqual(["instagram_manage_insights", "pages_read_engagement"]);
+  });
+
+  it("E56: permissoesDoToken diz, a parte e na mesma chamada, se a pessoa liberou a publicacao; a publicacao nao e exigida", async () => {
+    const todas = ["instagram_basic", "instagram_manage_insights", "pages_show_list", "pages_read_engagement"].map((permission) => ({ permission, status: "granted" }));
+    mockFetch.mockResolvedValueOnce(resposta({ data: todas }));
+    expect(await permissoesDoToken("EAAlongo")).toEqual({ faltam: [], publicar: false });
+    mockFetch.mockResolvedValueOnce(resposta({ data: [...todas, { permission: "instagram_content_publish", status: "granted" }] }));
+    expect(await permissoesDoToken("EAAlongo")).toEqual({ faltam: [], publicar: true });
+    mockFetch.mockResolvedValueOnce(resposta({ data: [...todas, { permission: "instagram_content_publish", status: "declined" }] }));
+    expect(await permissoesDoToken("EAAlongo")).toEqual({ faltam: [], publicar: false });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
   it("as contas do Instagram: so Paginas com conta profissional ligada, segue a paginacao e usa o username", async () => {

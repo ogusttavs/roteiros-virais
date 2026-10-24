@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CircleAlert, Copy, Download, Ellipsis, ExternalLink, Eye, HelpCircle, History, ImageDown, Mic, Music, Newspaper, Pencil, Play, RotateCcw, Scissors, Search, Sparkles, TrendingUp, Type, Undo2, Video, X } from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, Copy, Download, Ellipsis, ExternalLink, Eye, HelpCircle, History, ImageDown, Mic, Music, Newspaper, Pencil, Play, RotateCcw, Scissors, Search, Send, Sparkles, TrendingUp, Type, Undo2, Video, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -27,12 +27,14 @@ import { ehFalhaDeRede } from "@/lib/offline";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { PesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
+import type { VisaoDePublicar, VistaDaPublicacao } from "@/servicos/publicar-instagram";
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
 import { textosGravacao } from "@/textos/gravacao";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 import { textosPesquisa } from "@/textos/pesquisa";
+import { textosPublicar } from "@/textos/publicar";
 import { textosRoteiro } from "@/textos/roteiro";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
@@ -63,6 +65,7 @@ import {
   reprovarERescreverAction,
   salvarEdicaoAction,
 } from "./acoes";
+import { PublicarNoInstagram } from "./PublicarNoInstagram";
 import { RoteiroLongo, type EdicaoDoCapitulo } from "./RoteiroLongo";
 import styles from "./RoteiroTela.module.css";
 import { useMarcasDeFala } from "./useMarcasDeFala";
@@ -224,7 +227,7 @@ function normalizarLink(texto: string): string | null {
 const LIMIAR_DEMORANDO_MS = 10000;
 const ID_ERRO_POSTEI = "erro-postei";
 
-type Painel = "menu" | "postei" | "reprovar" | "versoes" | null;
+type Painel = "menu" | "postei" | "publicar" | "reprovar" | "versoes" | null;
 
 type Props = {
   roteiro: RoteiroLinha;
@@ -254,6 +257,8 @@ type Props = {
   nomePessoa: string;
   /** E48 PR 1: o servidor diz que o convite de instalar o aplicativo pode aparecer (não instalou e o "agora não" não vale mais). */
   conviteInstalarPodeAparecer: boolean;
+  /** E56 PR 1: "Publicar no Instagram" (Reels ou Story, pela conta ligada). Nulo quando a função não aparece: no "ver como", para quem não é dono, no vídeo longo e com a publicação fechada no ambiente. */
+  publicar?: VisaoDePublicar | null;
 };
 
 /**
@@ -277,6 +282,7 @@ export function RoteiroTela({
   marcas,
   nomePessoa,
   conviteInstalarPodeAparecer,
+  publicar = null,
 }: Props) {
   const router = useRouter();
   const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
@@ -285,6 +291,22 @@ export function RoteiroTela({
   const [painel, setPainel] = useState<Painel>(null);
   const botaoMenuRef = useRef<HTMLButtonElement>(null);
   const [urlDigitada, setUrlDigitada] = useState("");
+  /** E56 PR 1: a publicação mais recente deste roteiro; a folha de publicar pode fechar e abrir sem perder o andamento. */
+  const [publicacao, setPublicacao] = useState<VistaDaPublicacao | null>(publicar?.publicacao ?? null);
+  /** O vídeo está subindo: a folha de publicar não fecha (fechar interromperia o envio). */
+  const publicandoRef = useRef(false);
+  const avisarEnviando = useCallback((enviando: boolean) => {
+    publicandoRef.current = enviando;
+  }, []);
+  const mudouPublicacao = useCallback((vista: VistaDaPublicacao) => {
+    setPublicacao(vista);
+    // Publicado pelo aplicativo: o "postei" vira automático (o servidor já marcou o roteiro e guardou o link).
+    if (vista.estado === "publicada") {
+      setPostado(true);
+      setGravadoEm((atual) => atual ?? new Date());
+      setUrlPostado((atual) => vista.permalink ?? (atual || "https://www.instagram.com/"));
+    }
+  }, []);
   const [erroPostei, setErroPostei] = useState<string | null>(null);
   const [motivosSelecionados, setMotivosSelecionados] = useState<Set<IdMotivoReprovacao>>(
     new Set(),
@@ -457,7 +479,7 @@ export function RoteiroTela({
   function fecharPainel() {
     // Voltar do aparelho com a reescrita rodando: o painel fica, porque só ele mostra o andamento. Devolver
     // `false` faz o gancho pôr de volta a entrada do histórico, e o próximo Voltar continua fechando.
-    if (reescritaEmCursoRef.current) return false;
+    if (reescritaEmCursoRef.current || publicandoRef.current) return false;
     setPainel(null);
     botaoMenuRef.current?.focus();
   }
@@ -465,7 +487,7 @@ export function RoteiroTela({
 
   /** O que os painéis recebem para fechar: com a reescrita rodando, véu, Esc, Cancelar e arrastar não fecham. */
   function fecharSeLivre() {
-    if (reescritaEmCursoRef.current) return;
+    if (reescritaEmCursoRef.current || publicandoRef.current) return;
     fechar();
   }
 
@@ -1399,6 +1421,12 @@ export function RoteiroTela({
             <MotivoSemRede className={styles.motivoItem} />
           </button>
         ) : null}
+        {publicar && (!postado || publicacao) ? (
+          <button type="button" role="menuitem" onClick={() => setPainel("publicar")} className={styles.itemMenu} data-publicar-instagram>
+            <Send size={20} strokeWidth={1.5} aria-hidden="true" />
+            {textosPublicar.tela.abrir}
+          </button>
+        ) : null}
         <button type="button" role="menuitem" onClick={copiarTexto} className={styles.itemMenu}>
           <Copy size={20} strokeWidth={1.5} aria-hidden="true" />
           {textosRoteiro.menu.copiar}
@@ -1505,7 +1533,19 @@ export function RoteiroTela({
           </button>
           <MotivoSemRede />
         </form>
+        {/* E56 PR 1: quem ainda não postou pode publicar daqui mesmo, pela conta do Instagram ligada. */}
+        {publicar && !postado ? (
+          <button type="button" onClick={() => setPainel("publicar")} className={styles.btnTextoCancelar} data-publicar-instagram>
+            {textosPublicar.tela.abrir}
+          </button>
+        ) : null}
       </PainelFlutuante>
+
+      {publicar ? (
+        <PainelFlutuante titulo={textosPublicar.tela.titulo} aberto={painel === "publicar"} aoFechar={fecharSeLivre}>
+          <PublicarNoInstagram roteiroId={roteiro.id} visao={publicar} publicacao={publicacao} aoMudar={mudouPublicacao} aoEnviando={avisarEnviando} semConexao={semConexao} />
+        </PainelFlutuante>
+      ) : null}
 
       {/* A espera da claquete assume enquanto a reescrita roda (o painel some, e volta com a frase de erro se ela falhar): passo 19 do Opus. */}
       <TelaReescrevendo

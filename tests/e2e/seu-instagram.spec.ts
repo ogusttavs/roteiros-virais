@@ -78,7 +78,7 @@ test.describe("Seu Instagram, em Conta", () => {
     await expect(c).toHaveAttribute("data-estado", "sem-ligacao");
     await expect(c.getByRole("heading", { name: "Seu Instagram" })).toBeVisible();
     await expect(c).toContainText("o nome da sua conta");
-    await expect(c).toContainText("postar por você nem ler as suas mensagens");
+    await expect(c).toContainText("ler as suas mensagens nem postar sem você pedir");
     await expect(c).toContainText("a ligação direta abre para todos quando a Meta aprovar o aplicativo");
     await expect(c.getByRole("link", { name: "Ligar o meu Instagram" })).toHaveAttribute("href", "/api/meta/conectar");
     // Nada foi pedido à Meta só por abrir a tela.

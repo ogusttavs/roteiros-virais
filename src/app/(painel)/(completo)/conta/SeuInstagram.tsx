@@ -138,6 +138,12 @@ export function SeuInstagram({ visao }: { visao: VisaoSeuInstagram }) {
                 {conta.erro}
               </p>
             ) : null}
+            {/* E56 PR 1: a publicação pelo aplicativo depende de a pessoa ter liberado a publicação ao ligar. */}
+            {!conta.erro ? (
+              <p className={styles.nota} data-parte="publicar" data-publicar={conta.publicar ? "liberada" : "falta"}>
+                {conta.publicar ? t.publicarLiberada : t.publicarFalta}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -166,7 +172,7 @@ export function SeuInstagram({ visao }: { visao: VisaoSeuInstagram }) {
             </div>
           ) : (
             <div className={styles.acoes}>
-              {conta.erro && visao.ligacaoAberta ? (
+              {(conta.erro || !conta.publicar) && visao.ligacaoAberta ? (
                 <a className={styles.ligar} href={CAMINHO_PARA_LIGAR}>
                   {t.ligarDeNovo}
                 </a>
@@ -198,6 +204,7 @@ function SemLigacao({ visao }: { visao: VisaoSeuInstagram }) {
     <div className={styles.convite} data-parte="convite">
       <p className={styles.explica}>{t.explica}</p>
       <p className={styles.explica}>{t.oQueLemos}</p>
+      <p className={styles.explica}>{t.oQuePublicamos}</p>
       <p className={styles.explica}>{t.oQueNunca}</p>
       {visao.podeMexer ? (
         <a className={styles.ligar} href={CAMINHO_PARA_LIGAR}>
