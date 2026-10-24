@@ -403,6 +403,33 @@ describe("concluirLigacao: o que a Meta devolve", () => {
     expect(await linhas()).toHaveLength(0);
   });
 
+  it("E56: a permissao de publicar nao e exigida para ligar, mas fica guardada: sem ela a conta liga (so le), com ela a conta guarda que pode publicar", async () => {
+    instalarMeta();
+    expect(await concluirLigacao(volta("cc-dono-a", marcaA))).toEqual({ resultado: "ligada" });
+    expect((await linhas())[0].publicarLiberado).toBe(false);
+    expect((await contaLigadaDaMarca(marcaA))?.publicarLiberado).toBe(false);
+
+    instalarMeta({ permissoesLiberadas: [...TODAS_AS_PERMISSOES, "instagram_content_publish"] });
+    expect(await concluirLigacao(volta("cc-dono-a", marcaA))).toEqual({ resultado: "ligada" });
+    expect((await linhas())[0].publicarLiberado).toBe(true);
+    expect((await contaLigadaDaMarca(marcaA))?.publicarLiberado).toBe(true);
+  });
+
+  it("E56: a candidata escolhida entre varias herda se a pessoa liberou a publicacao", async () => {
+    instalarMeta({
+      permissoesLiberadas: [...TODAS_AS_PERMISSOES, "instagram_content_publish"],
+      contas: [
+        { pageId: "pg-1", pageName: "Pagina 1", igId: "ig-1", username: "outra1" },
+        { pageId: "pg-2", pageName: "Pagina 2", igId: "ig-2", username: "outra2" },
+      ],
+    });
+    expect(await concluirLigacao(volta("cc-dono-a", marcaA))).toEqual({ resultado: "escolher" });
+    expect((await linhas()).every((l) => l.publicarLiberado)).toBe(true);
+    await escolherConta("cc-dono-a", marcaA, "ig-2");
+    const [ativa] = await linhas();
+    expect(ativa).toMatchObject({ contaId: "ig-2", estado: "ativa", publicarLiberado: true });
+  });
+
   it("nenhuma Pagina com Instagram profissional ligado: avisa", async () => {
     instalarMeta({ contas: [] });
     expect(await concluirLigacao(volta("cc-dono-a", marcaA))).toEqual({ resultado: "sem-instagram" });

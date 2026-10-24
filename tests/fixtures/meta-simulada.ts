@@ -11,7 +11,7 @@ export const TOKEN_CURTO_SIMULADO = "EAA-CURTO-E2E-NAO-E-REAL";
 export const TOKEN_LONGO_SIMULADO = "EAA-LONGO-E2E-NAO-E-REAL";
 export const CODIGO_SIMULADO = "codigo-simulado-e2e";
 
-const TODAS_AS_PERMISSOES = ["instagram_basic", "instagram_manage_insights", "pages_show_list", "pages_read_engagement", "public_profile"];
+const TODAS_AS_PERMISSOES = ["instagram_basic", "instagram_manage_insights", "pages_show_list", "pages_read_engagement", "instagram_content_publish", "public_profile"];
 
 export type ContaSimulada = { paginaId: string; paginaNome: string; igId: string; username: string };
 
@@ -24,9 +24,17 @@ export type CenarioMeta = {
   permissoesLiberadas?: string[];
   /** Responde com erro da Graph API em uma etapa. */
   erroEm?: "codigo" | "longo" | "usuario" | "permissoes" | "contas";
+  /** E56 PR 1: a publicação. Os `status_code` que o contêiner devolve, um por pergunta (o último se repete); padrão: FINISHED. */
+  statusDoContainer?: string[];
+  /** Erro ao criar o contêiner ou ao enviar o vídeo (a Meta recusa o formato, por exemplo). */
+  erroNaPublicacao?: "container" | "envio";
+  /** O endereço da mídia publicada. */
+  permalink?: string;
+  /** Quanto o servidor de envio demora a responder (só para as capturas pararem na tela de "enviando"). */
+  demoraNoEnvioMs?: number;
 };
 
-export type ChamadaSimulada = { caminho: string; parametros: Record<string, string> };
+export type ChamadaSimulada = { caminho: string; parametros: Record<string, string>; metodo?: string; bytes?: number };
 
 export type MetaSimulada = {
   cenario: CenarioMeta;
@@ -45,11 +53,50 @@ function json(res: ServerResponse, corpo: unknown, status = 200): void {
 export async function iniciarMetaSimulada(porta: number): Promise<MetaSimulada> {
   const meta: MetaSimulada = { cenario: {}, chamadas: [], porta, fechar: async () => undefined };
 
-  function tratar(req: IncomingMessage, res: ServerResponse): void {
+  /** O corpo do pedido, lido até o fim (o envio de vídeo pode ser grande; o simulador só conta os bytes). */
+  async function lerCorpo(req: IncomingMessage): Promise<Buffer> {
+    const pedacos: Buffer[] = [];
+    for await (const pedaco of req) pedacos.push(pedaco as Buffer);
+    return Buffer.concat(pedacos);
+  }
+
+  async function tratar(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? "/", `http://127.0.0.1:${porta}`);
     const parametros = Object.fromEntries(url.searchParams);
-    meta.chamadas.push({ caminho: url.pathname, parametros });
     const c = meta.cenario;
+
+    // E56 PR 1: o envio de vídeo (rupload) e os passos da publicação.
+    if (url.pathname.startsWith("/rupload/")) {
+      const corpo = await lerCorpo(req);
+      meta.chamadas.push({ caminho: url.pathname, parametros: { offset: String(req.headers.offset ?? ""), file_size: String(req.headers.file_size ?? "") }, metodo: req.method, bytes: corpo.byteLength });
+      if (c.demoraNoEnvioMs) await new Promise((resolver) => setTimeout(resolver, c.demoraNoEnvioMs));
+      if (c.erroNaPublicacao === "envio") return json(res, { debug_info: { retriable: false, type: "ProcessingFailedError", message: JSON.stringify({ success: false, error: { message: "formato", code: 352 } }) } }, 400);
+      return json(res, { success: true, message: "Upload successful." });
+    }
+    if (req.method === "POST" && url.pathname.startsWith("/graph/")) {
+      const corpo = new URLSearchParams((await lerCorpo(req)).toString("utf8"));
+      const dados = Object.fromEntries(corpo);
+      // O acesso de quem pede nunca é gravado como dado da chamada (o teste confere o que foi pedido, não o segredo).
+      delete dados.access_token;
+      delete dados.appsecret_proof;
+      meta.chamadas.push({ caminho: url.pathname, parametros: dados, metodo: "POST" });
+      if (url.pathname.endsWith("/media")) {
+        if (c.erroNaPublicacao === "container") return json(res, { error: { message: "erro simulado", code: 100, error_subcode: 2207032 } }, 400);
+        return json(res, { id: "container-simulado-1", uri: `http://127.0.0.1:${porta}/rupload/container-simulado-1` });
+      }
+      if (url.pathname.endsWith("/media_publish")) return json(res, { id: "midia-simulada-1" });
+      return json(res, { error: { message: "caminho desconhecido do simulador", code: 100 } }, 404);
+    }
+    meta.chamadas.push({ caminho: url.pathname, parametros, metodo: req.method });
+    if (url.pathname.endsWith("/content_publishing_limit")) return json(res, { data: [{ quota_usage: 1, config: { quota_total: 50, quota_duration: 86400 } }] });
+    if (parametros.fields === "status_code") {
+      const lista = c.statusDoContainer ?? ["FINISHED"];
+      // Quantas vezes o contêiner já foi perguntado neste teste (a chamada de agora já está na lista).
+      const perguntas = meta.chamadas.filter((x) => x.parametros.fields === "status_code").length - 1;
+      const status = lista[Math.min(perguntas, lista.length - 1)];
+      return json(res, { status_code: status, id: url.pathname });
+    }
+    if (parametros.fields === "permalink") return json(res, { permalink: c.permalink ?? "https://www.instagram.com/reel/SIMULADOe2e/", id: url.pathname });
 
     if (url.pathname === "/dialog/oauth") {
       const volta = new URL(parametros.redirect_uri);
@@ -89,7 +136,12 @@ export async function iniciarMetaSimulada(porta: number): Promise<MetaSimulada> 
     return json(res, { data: contas.map((x) => ({ id: x.paginaId, name: x.paginaNome, instagram_business_account: { id: x.igId, username: x.username } })) });
   }
 
-  const servidor: Server = createServer(tratar);
+  const servidor: Server = createServer((req, res) => {
+    tratar(req, res).catch(() => {
+      res.writeHead(500);
+      res.end();
+    });
+  });
   await new Promise<void>((resolver, rejeitar) => {
     servidor.once("error", rejeitar);
     servidor.listen(porta, "127.0.0.1", () => resolver());

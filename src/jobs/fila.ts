@@ -87,6 +87,11 @@ export const FILAS = {
    * (cada tentativa gasta buscas pagas; a que cai vira "a pesquisa não terminou" e a pessoa decide) e sem horário.
    */
   pesquisaNaHora: "pesquisa-na-hora",
+  /**
+   * E56 PR 1, publicar no Instagram: por evento (o vídeo terminou de subir), `{ publicacaoId }`. Cada execução pergunta à Meta se o vídeo já está pronto e, estando, publica; se ainda não, agenda
+   * a próxima pergunta (`startAfter`). Job curto: a conferência é idempotente (a reserva `processando` para `publicando` impede publicar duas vezes), então repetir por erro de rede é seguro.
+   */
+  publicarInstagram: "publicar-instagram",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
@@ -97,7 +102,7 @@ export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
  * `clienteId`, que só `reprovarERescrever` sabe qual é; disparada sem isso,
  * o worker chama o job com `clienteId` indefinido e ele sempre quebra.
  */
-export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora]);
+export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram]);
 
 /**
  * As filas que aceitam rodar só para um ramo (`{ nichoId }` no disparo) e gravam o ramo em
@@ -152,6 +157,7 @@ const FILAS_CURTAS = new Set<string>([
   FILAS.renovarContasLigadas,
   FILAS.aprenderCliente,
   FILAS.analisarPerfil,
+  FILAS.publicarInstagram,
 ]);
 
 const QUATRO_HORAS_S = 4 * 60 * 60;

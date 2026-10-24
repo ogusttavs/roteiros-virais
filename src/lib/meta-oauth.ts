@@ -17,12 +17,27 @@ export const VERSAO_GRAPH = "v26.0";
 const GRAPH_DA_META = `https://graph.facebook.com/${VERSAO_GRAPH}`;
 const DIALOGO_DA_META = `https://www.facebook.com/${VERSAO_GRAPH}/dialog/oauth`;
 
+/** E56 PR 1: o servidor de envio de vídeo da Meta (carregamento retomável): `publicacao-de-conteudo.md`, "Sessão de carregamento retomável". */
+const RUPLOAD_DA_META = `https://rupload.facebook.com/ig-api-upload/${VERSAO_GRAPH}`;
+
 /** Lidos a cada chamada: só no e2e (`MODO_E2E=1`) eles apontam para o servidor local que simula a Meta (`config.metaConexao.simuladorE2E`); fora dele são sempre os da Meta. */
 const graph = () => (config.metaConexao.simuladorE2E ? `${config.metaConexao.simuladorE2E}/graph` : GRAPH_DA_META);
 const dialogo = () => (config.metaConexao.simuladorE2E ? `${config.metaConexao.simuladorE2E}/dialog/oauth` : DIALOGO_DA_META);
+const rupload = () => (config.metaConexao.simuladorE2E ? `${config.metaConexao.simuladorE2E}/rupload` : RUPLOAD_DA_META);
+
+/** Para `lib/meta-publicar.ts`: os mesmos endereços, lidos a cada chamada, com o desvio do e2e. */
+export const enderecoDoGraph = graph;
+export const enderecoDoRupload = rupload;
 
 /** As permissões que a configuração de login precisa liberar. O código confere, depois do login, que a pessoa liberou todas (`login-para-empresas.md`: todas ou nenhuma). */
 export const PERMISSOES_EXIGIDAS = ["instagram_basic", "instagram_manage_insights", "pages_show_list", "pages_read_engagement"] as const;
+
+/**
+ * E56 PR 1: publicar no Instagram da própria marca (`permissoes.md`: "instagram_content_publish"; `publicacao-de-conteudo.md`: com o Login do Facebook para Empresas também pede
+ * `instagram_basic` e `pages_read_engagement`, que a ligação já pede). Fica FORA de `PERMISSOES_EXIGIDAS` de propósito: a configuração do Login para Empresas só passa a pedir esta permissão
+ * depois que o Gustavo a acrescenta no painel da Meta; até lá a ligação continua funcionando para ler os números, e a conta guarda `publicarLiberado = false`.
+ */
+export const PERMISSAO_DE_PUBLICAR = "instagram_content_publish";
 
 /** A pessoa tem dez minutos entre abrir o diálogo da Meta e voltar. */
 export const VALIDADE_DO_STATE_MS = 10 * 60 * 1000;
@@ -152,23 +167,31 @@ export function lerSignedRequest(valor: string | null | undefined, segredo: stri
 type ErroGraph = { message?: string; code?: number; error_subcode?: number };
 
 /** Dentro do Vitest, só com `fetch` simulado: nenhum teste fala com a Meta de verdade. */
-function conferirQueNaoEhRedeDeVerdade(): void {
+export function conferirQueNaoEhRedeDeVerdade(): void {
   if (process.env.VITEST && !("mock" in (globalThis.fetch as unknown as object))) {
     throw new ErroMetaLogin("Dentro do Vitest o fetch precisa estar simulado: nenhum teste chama a Meta de verdade.");
   }
 }
 
-async function pedirGraph<T>(caminho: string, parametros: Record<string, string>, token?: string): Promise<T> {
+/**
+ * Uma chamada à Graph API. `GET` leva tudo na query (como sempre); `POST` (E56 PR 1, publicar) leva tudo no corpo do formulário, inclusive o acesso: a legenda de um vídeo pode ter 2.200
+ * caracteres, e endereço comprido demais não passa. Em nenhum dos dois casos o endereço ou o corpo vão para log ou erro.
+ */
+export async function pedirGraph<T>(caminho: string, parametros: Record<string, string>, token?: string, metodo: "GET" | "POST" = "GET"): Promise<T> {
   conferirQueNaoEhRedeDeVerdade();
   const url = new URL(`${graph()}/${caminho}`);
-  for (const [chave, valor] of Object.entries(parametros)) url.searchParams.set(chave, valor);
+  const campos = metodo === "GET" ? url.searchParams : new URLSearchParams();
+  for (const [chave, valor] of Object.entries(parametros)) campos.set(chave, valor);
   if (token) {
-    url.searchParams.set("access_token", token);
-    if (config.metaConexao.appSecret) url.searchParams.set("appsecret_proof", provaDoSegredo(token));
+    campos.set("access_token", token);
+    if (config.metaConexao.appSecret) campos.set("appsecret_proof", provaDoSegredo(token));
   }
   let resposta: Response;
   try {
-    resposta = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    resposta =
+      metodo === "GET"
+        ? await fetch(url, { signal: AbortSignal.timeout(20_000) })
+        : await fetch(url, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: campos as URLSearchParams, signal: AbortSignal.timeout(30_000) });
   } catch {
     // Sem a causa nem o endereço: o endereço leva token e segredo na query.
     throw new ErroMetaLogin("Nao foi possivel falar com a Meta (rede ou prazo).");
@@ -220,11 +243,18 @@ export async function usuarioDoToken(token: string): Promise<{ id: string }> {
   return { id: corpo.id };
 }
 
-/** As permissões exigidas que a pessoa não liberou (`/me/permissions`, `login-fluxo-manual-codigo.md`). */
-export async function permissoesQueFaltam(token: string): Promise<string[]> {
+/**
+ * O que a pessoa liberou no diálogo (`/me/permissions`, `login-fluxo-manual-codigo.md`): as permissões exigidas que faltam e, à parte, se liberou a de publicar (E56 PR 1). Uma chamada só.
+ */
+export async function permissoesDoToken(token: string): Promise<{ faltam: string[]; publicar: boolean }> {
   const corpo = await pedirGraph<{ data?: { permission?: string; status?: string }[] }>("me/permissions", {}, token);
   const liberadas = new Set((corpo.data ?? []).filter((p) => p.status === "granted" && p.permission).map((p) => p.permission as string));
-  return PERMISSOES_EXIGIDAS.filter((p) => !liberadas.has(p));
+  return { faltam: PERMISSOES_EXIGIDAS.filter((p) => !liberadas.has(p)), publicar: liberadas.has(PERMISSAO_DE_PUBLICAR) };
+}
+
+/** As permissões exigidas que a pessoa não liberou. */
+export async function permissoesQueFaltam(token: string): Promise<string[]> {
+  return (await permissoesDoToken(token)).faltam;
 }
 
 export type ContaDoInstagram = { paginaId: string; paginaNome: string | null; contaId: string; nome: string };

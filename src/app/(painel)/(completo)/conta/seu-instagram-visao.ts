@@ -36,7 +36,7 @@ export type VisaoSeuInstagram = {
   /** É dona da marca, mas está no "ver como" (o cartão fica só de leitura). */
   verComo: boolean;
   /** A conta ativa, ou `null`. */
-  conta: { nome: string; pagina: string | null; desde: string; ultimaLeitura: string | null; erro: string | null } | null;
+  conta: { nome: string; pagina: string | null; desde: string; ultimaLeitura: string | null; erro: string | null; publicar: boolean } | null;
   /** As contas à espera da escolha; vazio para quem não pode mexer. */
   candidatas: { contaId: string; nome: string; pagina: string | null }[];
   /** A frase da volta do diálogo, quando a página abriu com `?instagram=`. */
@@ -69,6 +69,7 @@ export function montarVisaoSeuInstagram(entrada: EntradaDaVisao): VisaoSeuInstag
           desde: formatarDia(entrada.conta.conectadaEm),
           ultimaLeitura: entrada.conta.ultimaLeituraEm ? formatarDiaEHora(entrada.conta.ultimaLeituraEm) : null,
           erro: entrada.conta.erro,
+          publicar: entrada.conta.publicarLiberado === true,
         }
       : null,
     // A lista de escolha é de quem pode escolher: nem membro nem o "ver como" a veem (e a ação recusaria de qualquer jeito).

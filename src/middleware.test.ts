@@ -176,5 +176,17 @@ describe("middleware", () => {
       expect(passaPeloMiddleware("/_next/image/foo")).toBe(false);
       expect(passaPeloMiddleware("/api/auth/session")).toBe(false);
     });
+
+    /**
+     * E56 PR 1: o corpo do pedido de `/api/publicar/<id>/video` e o video. Com o middleware no caminho, o Next.js clonaria o corpo e entregaria a rota so os primeiros 10 MB (o teto
+     * `middlewareClientMaxBodySize`), o que cortaria um Reels de 300 MB no meio sem erro nenhum. A rota confere a sessao sozinha.
+     */
+    it("o envio de video da publicacao fica de fora, para o corpo chegar inteiro; o resto de /api/publicar e as outras rotas de API continuam passando", () => {
+      expect(passaPeloMiddleware("/api/publicar/7/video")).toBe(false);
+      expect(passaPeloMiddleware("/api/publicar/123456/video")).toBe(false);
+      expect(passaPeloMiddleware("/api/publicarmesmo")).toBe(true);
+      expect(passaPeloMiddleware("/api/transcrever")).toBe(true);
+      expect(passaPeloMiddleware("/api/meta/conectar")).toBe(true);
+    });
   });
 });
