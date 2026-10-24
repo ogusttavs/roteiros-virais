@@ -344,14 +344,27 @@ fazer_backup() {
   # muda nada fora de sistemas que dao significado especial a ela, e o
   # Debian do container nao da). Fora do Git Bash (Linux, macOS, CI) a
   # barra dupla tambem nunca teve efeito nenhum, comando roda igual.
+  #
+  # `agora` e o dump de deploy (so no volume, nome com -deploy); `diario` e o das 06:00 (o
+  # unico que vai ao bucket). O ensaio nao tem bucket (BACKUP_RCLONE_REMOTE vazio), entao so
+  # confere que os dois nomes aparecem no volume.
   "${COMPOSE[@]}" exec -T roteiros-backup //usr/local/bin/backup.sh agora
-  local dump
-  dump=$("${COMPOSE[@]}" exec -T roteiros-backup sh -c 'ls -1 /backups/roteiros-*.sql.gz 2>/dev/null | tail -1')
-  [ -n "$dump" ] || {
+  "${COMPOSE[@]}" exec -T roteiros-backup //usr/local/bin/backup.sh diario
+  local dumps
+  dumps=$("${COMPOSE[@]}" exec -T roteiros-backup sh -c 'ls -1 /backups/roteiros-*.sql.gz 2>/dev/null' | tr -d '\r')
+  [ -n "$dumps" ] || {
     echo "backup.sh rodou mas nenhum dump apareceu em /backups" >&2
     return 1
   }
-  echo "dump: $(echo "$dump" | tr -d '\r')"
+  echo "$dumps" | grep -q -- '-deploy\.sql\.gz$' || {
+    echo "backup.sh agora nao deixou um dump de deploy (roteiros-*-deploy.sql.gz) em /backups: $dumps" >&2
+    return 1
+  }
+  echo "$dumps" | grep -v -- '-deploy\.sql\.gz$' | grep -q . || {
+    echo "backup.sh diario nao deixou um dump diario (sem -deploy) em /backups: $dumps" >&2
+    return 1
+  }
+  echo "dumps: $(echo "$dumps" | tr '\n' ' ')"
 }
 
 passo "confere .env.ensaio (segredos de 32+ caracteres)" conferir_env
@@ -372,7 +385,7 @@ passo "para o worker (SIGTERM), confere 'parando com graca', e inicia de novo" w
 passo "dispara coleta-noticias e espera terminar ok (2a vez, depois do stop/start)" disparar_e_esperar_job
 passo "mata o processo do worker de dentro do container e confere que o Compose sobe sozinho" worker_volta_sozinho_apos_kill
 passo "dispara coleta-noticias e espera terminar ok (3a vez, depois do kill)" disparar_e_esperar_job
-passo "roda o backup.sh e confere o dump no volume" fazer_backup
+passo "roda o backup.sh (agora e diario) e confere os dois dumps no volume" fazer_backup
 
 imprimir_resumo
 echo
