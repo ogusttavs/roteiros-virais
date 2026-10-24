@@ -16,7 +16,7 @@ import { and, asc, eq, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import { contas, nichos } from "@/db/schema";
 import { FILAS } from "@/jobs/fila";
-import { buscarBusinessDiscovery, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi, PausaDaMeta } from "@/jobs/meta-api";
+import { buscarBusinessDiscovery, comMedicaoDeUso, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi, PausaDaMeta } from "@/jobs/meta-api";
 import { config } from "@/lib/config";
 import { normalizarBusinessDiscovery } from "@/servicos/normalizadores/meta";
 
@@ -37,7 +37,11 @@ export async function rodarMetaContas(nichoId?: number, retomada?: { desde?: str
       false,
     );
   }
+  // O resumo da noite traz `usoDaMeta`: o maior valor visto de cada medida de uso do aplicativo e qual delas fez pausar (23/10/2026).
+  return comMedicaoDeUso(() => lerContasDaMeta(nichoId, retomada));
+}
 
+async function lerContasDaMeta(nichoId?: number, retomada?: { desde?: string }): Promise<Record<string, unknown>> {
   const condicao = nichoId ? and(eq(nichos.ativo, true), eq(nichos.id, nichoId)) : eq(nichos.ativo, true);
   const nichosAtivos = await db().select().from(nichos).where(condicao);
   const desdeDaPassada = retomada?.desde && !Number.isNaN(new Date(retomada.desde).getTime()) ? new Date(retomada.desde) : new Date();

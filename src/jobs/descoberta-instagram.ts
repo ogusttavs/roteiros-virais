@@ -14,6 +14,15 @@
  * `contas-base` para de tentar assim que a base dela fica completa); e
  * pulado quando a conta ja e coberta (a Meta ja cuida do dado dela, mais
  * completo, de graca).
+ *
+ * FORA DO AGENDADOR desde 23/10/2026 (passo 6 de `pesquisa/estudo-instagram-sem-apify.md`):
+ * nas execucoes de 29/09, 04/10, 11/10 e 18/10 ela buscou 0 termos, porque o teto diario
+ * de 300 resultados do Apify ja estava gasto as 02:35 (`contas-base`) e 03:30
+ * (`coleta-apify`) quando o cron de domingo, 04:15, chegava. O job, a fila e o
+ * worker continuam existindo e rodam a mao (`npm run job -- descoberta-instagram`); o
+ * cron antigo e desinscrito na subida do worker (`AGENDAMENTOS_APOSENTADOS`, `agenda.ts`).
+ * A entrada de conta nova de Instagram passa a vir da semente, dos concorrentes que a
+ * marca cita no briefing (lidos pela Business Discovery) e da sugestao de contas do ramo.
  */
 import { and, eq, sql } from "drizzle-orm";
 

@@ -25,7 +25,6 @@ describe("normalizarBusinessDiscovery", () => {
     const resultado = normalizarBusinessDiscovery("natgeo", {
       username: "natgeo",
       followers_count: 268602293,
-      media_count: 31995,
       media: {
         data: [
           {
