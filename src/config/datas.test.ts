@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -64,6 +67,39 @@ describe("a base de datas", () => {
   it("os pontos facultativos móveis de 2026 batem com a portaria (Carnaval 16 e 17 de fevereiro, Corpus Christi 4 de junho)", () => {
     expect(ocorrenciasNoAno(data("carnaval"), 2026)).toEqual(["2026-02-16", "2026-02-17"]);
     expect(ocorrenciasNoAno(data("corpus-christi"), 2026)).toEqual(["2026-06-04"]);
+  });
+
+  it("o tipo de cada data da portaria bate com o que a portaria escreve: feriado nacional é feriado, ponto facultativo nunca vira feriado", () => {
+    // A pesquisa mora fora do repositório do código (no dos documentos): sobe as pastas até achar `pesquisa/datas/docs`; sem ela (CI), não há o que conferir.
+    let texto: string | null = null;
+    for (let pasta = __dirname, i = 0; i < 8 && texto === null; i++, pasta = resolve(pasta, "..")) {
+      const caminho = resolve(pasta, "pesquisa/datas/docs/portaria-mgi-11460-2025-copia-do-dou.md");
+      if (existsSync(caminho)) texto = readFileSync(caminho, "utf-8");
+    }
+    if (texto === null) return;
+    const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+    // "V , 3 de abril, Paixão de Cristo (feriado nacional);" -> { "2026-04-03": "feriado" }
+    const daPortaria = new Map<string, "feriado" | "ponto-facultativo">();
+    for (const linha of texto.split("\n")) {
+      const m = linha.match(/^\s*[IVXL]+\s*,\s*(\d{1,2})º? de ([a-zç]+)\b.*\((feriado nacional|ponto facultativo)/i);
+      if (!m) continue;
+      const mes = MESES.indexOf(m[2].toLowerCase()) + 1;
+      expect(mes, linha).toBeGreaterThan(0);
+      const iso = `2026-${String(mes).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+      daPortaria.set(iso, m[3].toLowerCase() === "feriado nacional" ? "feriado" : "ponto-facultativo");
+    }
+    expect(daPortaria.size).toBeGreaterThanOrEqual(18);
+
+    const citam = DATAS_DO_CALENDARIO.filter((d) => d.arquivo === "portaria-mgi-11460-2025-copia-do-dou");
+    expect(citam.length).toBeGreaterThan(0);
+    for (const d of citam) {
+      for (const dia of ocorrenciasNoAno(d, 2026)) {
+        expect(daPortaria.get(dia), `${d.chave} em ${dia} não está na portaria`).toBe(d.tipo);
+      }
+    }
+    // E o caminho inverso: todo ponto facultativo da portaria que o calendário tem não pode estar como feriado.
+    const comoFeriado = new Set(DATAS_DO_CALENDARIO.filter((d) => d.tipo === "feriado").flatMap((d) => ocorrenciasNoAno(d, 2026)));
+    for (const [dia, tipo] of daPortaria) if (tipo === "ponto-facultativo") expect(comoFeriado.has(dia), `${dia} é ponto facultativo`).toBe(false);
   });
 });
 
