@@ -70,7 +70,6 @@ describe("buscarBusinessDiscovery", () => {
         business_discovery: {
           username: "natgeo",
           followers_count: 268602293,
-          media_count: 31995,
           media: {
             data: [
               {
@@ -92,7 +91,6 @@ describe("buscarBusinessDiscovery", () => {
     expect(perfil).toEqual({
       username: "natgeo",
       followers_count: 268602293,
-      media_count: 31995,
       media: {
         data: [
           {

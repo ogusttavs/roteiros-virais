@@ -1,7 +1,8 @@
 /**
  * Job `meta-hashtags` (E6 parte 3, segunda rodada, item 3, ajuste 2 da
- * revisao do PR #35): diario, as 04:20 (depois de `transcrever`, antes de
- * `extrair`), por nicho, resolve até `TERMOS_POR_NICHO` termos com
+ * revisao do PR #35): diario, as 02:10 desde 23/10/2026 (era 04:20; roda antes de
+ * `contas-base` e `meta-contas` gastarem o limite do aplicativo, ver `agenda.ts`),
+ * por nicho, resolve até `TERMOS_POR_NICHO` termos com
  * `ig_hashtag_search` e lê o `recent_media` de cada um. Era `top_media` e
  * semanal (segunda de manhã) na rodada anterior; a chamada real do Fable
  * contra a hashtag "limpeza" achou o motivo da troca: `top_media` devolveu
@@ -50,7 +51,7 @@ import { and, eq, gte } from "drizzle-orm";
 import { temIndicioDeBrasil } from "@/config/brasil";
 import { db } from "@/db";
 import { hashtagsMetaUsadas, nichos, videos } from "@/db/schema";
-import { buscarIdDaHashtag, buscarRecentMediaDaHashtag, ErroMetaApi, erroMetaEhHashtagInexistente, PausaDaMeta } from "@/jobs/meta-api";
+import { buscarIdDaHashtag, buscarRecentMediaDaHashtag, comMedicaoDeUso, ErroMetaApi, erroMetaEhHashtagInexistente, PausaDaMeta } from "@/jobs/meta-api";
 import { config } from "@/lib/config";
 import { normalizarHashtag } from "@/servicos/normalizadores/hashtag";
 import { ehVideo, normalizarHashtagMedia } from "@/servicos/normalizadores/meta";
@@ -135,6 +136,11 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
   if (!config.coleta.metaAtivo) {
     throw new ErroColeta("META_ATIVO nao esta ligado; a hashtag search da meta fica desligada", false);
   }
+  // O resumo da noite traz `usoDaMeta` (o maior valor visto de cada medida de uso e, se parou, qual delas pausou): sem isso não se sabia por que esta rotina não rodava desde 05/10.
+  return comMedicaoDeUso(() => lerHashtagsDaMeta(nichoId));
+}
+
+async function lerHashtagsDaMeta(nichoId?: number): Promise<Record<string, unknown>> {
 
   const seteDiasAtras = new Date(Date.now() - JANELA_SEMANA_MS);
   const usadosRecentes = await db()

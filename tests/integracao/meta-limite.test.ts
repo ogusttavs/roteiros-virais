@@ -2,7 +2,7 @@
  * O limite do aplicativo na Meta (achado de 05/10/2026), contra o Postgres real: a resposta que passa de 80% de uso nos cabeçalhos põe a Meta em pausa e a chamada seguinte nem
  * sai; o código 4 vira pausa (não erro); `meta-contas` para com o motivo "limite da Meta, continua na próxima hora", enfileira a retomada e a retomada pula quem já foi lido.
  */
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/jobs/meta-retomada", () => ({ agendarRetomadaDaMeta: vi.fn().mockResolvedValue(true) }));
@@ -18,6 +18,8 @@ import { config } from "@/lib/config";
 import { resetarSchema } from "../../scripts/resetar-schema";
 
 let nichoId: number;
+
+const CHAVES_DE_PAUSA = ["meta_pausa_ate", "meta_pausa_causa", "meta_pausa_contas_ate", "meta_pausa_contas_causa"];
 
 const DISCOVERY = { username: "x", followers_count: 1000, media: { data: [] as never[] } };
 
@@ -39,7 +41,7 @@ beforeEach(async () => {
   config.coleta.metaAtivo = true;
   (config.coleta as { metaIgId: string }).metaIgId = "17841400000000000";
   (config.coleta as { metaToken: string }).metaToken = "token-de-teste";
-  await db().delete(configuracaoAdmin).where(eq(configuracaoAdmin.chave, "meta_pausa_ate"));
+  await db().delete(configuracaoAdmin).where(inArray(configuracaoAdmin.chave, CHAVES_DE_PAUSA));
   vi.mocked(agendarRetomadaDaMeta).mockClear();
 });
 
@@ -65,8 +67,9 @@ describe("a pausa da Meta", () => {
     expect(fetchFalso).toHaveBeenCalledTimes(1);
   });
 
+  // Abaixo da reserva das hashtags (60%) nada pausa; entre 60% e 80% só a leitura de contas pausa (meta-uso-e-fatia.test.ts).
   it("abaixo do limite não pausa nada", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => resposta({ business_discovery: DISCOVERY }, { "x-app-usage": JSON.stringify({ call_count: 79, total_time: 1, total_cputime: 1 }) })));
+    vi.stubGlobal("fetch", vi.fn(async () => resposta({ business_discovery: DISCOVERY }, { "x-app-usage": JSON.stringify({ call_count: 59, total_time: 1, total_cputime: 1 }) })));
     await buscarBusinessDiscovery("conta-a");
     await buscarBusinessDiscovery("conta-b");
     expect(await pausaDaMetaAte()).toBeNull();
@@ -116,7 +119,7 @@ describe("meta-contas parando no limite e retomando", () => {
     expect(chamadas).toBe(1);
 
     // Passou a hora: a pausa acaba, e a retomada lê só as duas que faltavam.
-    await db().delete(configuracaoAdmin).where(eq(configuracaoAdmin.chave, "meta_pausa_ate"));
+    await db().delete(configuracaoAdmin).where(inArray(configuracaoAdmin.chave, CHAVES_DE_PAUSA));
     const aposRetomada = await rodarMetaContas(undefined, { desde: (dados as { retomadaDesde: string }).retomadaDesde });
     expect(aposRetomada).toMatchObject({ contasLidas: 2 });
     expect(aposRetomada.pausadoPorLimite).toBeUndefined();

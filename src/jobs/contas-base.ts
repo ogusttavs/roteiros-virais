@@ -39,7 +39,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { consumoApi, contas, nichos } from "@/db/schema";
 import { FILAS } from "@/jobs/fila";
-import { buscarBusinessDiscovery, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi, PausaDaMeta } from "@/jobs/meta-api";
+import { buscarBusinessDiscovery, comMedicaoDeUso, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi, PausaDaMeta } from "@/jobs/meta-api";
 import { config, hojeISO } from "@/lib/config";
 import { normalizarVideoInstagram } from "@/servicos/normalizadores/instagram";
 import { normalizarBusinessDiscovery } from "@/servicos/normalizadores/meta";
@@ -364,6 +364,11 @@ async function catchUpYoutube(nichoId: number, candidata: ContaCandidata): Promi
 }
 
 export async function rodarContasBase(): Promise<Record<string, unknown>> {
+  // A faixa Meta do catch-up também gasta o limite do aplicativo: o resumo traz `usoDaMeta`, como o de `meta-contas` (23/10/2026).
+  return comMedicaoDeUso(() => catchUpDasContas());
+}
+
+async function catchUpDasContas(): Promise<Record<string, unknown>> {
   const nichosAtivos = await db().select().from(nichos).where(eq(nichos.ativo, true));
 
   /**

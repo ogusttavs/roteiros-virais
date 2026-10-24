@@ -23,19 +23,25 @@
  * coleta do Apify (03:30) e o `contasBase` (03:40): a Business Discovery
  * refaz a leitura das contas vigiadas do Instagram (a fonte da vigilancia
  * passa a ser ela, nao mais o Apify), a tempo de `contasBase` e `pontuar`
- * contarem com dado fresco. `descobertaInstagram` (item 4) e semanal,
- * domingo as 04:15, entre `contasBase`/`pontuar` (03:40/03:45) e a
- * `vigilancia` (04:30): o Apify do Instagram vira so isto, achar handle de
- * conta ainda desconhecida por hashtag, 30 resultados por termo.
- * `metaHashtags` (item 3) e diario, as 04:20 (ajuste 2 da revisao do PR
- * #35: o `recent_media` da hashtag e uma janela de 24h, entao precisa
- * rodar todo dia para nao perder o que saiu da janela; era semanal,
- * segunda as 05:00, quando ainda lia `top_media`), depois de `transcrever`
- * (04:00) e antes de `extrair` (05:00): o video sem_dono que ele grava e
- * transcreve na hora entra no lote de extracao do mesmo dia. As tres so
- * agendam com `config.coleta.metaAtivo` (`agendarTudo`, abaixo): sem
- * `META_IG_ID`/`META_TOKEN`, o cron nem inscreve, e o Apify continua
- * sozinho como hoje.
+ * contarem com dado fresco. `descobertaInstagram` (item 4) era semanal,
+ * domingo as 04:15 (o Apify do Instagram achando handle de conta desconhecida
+ * por hashtag, 30 resultados por termo), e SAIU do agendador em 23/10/2026:
+ * buscava 0 termos desde 29/09, porque o teto diario de 300 resultados do
+ * Apify ja estava gasto as 02:35 e 03:30 (`AGENDAMENTOS_APOSENTADOS`, abaixo;
+ * o job continua e roda a mao). `metaHashtags` (item 3) e diario (ajuste 2 da
+ * revisao do PR #35: o `recent_media` da hashtag e uma janela de 24h, entao
+ * precisa rodar todo dia para nao perder o que saiu da janela; era semanal,
+ * segunda as 05:00, quando ainda lia `top_media`). Era as 04:20 e nao rodava
+ * desde 05/10, porque `meta-contas` (03:35) levava o uso do aplicativo ao
+ * limite antes e a pausa ja estava de pe; desde 23/10/2026 roda as 02:10,
+ * ANTES de `contas-base` (02:35) e `meta-contas` (03:35), com a janela da
+ * hora vazia (e, alem disso, a leitura de contas para em 60% do limite e
+ * deixa a fatia das hashtags livre: `meta-api.ts`, `RESERVA_DAS_HASHTAGS_PERCENTUAL`).
+ * O video sem_dono que ele grava e transcreve na propria hora entra no lote
+ * de extracao do mesmo dia (`transcrever` as 04:00 e `extrair` as 05:00 vem
+ * depois). `metaContas` e `metaHashtags` so agendam com `config.coleta.metaAtivo`
+ * (`agendarTudo`, abaixo): sem `META_IG_ID`/`META_TOKEN`, o cron nem
+ * inscreve, e o Apify continua sozinho como hoje.
  *
  * `metaContas` roda uma segunda vez as 11:55 (E6 parte 3, terceira rodada,
  * item 10, decisao do Gustavo: a Meta e de graca, entao roda mais vezes;
@@ -58,13 +64,13 @@
  * quando a cadeia nao disparar (o worker caindo no meio, por exemplo). Timeline tipica agora:
  * transcrever 04:00 (hoje leva mais de uma hora), a cadeia dispara extrair-sem-fala e extrair logo
  * em seguida, resultado do lote normalmente ate 06:20, tema 06:30, lembrete padrao 08:00.
- * `metaHashtags` continua fixo as 04:20 porque transcreve o video sem_dono na propria hora, sem
- * depender da fila de `transcrever` (`meta-hashtags.ts`); num dia raro em que `transcrever` termine
- * rapido demais (antes das 04:20) e a cadeia alcance `extrair` antes de `metaHashtags` gravar o
- * video do dia, esse video em particular so entra no lote do dia seguinte. Caso conhecido, nao
- * corrigido nesta rodada: na pratica `transcrever` nunca terminou antes dos 25 minutos.
+ * `metaHashtags` e fixo (02:10) porque transcreve o video sem_dono na propria hora, sem depender da
+ * fila de `transcrever` (`meta-hashtags.ts`); como roda mais de uma hora antes de `transcrever`
+ * (04:00), o video do dia sempre entra no lote de extracao do mesmo dia (antes, as 04:20, havia um
+ * caso raro em que a cadeia chegava em `extrair` antes dele gravar).
  */
 import { config } from "@/lib/config";
+import { logger } from "@/lib/log";
 
 import { boss, FILAS } from "./fila";
 
@@ -132,15 +138,9 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "catch-up de contas sem base (ate 10 videos cada), todo dia as 02:35, uma hora antes do meta-contas (limite do aplicativo na Meta) e antes de pontuar",
   },
   {
-    fila: FILAS.descobertaInstagram,
-    cron: "15 4 * * 0",
-    descricao: "apify do instagram, so descoberta de conta nova por hashtag, todo domingo as 04:15",
-    condicao: () => config.coleta.metaAtivo,
-  },
-  {
     fila: FILAS.metaHashtags,
-    cron: "20 4 * * *",
-    descricao: "hashtag search da meta pelo recent_media (sinal de assunto, sem_dono), todo dia as 04:20, depois de transcrever e antes de extrair",
+    cron: "10 2 * * *",
+    descricao: "hashtag search da meta pelo recent_media (sinal de assunto, sem_dono), todo dia as 02:10, antes de contas-base (02:35) e meta-contas (03:35) gastarem o limite do aplicativo",
     condicao: () => config.coleta.metaAtivo,
   },
   {
@@ -264,8 +264,28 @@ export const AGENDAMENTOS: Agendamento[] = [
   },
 ];
 
+/**
+ * Filas que tinham cron e deixaram de ter (23/10/2026). Tirar a linha de `AGENDAMENTOS` NAO apaga o cron que o pg-boss ja guardou no banco (a linha em `pgboss.schedule` continua
+ * disparando), entao `agendarTudo` desinscreve estas na subida do worker. O job e a fila continuam: rodam a mao (`npm run job -- <nome>`).
+ */
+export const AGENDAMENTOS_APOSENTADOS: { fila: string; chave?: string; motivo: string }[] = [
+  {
+    fila: FILAS.descobertaInstagram,
+    motivo:
+      "buscava 0 termos desde 29/09: o teto diario de 300 resultados do Apify ja estava gasto as 02:35 e 03:30 (pesquisa/estudo-instagram-sem-apify.md, secao 3); a entrada de conta nova vem da semente, dos concorrentes do briefing e da sugestao de contas do ramo",
+  },
+];
+
 export async function agendarTudo(): Promise<void> {
   const b = boss();
+  for (const aposentado of AGENDAMENTOS_APOSENTADOS) {
+    try {
+      await b.unschedule(aposentado.fila, aposentado.chave);
+    } catch (erro) {
+      // Nunca derruba a subida do worker: na pior das hipoteses o cron antigo roda mais uma vez e o proximo deploy tenta de novo.
+      logger.warn({ err: erro, fila: aposentado.fila }, "nao foi possivel desinscrever o cron aposentado");
+    }
+  }
   for (const agendamento of AGENDAMENTOS) {
     if (agendamento.condicao && !agendamento.condicao()) continue;
     await b.schedule(agendamento.fila, agendamento.cron, null, {

@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { config } from "@/lib/config";
 
-import { AGENDAMENTOS, listarAgendamentos } from "./agenda";
-import { FILAS } from "./fila";
+import { AGENDAMENTOS, AGENDAMENTOS_APOSENTADOS, agendarTudo, listarAgendamentos } from "./agenda";
+import { boss, FILAS } from "./fila";
+
+vi.mock("./fila", async (importOriginal) => ({ ...(await importOriginal<typeof import("./fila")>()), boss: vi.fn() }));
 
 function cronDe(fila: string, chave?: string): string | undefined {
   return AGENDAMENTOS.find((a) => a.fila === fila && a.chave === chave)?.cron;
@@ -53,10 +55,19 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.contasBase)).toBe("35 2 * * *");
   });
 
-  it("metaHashtags roda todo dia as 04:20, entre transcrever (04:00) e extrair (05:00) (ajuste 2 da revisao do PR #35: recent_media e janela de 24h)", () => {
-    expect(cronDe(FILAS.transcrever)).toBe("0 4 * * *");
-    expect(cronDe(FILAS.metaHashtags)).toBe("20 4 * * *");
-    expect(cronDe(FILAS.extrair)).toBe("0 5 * * *");
+  it("metaHashtags roda todo dia as 02:10, antes de contas-base (02:35) e meta-contas (03:35): o limite do aplicativo e por hora e ela nao rodava desde 05/10 (recent_media e janela de 24h)", () => {
+    expect(cronDe(FILAS.metaHashtags)).toBe("10 2 * * *");
+    // Depois do despachante das marcas (01:30) e antes das duas rotinas que gastam o limite do aplicativo.
+    expect(cronDe(FILAS.contasBase)).toBe("35 2 * * *");
+    expect(cronDe(FILAS.metaContas)).toBe("35 3 * * *");
+    expect(cronDe(FILAS.entenderMarca)).toBe("30 1 * * *");
+  });
+
+  /** Passo 6 do estudo de 23/10/2026: buscava 0 termos desde 29/09 (teto diario do Apify gasto antes das 04:15). */
+  it("a descoberta de conta do Instagram pelo Apify saiu do agendador, e o cron antigo e desinscrito", () => {
+    expect(AGENDAMENTOS.some((a) => a.fila === FILAS.descobertaInstagram)).toBe(false);
+    expect(listarAgendamentos()).not.toContain(FILAS.descobertaInstagram);
+    expect(AGENDAMENTOS_APOSENTADOS.map((a) => a.fila)).toContain(FILAS.descobertaInstagram);
   });
 
   it("vigilancia roda todo dia as 04:30 (E6 parte 3, terceira rodada, item 8: nao mais so domingo)", () => {
@@ -105,6 +116,33 @@ describe("AGENDAMENTOS", () => {
       const agendamento = AGENDAMENTOS.find((a) => a.fila === FILAS.metaContas);
       expect(agendamento?.condicao?.()).toBe(true);
     });
+  });
+});
+
+describe("agendarTudo", () => {
+  afterEach(() => {
+    config.coleta.metaAtivo = false;
+  });
+
+  it("desinscreve os crons aposentados e nao inscreve a descoberta do Instagram", async () => {
+    config.coleta.metaAtivo = true;
+    const schedule = vi.fn().mockResolvedValue(undefined);
+    const unschedule = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(boss).mockReturnValue({ schedule, unschedule } as unknown as ReturnType<typeof boss>);
+
+    await agendarTudo();
+
+    expect(unschedule).toHaveBeenCalledWith(FILAS.descobertaInstagram, undefined);
+    expect(schedule.mock.calls.map((c) => c[0])).not.toContain(FILAS.descobertaInstagram);
+    expect(schedule.mock.calls.map((c) => c[0])).toContain(FILAS.metaHashtags);
+  });
+
+  it("um erro ao desinscrever nao derruba a subida do worker", async () => {
+    const schedule = vi.fn().mockResolvedValue(undefined);
+    const unschedule = vi.fn().mockRejectedValue(new Error("banco fora"));
+    vi.mocked(boss).mockReturnValue({ schedule, unschedule } as unknown as ReturnType<typeof boss>);
+    await expect(agendarTudo()).resolves.toBeUndefined();
+    expect(schedule).toHaveBeenCalled();
   });
 });
 
