@@ -204,7 +204,7 @@ describe("o formulário", () => {
 describe("publicar", () => {
   it("do toque ao post: pede ao servidor com o que a pessoa confirmou, envia o arquivo com andamento, espera a Meta e mostra o link", async () => {
     iniciarPublicacaoAction.mockResolvedValue({ ok: true, dado: { publicacaoId: 7 } });
-    conferirPublicacaoAction.mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "publicada", permalink: "https://www.instagram.com/reel/ABC123/" }) } });
+    conferirPublicacaoAction.mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "publicada", permalink: "https://www.instagram.com/reel/ABC123/" }), reconferirEmSeg: null } });
     render(<Pai />);
     escolher(arquivo("meu-video.mp4", "video/mp4", 4096));
     fireEvent.change(screen.getByLabelText(t.legenda), { target: { value: "Minha legenda #oferta" } });
@@ -239,7 +239,7 @@ describe("publicar", () => {
 
   it("enquanto a Meta prepara, a folha mostra a espera e não deixa publicar de novo", async () => {
     iniciarPublicacaoAction.mockResolvedValue({ ok: true, dado: { publicacaoId: 7 } });
-    conferirPublicacaoAction.mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "processando" }) } });
+    conferirPublicacaoAction.mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "processando" }), reconferirEmSeg: 60 } });
     render(<Pai />);
     escolher(arquivo());
     fireEvent.click(screen.getByRole("button", { name: t.publicar }));
@@ -312,7 +312,7 @@ describe("outros estados da folha", () => {
   });
 
   it("uma publicação em preparo de antes: a folha volta a perguntar e mostra o resultado", async () => {
-    conferirPublicacaoAction.mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "publicada", permalink: null }) } });
+    conferirPublicacaoAction.mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "publicada", permalink: null }), reconferirEmSeg: null } });
     render(<Pai inicial={vista({ estado: "processando" })} />);
     expect(screen.getByText(t.processando)).toBeTruthy();
     expect(await screen.findByText(t.publicadaSemLink)).toBeTruthy();
@@ -334,5 +334,108 @@ describe("outros estados da folha", () => {
       expect(document.querySelector("input[type=file]")).toBeNull();
       unmount();
     }
+  });
+});
+
+describe("a espera da Meta: o ritmo é o do servidor, e dá para cancelar", () => {
+  const processando = (reconferirEmSeg: number | null, extra: Partial<VistaDaPublicacao> = {}) => ({ ok: true, dado: { vista: vista({ estado: "processando", ...extra }), reconferirEmSeg } });
+  const passar = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("pergunta uma vez ao abrir e depois só quando o servidor manda (30 s, depois 60 s), nunca a cada 6 segundos", async () => {
+    conferirPublicacaoAction.mockResolvedValueOnce(processando(30)).mockResolvedValue(processando(60));
+    render(<Pai inicial={vista({ estado: "processando" })} />);
+    await passar(0);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(1);
+    // O ritmo antigo (6 s) passaria de nove perguntas em um minuto: aqui, nenhuma antes dos 30 s.
+    await passar(29_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(1);
+    await passar(1_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(2);
+    await passar(59_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(2);
+    await passar(1_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(3);
+    // Em 6 minutos, no ritmo de 60 s: no máximo cerca de dez perguntas.
+    await passar(5 * 60_000);
+    expect(conferirPublicacaoAction.mock.calls.length).toBeLessThanOrEqual(8);
+  });
+
+  it("não deixa o servidor pedir pressa demais: o piso é de 5 segundos", async () => {
+    conferirPublicacaoAction.mockResolvedValue(processando(1));
+    render(<Pai inicial={vista({ estado: "processando" })} />);
+    await passar(0);
+    await passar(4_900);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(1);
+    await passar(200);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("sem rede na pergunta: tenta de novo em 30 segundos, sem derrubar a folha", async () => {
+    conferirPublicacaoAction.mockRejectedValueOnce(new Error("sem rede")).mockResolvedValue(processando(60));
+    render(<Pai inicial={vista({ estado: "processando" })} />);
+    await passar(0);
+    expect(screen.getByText(t.processando)).toBeTruthy();
+    await passar(29_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(1);
+    await passar(1_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("o servidor ainda não terminou mas não dá número (outra conferência publicando): volta a perguntar em 10 segundos", async () => {
+    conferirPublicacaoAction.mockResolvedValueOnce({ ok: true, dado: { vista: vista({ estado: "publicando" }), reconferirEmSeg: null } }).mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "publicada" }), reconferirEmSeg: null } });
+    render(<Pai inicial={vista({ estado: "processando" })} />);
+    await passar(0);
+    expect(screen.getByText(t.publicando)).toBeTruthy();
+    await passar(10_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(t.publicadaSemLink)).toBeTruthy();
+  });
+
+  it("terminou (falhou por tempo, publicada): para de perguntar", async () => {
+    conferirPublicacaoAction.mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "falhou", motivo: fraseDeFalha("demorou") }), reconferirEmSeg: null } });
+    render(<Pai inicial={vista({ estado: "processando" })} />);
+    await passar(0);
+    expect(screen.getByRole("alert").textContent).toContain(fraseDeFalha("demorou"));
+    await passar(10 * 60_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("fechar a folha no meio da espera para as perguntas", async () => {
+    conferirPublicacaoAction.mockResolvedValue(processando(30));
+    const { unmount } = render(<Pai inicial={vista({ estado: "processando" })} />);
+    await passar(0);
+    unmount();
+    await passar(5 * 60_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("esperando o Instagram há \"Cancelar a publicação\": avisa o servidor, volta ao formulário com o motivo e para de perguntar", async () => {
+    conferirPublicacaoAction.mockResolvedValue(processando(60));
+    cancelarEnvioAction.mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "falhou", motivo: fraseDeFalha("cancelada") }) } });
+    render(<Pai inicial={vista({ estado: "processando" })} />);
+    await passar(0);
+    fireEvent.click(screen.getByRole("button", { name: t.cancelarPublicacao }));
+    await passar(0);
+    expect(cancelarEnvioAction).toHaveBeenCalledWith(7);
+    expect(screen.getByRole("alert").textContent).toContain(fraseDeFalha("cancelada"));
+    expect(screen.getByRole("button", { name: t.tentarDeNovo })).toBeTruthy();
+    await passar(5 * 60_000);
+    expect(conferirPublicacaoAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("publicando (o pedido já saiu): não oferece cancelar", async () => {
+    conferirPublicacaoAction.mockResolvedValue({ ok: true, dado: { vista: vista({ estado: "publicando" }), reconferirEmSeg: null } });
+    render(<Pai inicial={vista({ estado: "publicando" })} />);
+    await passar(0);
+    expect(screen.getByText(t.publicando)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: t.cancelarPublicacao })).toBeNull();
+    expect(screen.queryByRole("button", { name: t.cancelar })).toBeNull();
   });
 });

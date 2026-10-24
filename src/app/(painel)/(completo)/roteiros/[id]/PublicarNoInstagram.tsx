@@ -2,7 +2,7 @@
 
 import { Check, CircleAlert, ExternalLink, Upload } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { LIMITES_DA_LEGENDA, LIMITES_DA_PUBLICACAO, tipoDeVideoAceito } from "@/config/publicacao";
 import type { TipoDePublicacao } from "@/db/schema";
@@ -19,8 +19,14 @@ import { cancelarEnvioAction, conferirPublicacaoAction, iniciarPublicacaoAction 
 import styles from "./PublicarNoInstagram.module.css";
 
 const t = textosPublicar.tela;
-/** De quanto em quanto tempo a folha pergunta se o vídeo já foi publicado, enquanto está aberta. */
-const INTERVALO_DA_CONFERENCIA_MS = 6000;
+/**
+ * A folha não escolhe o ritmo: ela pergunta de novo quando o servidor manda (`reconferirEmSeg`, de `config/publicacao.ts`, que segue a recomendação da Meta de uma consulta por minuto, por até
+ * 5 minutos: documentação da Meta baixada em `pesquisa/plataformas/docs/meta/publicacao-*.md`, seção "Status de publicação do contêiner"). Estes três só cobrem o que o servidor não diz: o piso (nunca perguntar mais rápido que isto), a espera depois de
+ * uma pergunta que não chegou (sem rede) e a espera quando ainda não terminou mas o servidor não deu número (outra conferência está publicando, e esta pergunta não vai à Meta).
+ */
+const ESPERA_MINIMA_MS = 5000;
+const ESPERA_SEM_RESPOSTA_MS = 30_000;
+const ESPERA_SEM_NUMERO_MS = 10_000;
 
 const OPCOES: TipoDePublicacao[] = ["reels", "story"];
 const ROTULOS = [t.reels, t.story];
@@ -86,9 +92,11 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
   const [porcento, setPorcento] = useState<number | null>(null);
   const requisicao = useRef<XMLHttpRequest | null>(null);
   const publicacaoRef = useRef(publicacao);
+  const aoMudarRef = useRef(aoMudar);
   useEffect(() => {
     publicacaoRef.current = publicacao;
-  }, [publicacao]);
+    aoMudarRef.current = aoMudar;
+  }, [publicacao, aoMudar]);
 
   const estado = publicacao?.estado;
   // Subindo agora, por esta folha; ou um envio de antes (a página recarregou no meio) que só dá para cancelar.
@@ -111,25 +119,35 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
     };
   }, [arquivo]);
 
-  // Enquanto o Instagram prepara o vídeo, a folha pergunta (e a pergunta é o que publica, se o worker ainda não o fez).
-  const conferir = useCallback(
-    async (id: number) => {
-      try {
-        const resultado = await conferirPublicacaoAction(id);
-        if (resultado.ok) aoMudar(resultado.dado.vista);
-      } catch {
-        // Sem rede ou erro passageiro: pergunta de novo na próxima volta.
-      }
-    },
-    [aoMudar],
-  );
+  // Enquanto o Instagram prepara o vídeo, a folha pergunta (e a pergunta é o que publica, se o worker ainda não o fez), uma de cada vez e no ritmo que o servidor manda.
   const idEmEspera = esperando ? publicacao?.id : undefined;
   useEffect(() => {
     if (idEmEspera === undefined) return;
-    void conferir(idEmEspera);
-    const volta = setInterval(() => void conferir(idEmEspera), INTERVALO_DA_CONFERENCIA_MS);
-    return () => clearInterval(volta);
-  }, [idEmEspera, conferir]);
+    let vigente = true;
+    let espera: ReturnType<typeof setTimeout> | undefined;
+    async function rodada(id: number) {
+      let proximaEmMs = ESPERA_SEM_RESPOSTA_MS;
+      try {
+        const resultado = await conferirPublicacaoAction(id);
+        if (!vigente) return;
+        if (resultado.ok) {
+          const { vista, reconferirEmSeg } = resultado.dado;
+          aoMudarRef.current(vista);
+          if (typeof reconferirEmSeg === "number") proximaEmMs = Math.max(reconferirEmSeg * 1000, ESPERA_MINIMA_MS);
+          else if (vista.estado === "processando" || vista.estado === "publicando") proximaEmMs = ESPERA_SEM_NUMERO_MS;
+          else return;
+        }
+      } catch {
+        // Sem rede ou erro passageiro: pergunta de novo daqui a pouco.
+      }
+      if (vigente) espera = setTimeout(() => void rodada(id), proximaEmMs);
+    }
+    void rodada(idEmEspera);
+    return () => {
+      vigente = false;
+      if (espera) clearTimeout(espera);
+    };
+  }, [idEmEspera]);
 
   // Fechar a página no meio do envio: o envio é interrompido (a Meta nunca recebe o vídeo inteiro) e o servidor libera o roteiro depois de um tempo.
   useEffect(() => () => requisicao.current?.abort(), []);
@@ -233,6 +251,7 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
   }
 
   async function cancelar() {
+    // Subindo, interrompe o pedido; esperando o Instagram, só avisa o servidor (não há pedido para interromper).
     requisicao.current?.abort();
     const id = publicacaoRef.current?.id;
     if (id === undefined) return;
@@ -318,6 +337,11 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
           {estado === "publicando" ? t.publicando : t.processando}
         </p>
         <progress className={styles.barra} max={100} aria-label={t.processando} />
+        {estado === "processando" ? (
+          <Botao type="button" variante="ghost" onClick={cancelar}>
+            {t.cancelarPublicacao}
+          </Botao>
+        ) : null}
       </section>
     );
   }

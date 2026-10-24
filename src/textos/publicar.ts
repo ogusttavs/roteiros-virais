@@ -46,7 +46,8 @@ export type CodigoDeFalha =
   | "demorou"
   | "nao-confirmou"
   | "envio-interrompido"
-  | "envio-parado";
+  | "envio-parado"
+  | "cancelada";
 
 export const textosPublicar = {
   recusa: {
@@ -74,11 +75,11 @@ export const textosPublicar = {
 
   /** O motivo guardado quando a publicação falha, na língua de quem grava vídeo. */
   falha: {
-    formato: "O Instagram não aceitou o formato do vídeo. Use MP4 ou MOV, com o som em AAC e a imagem em H.264 ou HEVC.",
+    formato: "O Instagram não aceitou o formato do vídeo. Use o vídeo como o celular gravou, na vertical. Se ele passou por um editor, exporte de novo no formato padrão para redes sociais.",
     "nao-preparou": (tipo: TipoDePublicacao) => {
       const l = LIMITES_DA_PUBLICACAO[tipo];
       const duracao = l.segundosMax >= 60 && l.segundosMax % 60 === 0 && l.segundosMax > 60 ? `${l.segundosMax / 60} minutos` : `${l.segundosMax} segundos`;
-      return `O Instagram não conseguiu preparar o vídeo. Confira se ele é MP4 ou MOV, se tem de ${l.segundosMin} segundos a ${duracao} e se tem no máximo ${l.megasMax} MB; depois tente de novo.`;
+      return `O Instagram não conseguiu preparar o vídeo. Confira se ele está como o celular gravou (ou exportado no formato padrão para redes sociais), se tem de ${l.segundosMin} segundos a ${duracao} e se tem no máximo ${l.megasMax} MB; depois tente de novo.`;
     },
     "limite-do-dia": "O Instagram já recebeu o máximo de publicações de hoje desta conta. Tente de novo amanhã.",
     "conta-restrita": "O Instagram diz que a conta está restrita ou pede uma confirmação. Abra o aplicativo do Instagram, resolva o que ele pedir e tente de novo.",
@@ -93,6 +94,7 @@ export const textosPublicar = {
     "nao-confirmou": "Não conseguimos confirmar se o vídeo foi publicado. Antes de tentar de novo, abra o seu Instagram e confira, para não publicar duas vezes.",
     "envio-interrompido": "O envio do vídeo foi interrompido. Tente de novo com uma conexão estável.",
     "envio-parado": "O envio anterior não terminou. Escolha o vídeo de novo.",
+    cancelada: "Você cancelou a publicação. Nada foi publicado no Instagram. Escolha o vídeo de novo para tentar outra vez.",
   } satisfies Record<CodigoDeFalha, string | ((tipo: TipoDePublicacao) => string)>,
 
   /** A folha "Publicar no Instagram" do roteiro. */
@@ -103,8 +105,8 @@ export const textosPublicar = {
     ondeRotulo: "Onde publicar",
     reels: "Reels",
     story: "Story",
-    ajudaReels: (megas: number) => `Reels: vídeo MP4 ou MOV, até ${megas} MB e 15 minutos.`,
-    ajudaStory: (megas: number) => `Story: vídeo MP4 ou MOV, até ${megas} MB e 60 segundos. O Story não leva legenda.`,
+    ajudaReels: (megas: number) => `Reels: vídeo como o celular gravou, até ${megas} MB e 15 minutos.`,
+    ajudaStory: (megas: number) => `Story: vídeo como o celular gravou, até ${megas} MB e 60 segundos. O Story não leva legenda.`,
     legenda: "Legenda",
     legendaAjuda: "Já vem preenchida com o texto do seu roteiro. Mude o que quiser.",
     contador: (usadas: number) => `${usadas.toLocaleString("pt-BR")} de ${LIMITES_DA_LEGENDA.caracteres.toLocaleString("pt-BR")} letras`,
@@ -127,6 +129,7 @@ export const textosPublicar = {
     marcadoComoPostado: "O roteiro já foi marcado como postado.",
     tentarDeNovo: "Tentar de novo",
     cancelar: "Cancelar o envio",
+    cancelarPublicacao: "Cancelar a publicação",
     erroGenerico: "Não conseguimos publicar agora. Tente de novo em um minuto.",
     semConexao: "Sem conexão agora. Tente de novo quando voltar a internet.",
     // Sem condição para publicar (a folha explica e leva à Conta).

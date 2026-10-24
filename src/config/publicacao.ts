@@ -21,8 +21,24 @@ export const LIMITES_DA_LEGENDA = { caracteres: 2200, hashtags: 30, marcacoes: 2
 export const ENVIO_PARADO_APOS_MS = 45 * 60 * 1000;
 /** Depois de mandar publicar, a resposta da Meta não pode demorar mais que isto; passou, o resultado é tratado como "não confirmado" (nunca se tenta publicar de novo sozinho). */
 export const PUBLICANDO_PARADO_APOS_MS = 3 * 60 * 1000;
-/** A espera, em segundos, entre as conferências de "o vídeo já está pronto?" (a Meta pede no máximo uma por minuto, por até 5 minutos: `publicacao-de-conteudo.md`, "Status de publicação do contêiner"). */
-export const ESPERAS_DA_CONFERENCIA_S = [10, 20, 30, 45, 60, 60, 60, 60, 60] as const;
+/**
+ * Quanto tempo a Meta tem para preparar o vídeo, contado desde que a publicação entrou em `processando` (o vídeo terminou de subir). A documentação oficial baixada
+ * (`pesquisa/plataformas/docs/meta/publicacao-de-conteudo.md`, "Status de publicação do contêiner", e `publicacao-ig-container.md`, `status_code`) recomenda consultar o estado do contêiner
+ * uma vez por minuto, por no máximo 5 minutos. O prazo é de 6: os 5 da Meta mais uma folga para a última resposta chegar. Passou disso, a publicação falha com "demorou". É um prazo
+ * de relógio, nunca uma contagem de perguntas: a tela e a fila podem perguntar em ritmos diferentes e nenhum deles pode gastar o prazo dos outros.
+ */
+export const PREPARO_DA_META_PRAZO_MS = 6 * 60 * 1000;
+/**
+ * A espera, em segundos, entre as conferências de "o vídeo já está pronto?". A Meta recomenda uma por minuto (`publicacao-de-conteudo.md`); o ritmo é 60 s, com as quatro primeiras mais
+ * curtas (10, 20, 30 e 45 s) porque a maioria dos vídeos fica pronta logo e a pessoa espera olhando a tela. Quem confere (a tela e o worker) obedece a este número, que o servidor devolve
+ * em `reconferirEmSeg`; ninguém pergunta por conta própria.
+ */
+export const ESPERAS_INICIAIS_DA_CONFERENCIA_S = [10, 20, 30, 45] as const;
+export const ESPERA_PADRAO_DA_CONFERENCIA_S = 60;
+/** A espera antes da conferência de número `feitas + 1`: `feitas` é quantas vezes a Meta já foi perguntada. */
+export function esperaDaConferencia(feitas: number): number {
+  return ESPERAS_INICIAIS_DA_CONFERENCIA_S[Math.max(0, feitas - 1)] ?? ESPERA_PADRAO_DA_CONFERENCIA_S;
+}
 
 /** Quando o limite de publicações por dia não puder ser lido na Meta: a documentação do ponto `content_publishing_limit` diz 50 por 24 horas (o guia diz 100; vale o menor). */
 export const LIMITE_DE_PUBLICACOES_PADRAO = 50;

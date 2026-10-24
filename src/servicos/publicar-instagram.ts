@@ -12,7 +12,7 @@
  */
 import { and, desc, eq, inArray } from "drizzle-orm";
 
-import { ENVIO_PARADO_APOS_MS, ESPERAS_DA_CONFERENCIA_S, LIMITE_DE_PUBLICACOES_PADRAO, LIMITES_DA_LEGENDA, LIMITES_DA_PUBLICACAO, PUBLICANDO_PARADO_APOS_MS, tipoDeVideoAceito } from "@/config/publicacao";
+import { ENVIO_PARADO_APOS_MS, esperaDaConferencia, LIMITE_DE_PUBLICACOES_PADRAO, LIMITES_DA_LEGENDA, LIMITES_DA_PUBLICACAO, PREPARO_DA_META_PRAZO_MS, PUBLICANDO_PARADO_APOS_MS, tipoDeVideoAceito } from "@/config/publicacao";
 import { db } from "@/db";
 import { ESTADOS_VIVOS_DA_PUBLICACAO, publicacoes, videosCliente, type EstadoDaPublicacao, type Publicacao, type TipoDePublicacao } from "@/db/schema";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
@@ -207,12 +207,15 @@ function ehConflitoDeUnico(erro: unknown): boolean {
   return causa.code === "23505" || causa.cause?.code === "23505";
 }
 
-async function falhar(linha: Pick<Publicacao, "id" | "clienteId" | "tipo">, falha: Falha, agora: Date): Promise<string> {
+const ESTADOS_QUE_FALHAM: EstadoDaPublicacao[] = ["enviando", "processando", "publicando"];
+
+/** Passa a publicação a `falhou` com a frase. `estados` limita de onde ela pode sair (o "Cancelar" nunca derruba uma que já está sendo publicada). */
+async function falhar(linha: Pick<Publicacao, "id" | "clienteId" | "tipo">, falha: Falha, agora: Date, estados: EstadoDaPublicacao[] = ESTADOS_QUE_FALHAM): Promise<string> {
   const motivo = fraseDeFalha(falha.codigo, linha.tipo);
   await db()
     .update(publicacoes)
     .set({ estado: "falhou", motivo, codigoMeta: falha.codigoMeta ?? null, subcodigoMeta: falha.subcodigoMeta ?? null, terminadaEm: agora, atualizadaEm: agora })
-    .where(and(eq(publicacoes.id, linha.id), eq(publicacoes.clienteId, linha.clienteId), inArray(publicacoes.estado, ["enviando", "processando", "publicando"])));
+    .where(and(eq(publicacoes.id, linha.id), eq(publicacoes.clienteId, linha.clienteId), inArray(publicacoes.estado, estados)));
   return motivo;
 }
 
@@ -257,11 +260,15 @@ export async function iniciarPublicacao(entrada: EntradaDeIniciar, deps: DepsDaP
     .where(and(eq(publicacoes.clienteId, clienteId), eq(publicacoes.roteiroId, roteiroId), eq(publicacoes.tipo, tipo), inArray(publicacoes.estado, ESTADOS_VIVOS_DA_PUBLICACAO)));
   for (const viva of vivas) {
     if (viva.estado === "publicada") return recusa("ja-publicado", tipo);
+    // Em `processando`, `atualizadaEm` é o momento em que o vídeo terminou de subir (as conferências não a mexem): passou o prazo da Meta, ninguém mais vai conferir (a fila caiu, a Meta
+    // não respondeu) e o roteiro não pode ficar trancado para sempre.
+    const parado = agora.getTime() - viva.atualizadaEm.getTime();
     const parada =
-      (viva.estado === "enviando" && agora.getTime() - viva.atualizadaEm.getTime() > ENVIO_PARADO_APOS_MS) ||
-      (viva.estado === "publicando" && agora.getTime() - viva.atualizadaEm.getTime() > PUBLICANDO_PARADO_APOS_MS);
+      (viva.estado === "enviando" && parado > ENVIO_PARADO_APOS_MS) ||
+      (viva.estado === "processando" && parado >= PREPARO_DA_META_PRAZO_MS) ||
+      (viva.estado === "publicando" && parado > PUBLICANDO_PARADO_APOS_MS);
     if (!parada) return recusa("em-andamento", tipo);
-    await falhar(viva, { codigo: viva.estado === "enviando" ? "envio-parado" : "nao-confirmou" }, agora);
+    await falhar(viva, { codigo: viva.estado === "enviando" ? "envio-parado" : viva.estado === "processando" ? "demorou" : "nao-confirmou" }, agora);
   }
 
   // O limite do dia, da Meta. Uma falha daqui que não é do acesso não barra: a Meta recusa na hora de publicar, com a frase certa.
@@ -382,7 +389,7 @@ export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicac
     .set({ estado: "processando", atualizadaEm: agora })
     .where(and(eq(publicacoes.id, publicacaoId), eq(publicacoes.clienteId, clienteId), eq(publicacoes.estado, "enviando")));
   try {
-    await (deps.agendar ?? agendarNaFila)(publicacaoId, ESPERAS_DA_CONFERENCIA_S[0]);
+    await (deps.agendar ?? agendarNaFila)(publicacaoId, esperaDaConferencia(0));
   } catch (erro) {
     // A tela também confere (`conferirPublicacao` pela ação): sem a fila, o vídeo continua sendo publicado enquanto a pessoa estiver nela.
     logger.warn({ err: erro, publicacaoId }, "publicar: nao foi possivel agendar a conferencia");
@@ -390,12 +397,17 @@ export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicac
   return { ok: true };
 }
 
-/** "Cancelar o envio": só o dono, só uma publicação da marca que ainda está subindo. Vira falha com a frase de envio interrompido e libera o roteiro para tentar de novo. */
+/**
+ * "Cancelar": só o dono, só uma publicação da marca que ainda não terminou de ser preparada. Subindo, vira falha com a frase de envio interrompido; já enviada e esperando a Meta, vira falha
+ * "cancelada" (o contêiner fica sem ser publicado e a Meta o descarta sozinha). Nos dois casos libera o roteiro para tentar de novo. Já em `publicando` não cancela: o pedido de publicar já saiu
+ * e pode ter dado certo, então a publicação segue até a resposta (ou até virar "não confirmou").
+ */
 export async function cancelarEnvio(usuarioId: string, clienteId: number, publicacaoId: number, agora: Date = new Date()): Promise<VistaDaPublicacao | null> {
   if (!(await ehDonoDaMarca(usuarioId, clienteId))) return null;
   const linha = await carregar(publicacaoId, clienteId);
   if (!linha) return null;
-  if (linha.estado === "enviando") await falhar(linha, { codigo: "envio-interrompido" }, agora);
+  if (linha.estado === "enviando") await falhar(linha, { codigo: "envio-interrompido" }, agora, ["enviando"]);
+  else if (linha.estado === "processando") await falhar(linha, { codigo: "cancelada" }, agora, ["enviando", "processando"]);
   const atual = await carregar(publicacaoId, clienteId);
   return atual ? vista(atual) : null;
 }
@@ -450,17 +462,21 @@ export async function conferirPublicacao(publicacaoId: number, opcoes: DepsDaPub
   }
   const { conta } = acesso;
 
+  // A Meta acabou de ser perguntada e ainda não está pronto. O prazo é de relógio, desde que a publicação entrou em `processando` (`atualizadaEm`, que aqui não se mexe): a contagem
+  // `conferencias` só registra quantas perguntas de verdade foram feitas e nunca decide nada. A última pergunta cai no prazo; respondendo "ainda preparando" depois dele, falha.
   const maisUmaVez = async (): Promise<ResultadoDaConferencia> => {
-    const conferencias = linha.conferencias + 1;
-    if (conferencias > ESPERAS_DA_CONFERENCIA_S.length) {
+    const decorrido = agora.getTime() - linha.atualizadaEm.getTime();
+    if (decorrido >= PREPARO_DA_META_PRAZO_MS) {
       await falhar(linha, { codigo: "demorou" }, agora);
       return { vista: vista((await carregar(publicacaoId, opcoes.clienteId)) ?? linha), reconferirEmSeg: null };
     }
+    const conferencias = linha.conferencias + 1;
     await db()
       .update(publicacoes)
-      .set({ conferencias, atualizadaEm: agora })
+      .set({ conferencias })
       .where(and(eq(publicacoes.id, publicacaoId), eq(publicacoes.estado, "processando")));
-    return { vista: vista({ ...linha, conferencias }), reconferirEmSeg: ESPERAS_DA_CONFERENCIA_S[conferencias - 1] };
+    const faltamSeg = Math.max(1, Math.ceil((PREPARO_DA_META_PRAZO_MS - decorrido) / 1000));
+    return { vista: vista({ ...linha, conferencias }), reconferirEmSeg: Math.min(esperaDaConferencia(conferencias), faltamSeg) };
   };
 
   let status: Awaited<ReturnType<typeof statusDoContainer>>;
@@ -504,7 +520,7 @@ export async function conferirPublicacao(publicacaoId: number, opcoes: DepsDaPub
     const falha = classificarFalha(erro);
     if (falha.subcodigoMeta === 2207027) {
       // A Meta ainda não liberou: volta a esperar.
-      await db().update(publicacoes).set({ estado: "processando", atualizadaEm: agora }).where(and(eq(publicacoes.id, publicacaoId), eq(publicacoes.estado, "publicando")));
+      await db().update(publicacoes).set({ estado: "processando", atualizadaEm: linha.atualizadaEm }).where(and(eq(publicacoes.id, publicacaoId), eq(publicacoes.estado, "publicando")));
       return maisUmaVez();
     }
     logger.warn({ publicacaoId, codigo: falha.codigoMeta, subcodigo: falha.subcodigoMeta }, "publicar: a Meta nao publicou");
