@@ -431,6 +431,12 @@ describe("R-CONF-10 (E59): nome de partido e de candidato nunca; imagem de pesso
     expect(reprovam({ corpo: BOM.corpo + " Sou PT, personal trainer, e abro o arquivo PSD no Photoshop." })).toEqual([]);
   });
 
+  it("nome de partido que também é frase comum só reprova com política por perto (rede sustentabilidade de lojas, união Brasil de franqueados)", () => {
+    expect(reprovam({ corpo: BOM.corpo + " Montamos uma rede sustentabilidade de lojas parceiras." })).toEqual([]);
+    expect(reprovam({ corpo: BOM.corpo + " A união Brasil de franqueados se reúne toda segunda.", tentativa: 2 })).toEqual([]);
+    expect(com(reprovam({ corpo: BOM.corpo + " Na eleição, a União Brasil e a Rede Sustentabilidade apoiaram." }), "R-CONF-10")).toBe(true);
+  });
+
   it("sugerir imagem de pessoa pública sem dizer que quem grava continua no quadro reprova", () => {
     const m = reprovam({ itensDaEdicao: ["Tela dividida com a foto de duas figuras famosas, uma de cada lado."] });
     expect(m.some((x) => x.startsWith("R-CONF-10") && x.includes("no quadro"))).toBe(true);

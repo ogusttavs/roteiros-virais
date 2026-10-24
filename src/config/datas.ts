@@ -47,7 +47,7 @@ const fixa = (mes: number, dia: number): Regra => ({ tipo: "fixa", mes, dia });
 export const DATAS_DO_CALENDARIO: readonly DataDoCalendario[] = [
   // Feriados nacionais: Lei 662/1949 com a redação da Lei 10.607/2002, Lei 6.802/1980 (Aparecida), Lei 14.759/2023 (20 de novembro) e a Portaria MGI 11.460/2025 (a Paixão de Cristo).
   { chave: "confraternizacao-universal", nome: "Confraternização Universal", tipo: "feriado", ramos: "geral", regra: fixa(1, 1), fonte: "Lei 662/1949", arquivo: "lei-662-1949-feriados" },
-  { chave: "sexta-feira-santa", nome: "Sexta-feira Santa", tipo: "feriado", ramos: "geral", regra: { tipo: "pascoa", dias: [-2] }, fonte: "Portaria MGI 11.460/2025 (Paixão de Cristo)", arquivo: "portaria-mgi-11460-2025-copia-do-dou" },
+  { chave: "sexta-feira-santa", nome: "Sexta-feira Santa", tipo: "feriado", ramos: "geral", regra: { tipo: "pascoa", dias: [-2] }, fonte: "Portaria MGI 11.460/2025 (Paixão de Cristo, feriado nacional)", arquivo: "portaria-mgi-11460-2025-copia-do-dou" },
   { chave: "tiradentes", nome: "Tiradentes", tipo: "feriado", ramos: "geral", regra: fixa(4, 21), fonte: "Lei 10.607/2002", arquivo: "lei-10607-2002-feriados" },
   { chave: "dia-do-trabalho", nome: "Dia do Trabalho", tipo: "feriado", ramos: "geral", regra: fixa(5, 1), fonte: "Lei 662/1949", arquivo: "lei-662-1949-feriados" },
   { chave: "independencia", nome: "Independência do Brasil", tipo: "feriado", ramos: "geral", regra: fixa(9, 7), fonte: "Lei 662/1949", arquivo: "lei-662-1949-feriados" },
