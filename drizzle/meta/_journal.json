@@ -715,6 +715,13 @@
       "when": 1792792153212,
       "tag": "0102_publicar-no-instagram",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1792819392388,
+      "tag": "0103_fonte-da-transcricao",
+      "breakpoints": true
     }
   ]
 }

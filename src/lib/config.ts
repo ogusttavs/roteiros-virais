@@ -99,6 +99,12 @@ export const config = {
     ytdlpLimiteS: envNumero("YTDLP_LIMITE_S", 90),
     /** Tempo limite de UMA transcrição na Groq (todas as tentativas do SDK juntas), em segundos (M5c). */
     groqLimiteS: envNumero("GROQ_LIMITE_S", 60),
+    /**
+     * A legenda do próprio YouTube antes do áudio (`jobs/legenda-youtube.ts`): manual ou automática, em json3, usada como transcrição quando traz texto suficiente
+     * para a duração; sem legenda ou curta demais, segue o áudio e a Groq. Ligada por padrão; `TRANSCRICAO_LEGENDA_PRIMEIRO=0` volta ao caminho antigo (legenda
+     * automática em vtt, só com o idioma conhecido). TikTok e Instagram nunca passam por aqui.
+     */
+    legendaPrimeiro: !["0", "false", "nao"].includes(env("TRANSCRICAO_LEGENDA_PRIMEIRO", "1").toLowerCase()),
   },
   coleta: {
     youtubeKey: env("YOUTUBE_API_KEY"),

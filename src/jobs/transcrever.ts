@@ -68,6 +68,7 @@ import { db } from "@/db";
 import { contas, nichos, videos, type Plataforma } from "@/db/schema";
 import { apagarAudio, baixarAudio, bytesDoAudio, ErroAudio, ErroAudioTempoLimite } from "@/jobs/audio";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
+import { baixarLegendaJson3, type FonteDaLegenda } from "@/jobs/legenda-youtube";
 import { baixarLegendaYoutube, ErroLegendaTempoLimite } from "@/jobs/legendas-youtube";
 import { ehUrlDoYoutube, ErroDoProxy, type MotivoDoProxy, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
@@ -225,7 +226,8 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number, redes?: Fi
 
 /** O que a transcrição de um vídeo deu (exportada: `ler-longos.ts`, E52, transcreve os longos do YouTube pelo mesmo caminho). */
 export type ResultadoVideo =
-  | { tipo: "legenda" }
+  /** `fonte` só na legenda nova em json3 (`legenda-youtube.ts`); o caminho antigo (vtt) não distingue manual de automática. */
+  | { tipo: "legenda"; fonte?: FonteDaLegenda }
   | { tipo: "pulado" }
   | { tipo: "groq"; duracaoS: number | null }
   | { tipo: "falhou"; motivo: string }
@@ -259,10 +261,43 @@ export async function transcreverUm(
 ): Promise<ResultadoVideo> {
   const idiomaParaBuscar = idiomaParaForcar(idiomaConhecido);
 
+  // A legenda do YouTube em json3 antes do áudio (`TRANSCRICAO_LEGENDA_PRIMEIRO`, ligada por padrão): manual ou automática, com o idioma conferido contra o que
+  // o vídeo diz ser (`legenda-youtube.ts`). Sem legenda, curta demais para a duração ou faixa que não é a fala: cai para o áudio e a Groq, como sempre.
+  if (plataforma === "youtube" && config.transcricao.legendaPrimeiro) {
+    let achada: Awaited<ReturnType<typeof baixarLegendaJson3>>;
+    try {
+      achada = await baixarLegendaJson3(url, duracaoS, idiomaParaBuscar ?? null);
+    } catch (erro) {
+      if (erro instanceof ErroDoProxy) return { tipo: "proxyFora", motivo: erro.motivo };
+      if (erro instanceof ErroLegendaTempoLimite) {
+        await db()
+          .update(videos)
+          .set({ proximaTentativaTranscricao: new Date(Date.now() + TRES_DIAS_MS), falhaDeInfraEm: new Date() })
+          .where(eq(videos.id, videoId));
+        return { tipo: "falhouTempoLimite", motivo: erro.message };
+      }
+      throw erro;
+    }
+    if (achada) {
+      const idiomaDaFaixa = achada.idioma === "pt" || achada.idioma === "en" ? achada.idioma : null;
+      await db()
+        .update(videos)
+        .set({
+          transcricao: achada.texto,
+          fonteTranscricao: achada.fonte,
+          transcritoEm: new Date(),
+          falhaDeInfraEm: null,
+          ...(idiomaParaBuscar ? { idiomaConfirmado: true } : idiomaDaFaixa ? { idioma: idiomaDaFaixa, idiomaConfirmado: true } : {}),
+        })
+        .where(eq(videos.id, videoId));
+      return { tipo: "legenda", fonte: achada.fonte };
+    }
+  }
+
   // Achado 3 da revisao do motor (01/10/2026): so pede legenda do YouTube quando ja sabe o
   // idioma do video (`videos.idioma`, da coleta); sem isso, "--sub-lang" forcado buscava a
   // traducao automatica do YouTube para quem nao sabia, nunca a fala original.
-  if (plataforma === "youtube" && idiomaParaBuscar) {
+  if (plataforma === "youtube" && idiomaParaBuscar && !config.transcricao.legendaPrimeiro) {
     let legenda: string | null;
     try {
       legenda = await baixarLegendaYoutube(url, idiomaParaBuscar);
@@ -283,7 +318,7 @@ export async function transcreverUm(
     if (legenda && legenda.length >= TAMANHO_MINIMO_LEGENDA) {
       await db()
         .update(videos)
-        .set({ transcricao: legenda, transcritoEm: new Date(), idiomaConfirmado: true, falhaDeInfraEm: null })
+        .set({ transcricao: legenda, fonteTranscricao: "legenda-automatica", transcritoEm: new Date(), idiomaConfirmado: true, falhaDeInfraEm: null })
         .where(eq(videos.id, videoId));
       return { tipo: "legenda" };
     }
@@ -322,6 +357,7 @@ export async function transcreverUm(
       .update(videos)
       .set({
         transcricao: texto,
+        fonteTranscricao: "groq",
         transcritoEm: new Date(),
         falhaDeInfraEm: null,
         ...(semFala
@@ -463,6 +499,8 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
   const sondas: Record<string, "voltou" | "continua parada"> = {};
 
   let porLegenda = 0;
+  /** Das lidas por legenda, quantas eram legenda manual do YouTube (a automática é o resto). */
+  let porLegendaManual = 0;
   let porGroq = 0;
   let pulados = 0;
   let falhas = 0;
@@ -584,7 +622,10 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
             if (info.plataforma === "youtube") falhasSeguidasBotYoutube = 0;
             if (info.plataforma === "tiktok") falhasSeguidasTiktok = 0;
 
-            if (resultado.tipo === "legenda") porLegenda += 1;
+            if (resultado.tipo === "legenda") {
+              porLegenda += 1;
+              if (resultado.fonte === "legenda-manual") porLegendaManual += 1;
+            }
             else {
               porGroq += 1;
               segundosAudioGroq += resultado.duracaoS ?? 0;
@@ -764,6 +805,7 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
   return {
     nichos: nichosAtivos.length,
     transcritosPorLegenda: porLegenda,
+    transcritosPorLegendaManual: porLegendaManual,
     transcritosPorGroq: porGroq,
     puladosSemChaveGroq: pulados,
     falhas,

@@ -38,6 +38,8 @@ const envDeTeste = {
   ORCAMENTO_TRANSCREVER_SETOR_COM_MARCA_MIN: "90",
   // O ritmo entre chamadas da Meta (padrao 2 s) so atrapalha o teste.
   META_INTERVALO_MS: "0",
+  // A legenda em json3 antes do audio e ligada por padrao em producao; os testes antigos do job mockam o caminho antigo (vtt), e o teste do caminho novo liga na mao.
+  TRANSCRICAO_LEGENDA_PRIMEIRO: "0",
 };
 
 export default defineConfig({

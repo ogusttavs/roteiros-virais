@@ -1242,6 +1242,8 @@ export const videos = pgTable(
     /** velocidade / mediana de velocidade da conta */
     velocidadeRelativa: numeric("velocidade_relativa", { precision: 10, scale: 3 }),
     transcricao: text("transcricao"),
+    /** De onde veio a transcrição: `legenda-manual`, `legenda-automatica` (a do próprio YouTube) ou `groq` (áudio). Nula em tudo que foi lido antes da migração 0103. */
+    fonteTranscricao: text("fonte_transcricao"),
     analise: jsonb("analise").$type<AnaliseVideo>(),
     /** E52 (PR 2): a leitura de um vídeo longo, separada de `analise` (ver `AnaliseVideoLonga`). Nula em todo curto e no longo ainda não lido. */
     analiseLonga: jsonb("analise_longa").$type<AnaliseVideoLonga>(),
