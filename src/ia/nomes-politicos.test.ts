@@ -34,7 +34,9 @@ describe("partido: o que reprova", () => {
     ["quem é do partido liberal pensa diferente", "partido liberal"],
     ["a Federação Brasil da Esperança lançou a chapa", "federacao brasil da esperanca"],
     ["Movimento Democrático Brasileiro", "movimento democratico brasileiro"],
-    ["União Brasil e Progressistas", "uniao brasil"],
+    ["União Brasil e Progressistas disputam as eleições", "uniao brasil"],
+    ["o voto da Rede Sustentabilidade no congresso", "rede sustentabilidade"],
+    ["o partido Democracia Cristã lançou candidato", "democracia crista"],
     ["os dois são do PT e do PL, nas eleições", "PT"],
     ["na eleição, o candidato do PL perdeu", "PL"],
     ["filiado ao Novo desde 2018", "novo"],
@@ -63,8 +65,30 @@ describe("partido: o que passa (conversa de negócio, sem falar de política)", 
     "duas figuras eleitorais muito conhecidas, uma de cada lado",
     "o deputado mais votado da sua cidade",
     "o presidente da associação de moradores abriu a reunião",
+    "Montamos uma rede sustentabilidade de lojas parceiras que reaproveita embalagem.",
+    "A união Brasil-Argentina no comércio abriu mercado para o nosso produto.",
+    "A União Brasil de franqueados se reúne toda segunda; a Rede Sustentabilidade da nossa loja começou em março.",
+    "A democracia cristã de valores da nossa família guia o atendimento.",
   ])("%s", (texto) => {
     expect(acharNomePolitico(texto)).toBeNull();
+  });
+});
+
+describe("partido de nome comum: precisa de palavra de política por perto (R-CONF-10, achado 8 da revisão de 24/10/2026)", () => {
+  it("política longe do nome não conta: o voto de confiança lá no começo não faz a rede de lojas virar partido", () => {
+    const longe = `Meu cliente deu voto de confiança. ${"Falamos de preço, prazo e garantia. ".repeat(6)}Hoje a Rede Sustentabilidade das nossas lojas ajuda o bairro.`;
+    expect(acharNomePolitico(longe)).toBeNull();
+  });
+
+  it("política perto do nome conta, em qualquer ordem", () => {
+    expect(acharNomePolitico("nessa eleição, a União Brasil lançou chapa")?.trecho).toBe("uniao brasil");
+    expect(acharNomePolitico("a Rede Sustentabilidade, partido da ex-ministra")?.trecho).toBe("rede sustentabilidade");
+    expect(acharNomePolitico("O deputado só votou com a Democracia Cristã quando precisou.")?.tipo).toBe("partido");
+  });
+
+  it("os nomes que começam por Partido e as federações continuam valendo sem contexto", () => {
+    expect(acharNomePolitico("Tela: o Partido Verde")?.tipo).toBe("partido");
+    expect(acharNomePolitico("a Federação União Progressista foi citada")?.trecho).toBe("federacao uniao progressista");
   });
 });
 

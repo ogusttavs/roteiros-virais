@@ -4,8 +4,9 @@
  *
  * Partido: a lista oficial do TSE (`config/partidos-tse.ts`, fonte em `pesquisa/partidos/`). Nome e sigla têm graus de risco de falso alarme,
  * e `R-CONF` reprova nas duas tentativas, então um falso alarme derruba a geração de uma pessoa que não falou de política:
- *   1. Sempre: o nome completo que começa por "Partido ..." (e os que só existem como partido: "Movimento Democrático Brasileiro", "União Brasil",
+ *   1. Sempre: o nome completo que começa por "Partido ..." (e os que só existem como partido: "Movimento Democrático Brasileiro",
  *      as federações) e as siglas que ninguém usa para outra coisa (PSDB, PSOL, MDB, PDT, PSTU, PRTB, PCdoB). Siglas só em MAIÚSCULAS.
+ *   1b. Com palavra de política perto do nome (100 caracteres): "União Brasil", "Rede Sustentabilidade" e "Democracia Cristã", que também são frases comuns.
  *   2. Com contexto político no texto (partido, eleição, candidato, deputado, voto...): as siglas curtas que têm outro uso (PT é também "personal trainer",
  *      PSD é arquivo do Photoshop, PCB é placa de circuito, PL é também "projeto de lei" com número).
  *   3. Só logo depois de "partido" ou "legenda": as palavras comuns que também são nome de partido (Novo, Podemos, Cidadania, Avante, Agir, Democrata,
@@ -37,11 +38,16 @@ const NOMES_DE_PARTIDO = PARTIDOS_TSE.map((p) => normalizar(p.nome));
 const NOMES_SEGUROS = new Set<string>([
   ...NOMES_DE_PARTIDO.filter((n) => n.startsWith("partido ")),
   "movimento democratico brasileiro",
-  "uniao brasil",
-  "democracia crista",
-  "rede sustentabilidade",
   ...FEDERACOES_TSE.map((f) => normalizar(f).replace(/ - fe brasil$/, "")),
 ]);
+
+/**
+ * Nomes de partido que são frases comuns ("união Brasil-Argentina", "rede sustentabilidade da loja", "democracia cristã" como ideia): só contam
+ * quando há palavra de política (partido, voto, eleição, candidato...) perto do nome. Sem isso, um falso alarme derrubava a geração nas duas tentativas.
+ */
+const NOMES_DE_FRASE_COMUM = ["uniao brasil", "rede sustentabilidade", "democracia crista"];
+/** Quantos caracteres (do texto sem acento, minúsculo) para cada lado do nome valem como "perto". */
+const JANELA_DO_CONTEXTO = 100;
 
 /** Palavras e frases comuns que também são nome de partido: só depois de "partido" ou "legenda". */
 const NOMES_COMUNS = [
@@ -68,6 +74,17 @@ function nomeSeguro(): RegExp {
 
 const RE_MARCADOR = marcadorMaisNome();
 const RE_SEGURO = nomeSeguro();
+const RE_FRASE_COMUM = new RegExp(`(?:^|[^a-z])(${NOMES_DE_FRASE_COMUM.map(escapar).join("|")})(?![a-z])`, "g");
+
+/** O nome de frase comum que tem palavra de política por perto, ou nulo. */
+function achaNomeDeFraseComum(normal: string): string | null {
+  for (const m of normal.matchAll(RE_FRASE_COMUM)) {
+    const fim = m.index + m[0].length;
+    const perto = normal.slice(Math.max(0, m.index - JANELA_DO_CONTEXTO), fim + JANELA_DO_CONTEXTO);
+    if (CONTEXTO_POLITICO.test(perto)) return m[1];
+  }
+  return null;
+}
 
 function reSigla(siglas: string[]): RegExp {
   const lista = siglas.map(escapar).join("|");
@@ -116,6 +133,8 @@ export function acharNomePolitico(texto: string): AchadoPolitico | null {
 
   const seguro = RE_SEGURO.exec(normal);
   if (seguro) return { tipo: "partido", trecho: seguro[1] };
+  const fraseComum = achaNomeDeFraseComum(normal);
+  if (fraseComum) return { tipo: "partido", trecho: fraseComum };
   const sigla = RE_SIGLA_SEMPRE.exec(linha);
   if (sigla) return { tipo: "partido", trecho: sigla[1] };
   if (CONTEXTO_POLITICO.test(normal)) {
