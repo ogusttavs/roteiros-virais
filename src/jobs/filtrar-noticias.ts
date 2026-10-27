@@ -4,7 +4,7 @@
  *
  *  - com `{ nichoId }`: a marca acabou de chegar naquele ramo (briefing terminado, conta criada pelo admin, ramo trocado, tela de Notícias aberta). Roda já, só para ele.
  *  - sem nada: depois de cada coleta de notícias (06:00 e 14:00) para os ramos com marca ativa, sem depender do `temas-do-dia`. "Ativa" é a mesma economia de 06/10/2026 (o filtro é a única chamada
- *    de IA deste job, barata, mas não custa nada onde ninguém lê): ramo de marca que gerou roteiro, abriu o aplicativo ou foi criada nos últimos 3 dias.
+ *    de IA deste job, barata, mas não custa nada onde ninguém lê): ramo de marca que alguém abriu (o mesmo critério dos temas do dia, `DIAS_DE_USO_PARA_TEMA`, 5 dias desde 27/10/2026) ou que foi criada nesse período.
  *
  * O que entra no filtro está em `servicos/filtro-de-noticias.ts` (só notícia publicada nos últimos 7 dias). A foto fica com `foto-da-materia.ts`: só para as relevantes que a capa ainda mostra, sem
  * foto do veículo no feed, até `FOTOS_POR_RAMO_POR_RODADA` por ramo e `ORCAMENTO_DE_FOTOS_MS` no total; a que não deu certo volta uma vez; o que passa de 14 dias é apagado.
