@@ -69,6 +69,8 @@ RUN apt-get update \
   && curl -fL "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_POT_VERSION}/bgutil-ytdlp-pot-provider.zip" -o "$PLUGIN_ROOT/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip" \
   && rm -rf /var/lib/apt/lists/*
 
+# E19b: ponto de montagem do volume `roteiros_publicar`, o mesmo do app (ver Dockerfile): aberto como /tmp.
+RUN mkdir -p /var/publicar && chmod 1777 /var/publicar
 WORKDIR /app
 
 COPY package.json package-lock.json ./

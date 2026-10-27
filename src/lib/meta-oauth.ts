@@ -10,6 +10,7 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
+import type { ViaDaLigacao } from "@/db/schema";
 import { config } from "@/lib/config";
 
 /** A versão da Graph API que o resto do produto usa (`src/jobs/meta-api.ts`). */
@@ -20,10 +21,24 @@ const DIALOGO_DA_META = `https://www.facebook.com/${VERSAO_GRAPH}/dialog/oauth`;
 /** E56 PR 1: o servidor de envio de vídeo da Meta (carregamento retomável): `publicacao-de-conteudo.md`, "Sessão de carregamento retomável". */
 const RUPLOAD_DA_META = `https://rupload.facebook.com/ig-api-upload/${VERSAO_GRAPH}`;
 
+/**
+ * E19b: o endereço da Graph API para quem ligou pelo Login do Instagram. `pesquisa/plataformas/docs/meta/ig-login-comecar.md` (exemplo `graph.instagram.com/v26.0/me`) e
+ * `publicacao-de-conteudo.md` (coluna "URL de hospedagem": `graph.instagram.com`).
+ */
+const GRAPH_DO_INSTAGRAM = `https://graph.instagram.com/${VERSAO_GRAPH}`;
+
 /** Lidos a cada chamada: só no e2e (`MODO_E2E=1`) eles apontam para o servidor local que simula a Meta (`config.metaConexao.simuladorE2E`); fora dele são sempre os da Meta. */
 const graph = () => (config.metaConexao.simuladorE2E ? `${config.metaConexao.simuladorE2E}/graph` : GRAPH_DA_META);
 const dialogo = () => (config.metaConexao.simuladorE2E ? `${config.metaConexao.simuladorE2E}/dialog/oauth` : DIALOGO_DA_META);
 const rupload = () => (config.metaConexao.simuladorE2E ? `${config.metaConexao.simuladorE2E}/rupload` : RUPLOAD_DA_META);
+
+/** E19b: o `graph.instagram.com` (ou, no e2e, o servidor local que o simula). */
+const graphDoInstagram = () => (config.metaConexao.simuladorE2E ? `${config.metaConexao.simuladorE2E}/graph-ig` : GRAPH_DO_INSTAGRAM);
+
+/** O endereço da Graph API de cada via, lido a cada chamada, com o desvio do e2e. */
+export function enderecoDoGraphDaVia(via: ViaDaLigacao): string {
+  return via === "instagram" ? graphDoInstagram() : graph();
+}
 
 /** Para `lib/meta-publicar.ts`: os mesmos endereços, lidos a cada chamada, com o desvio do e2e. */
 export const enderecoDoGraph = graph;
@@ -67,6 +82,8 @@ export type CargaDoState = {
   n: string;
   /** Quando vence, em milissegundos desde 1970. */
   e: number;
+  /** E19b: a via em que o diálogo foi aberto. Estados sem este campo (anteriores à E19b) valem `facebook`. */
+  v?: ViaDaLigacao;
 };
 
 function assinar(corpo: string): string {
@@ -102,7 +119,8 @@ export function lerState(doRetorno: string | null | undefined, doCookie: string 
   try {
     const bruto = JSON.parse(Buffer.from(corpo, "base64url").toString("utf8")) as Partial<CargaDoState>;
     if (!Number.isInteger(bruto.c) || typeof bruto.u !== "string" || typeof bruto.n !== "string" || typeof bruto.e !== "number") return { ok: false, motivo: "invalido" };
-    const carga = { c: bruto.c as number, u: bruto.u, n: bruto.n, e: bruto.e };
+    if (bruto.v !== undefined && bruto.v !== "facebook" && bruto.v !== "instagram") return { ok: false, motivo: "invalido" };
+    const carga: CargaDoState = { c: bruto.c as number, u: bruto.u, n: bruto.n, e: bruto.e, v: bruto.v ?? "facebook" };
     return carga.e <= agora.getTime() ? { ok: false, motivo: "expirado" } : { ok: true, carga };
   } catch {
     return { ok: false, motivo: "invalido" };
@@ -177,14 +195,15 @@ export function conferirQueNaoEhRedeDeVerdade(): void {
  * Uma chamada à Graph API. `GET` leva tudo na query (como sempre); `POST` (E56 PR 1, publicar) leva tudo no corpo do formulário, inclusive o acesso: a legenda de um vídeo pode ter 2.200
  * caracteres, e endereço comprido demais não passa. Em nenhum dos dois casos o endereço ou o corpo vão para log ou erro.
  */
-export async function pedirGraph<T>(caminho: string, parametros: Record<string, string>, token?: string, metodo: "GET" | "POST" = "GET"): Promise<T> {
+export async function pedirGraph<T>(caminho: string, parametros: Record<string, string>, token?: string, metodo: "GET" | "POST" = "GET", via: ViaDaLigacao = "facebook"): Promise<T> {
   conferirQueNaoEhRedeDeVerdade();
-  const url = new URL(`${graph()}/${caminho}`);
+  const url = new URL(`${enderecoDoGraphDaVia(via)}/${caminho}`);
   const campos = metodo === "GET" ? url.searchParams : new URLSearchParams();
   for (const [chave, valor] of Object.entries(parametros)) campos.set(chave, valor);
   if (token) {
     campos.set("access_token", token);
-    if (config.metaConexao.appSecret) campos.set("appsecret_proof", provaDoSegredo(token));
+    // `appsecret_proof` é da via do Facebook (`graph-requisicoes-seguras.md`); a documentação da via do Instagram não o prevê.
+    if (via === "facebook" && config.metaConexao.appSecret) campos.set("appsecret_proof", provaDoSegredo(token));
   }
   let resposta: Response;
   try {
@@ -257,7 +276,7 @@ export async function permissoesQueFaltam(token: string): Promise<string[]> {
   return (await permissoesDoToken(token)).faltam;
 }
 
-export type ContaDoInstagram = { paginaId: string; paginaNome: string | null; contaId: string; nome: string };
+export type ContaDoInstagram = { paginaId: string | null; paginaNome: string | null; contaId: string; nome: string };
 
 type PaginaGraph = { id?: string; name?: string; instagram_business_account?: { id?: string; username?: string; name?: string } };
 

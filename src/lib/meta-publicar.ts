@@ -5,10 +5,13 @@
  *   2. manda os bytes do vídeo para `rupload.facebook.com/ig-api-upload/<versão>/<contêiner>` com `offset` e `file_size` (o vídeo passa do navegador direto para a Meta: nada fica guardado aqui);
  *   3. pergunta `status_code` do contêiner até FINISHED (a Meta pede no máximo uma pergunta por minuto, por até 5 minutos);
  *   4. publica (`media_publish` com `creation_id`), e lê o endereço da mídia publicada.
+ * E19b, a via do Instagram (`graph.instagram.com`): o envio retomável (`upload_type=resumable` e `rupload`) é "Apenas para apps que implementaram o Login do Facebook para Empresas"
+ * (`publicacao-de-conteudo.md`, "Pontos de extremidade"). Pela via do Instagram o contêiner nasce com `video_url`, um endereço PÚBLICO de onde a Meta baixa o vídeo ("Mídia em servidor público":
+ * "as mídias precisam estar hospedadas em um servidor publicamente acessível no momento da tentativa"), e os passos 3 e 4 são os mesmos, só que em `graph.instagram.com` e sem `appsecret_proof`.
  * O uso do dia vem de `content_publishing_limit`. O acesso (token) entra como argumento e NUNCA vai para log, erro ou retorno; as mensagens de erro são as de `ErroMetaLogin`, sem endereço. Nos
  * testes o `fetch` é simulado; a chamada de verdade recusa rodar dentro do Vitest sem isso.
  */
-import type { TipoDePublicacao } from "@/db/schema";
+import type { TipoDePublicacao, ViaDaLigacao } from "@/db/schema";
 import { conferirQueNaoEhRedeDeVerdade, enderecoDoRupload, ErroMetaLogin, pedirGraph } from "@/lib/meta-oauth";
 
 export type StatusDoContainer = "EXPIRED" | "ERROR" | "FINISHED" | "IN_PROGRESS" | "PUBLISHED";
@@ -25,16 +28,26 @@ export class ErroDeEnvioDoVideo extends ErroMetaLogin {
   }
 }
 
-/** Passo 1: o contêiner de envio retomável. Story não leva legenda (a documentação não a prevê para Story). */
-export async function criarContainerDeVideo(entrada: { igId: string; token: string; tipo: TipoDePublicacao; legenda: string }): Promise<{ containerId: string }> {
+/**
+ * Passo 1: o contêiner. Pela via do Facebook, o de envio retomável (`upload_type=resumable`); pela via do Instagram, com o `video_url` (público) de onde a Meta baixa o vídeo
+ * (`publicacao-ig-user-media.md`, `video_url`: "Criaremos um cURL para o vídeo a partir do URL fornecido, que deve estar em um servidor público"). Story não leva legenda (a documentação não a prevê para Story).
+ */
+export async function criarContainerDeVideo(entrada: { igId: string; token: string; tipo: TipoDePublicacao; legenda: string; via?: ViaDaLigacao; videoUrl?: string }): Promise<{ containerId: string }> {
   const { igId, token, tipo, legenda } = entrada;
-  const parametros: Record<string, string> = { media_type: tipo === "story" ? "STORIES" : "REELS", upload_type: "resumable" };
+  const via = entrada.via ?? "facebook";
+  const parametros: Record<string, string> = { media_type: tipo === "story" ? "STORIES" : "REELS" };
+  if (via === "instagram") {
+    if (!entrada.videoUrl) throw new ErroMetaLogin("Faltou o endereco do video para a Meta baixar.");
+    parametros.video_url = entrada.videoUrl;
+  } else {
+    parametros.upload_type = "resumable";
+  }
   if (tipo === "reels") {
     // `share_to_feed=true`: o Reel aparece no perfil e no Feed, além da aba Reels (`publicacao-ig-user-media.md`, `share_to_feed`).
     parametros.share_to_feed = "true";
     if (legenda.trim()) parametros.caption = legenda;
   }
-  const corpo = await pedirGraph<{ id?: unknown }>(`${igId}/media`, parametros, token, "POST");
+  const corpo = await pedirGraph<{ id?: unknown }>(`${igId}/media`, parametros, token, "POST", via);
   if (typeof corpo.id !== "string" || corpo.id === "") throw new ErroMetaLogin("A Meta nao devolveu o conteiner da publicacao.");
   return { containerId: corpo.id };
 }
@@ -87,23 +100,23 @@ export async function enviarVideo(entrada: { containerId: string; token: string;
 }
 
 /** Passo 3: o estado do contêiner (`status_code`). Valor que a documentação não lista vira erro, nunca um palpite. */
-export async function statusDoContainer(containerId: string, token: string): Promise<StatusDoContainer> {
-  const corpo = await pedirGraph<{ status_code?: unknown }>(containerId, { fields: "status_code" }, token);
+export async function statusDoContainer(containerId: string, token: string, via: ViaDaLigacao = "facebook"): Promise<StatusDoContainer> {
+  const corpo = await pedirGraph<{ status_code?: unknown }>(containerId, { fields: "status_code" }, token, "GET", via);
   if (typeof corpo.status_code !== "string" || !STATUS_CONHECIDOS.includes(corpo.status_code)) throw new ErroMetaLogin("A Meta devolveu um estado de publicacao desconhecido.");
   return corpo.status_code as StatusDoContainer;
 }
 
 /** Passo 4: publica o contêiner pronto. Devolve o id da mídia publicada. */
-export async function publicarContainer(entrada: { igId: string; containerId: string; token: string }): Promise<{ midiaId: string }> {
-  const corpo = await pedirGraph<{ id?: unknown }>(`${entrada.igId}/media_publish`, { creation_id: entrada.containerId }, entrada.token, "POST");
+export async function publicarContainer(entrada: { igId: string; containerId: string; token: string; via?: ViaDaLigacao }): Promise<{ midiaId: string }> {
+  const corpo = await pedirGraph<{ id?: unknown }>(`${entrada.igId}/media_publish`, { creation_id: entrada.containerId }, entrada.token, "POST", entrada.via ?? "facebook");
   if (typeof corpo.id !== "string" || corpo.id === "") throw new ErroMetaLogin("A Meta nao devolveu o id da midia publicada.");
   return { midiaId: corpo.id };
 }
 
 /** O endereço da mídia publicada no Instagram; `null` quando a Meta não devolve (uma falha aqui nunca desfaz a publicação). */
-export async function enderecoDaMidia(midiaId: string, token: string): Promise<string | null> {
+export async function enderecoDaMidia(midiaId: string, token: string, via: ViaDaLigacao = "facebook"): Promise<string | null> {
   try {
-    const corpo = await pedirGraph<{ permalink?: unknown }>(midiaId, { fields: "permalink" }, token);
+    const corpo = await pedirGraph<{ permalink?: unknown }>(midiaId, { fields: "permalink" }, token, "GET", via);
     return typeof corpo.permalink === "string" && /^https:\/\//.test(corpo.permalink) ? corpo.permalink : null;
   } catch {
     return null;
@@ -111,8 +124,8 @@ export async function enderecoDaMidia(midiaId: string, token: string): Promise<s
 }
 
 /** O uso do limite diário: quantas publicações já saíram nas últimas 24 horas e o total permitido (`content_publishing_limit`). */
-export async function usoDoLimite(igId: string, token: string): Promise<{ usadas: number; total: number | null }> {
-  const corpo = await pedirGraph<{ data?: { quota_usage?: unknown; config?: { quota_total?: unknown } }[] }>(`${igId}/content_publishing_limit`, { fields: "quota_usage,config" }, token);
+export async function usoDoLimite(igId: string, token: string, via: ViaDaLigacao = "facebook"): Promise<{ usadas: number; total: number | null }> {
+  const corpo = await pedirGraph<{ data?: { quota_usage?: unknown; config?: { quota_total?: unknown } }[] }>(`${igId}/content_publishing_limit`, { fields: "quota_usage,config" }, token, "GET", via);
   const linha = corpo.data?.[0];
   const usadas = typeof linha?.quota_usage === "number" ? linha.quota_usage : 0;
   const total = typeof linha?.config?.quota_total === "number" && linha.config.quota_total > 0 ? linha.config.quota_total : null;

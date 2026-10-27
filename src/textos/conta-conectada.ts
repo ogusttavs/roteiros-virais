@@ -9,7 +9,7 @@ import { envolverEmail, linkEmail } from "./casca-email";
  */
 
 /** O que o retorno do diálogo da Meta manda para `/conta?instagram=<código>`. Cada código tem a sua frase (a tela do PR 2 as mostra). */
-export type CodigoDoRetorno = "ligada" | "escolher" | "cancelou" | "venceu" | "permissao" | "sem-instagram" | "ja-ligada" | "falhou" | "nao-configurada" | "sem-acesso";
+export type CodigoDoRetorno = "ligada" | "escolher" | "cancelou" | "venceu" | "permissao" | "sem-instagram" | "conta-pessoal" | "ja-ligada" | "falhou" | "nao-configurada" | "sem-acesso";
 
 export const textosLigacao = {
   retorno: {
@@ -20,6 +20,8 @@ export const textosLigacao = {
     permissao: "Faltou liberar alguma coisa. Para a ligação funcionar, libere tudo o que a Meta mostrar na tela.",
     "sem-instagram":
       "Não achamos um Instagram profissional ligado à Página que você escolheu. Confira se o seu Instagram é uma conta profissional e se está ligado a uma Página do Facebook.",
+    "conta-pessoal":
+      "Esse Instagram é uma conta pessoal, e só conta de empresa ou de criador pode ser ligada. Para trocar, abra o Instagram no celular, vá em Configurações e privacidade, depois em Tipo de conta e ferramentas, e escolha Mudar para conta profissional. Leva um minuto e não custa nada. Depois volte aqui e ligue de novo.",
     "ja-ligada": "Este Instagram já está ligado a outra conta aqui. Desligue lá primeiro e tente de novo.",
     falhou: "Não deu para ligar agora. Tente de novo daqui a pouco.",
     "nao-configurada": "A ligação direta com o Instagram ainda não está aberta para você.",
@@ -34,6 +36,9 @@ export const textosLigacao = {
     titulo: "Seu Instagram",
     /** O que a ligação faz, antes de ligar (sem ligação, dono). */
     explica: "Ligue o seu Instagram e a gente passa a ler os números de cada vídeo seu direto dele, sem você precisar mandar nada.",
+    /** E19b: o Instagram só deixa ligar conta profissional; quem é pessoal precisa trocar (de graça, um minuto). */
+    contaProfissional:
+      "Para ligar, o seu Instagram precisa ser uma conta profissional (de empresa ou de criador). Se o seu for pessoal, abra o Instagram no celular, vá em Configurações e privacidade, depois em Tipo de conta e ferramentas, e escolha Mudar para conta profissional. É de graça e leva um minuto.",
     oQueLemos: "O que lemos: o nome da sua conta e, de cada vídeo, quantas pessoas viram, curtiram, comentaram e compartilharam.",
     oQueNunca: "O que nunca fazemos: ler as suas mensagens nem postar sem você pedir.",
     /** E56 PR 1: a publicação pelo aplicativo é sempre um pedido da pessoa, vídeo por vídeo. */

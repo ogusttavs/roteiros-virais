@@ -183,6 +183,32 @@ describe("verificarSegredosDeProducao", () => {
       expect(() => verificarSegredosDeProducao({ NODE_ENV: "development", META_TOKEN_CHAVE: "curta" })).not.toThrow();
     });
   });
+
+  describe("E19b: a ligacao pelo Login do Instagram em producao (variaveis juntas ou nenhuma)", () => {
+    const base = { NODE_ENV: "production", ...segredosDeVerdade };
+    const chaveBase64 = Buffer.alloc(32, 7).toString("base64");
+    const completa = { META_IG_APP_ID: "990602627938098", META_IG_APP_SECRET: "segredo-do-app-do-instagram", META_TOKEN_CHAVE: chaveBase64 };
+
+    it("com as duas do Instagram e a chave de 32 bytes, passa; sem nenhuma, desligada, tambem", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, ...completa })).not.toThrow();
+      expect(() => verificarSegredosDeProducao(base)).not.toThrow();
+    });
+    it("com qualquer uma das tres faltando, recusa", () => {
+      for (const faltando of ["META_IG_APP_ID", "META_IG_APP_SECRET", "META_TOKEN_CHAVE"] as const) {
+        const parcial = { ...completa, [faltando]: "" };
+        expect(() => verificarSegredosDeProducao({ ...base, ...parcial }), faltando).toThrow(/juntos/);
+      }
+    });
+    it("a chave sozinha, ou fraca, recusa", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, META_TOKEN_CHAVE: chaveBase64 })).toThrow(/juntos/);
+      expect(() => verificarSegredosDeProducao({ ...base, ...completa, META_TOKEN_CHAVE: "curta" })).toThrow(/META_TOKEN_CHAVE precisa ter 32 bytes/);
+    });
+    it("as duas vias juntas passam, desde que cada uma esteja inteira", () => {
+      const facebook = { META_APP_ID: "123", META_APP_SECRET: "s", META_LOGIN_CONFIG_ID: "456" };
+      expect(() => verificarSegredosDeProducao({ ...base, ...completa, ...facebook })).not.toThrow();
+      expect(() => verificarSegredosDeProducao({ ...base, ...completa, META_APP_ID: "123" })).toThrow(/juntos/);
+    });
+  });
 });
 
 describe("config.cobranca (o portao desligado por padrao e a porta de teste)", () => {

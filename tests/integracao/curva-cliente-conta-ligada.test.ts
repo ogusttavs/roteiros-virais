@@ -13,7 +13,7 @@ vi.mock("@/lib/config", async (importarOriginal) => {
     config: {
       ...original.config,
       coleta: { ...original.config.coleta, metaAtivo: true, metaIgId: "sistema-ig", metaToken: "EAA-TOKEN-DO-SISTEMA" },
-      metaConexao: { ...original.config.metaConexao, appSecret: "segredo-do-app-da-suite", tokenChave: Buffer.alloc(32, 13).toString("base64"), ativa: true },
+      metaConexao: { ...original.config.metaConexao, appSecret: "segredo-do-app-da-suite", tokenChave: Buffer.alloc(32, 13).toString("base64"), ativa: true, viaFacebookLigada: true },
     },
   };
 });
