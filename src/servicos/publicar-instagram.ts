@@ -637,6 +637,8 @@ async function concluir(linha: Publicacao, resultado: { midiaId: string | null; 
  * Para o worker: confere e, se ainda falta esperar, agenda a próxima conferência. O resumo vai para `execucoes_job`: só números e o estado, nunca nome de conta nem acesso.
  */
 export async function rodarConferenciaDaPublicacao(publicacaoId: number, deps: DepsDaPublicacao = {}): Promise<Record<string, unknown>> {
+  // Pasta compartilhada com o app (volume em produção): quem roda a conferência aproveita para varrer vídeo velho esquecido.
+  void varrerVideosVelhos(relogio(deps)).catch(() => undefined);
   const resultado = await conferirPublicacao(publicacaoId, deps);
   if (resultado.reconferirEmSeg !== null) await (deps.agendar ?? agendarNaFila)(publicacaoId, resultado.reconferirEmSeg);
   return { publicacaoId, estado: resultado.vista?.estado ?? "inexistente", reconferirEmSeg: resultado.reconferirEmSeg };

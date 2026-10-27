@@ -378,6 +378,32 @@ describe("Reels pela via do Instagram, do começo ao post", () => {
 // Quando dá errado: o arquivo some em todo fim
 // ---------------------------------------------------------------------------
 
+describe("a varredura no worker", () => {
+  it("a conferência da fila e o job diário varrem o vídeo velho esquecido, sem depender de alguém subir outro vídeo; o recente fica", async () => {
+    const { rodarRenovarContasLigadas } = await import("@/jobs/renovar-contas-ligadas");
+    const { rodarConferenciaDaPublicacao } = await import("@/servicos/publicar-instagram");
+    const { guardarVideo, IDADE_MAXIMA_MS } = await import("@/lib/video-temporario");
+    const { utimesSync } = await import("node:fs");
+    for (const id of [9001, 9002, 9003]) await guardarVideo(id, fluxoDe([1, 2, 3]), 3);
+    const velho = new Date(Date.now() - IDADE_MAXIMA_MS - 60_000);
+    utimesSync(caminhoDoVideo(9001), velho, velho);
+    utimesSync(caminhoDoVideo(9002), velho, velho);
+
+    await rodarConferenciaDaPublicacao(99999999, deps());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(existsSync(caminhoDoVideo(9001))).toBe(false);
+    expect(existsSync(caminhoDoVideo(9002))).toBe(false);
+    expect(existsSync(caminhoDoVideo(9003))).toBe(true);
+
+    await guardarVideo(9004, fluxoDe([1]), 1);
+    utimesSync(caminhoDoVideo(9004), velho, velho);
+    const resumo = await rodarRenovarContasLigadas(new Date());
+    expect(resumo.videosVarridos).toBe(1);
+    expect(existsSync(caminhoDoVideo(9004))).toBe(false);
+    expect(existsSync(caminhoDoVideo(9003))).toBe(true);
+  });
+});
+
 describe("o arquivo temporário some em todo fim possível", () => {
   it("a Meta não consegue baixar o vídeo (2207052): falhou com a frase de não preparar, e nenhum arquivo fica", async () => {
     instalarInstagram({ erroNoContainer: { code: 100, subcode: 2207052 } });
