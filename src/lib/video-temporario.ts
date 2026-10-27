@@ -11,10 +11,10 @@
  *    A rota que serve o arquivo (`app/api/publicar-arquivo`) confere o código, o prazo e se a publicação ainda está viva no banco.
  *  - Nada aqui vai para log além do número da publicação.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
 import { createWriteStream } from "node:fs";
-import { mkdir, readdir, rm, stat } from "node:fs/promises";
+import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -33,16 +33,22 @@ export function caminhoDoVideo(publicacaoId: number): string {
   return join(pastaDosVideos(), `pub-${publicacaoId}.video`);
 }
 
+/** O arquivo de um envio ainda em andamento: nome único por tentativa, para dois envios nunca escreverem no mesmo arquivo. Vira `pub-<id>.video` por `rename` só quando está inteiro. */
+function caminhoTemporarioDoVideo(publicacaoId: number): string {
+  return join(pastaDosVideos(), `pub-${publicacaoId}.${randomBytes(6).toString("hex")}.parte`);
+}
+
 /** Falha ao guardar o vídeo (corpo ausente, maior ou menor que o declarado, disco). A mensagem é técnica e não leva nada da pessoa. */
 export class ErroDoVideoTemporario extends Error {}
 
 /**
  * Grava o corpo do pedido em disco, em fluxo. O tamanho tem de bater EXATAMENTE com o declarado ao começar a publicação (o mesmo número que a tela e o limite do Instagram conferiram).
- * Em qualquer falha o arquivo parcial é apagado.
+ * Grava num arquivo temporário de nome único e só no fim o renomeia (`rename`, atômico) para o caminho que a rota serve: quem baixa nunca encontra o arquivo pela metade, e um envio que falha
+ * apaga apenas o PRÓPRIO arquivo temporário, nunca o `pub-<id>.video` de outro envio. Em qualquer falha o arquivo parcial é apagado.
  */
 export async function guardarVideo(publicacaoId: number, corpo: ReadableStream<Uint8Array>, tamanho: number): Promise<void> {
   await mkdir(pastaDosVideos(), { recursive: true });
-  const caminho = caminhoDoVideo(publicacaoId);
+  const caminho = caminhoTemporarioDoVideo(publicacaoId);
   const saida = createWriteStream(caminho);
   const falhouAoEscrever = new Promise<never>((_, rejeitar) => saida.once("error", (erro) => rejeitar(erro)));
   falhouAoEscrever.catch(() => undefined);
@@ -61,6 +67,7 @@ export async function guardarVideo(publicacaoId: number, corpo: ReadableStream<U
       saida.once("error", rejeitar);
       saida.end(() => resolver());
     });
+    await rename(caminho, caminhoDoVideo(publicacaoId));
   } catch (erro) {
     // Fecha o arquivo ANTES de apagar: apagar com ele ainda abrindo deixa o arquivo (no Windows nem apaga).
     if (!saida.closed) {
@@ -69,7 +76,7 @@ export async function guardarVideo(publicacaoId: number, corpo: ReadableStream<U
         saida.destroy();
       });
     }
-    await descartarVideo(publicacaoId);
+    await rm(caminho, { force: true }).catch(() => undefined);
     throw erro instanceof ErroDoVideoTemporario ? erro : new ErroDoVideoTemporario("nao foi possivel guardar o video");
   } finally {
     leitor.releaseLock?.();
@@ -90,7 +97,7 @@ export async function varrerVideosVelhos(agora: Date = new Date()): Promise<numb
   let apagados = 0;
   try {
     for (const nome of await readdir(pastaDosVideos())) {
-      if (!/^pub-\d+\.video$/.test(nome)) continue;
+      if (!/^pub-\d+\.(video|[0-9a-f]{12}\.parte)$/.test(nome)) continue;
       const caminho = join(pastaDosVideos(), nome);
       try {
         const info = await stat(caminho);

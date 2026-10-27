@@ -16,7 +16,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { ENVIO_PARADO_APOS_MS, esperaDaConferencia, LIMITE_DE_PUBLICACOES_PADRAO, LIMITES_DA_LEGENDA, LIMITES_DA_PUBLICACAO, PREPARO_DA_META_PRAZO_MS, PUBLICANDO_PARADO_APOS_MS, tipoDeVideoAceito } from "@/config/publicacao";
-import { db } from "@/db";
+import { db, getPool } from "@/db";
 import { ESTADOS_VIVOS_DA_PUBLICACAO, publicacoes, videosCliente, type EstadoDaPublicacao, type Publicacao, type TipoDePublicacao } from "@/db/schema";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { problemaDaLegenda } from "@/lib/legenda-do-instagram";
@@ -359,7 +359,6 @@ function contador(tamanho: number): TransformStream<Uint8Array, Uint8Array> {
  * que foi declarado ao começar. Terminou bem: a publicação passa a `processando` e a primeira conferência é agendada. Falhou: `falhou` com a frase.
  */
 export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicacao = {}): Promise<ResultadoDoVideo> {
-  const agora = relogio(deps);
   const { usuarioId, clienteId, publicacaoId } = entrada;
   const semStatus = (codigo: CodigoDeRecusa | CodigoDeFalha, status: number, tipo: TipoDePublicacao = "reels"): ResultadoDoVideo => ({
     ok: false,
@@ -369,6 +368,70 @@ export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicac
   });
 
   if (!(await ehDonoDaMarca(usuarioId, clienteId))) return semStatus("so-dono", 403);
+  // Um envio por publicação por vez. Quem chega com outro já em curso recebe a recusa SEM tocar em nada: não grava, não abre contêiner, não derruba a publicação e não apaga o arquivo que a Meta baixa.
+  const reserva = await reservarEnvio(publicacaoId);
+  if (reserva === "ocupada") return semStatus("envio-em-curso", 409);
+  if (reserva === "indisponivel") return semStatus("nao-comecou", 503);
+  try {
+    return await receberVideoReservado(entrada, deps, semStatus);
+  } finally {
+    await reserva.soltar();
+  }
+}
+
+/**
+ * A reserva do envio: uma trava de aviso do Postgres (`pg_try_advisory_lock`) por publicação, segurada por uma conexão só dela até o envio acabar. Sem migração e sem estado novo na tabela; se o
+ * processo cair, a conexão cai e a trava se solta sozinha (um estado `reservado` na tabela ficaria preso para sempre). Custa uma conexão do pool por envio em andamento, e há poucos ao mesmo tempo.
+ */
+async function reservarEnvio(publicacaoId: number): Promise<"ocupada" | "indisponivel" | { soltar: () => Promise<void> }> {
+  let conexao;
+  try {
+    conexao = await getPool().connect();
+  } catch (erro) {
+    logger.warn({ err: erro, publicacaoId }, "publicar: sem conexao para reservar o envio");
+    return "indisponivel";
+  }
+  // Um erro numa conexão emprestada sem ouvinte derrubaria o processo. O ouvinte sai na devolução, para não se acumular na conexão que volta ao pool.
+  const ignorar = () => undefined;
+  conexao.on("error", ignorar);
+  const devolver = (destruir?: boolean) => {
+    conexao.off("error", ignorar);
+    conexao.release(destruir);
+  };
+  try {
+    const { rows } = await conexao.query<{ ok: boolean }>("select pg_try_advisory_lock($1, $2) as ok", [TRAVA_DO_ENVIO, publicacaoId]);
+    if (!rows[0]?.ok) {
+      devolver();
+      return "ocupada";
+    }
+  } catch (erro) {
+    logger.warn({ err: erro, publicacaoId }, "publicar: nao foi possivel reservar o envio");
+    devolver(true);
+    return "indisponivel";
+  }
+  return {
+    soltar: async () => {
+      try {
+        await conexao.query("select pg_advisory_unlock($1, $2)", [TRAVA_DO_ENVIO, publicacaoId]);
+        devolver();
+      } catch {
+        // Destruir a conexão solta a trava do mesmo jeito.
+        devolver(true);
+      }
+    },
+  };
+}
+
+/** Primeira parte do par da trava de aviso: separa esta trava de qualquer outra que o aplicativo venha a ter. */
+const TRAVA_DO_ENVIO = 5619;
+
+async function receberVideoReservado(
+  entrada: EntradaDoVideo,
+  deps: DepsDaPublicacao,
+  semStatus: (codigo: CodigoDeRecusa | CodigoDeFalha, status: number, tipo?: TipoDePublicacao) => ResultadoDoVideo,
+): Promise<ResultadoDoVideo> {
+  const agora = relogio(deps);
+  const { clienteId, publicacaoId } = entrada;
   const [linha] = await db()
     .select()
     .from(publicacoes)
