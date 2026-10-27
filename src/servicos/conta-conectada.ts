@@ -1,5 +1,6 @@
 /**
- * E19 PR 1: o Instagram ligado pela própria pessoa. O fluxo (Login do Facebook para Empresas, código), a tabela `contas_conectadas` com o token cifrado, a renovação, o desligar, o aviso
+ * E19 PR 1 e E19b: o Instagram ligado pela própria pessoa. Duas vias, guardadas em `contas_conectadas.via`: `instagram` (E19b, API do Instagram com o Login do Instagram, sem Página do Facebook:
+ * `lib/meta-instagram-login.ts`; é a que as pessoas usam) e `facebook` (E19, Login do Facebook para Empresas, código; desligada por padrão: `config.metaConexao.viaFacebookLigada`). O fluxo (código), a tabela `contas_conectadas` com o token cifrado, a renovação, o desligar, o aviso
  * de exclusão de dados da Meta e a conta que a curva usa para ler os vídeos da marca.
  *
  * Regras que valem aqui (e têm teste):
@@ -11,13 +12,21 @@
  */
 import { randomBytes } from "node:crypto";
 
-import { and, asc, eq, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { clientes, contasConectadas, exclusoesMeta, membrosMarca, metricasVideoCliente, user, videosCliente, type ContaConectada } from "@/db/schema";
+import { clientes, contasConectadas, exclusoesMeta, membrosMarca, metricasVideoCliente, user, videosCliente, type ContaConectada, type ViaDaLigacao } from "@/db/schema";
 import { config } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { logger } from "@/lib/log";
+import {
+  conferirPermissoesInstagram,
+  contaDoTokenInstagram,
+  renovarTokenInstagram,
+  trocarCodigoPorTokenInstagram,
+  trocarPorLongaDuracaoInstagram,
+  urlDoDialogoInstagram,
+} from "@/lib/meta-instagram-login";
 import {
   contasDoInstagram,
   criarState,
@@ -70,6 +79,19 @@ export function ligacaoDisponivel(): boolean {
   return config.metaConexao.ativa;
 }
 
+/** A via em que uma ligação NOVA começa: a do Instagram quando está configurada; a do Facebook só quando ligada de propósito. `null` sem nenhuma. */
+export function viaDeNovaLigacao(): ViaDaLigacao | null {
+  if (!config.metaConexao.ativa) return null;
+  if (config.metaConexao.instagram.ativa) return "instagram";
+  return config.metaConexao.viaFacebookLigada ? "facebook" : null;
+}
+
+/** A via funciona neste ambiente (tem os dados do aplicativo dela). Conta ligada por uma via desligada não é lida, publicada nem renovada, e nunca é marcada com erro por isso. */
+export function viaDisponivel(via: ViaDaLigacao): boolean {
+  if (!config.metaConexao.ativa) return false;
+  return via === "instagram" ? config.metaConexao.instagram.ativa : config.metaConexao.viaFacebookLigada;
+}
+
 // ---------------------------------------------------------------------------
 // O começo: o endereço do diálogo da Meta
 // ---------------------------------------------------------------------------
@@ -79,10 +101,11 @@ export function ligacaoDisponivel(): boolean {
  * aplicativo) ou a pessoa não é a dona da marca.
  */
 export async function iniciarLigacao(usuarioId: string, clienteId: number): Promise<{ url: string; state: string } | { recusa: CodigoDoRetorno }> {
-  if (!ligacaoDisponivel()) return { recusa: "nao-configurada" };
+  const via = viaDeNovaLigacao();
+  if (!via) return { recusa: "nao-configurada" };
   if (!(await ehDonoDaMarca(usuarioId, clienteId))) return { recusa: "sem-acesso" };
-  const state = criarState({ c: clienteId, u: usuarioId });
-  return { url: urlDoDialogo(state), state };
+  const state = criarState({ c: clienteId, u: usuarioId, v: via });
+  return { url: via === "instagram" ? urlDoDialogoInstagram(state) : urlDoDialogo(state), state };
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +150,9 @@ export async function concluirLigacao(entrada: EntradaDoRetorno, agora: Date = n
     return { resultado: estado.motivo === "expirado" ? "venceu" : "sem-acesso" };
   }
   const { c: clienteId, u: usuarioDoState } = estado.carga;
+  const via: ViaDaLigacao = estado.carga.v ?? "facebook";
+  // O diálogo foi aberto por uma via que este ambiente não tem mais (variáveis tiradas no meio do caminho): nada é ligado.
+  if (!viaDisponivel(via)) return { resultado: "nao-configurada" };
   if (!entrada.usuarioId || entrada.usuarioId !== usuarioDoState) {
     logger.warn({ clienteId }, "meta: retorno por outra sessao que a que abriu o dialogo");
     return { resultado: "sem-acesso" };
@@ -138,6 +164,7 @@ export async function concluirLigacao(entrada: EntradaDoRetorno, agora: Date = n
 
   if (entrada.erroDaMeta) return { resultado: "cancelou" };
   if (!entrada.codigo) return { resultado: "falhou" };
+  if (via === "instagram") return concluirPeloInstagram(entrada.codigo, { clienteId, usuarioId: usuarioDoState }, agora);
 
   let longo: { token: string; expiraEmSeg: number | null };
   let metaUsuarioId: string;
@@ -174,8 +201,50 @@ export async function concluirLigacao(entrada: EntradaDoRetorno, agora: Date = n
   return { resultado: "escolher" };
 }
 
+/**
+ * E19b: a volta pela via do Instagram. O código vira o token curto e depois o de longa duração; as permissões vêm na própria troca do código (`ig-login-business-login.md`, "Etapa 2"); a
+ * conta é quem o token diz ser (`/me`). Só existe uma conta por login, então não há escolha: liga direto.
+ */
+async function concluirPeloInstagram(codigo: string, quem: { clienteId: number; usuarioId: string }, agora: Date): Promise<ResultadoDaLigacao> {
+  const { clienteId, usuarioId } = quem;
+  const segredos: string[] = [codigo];
+  let longo: { token: string; expiraEmSeg: number | null };
+  let permissoes: { faltam: string[]; publicar: boolean };
+  let conta: Awaited<ReturnType<typeof contaDoTokenInstagram>>;
+  let metaUsuarioId: string;
+  try {
+    const curto = await trocarCodigoPorTokenInstagram(codigo);
+    segredos.push(curto.token);
+    permissoes = conferirPermissoesInstagram(curto.permissoes);
+    if (permissoes.faltam.length > 0) return { resultado: "permissao" };
+    longo = await trocarPorLongaDuracaoInstagram(curto.token);
+    segredos.push(longo.token);
+    conta = await contaDoTokenInstagram(longo.token);
+    metaUsuarioId = curto.usuarioId ?? conta.usuarioId ?? conta.contaId;
+  } catch (erro) {
+    // A mensagem do `ErroMetaLogin` nunca leva token nem endereço (`lib/meta-instagram-login.ts`).
+    logger.error({ clienteId, codigo: erro instanceof ErroMetaLogin ? erro.codigo : undefined, mensagem: semSegredos(erro instanceof Error ? erro.message : "erro", segredos) }, "meta: a ligacao pelo instagram falhou");
+    return { resultado: "falhou" };
+  }
+  if (!conta.profissional) return { resultado: "conta-pessoal" };
+  const expiraEm = longo.expiraEmSeg ? new Date(agora.getTime() + longo.expiraEmSeg * 1000) : null;
+  return gravarAtiva({
+    clienteId,
+    usuarioId,
+    metaUsuarioId,
+    conta: { paginaId: null, paginaNome: null, contaId: conta.contaId, nome: conta.nome },
+    token: longo.token,
+    expiraEm,
+    publicarLiberado: permissoes.publicar,
+    via: "instagram",
+    agora,
+  });
+}
+
 type DadosDaGravacao = {
   clienteId: number;
+  /** E19b: a via da ligação (padrão `facebook`, o caminho antigo). */
+  via?: ViaDaLigacao;
   usuarioId: string;
   metaUsuarioId: string;
   conta: ContaDoInstagram;
@@ -210,6 +279,7 @@ async function gravarAtiva(dados: DadosDaGravacao): Promise<ResultadoDaLigacao> 
         paginaNome: conta.paginaNome,
         metaUsuarioId: dados.metaUsuarioId,
         estado: "ativa",
+        via: dados.via ?? "facebook",
         tokenCifrado: cifrarToken(dados.token, contextoDoToken(clienteId, PLATAFORMA_INSTAGRAM, conta.contaId)),
         tokenExpiraEm: dados.expiraEm,
         publicarLiberado: dados.publicarLiberado,
@@ -278,6 +348,8 @@ export type ContaLigadaVista = {
   erro: string | null;
   /** E56 PR 1: a pessoa liberou a publicação ao ligar. Falso nas contas ligadas antes, e enquanto a configuração da Meta não pede a permissão. */
   publicarLiberado?: boolean;
+  /** E19b: a via em que a conta foi ligada. */
+  via?: ViaDaLigacao;
 };
 
 function vista(linha: ContaConectada): ContaLigadaVista {
@@ -291,6 +363,7 @@ function vista(linha: ContaConectada): ContaLigadaVista {
     tokenExpiraEm: linha.tokenExpiraEm,
     erro: linha.erro,
     publicarLiberado: linha.publicarLiberado,
+    via: linha.via,
   };
 }
 
@@ -363,7 +436,7 @@ export async function desligarConta(usuarioId: string, clienteId: number): Promi
 // ---------------------------------------------------------------------------
 
 /** O que a curva precisa para ler a conta da marca. O único lugar em que o token sai decifrado. */
-export type ContaParaLeitura = { id: number; igId: string; token: string };
+export type ContaParaLeitura = { id: number; igId: string; token: string; via: ViaDaLigacao };
 
 /**
  * A conta ligada da marca, pronta para ler, ou `null` (sem conta, vencida, ou com o acesso guardado ilegível). SEMPRE filtra pela marca recebida. Conta que a Meta já recusou
@@ -378,10 +451,12 @@ export async function contaParaLeitura(clienteId: number, agora: Date = new Date
     .from(contasConectadas)
     .where(and(eq(contasConectadas.clienteId, clienteId), eq(contasConectadas.plataforma, PLATAFORMA_INSTAGRAM), eq(contasConectadas.estado, "ativa")));
   if (!linha) return null;
+  // A via desta conta não está ligada neste ambiente (por exemplo, a do Facebook, desligada por padrão): não é problema da conta.
+  if (!viaDisponivel(linha.via)) return null;
   if (linha.tokenExpiraEm && linha.tokenExpiraEm.getTime() <= agora.getTime()) return null;
   if (linha.erro === textosLigacao.erroDaConta.recusada) return null;
   try {
-    return { id: linha.id, igId: linha.contaId, token: decifrarToken(linha.tokenCifrado, contextoDoToken(linha.clienteId, linha.plataforma, linha.contaId)) };
+    return { id: linha.id, igId: linha.contaId, via: linha.via, token: decifrarToken(linha.tokenCifrado, contextoDoToken(linha.clienteId, linha.plataforma, linha.contaId)) };
   } catch (erro) {
     if (!(erro instanceof ErroTokenCifrado)) throw erro;
     await registrarErroDaConta(linha.id, textosLigacao.erroDaConta.ilegivel, agora);
@@ -394,7 +469,7 @@ export async function contaParaLeitura(clienteId: number, agora: Date = new Date
 // ---------------------------------------------------------------------------
 
 /** O que a publicação precisa para falar com a Meta em nome da marca. O segundo lugar em que o token sai decifrado (o primeiro é `contaParaLeitura`). */
-export type ContaParaPublicar = { id: number; igId: string; nome: string; token: string };
+export type ContaParaPublicar = { id: number; igId: string; nome: string; token: string; via: ViaDaLigacao };
 export type RecusaDePublicar = "nao-configurada" | "sem-conta" | "sem-permissao" | "acesso-recusado" | "venceu" | "ilegivel";
 
 /**
@@ -408,11 +483,12 @@ export async function contaParaPublicar(clienteId: number, agora: Date = new Dat
     .from(contasConectadas)
     .where(and(eq(contasConectadas.clienteId, clienteId), eq(contasConectadas.plataforma, PLATAFORMA_INSTAGRAM), eq(contasConectadas.estado, "ativa")));
   if (!linha) return { recusa: "sem-conta" };
+  if (!viaDisponivel(linha.via)) return { recusa: "nao-configurada" };
   if (linha.tokenExpiraEm && linha.tokenExpiraEm.getTime() <= agora.getTime()) return { recusa: "venceu" };
   if (linha.erro === textosLigacao.erroDaConta.recusada) return { recusa: "acesso-recusado" };
   if (!linha.publicarLiberado) return { recusa: "sem-permissao" };
   try {
-    return { conta: { id: linha.id, igId: linha.contaId, nome: linha.nome, token: decifrarToken(linha.tokenCifrado, contextoDoToken(linha.clienteId, linha.plataforma, linha.contaId)) } };
+    return { conta: { id: linha.id, igId: linha.contaId, nome: linha.nome, via: linha.via, token: decifrarToken(linha.tokenCifrado, contextoDoToken(linha.clienteId, linha.plataforma, linha.contaId)) } };
   } catch (erro) {
     if (!(erro instanceof ErroTokenCifrado)) throw erro;
     await registrarErroDaConta(linha.id, textosLigacao.erroDaConta.ilegivel, agora);
@@ -465,6 +541,8 @@ export async function renovarContasLigadas(agora: Date = new Date()): Promise<Re
   if (!ligacaoDisponivel()) return resumo;
   const ativas = await db().select().from(contasConectadas).where(eq(contasConectadas.estado, "ativa"));
   for (const linha of ativas) {
+    // Conta de uma via que este ambiente não tem ligada: não dá para renovar sem os dados do aplicativo dela, e isso não é falha da conta.
+    if (!viaDisponivel(linha.via)) continue;
     const venceu = Boolean(linha.tokenExpiraEm && linha.tokenExpiraEm.getTime() <= agora.getTime());
     if (!precisaRenovar(linha, agora) && !venceu) continue;
     resumo.avaliadas += 1;
@@ -475,7 +553,8 @@ export async function renovarContasLigadas(agora: Date = new Date()): Promise<Re
     } else {
       try {
         const atual = decifrarToken(linha.tokenCifrado, contextoDoToken(linha.clienteId, linha.plataforma, linha.contaId));
-        const novo = await trocarPorLongaDuracao(atual);
+        // Via do Instagram: `refresh_access_token` (`ig-login-business-login.md`). Via do Facebook: a mesma troca por longa duração, com o token ainda válido (`token-longa-duracao.md`).
+        const novo = linha.via === "instagram" ? await renovarTokenInstagram(atual) : await trocarPorLongaDuracao(atual);
         await db()
           .update(contasConectadas)
           .set({
@@ -541,12 +620,17 @@ async function avisarDono(linha: ContaConectada, agora: Date): Promise<boolean> 
  * `{ url, confirmation_code }`; `null` quando a assinatura não bate (a rota responde 400). Pedido de uma pessoa sem ligação também é atendido (código, nada a apagar).
  */
 export async function tratarExclusaoDaMeta(signedRequest: string | null, agora: Date = new Date()): Promise<{ url: string; confirmation_code: string } | null> {
-  const carga = lerSignedRequest(signedRequest);
+  // Cada produto do aplicativo (Facebook, Instagram) assina o aviso com o segredo dele.
+  const carga =
+    [config.metaConexao.appSecret, config.metaConexao.instagram.appSecret]
+      .filter(Boolean)
+      .map((segredo) => lerSignedRequest(signedRequest, segredo))
+      .find(Boolean) ?? null;
   if (!carga?.user_id) return null;
   const codigo = randomBytes(8).toString("hex");
 
   await db().transaction(async (tx) => {
-    const apagadas = await tx.delete(contasConectadas).where(eq(contasConectadas.metaUsuarioId, carga.user_id as string)).returning({ clienteId: contasConectadas.clienteId });
+    const apagadas = await tx.delete(contasConectadas).where(or(eq(contasConectadas.metaUsuarioId, carga.user_id as string), eq(contasConectadas.contaId, carga.user_id as string))).returning({ clienteId: contasConectadas.clienteId });
     const marcas = [...new Set(apagadas.map((a) => a.clienteId))];
     if (marcas.length > 0) {
       const videos = await tx.select({ id: videosCliente.id }).from(videosCliente).where(inArray(videosCliente.clienteId, marcas));

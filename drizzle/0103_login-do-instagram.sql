@@ -1,0 +1,1 @@
+ALTER TABLE "contas_conectadas" ADD COLUMN "via" text DEFAULT 'facebook' NOT NULL;

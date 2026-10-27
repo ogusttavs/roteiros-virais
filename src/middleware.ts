@@ -33,9 +33,9 @@ const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/api/versao", "/termos", "/pri
  * esse redirecionamento nunca tinha sido pego antes. `/api/webhooks/stripe` (E22 PR 1)
  * tambem: quem chama e o Stripe, sem cookie; a rota confere a assinatura do corpo com
  * `STRIPE_WEBHOOK_SECRET` antes de qualquer coisa. `/api/meta/exclusao` (E19 PR 1) tambem: quem chama e a Meta, sem cookie; a rota confere a assinatura do
- * `signed_request` com o segredo do aplicativo. Ja `/api/meta/conectar` e `/api/meta/retorno` NAO entram aqui: sao da pessoa logada, e sem cookie de sessao vao para `/entrar`.
+ * `signed_request` com o segredo do aplicativo. `/api/publicar-arquivo` (E19b) tambem: quem baixa o video e a Meta, sem cookie; a rota confere o codigo assinado do endereco, o prazo e se a publicacao ainda esta viva. Ja `/api/meta/conectar` e `/api/meta/retorno` NAO entram aqui: sao da pessoa logada, e sem cookie de sessao vao para `/entrar`.
  */
-const ROTAS_COM_AUTENTICACAO_PROPRIA = ["/api/jobs", "/api/webhooks/stripe", "/api/meta/exclusao"];
+const ROTAS_COM_AUTENTICACAO_PROPRIA = ["/api/jobs", "/api/webhooks/stripe", "/api/meta/exclusao", "/api/publicar-arquivo"];
 
 /**
  * `/roteiros/[id]/imprimir` (roteiro em PDF, `PROXIMO.md`, acabamento do

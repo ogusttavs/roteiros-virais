@@ -301,6 +301,15 @@ Entra desligada: sem `COBRANCA_ATIVA=1` no `.env` da VPS ninguem e mandado para 
 - **O portao fora do layout**: toda Server Action do painel e toda rota `/api` chama `exigirAssinaturaValida` / `recusaDaCobranca` (`src/lib/portao-cobranca.ts`); `npm run checar-portao-cobranca` (na CI) reprova a que esquecer. Desligado, nada muda.
 - **Apagar uma marca**: so por `npm run marca:apagar -- <id> --confirmo` (cancela a assinatura no Stripe antes e so apaga se o Stripe confirmar). **Nunca apague a linha de `clientes` por SQL**: sem cancelar no Stripe antes, ele continua cobrando (desde a E22 PR 3 o banco recusa apagar a marca que ainda tem linha em `assinaturas`, `ON DELETE RESTRICT`).
 
+## O Instagram ligado direto pelo Instagram, sem Facebook (E19b, 27/10/2026)
+
+Troca a via da ligacao: a pessoa entra com o login do Instagram (API do Instagram com o Login do Instagram, `graph.instagram.com`), sem Pagina do Facebook. A via do Facebook da E19 continua no codigo, **desligada por padrao** (`META_VIA_FACEBOOK=1` para ligar). Nao havia conta ligada em producao quando a troca foi feita.
+
+- **Variaveis novas** (`.env.example`, bloco "E19b"): `META_IG_APP_ID` e `META_IG_APP_SECRET` (os do PRODUTO Instagram do aplicativo, diferentes dos do Facebook), juntos com `META_TOKEN_CHAVE` (a mesma chave). Preencher alguma sem as outras faz o app recusar subir. `PUBLICAR_PASTA_TEMP` e opcional.
+- **No aplicativo da Meta** (so o Gustavo): produto "Instagram" > "Configuracao da API com o login do Instagram" > "Configure o login da empresa no Instagram": a URI `<APP_URL>/api/meta/retorno` em "URIs de redirecionamento do OAuth" (a mesma da via antiga), e as tres permissoes `instagram_business_basic`, `instagram_business_manage_insights` e `instagram_business_content_publish`; em Funcoes do aplicativo, quem vai testar entra como "Testador do Instagram" e aceita o convite no Instagram dele; as URLs de "Cancelar autorizacao" e de "Solicitacao de exclusao de dados" apontam para `<APP_URL>/api/meta/exclusao` (assinadas com a chave secreta do app do Instagram, que o aplicativo ja confere).
+- **O video de uma publicacao** fica em disco por poucas horas (o envio retomavel so existe na via do Facebook): a Meta o baixa por `<APP_URL>/api/publicar-arquivo/<codigo assinado>/video.mp4`, que precisa ser alcancavel da internet (o Caddy ja encaminha tudo). O arquivo some quando a publicacao termina, falha ou e cancelada; o que sobrar e varrido pela idade. Fica na camada gravavel do container web (`/tmp`); um video de ate 300 MB ocupa disco ate a publicacao terminar.
+- **Renovacao**: o job `renovar-contas-ligadas` usa `refresh_access_token` para as contas dessa via (60 dias a mais, pelo menos 24 horas depois da ligacao).
+
 ## O Instagram ligado pela propria pessoa (E19 PR 1)
 
 Entra desligado: sem os quatro dados abaixo no `.env` da VPS, ninguem consegue comecar a ligacao (o botao do PR 2 diz que ainda nao esta aberta) e a curva segue pelo usuario do sistema e pelo Apify, como antes.
