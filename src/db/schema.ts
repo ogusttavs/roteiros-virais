@@ -2407,8 +2407,8 @@ export const videosCliente = pgTable("videos_cliente", {
   metaMediaId: text("meta_media_id"),
 });
 
-/** "youtube" e "meta" sao API oficial; "apify" e raspagem por url (V8, item 3). */
-export type FonteMedida = "youtube" | "apify" | "meta";
+/** "youtube" e "meta" sao API oficial; "apify" e "ytdlp" sao leitura da pagina publica do video por url (V8, item 3; "ytdlp" desde 27/10/2026, o TikTok sem Apify). */
+export type FonteMedida = "youtube" | "apify" | "meta" | "ytdlp";
 
 export const metricasVideoCliente = pgTable("metricas_video_cliente", {
   id: id(),
