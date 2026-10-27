@@ -89,15 +89,22 @@ export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", des
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key === "Escape") aoFecharRef.current();
     }
+    // De onde a página estava quando o menu abriu, lido depois do foco (abaixo): só rolar de verdade fecha.
+    let rolagemAoAbrir = 0;
     function aoRolar() {
       if (window.innerWidth < LARGURA_TABLET) return;
       if (role !== "menu") return;
+      // O navegador entrega o `scroll` um quadro depois da rolagem. Quem abre o menu logo depois de a página rolar (o toque que a rolou até o botão,
+      // ou o Playwright levando o botão para a tela) via o evento antigo chegar com o menu já aberto, e o menu fechava sozinho (e2e de 27/10/2026,
+      // `em-alta-hoje.spec.ts`: o botão ficou 25px abaixo da dobra). Sem mudança de posição desde a abertura, não houve rolagem a obedecer.
+      if (Math.abs(window.scrollY - rolagemAoAbrir) < 1) return;
       aoFecharRef.current();
     }
 
     document.addEventListener("keydown", aoTeclar);
     window.addEventListener("scroll", aoRolar, { passive: true });
     painelRef.current?.focus();
+    rolagemAoAbrir = window.scrollY;
 
     return () => {
       document.removeEventListener("keydown", aoTeclar);

@@ -160,7 +160,9 @@ export function MesConteudo({
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  onClick={() => ir(`/planejamento?visao=mes&mes=${anoMes}&dia=${dia.data}`)}
+                  // Um dia de ponta (do mês vizinho, que a grade mostra para não deixar buraco) leva ao mês dele: com `mes` do mês mostrado, a página não
+                  // acha o `dia` dentro dele e volta para hoje, e a pessoa tocava e nada acontecia (achado do e2e de 27/10/2026).
+                  onClick={() => ir(`/planejamento?visao=mes&mes=${dia.foraDoMes ? dia.data.slice(0, 7) : anoMes}&dia=${dia.data}`)}
                   onDragOver={(evento) => mover.aoPassarPorCimaDoDia(evento, dia.data, dia.passado)}
                   onDragLeave={(evento) => mover.aoSairDoDia(evento, dia.data)}
                   onDrop={(evento) => mover.aoSoltarNoDia(evento, dia.data, temConflito)}

@@ -282,6 +282,11 @@ test.describe("O calendário do mês (E39b, item e; E39c, parte 2a: aba Planejar
     const diaComRoteiro = somarDias(hoje, 5);
     const [ano, mes, dia] = diaComRoteiro.split("-").map(Number);
     const nomeMes = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date(Date.UTC(ano, mes - 1, dia, 12)));
+    // Daqui a 5 dias pode cair no mês seguinte (nos últimos 5 dias do mês), que a grade do mês de hoje nem sempre mostra: vai para o mês do dia.
+    if (!hoje.startsWith(diaComRoteiro.slice(0, 7))) {
+      await page.getByRole("button", { name: "Próximo mês" }).click();
+      await expect(page).toHaveURL(new RegExp(`mes=${diaComRoteiro.slice(0, 7)}`));
+    }
     await page.getByRole("button", { name: new RegExp(`, ${dia} de ${nomeMes}:`) }).click();
     await expect(page).toHaveURL(new RegExp(`dia=${diaComRoteiro}`));
     await expect(page.getByText("planejado para daqui a 5 dias")).toBeVisible();
@@ -289,6 +294,36 @@ test.describe("O calendário do mês (E39b, item e; E39c, parte 2a: aba Planejar
     // Sem "Voltar para hoje" no planejador: sair do calendário agora é trocar de aba.
     await page.getByRole("navigation", { name: "Navegação principal" }).getByRole("link", { name: "Hoje" }).click();
     await expect(page).toHaveURL(/\/hoje$/);
+  });
+
+  test("tocar num dia do mês vizinho que a grade mostra leva ao mês dele, com o dia selecionado", async ({ page }) => {
+    // A grade do mês termina nas semanas inteiras: o mês que não começa numa segunda mostra, no começo, os últimos dias do anterior. Pega o primeiro mês daqui para a frente assim,
+    // e põe o roteiro no último dia do mês de antes (que é hoje ou depois de hoje, nunca atrasado), para o teste valer em qualquer dia do ano.
+    const hoje = hojeISO();
+    let [ano, mes] = hoje.split("-").map(Number);
+    let primeiroDoMes: Date;
+    do {
+      mes += 1;
+      if (mes > 12) {
+        mes = 1;
+        ano += 1;
+      }
+      primeiroDoMes = new Date(Date.UTC(ano, mes - 1, 1, 12));
+    } while (primeiroDoMes.getUTCDay() === 1);
+    const ultimoDoAnterior = new Date(Date.UTC(ano, mes - 1, 0, 12));
+    const dataDaPonta = ultimoDoAnterior.toISOString().slice(0, 10);
+    const nomeDoAnterior = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(ultimoDoAnterior);
+
+    const { marcaId, email } = await criarMarca();
+    await criarRoteiro(marcaId, dataDaPonta, { titulo: "na ponta do mês anterior" });
+    await entrar(page, email);
+
+    await page.goto(`/planejamento?visao=mes&mes=${ano}-${String(mes).padStart(2, "0")}`);
+    await page.getByRole("button", { name: new RegExp(`, ${ultimoDoAnterior.getUTCDate()} de ${nomeDoAnterior}:`) }).click();
+
+    await expect(page).toHaveURL(new RegExp(`mes=${dataDaPonta.slice(0, 7)}&dia=${dataDaPonta}`));
+    await expect(page.getByRole("button", { name: new RegExp(`, ${ultimoDoAnterior.getUTCDate()} de ${nomeDoAnterior}:`) })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText("na ponta do mês anterior")).toBeVisible();
   });
 
   test("mês anterior e próximo mês navegam sem sair do calendário", async ({ page }) => {
