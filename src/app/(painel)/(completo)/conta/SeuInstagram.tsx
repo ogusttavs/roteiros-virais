@@ -206,6 +206,9 @@ function SemLigacao({ visao }: { visao: VisaoSeuInstagram }) {
       <p className={styles.explica}>{t.oQueLemos}</p>
       <p className={styles.explica}>{t.oQuePublicamos}</p>
       <p className={styles.explica}>{t.oQueNunca}</p>
+      <p className={styles.explica} data-parte="conta-profissional">
+        {t.contaProfissional}
+      </p>
       {visao.podeMexer ? (
         <a className={styles.ligar} href={CAMINHO_PARA_LIGAR}>
           {t.ligar}

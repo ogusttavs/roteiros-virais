@@ -8,14 +8,14 @@ export const dynamic = "force-dynamic";
 
 /**
  * E19 PR 1: o aviso de exclusão de dados da Meta (a URL cadastrada em "URL de solicitação de exclusão de dados" no aplicativo; `docs/meta/exclusao-de-dados-callback.md`). Quem chama é a
- * Meta, sem cookie (`middleware.ts` deixa passar); a autenticação é a assinatura do `signed_request` com o segredo do aplicativo, conferida antes de qualquer outra coisa.
+ * Meta, sem cookie (`middleware.ts` deixa passar); a autenticação é a assinatura do `signed_request` com o segredo do aplicativo (o do Facebook ou, E19b, o do Instagram), conferida antes de qualquer outra coisa.
  *
  * Respostas: 503 sem o segredo configurado (falha fechada); 400 com assinatura que não bate ou corpo sem `signed_request`; 200 com `{ url, confirmation_code }` quando atendeu (a Meta mostra
  * os dois à pessoa). O `signed_request` nunca é escrito em log.
  */
 export async function POST(req: NextRequest) {
-  if (!config.metaConexao.appSecret) {
-    logger.error("meta: META_APP_SECRET nao esta definido; aviso de exclusao recusado");
+  if (!config.metaConexao.appSecret && !config.metaConexao.instagram.appSecret) {
+    logger.error("meta: nem META_APP_SECRET nem META_IG_APP_SECRET estao definidos; aviso de exclusao recusado");
     return NextResponse.json({ ok: false }, { status: 503 });
   }
   let signedRequest: string | null = null;

@@ -137,12 +137,16 @@ export default defineConfig({
       STRIPE_WEBHOOK_SECRET: "whsec_e2e_nao_e_um_segredo_de_verdade",
       COBRANCA_ATIVA: "",
       /**
-       * E19 PR 2: a ligação do Instagram LIGADA no e2e, mas só contra a Meta simulada (nenhum destes dados é de verdade; o aplicativo da Meta de verdade nunca é tocado). A chave que
+       * E19 PR 2 e E19b: a ligação do Instagram (pela via do Instagram) LIGADA no e2e, mas só contra a Meta simulada (nenhum destes dados é de verdade; o aplicativo da Meta de verdade nunca é tocado). A chave que
        * cifra o acesso é de 32 bytes fixos e só de teste. `META_APP_APROVADO` fica vazio de propósito: a tela mostra o aviso de que a ligação direta ainda abre para poucas pessoas.
        */
-      META_APP_ID: "1000000000000001",
-      META_APP_SECRET: "segredo-do-app-so-de-teste-e2e",
-      META_LOGIN_CONFIG_ID: "2000000000000002",
+      META_IG_APP_ID: "1000000000000001",
+      META_IG_APP_SECRET: "segredo-do-app-do-instagram-so-de-teste-e2e",
+      // E19b: a via do Facebook (código antigo) fica desligada, como em produção; as variáveis dela ficam vazias.
+      META_APP_ID: "",
+      META_APP_SECRET: "",
+      META_LOGIN_CONFIG_ID: "",
+      META_VIA_FACEBOOK: "",
       META_TOKEN_CHAVE: Buffer.alloc(32, 7).toString("base64"),
       META_APP_APROVADO: "",
       META_SIMULADOR_E2E: `http://127.0.0.1:${portaMeta}`,

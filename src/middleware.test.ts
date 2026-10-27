@@ -77,6 +77,14 @@ describe("middleware", () => {
     expect(foiRedirecionada(middleware(requisicao("/dados/exclusao")))).toBe(false);
   });
 
+  it("E19b: so o arquivo de video que a Meta baixa passa sem cookie; o envio do video pela pessoa e o prefixo parecido continuam atras da sessao", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/api/publicar-arquivo/12.1792792153212.assinatura/video.mp4")))).toBe(false);
+    expect(foiRedirecionada(middleware(requisicao("/api/publicar/12/video")))).toBe(true);
+    expect(foiRedirecionada(middleware(requisicao("/api/publicar")))).toBe(true);
+    expect(foiRedirecionada(middleware(requisicao("/api/publicar-outra-coisa")))).toBe(true);
+  });
+
   it("outra rota de webhooks, ou o prefixo parecido, continua protegida", () => {
     vi.mocked(getSessionCookie).mockReturnValue(null);
     expect(foiRedirecionada(middleware(requisicao("/api/webhooks/outro")))).toBe(true);

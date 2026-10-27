@@ -3,12 +3,15 @@
  * locais; nunca a Meta de verdade). Prova, pelo que a pessoa vê: a folha com a legenda do roteiro já preenchida, o Reels do começo ao post publicado (o vídeo chega à Meta com o tamanho certo, o
  * "postei" vira automático e o botão da barra vira "Postado"), o Story sem legenda, o vídeo recusado pela Meta, o formato errado, a conta ligada sem a publicação liberada e quem é só membro.
  */
+import { existsSync } from "node:fs";
+
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import { account, briefings, clientes, contasConectadas, membrosMarca, nichos, preferenciasUsuario, publicacoes, roteiros, user, videosCliente, type ConteudoRoteiro } from "../../src/db/schema";
+import { caminhoDoVideo } from "../../src/lib/video-temporario";
 import { textosPublicar } from "../../src/textos/publicar";
 import { CONTA_PADRAO, iniciarMetaSimulada, TOKEN_LONGO_SIMULADO, type MetaSimulada } from "../fixtures/meta-simulada";
 
@@ -133,16 +136,24 @@ test.describe("Publicar no Instagram, no roteiro", () => {
     const ver = page.getByRole("link", { name: t.verNoInstagram });
     await expect(ver).toHaveAttribute("href", "https://www.instagram.com/reel/SIMULADOe2e/");
 
-    // O que a Meta recebeu: o contêiner retomável de Reels com a legenda editada, o vídeo inteiro (2048 bytes) e a publicação.
+    // O que a Meta recebeu (E19b, via do Instagram): o contêiner de Reels com a legenda editada e o ENDEREÇO do vídeo (nada de envio retomável), o vídeo baixado inteiro desse endereço (2048
+    // bytes, sem cookie) e a publicação. A chamada foi ao `graph.instagram.com` simulado.
     const contêiner = meta.chamadas.find((x) => x.metodo === "POST" && x.caminho.endsWith("/media"));
-    expect(contêiner?.parametros).toMatchObject({ media_type: "REELS", upload_type: "resumable", caption: "Minha legenda editada #louça", share_to_feed: "true" });
-    const envio = meta.chamadas.find((x) => x.caminho.startsWith("/rupload/"));
-    expect(envio).toMatchObject({ bytes: 2048, parametros: { offset: "0", file_size: "2048" } });
+    expect(contêiner?.caminho.startsWith("/graph-ig/")).toBe(true);
+    expect(contêiner?.parametros).toMatchObject({ media_type: "REELS", caption: "Minha legenda editada #louça", share_to_feed: "true", acessoRecebido: "sim" });
+    expect(contêiner?.parametros.video_url).toMatch(/\/api\/publicar-arquivo\/\d+\.\d+\.[\w-]+\/video\.mp4$/);
+    expect(contêiner?.parametros).not.toHaveProperty("upload_type");
+    expect(meta.chamadas.some((x) => x.caminho.startsWith("/rupload/"))).toBe(false);
+    expect(meta.chamadas.find((x) => x.caminho === "video_url")).toMatchObject({ bytes: 2048, parametros: { status: "200", tipo: "video/mp4" } });
     expect(meta.chamadas.filter((x) => x.caminho.endsWith("/media_publish"))).toHaveLength(1);
 
     // No banco: publicada, o roteiro postado com o link, e o vídeo na curva com a mídia da Meta.
     const [p] = await db().select().from(publicacoes).where(eq(publicacoes.clienteId, marca));
     expect(p).toMatchObject({ estado: "publicada", tipo: "reels", legenda: "Minha legenda editada #louça", permalink: "https://www.instagram.com/reel/SIMULADOe2e/", midiaId: "midia-simulada-1" });
+    // O vídeo guardado só para a Meta baixar já foi apagado, e o endereço público não serve mais.
+    expect(existsSync(caminhoDoVideo(p.id))).toBe(false);
+    const depois = await fetch(String(meta.chamadas.find((x) => x.caminho.endsWith("/media"))?.parametros.video_url));
+    expect(depois.status).toBe(404);
     const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, id));
     expect(roteiro).toMatchObject({ status: "postado", urlPostado: "https://www.instagram.com/reel/SIMULADOe2e/" });
     const [video] = await db().select().from(videosCliente).where(eq(videosCliente.roteiroId, id));
@@ -164,8 +175,7 @@ test.describe("Publicar no Instagram, no roteiro", () => {
     await folha.locator("input[type=file]").setInputFiles({ name: "grande.mp4", mimeType: "video/mp4", buffer: Buffer.alloc(doze, 3) });
     await folha.getByRole("button", { name: t.publicar }).click();
     await expect(page.getByText(t.publicada)).toBeVisible({ timeout: 60_000 });
-    const envio = meta.chamadas.find((x) => x.caminho.startsWith("/rupload/"));
-    expect(envio).toMatchObject({ bytes: doze, parametros: { offset: "0", file_size: String(doze) } });
+    expect(meta.chamadas.find((x) => x.caminho === "video_url")).toMatchObject({ bytes: doze, parametros: { status: "200" } });
   });
 
   test("Story: a escolha tira o campo da legenda e a Meta recebe um Story sem legenda", async ({ page }) => {
@@ -184,6 +194,8 @@ test.describe("Publicar no Instagram, no roteiro", () => {
     const contêiner = meta.chamadas.find((x) => x.metodo === "POST" && x.caminho.endsWith("/media"));
     expect(contêiner?.parametros.media_type).toBe("STORIES");
     expect(contêiner?.parametros).not.toHaveProperty("caption");
+    expect(contêiner?.parametros).not.toHaveProperty("upload_type");
+    expect(contêiner?.parametros.video_url).toContain("/api/publicar-arquivo/");
     const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, id));
     expect(roteiro.status).toBe("postado");
   });
@@ -204,6 +216,8 @@ test.describe("Publicar no Instagram, no roteiro", () => {
     await expect(page.getByRole("button", { name: t.tentarDeNovo })).toBeVisible();
     const [p] = await db().select().from(publicacoes).where(eq(publicacoes.clienteId, marca));
     expect(p.estado).toBe("falhou");
+    // A Meta não conseguiu baixar: o vídeo guardado para ela foi apagado.
+    expect(existsSync(caminhoDoVideo(p.id))).toBe(false);
     const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, id));
     expect(roteiro.status).toBe("gerado");
 
@@ -228,7 +242,7 @@ test.describe("Publicar no Instagram, no roteiro", () => {
   test("conta ligada sem a publicação liberada: a Conta avisa e a folha manda ligar de novo", async ({ page }) => {
     const id = await novoRoteiro("louça sem permissão");
     await entrar(page, DONO_EMAIL);
-    meta.cenario = { permissoesLiberadas: ["instagram_basic", "instagram_manage_insights", "pages_show_list", "pages_read_engagement"] };
+    meta.cenario = { permissoesLiberadas: ["instagram_business_basic", "instagram_business_manage_insights"] };
     await ligarInstagram(page);
     await expect(page.getByTestId("seu-instagram").locator("[data-parte='publicar']")).toHaveAttribute("data-publicar", "falta");
     await expect(page.getByTestId("seu-instagram").getByRole("link", { name: "Ligar de novo" })).toBeVisible();
