@@ -2,7 +2,7 @@
 
 import { Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import type { DataMarcada } from "@/config/datas";
 import type { DiaSemanaPlano, ItemSemanaPlano } from "@/servicos/roteiro";
@@ -16,6 +16,7 @@ import hojeStyles from "../hoje/HojeTela.module.css";
 import { MenuAcoesAgenda } from "../hoje/MenuAcoesAgenda";
 import { useDesfazerArquivar } from "../hoje/useDesfazerArquivar";
 
+import { diasComMovidos, idsJaConfirmados, useMovidosDeDia } from "./MovidosDeDia";
 import { useAbrirContarAgenda } from "./PlanejadorShell";
 import styles from "./SemanaTela.module.css";
 import { useMoverDeDia } from "./useMoverDeDia";
@@ -78,13 +79,19 @@ function perguntaSeConflitoSemana(dias: DiaSemanaPlano[], item: ItemSemanaPlano,
  * dia"), nunca uma segunda regra (`useMoverDeDia.ts`). Um sugerido continua sem jeito de mudar de
  * dia nesta rodada (hipótese já registrada na parte 2a).
  */
-export function SemanaConteudo({ dias, datas }: Props) {
+export function SemanaConteudo({ dias: diasDoServidor, datas }: Props) {
   const router = useRouter();
   const aoAbrirContarAgenda = useAbrirContarAgenda();
   const [ocupado, iniciarTransicao] = useTransition();
   const [diasExpandidos, setDiasExpandidos] = useState<Set<string>>(new Set());
   const { arquivar: arquivarComDesfazer, toast: toastArquivar } = useDesfazerArquivar();
   const mover = useMoverDeDia();
+  const { movidos, esquecer } = useMovidosDeDia();
+  // O item movido já aparece no dia novo; quando o servidor entrega a Semana com ele fora do dia de antes, o aviso local sai (`MovidosDeDia.tsx`).
+  const dias = diasComMovidos(diasDoServidor, movidos);
+  useEffect(() => {
+    esquecer(idsJaConfirmados(diasDoServidor, movidos));
+  }, [diasDoServidor, movidos, esquecer]);
 
   function ir(destino: string) {
     if (ocupado) return;
