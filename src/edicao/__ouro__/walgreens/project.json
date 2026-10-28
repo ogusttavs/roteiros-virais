@@ -1,0 +1,85 @@
+{
+ "name": "Walgreens - por dentro",
+ "format": "vertical",
+ "preset": "vlog",
+ "zoom_jumpcuts": 0,
+ "removals": [
+  [
+   78.6,
+   79.9,
+   "que tem sim (muleta solta)"
+  ]
+ ],
+ "caption_fixes": [
+  [
+   "a Greens",
+   "a Walgreens"
+  ],
+  [
+   "o Agroins",
+   "a Walgreens"
+  ],
+  [
+   "a Algrims",
+   "a Walgreens"
+  ],
+  [
+   "Da Game",
+   "da Gain"
+  ],
+  [
+   "Vou mandar",
+   "Vou andar"
+  ],
+  [
+   "os eletrolites",
+   "os eletrólitos"
+  ],
+  [
+   "essa marca líquida aqui",
+   "essa marca aqui, Liquid IV,"
+  ],
+  [
+   "congelados comida",
+   "congelados, comida"
+  ],
+  [
+   "dia a dia fone",
+   "dia a dia: fone"
+  ],
+  [
+   "Waterboy",
+   "WaterBoy"
+  ],
+  [
+   "eles tem",
+   "eles têm"
+  ],
+  [
+   "Que comporta",
+   "que comportam"
+  ],
+  [
+   "procuro",
+   "procure"
+  ],
+  [
+   "tudo o que",
+   "tudo que"
+  ],
+  [
+   "lojas são isso",
+   "lojas é isso"
+  ],
+  [
+   "health wellness",
+   "Health & Wellness"
+  ]
+ ],
+ "title": {
+  "text": "POR DENTRO DA WALGREENS",
+  "subtitle": "(farmácia americana)",
+  "duration": 3.5
+ },
+ "energia": "walgreens"
+}

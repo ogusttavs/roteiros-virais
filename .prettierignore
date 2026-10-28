@@ -4,3 +4,4 @@ drizzle/*.sql
 coverage
 playwright-report
 test-results
+src/edicao/__ouro__
