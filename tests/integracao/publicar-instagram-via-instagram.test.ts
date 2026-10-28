@@ -5,7 +5,7 @@
  * código certo, só enquanto a publicação vive), o arquivo apagado em cada fim possível, o isolamento entre marcas (o acesso de cada uma), só o dono, o "ver como", o limite do dia e que o acesso
  * nunca vai para log nem para a tabela. A via do Facebook tem os testes dela em `publicar-instagram.test.ts`.
  */
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -52,6 +52,7 @@ import { config } from "@/lib/config";
 import { cifrarToken, contextoDoToken } from "@/lib/meta-token";
 import { caminhoDoVideo, criarCodigoDoVideo, VALIDADE_DO_ENDERECO_MS } from "@/lib/video-temporario";
 import { cancelarEnvio, conferirPublicacao, iniciarPublicacao, receberVideo } from "@/servicos/publicar-instagram";
+import { fraseDeRecusa } from "@/textos/publicar";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -589,6 +590,81 @@ describe("quem pode publicar e o limite do dia", () => {
     expect(await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA }), deps())).toMatchObject({ ok: false, codigo: "acesso-perdido" });
     const [conta] = await db().select().from(contasConectadas).where(eq(contasConectadas.clienteId, marcaA));
     expect(conta.erro).toContain("Ligue de novo");
+  });
+});
+
+describe("dois envios do mesmo vídeo ao mesmo tempo (revisão do Fable de 27/10, achado 3)", () => {
+  const partesNaPasta = () => readdirSync(pasta).filter((n) => n.endsWith(".parte"));
+
+  it("o segundo, com o primeiro ainda subindo, recebe a recusa em língua de gente e não toca em nada: o primeiro termina, um só contêiner, o arquivo inteiro", async () => {
+    const dependencias = deps();
+    const inicio = await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA, tamanhoBytes: 10 }), dependencias);
+    if (!inicio.ok) throw new Error("nao iniciou");
+
+    let liberar!: () => void;
+    const portao = new Promise<void>((resolver) => (liberar = resolver));
+    let metade = false;
+    const primeiroCorpo = new ReadableStream<Uint8Array>({
+      async pull(controle) {
+        if (!metade) {
+          metade = true;
+          controle.enqueue(new Uint8Array([1, 1, 1, 1, 1]));
+          return;
+        }
+        await portao;
+        controle.enqueue(new Uint8Array([1, 1, 1, 1, 1]));
+        controle.close();
+      },
+    });
+    const entradaBase = { usuarioId: "pv-dono-a", clienteId: marcaA, publicacaoId: inicio.publicacaoId, tamanhoDoPedido: 10 };
+    const primeiro = receberVideo({ ...entradaBase, corpo: primeiroCorpo }, dependencias);
+    // Espera o primeiro estar de fato gravando.
+    for (let i = 0; i < 100 && partesNaPasta().length === 0; i += 1) await new Promise((resolver) => setTimeout(resolver, 20));
+    expect(partesNaPasta()).toHaveLength(1);
+
+    const segundo = await receberVideo({ ...entradaBase, corpo: fluxoDe([2, 2, 2, 2, 2, 2, 2, 2, 2, 2]) }, dependencias);
+    expect(segundo).toMatchObject({ ok: false, codigo: "envio-em-curso", status: 409 });
+    if (!segundo.ok) expect(segundo.frase).toBe(fraseDeRecusa("envio-em-curso"));
+    // O segundo não derrubou a publicação, não abriu contêiner e não mexeu no arquivo.
+    expect((await linha(inicio.publicacaoId)).estado).toBe("enviando");
+    expect(dasChamadas("container")).toHaveLength(0);
+    expect(existsSync(caminhoDoVideo(inicio.publicacaoId))).toBe(false);
+    expect(partesNaPasta()).toHaveLength(1);
+
+    liberar();
+    expect(await primeiro).toEqual({ ok: true });
+    expect(await linha(inicio.publicacaoId)).toMatchObject({ estado: "processando", containerId: "container-ig-1" });
+    expect(dasChamadas("container")).toHaveLength(1);
+    expect(readFileSync(caminhoDoVideo(inicio.publicacaoId))).toEqual(Buffer.alloc(10, 1));
+    expect(partesNaPasta()).toHaveLength(0);
+
+    // A reserva se soltou: um terceiro envio depois do fim é recusado pelo estado (já processando), não pela reserva, e não apaga o vídeo.
+    const terceiro = await receberVideo({ ...entradaBase, corpo: fluxoDe([3, 3, 3, 3, 3, 3, 3, 3, 3, 3]) }, dependencias);
+    expect(terceiro).toMatchObject({ ok: false, codigo: "em-andamento", status: 409 });
+    expect(existsSync(caminhoDoVideo(inicio.publicacaoId))).toBe(true);
+  });
+
+  it("dois PUT disparados juntos pela rota: um recebe 200, o outro 409, um só contêiner e o vídeo intacto", async () => {
+    const inicio = await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA, tamanhoBytes: 400_000 }), deps());
+    if (!inicio.ok) throw new Error("nao iniciou");
+    entrar("pv-dono-a");
+    const pedidoRota = (n: number): [Request, { params: Promise<{ id: string }> }] => {
+      const init: RequestInit & { duplex?: string } = {
+        method: "PUT",
+        headers: { "content-type": "video/mp4", "content-length": "400000" },
+        body: new Uint8Array(400_000).fill(n) as BodyInit,
+        duplex: "half",
+      };
+      return [new Request(`http://localhost/api/publicar/${inicio.publicacaoId}/video`, init), { params: Promise.resolve({ id: String(inicio.publicacaoId) }) }];
+    };
+    const [a, b] = await Promise.all([enviarVideoRota(...pedidoRota(1)), enviarVideoRota(...pedidoRota(2))]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    expect(dasChamadas("container")).toHaveLength(1);
+    expect((await linha(inicio.publicacaoId)).estado).toBe("processando");
+    const bytes = readFileSync(caminhoDoVideo(inicio.publicacaoId));
+    expect(bytes.length).toBe(400_000);
+    expect(new Set(bytes).size).toBe(1);
+    expect(partesNaPasta()).toHaveLength(0);
   });
 });
 
