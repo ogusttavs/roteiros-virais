@@ -299,12 +299,24 @@ export const clientes = pgTable("clientes", {
    */
   redePrincipal: text("rede_principal").$type<Plataforma>(),
   /**
+   * E61 PR 1 (28/10/2026): o foco da conta dentro do setor ("sobre o que você fala e para quem", ex.: "marketing e automação com IA para donos de pequena empresa"). A pesquisa continua por setor; o foco
+   * é o que faz o roteiro (PR 1) e os temas do dia (PR 2) puxarem para o assunto desta conta e não de todas as do setor. Três estados, todos por estas colunas: sem foco (`foco` nulo, tudo como
+   * antes); sugerido e ainda sem resposta (`foco` preenchido, `focoOrigem = "sugerido"`, `focoConfirmadoEm` nulo: aparece na tela, NUNCA chega ao roteiro); e confirmado (`focoConfirmadoEm`
+   * preenchido, por "Está certo" ou porque a própria pessoa escreveu). Colunas próprias de propósito: `camadaExclusiva` é reescrita inteira a cada recompilação do briefing e apagaria o foco.
+   */
+  foco: text("foco"),
+  focoOrigem: text("foco_origem").$type<OrigemDoFoco>(),
+  focoConfirmadoEm: timestamp("foco_confirmado_em", { withTimezone: true }),
+  /**
    * E22 PR 1 (22/10/2026): marca que usa sem pagar (a do Gustavo, a do Bruno, as de teste). Só vale quando o portão da cobrança está ligado
    * (`COBRANCA_ATIVA`): ligado, a marca sem assinatura ativa e sem cortesia vai para `/assinar`. Quem liga e desliga é o admin, em `/admin/clientes/[id]`.
    */
   cortesia: boolean("cortesia").notNull().default(false),
   criadoEm: criadoEm(),
 });
+
+/** E61 PR 1: de onde veio o foco da conta. "sugerido" nasceu da IA (mesmo depois de a pessoa dizer "Está certo"); "escrito" é o que a pessoa digitou ou corrigiu. */
+export type OrigemDoFoco = "sugerido" | "escrito";
 
 /** "dono" criou a marca e nao perde o acesso pela tela; "membro" foi convidado (V3, item 1). */
 export type PapelMarca = "dono" | "membro";

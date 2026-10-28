@@ -73,7 +73,9 @@ export type TarefaIA =
   /** E54: confere a premissa que a pessoa escreveu contra os dados achados e, se falta a posição dela, pergunta em uma frase. */
   | "conferirPremissa"
   /** Melhoria da E53 (23/10/2026): de 3 a 6 palavras de busca para um assunto de notícias que a pessoa escreveu e o catálogo não tem. */
-  | "sugerirPalavrasDoAssunto";
+  | "sugerirPalavrasDoAssunto"
+  /** E61 PR 1 (28/10/2026): uma frase de foco da conta (o assunto e o público dentro do setor), sugerida a partir do briefing para a pessoa confirmar. */
+  | "sugerirFoco";
 
 export type ImagemEntrada = {
   base64: string;

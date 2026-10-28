@@ -266,7 +266,7 @@ describe("o roteiro longo escrito", () => {
 
     const geracoes = await geracoesDa("roteiroLongo");
     expect(geracoes).toHaveLength(1);
-    expect(geracoes[0].versaoPrompt).toBe("1.5.0");
+    expect(geracoes[0].versaoPrompt).toBe("1.6.0");
     expect(roteiro.geracaoId).toBe(geracoes[0].id);
 
     const capitulos = roteiro.conteudo.capitulos!;

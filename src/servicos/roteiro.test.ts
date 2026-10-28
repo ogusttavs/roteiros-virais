@@ -128,6 +128,44 @@ describe("formatarCamadaExclusiva", () => {
     expect(texto).toContain("Sobre @marca_propria: o que mais rende são os bastidores.");
   });
 
+  /** E61 PR 1: o foco da conta entra primeiro, mas só o que a pessoa confirmou. */
+  it("foco confirmado: a primeira linha diz o foco e que ele manda no assunto e no público", () => {
+    const texto = formatarCamadaExclusiva({
+      alcance: "brasil",
+      regiao: null,
+      pais: null,
+      paises: null,
+      camadaExclusiva: CAMADA_VAZIA,
+      foco: "marketing e automação com IA, para donos de pequena empresa",
+      focoOrigem: "escrito",
+      focoConfirmadoEm: new Date("2026-10-28T12:00:00Z"),
+    });
+    expect(texto.startsWith("Foco desta conta, escolhido pela própria pessoa")).toBe(true);
+    expect(texto).toContain("marketing e automação com IA, para donos de pequena empresa");
+    expect(texto).toContain("Brasil inteiro");
+  });
+
+  it("foco só sugerido (sem a confirmação da pessoa): não entra no roteiro", () => {
+    const texto = formatarCamadaExclusiva({
+      alcance: null,
+      regiao: null,
+      pais: null,
+      paises: null,
+      camadaExclusiva: CAMADA_VAZIA,
+      foco: "marketing e automação com IA, para donos de pequena empresa",
+      focoOrigem: "sugerido",
+      focoConfirmadoEm: null,
+    });
+    expect(texto).not.toContain("Foco desta conta");
+    expect(texto).not.toContain("marketing");
+  });
+
+  it("sem foco: o texto é o de antes desta etapa", () => {
+    const base = { alcance: null, regiao: null, pais: null, paises: null, camadaExclusiva: CAMADA_VAZIA } as const;
+    expect(formatarCamadaExclusiva({ ...base, foco: null, focoOrigem: null, focoConfirmadoEm: null })).toBe(formatarCamadaExclusiva(base));
+    expect(formatarCamadaExclusiva(base)).toBe("nenhum dado exclusivo deste cliente registrado ainda.");
+  });
+
   it("o YouTube guarda o @ no handle: a linha sai com um arroba só, nunca '@@'", () => {
     const texto = formatarCamadaExclusiva(
       { alcance: null, regiao: null, pais: null, paises: null, camadaExclusiva: CAMADA_VAZIA },

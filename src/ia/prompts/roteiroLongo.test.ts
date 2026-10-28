@@ -34,7 +34,7 @@ const entrada = (extra: Partial<Parameters<typeof roteiroLongo.montarEntrada>[0]
 
 describe("o prompt do roteiro longo", () => {
   it("é uma tarefa própria, no modelo forte, com versão", () => {
-    expect(roteiroLongo.versao).toBe("1.5.0");
+    expect(roteiroLongo.versao).toBe("1.6.0");
     expect(roteiroLongo.nivel).toBe("forte");
   });
 

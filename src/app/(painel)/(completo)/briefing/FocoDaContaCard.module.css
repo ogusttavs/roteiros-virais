@@ -1,0 +1,83 @@
+/**
+ * "O foco da sua conta" (E61 PR 1). Mesmos tokens e mesmo desenho do cartão "O que a IA tirou das suas redes e do seu site" (`ContextoMarcaCard.module.css`): nada de visual novo.
+ */
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+}
+
+.pergunta {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+}
+
+.ajuda {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.dica {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  line-height: 1.3;
+  color: var(--cor-texto-dica);
+}
+
+.foco {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-titulo);
+  /* O texto foi digitado ou veio da IA: um link ou uma cadeia sem espaço não pode alargar a página no celular. */
+  overflow-wrap: anywhere;
+}
+
+.corpo {
+  display: grid;
+  min-width: 0;
+  gap: var(--espaco-2);
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+}
+
+.confirmado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-positivo);
+}
+
+/* Dito só por voz (leitor de tela): o cartão muda no lugar e o foco do teclado fica onde estava. */
+.somenteLeitorDeTela {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

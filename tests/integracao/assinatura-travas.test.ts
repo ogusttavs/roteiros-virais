@@ -34,6 +34,7 @@ const { favoritarAction } = await import("@/app/(painel)/(completo)/referencias/
 const { salvarRascunhoAction: salvarRascunhoDoOnboarding } = await import("@/app/comecar/acoes");
 const { organizarFalaBriefingAction } = await import("@/app/(painel)/_briefing/acoes");
 const { sugerirPalavrasAction } = await import("@/app/(painel)/(completo)/noticias/acoes");
+const { sugerirFocoAction } = await import("@/app/(painel)/(completo)/briefing/acoes");
 const { POST: transcrever } = await import("@/app/api/transcrever/route");
 const { GET: pdf } = await import("@/app/api/roteiros/[id]/pdf/route");
 const { GET: imagem } = await import("@/app/api/roteiros/[id]/imagem/route");
@@ -132,6 +133,7 @@ const ACOES_QUE_GASTAM: Array<[string, () => Promise<unknown>]> = [
   ["reprovarERescreverAction (reescrever o roteiro)", () => reprovarERescreverAction(1, [] as never)],
   ["organizarFalaBriefingAction (IA sobre a fala)", () => organizarFalaBriefingAction("p1", "texto falado")],
   ["sugerirPalavrasAction (palavras do assunto das Notícias)", () => sugerirPalavrasAction("feira de adoção")],
+  ["sugerirFocoAction (foco da conta, E61)", () => sugerirFocoAction()],
   ["avaliarRespostaAction do onboarding, com o briefing completo", () => avaliarRespostaDoBriefing("p1", "x")],
 ];
 

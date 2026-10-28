@@ -261,6 +261,50 @@ export const textosBriefing = {
    * estados vazio, lendo e "não deu", "Tirar", os erros) é montado com o que existe e fica
    * registrado para o Opus desenhar depois (regra 11).
    */
+  /**
+   * E61 PR 1 (28/10/2026): "o foco da sua conta". A pesquisa é do setor; o foco é o que a conta fala dentro dele. A pergunta é do Gustavo, palavra por palavra. Só o foco confirmado chega aos roteiros.
+   */
+  focoDaConta: {
+    titulo: "O foco da sua conta",
+    pergunta: "Dentro do seu setor, sobre o que você fala e para quem?",
+    ajuda: "Uma frase. Com o foco dito, os seus roteiros falam do seu assunto e com o seu público, e não do setor inteiro.",
+    exemplo: "Por exemplo: marketing e automação com inteligência artificial, para donos de pequena empresa.",
+    semFoco: "Você ainda não disse o foco. Os seus roteiros falam do setor em geral até você dizer.",
+    campo: "O foco da sua conta",
+    campoMarcador: "Sobre o que eu falo, e para quem",
+    contador: (usados: number, maximo: number): string => `${usados} de ${maximo} caracteres`,
+    sugerir: "Sugerir um foco para mim",
+    sugerindo: "Lendo o seu briefing...",
+    sugerirOutro: "Sugerir outro",
+    escreverEu: "Escrever eu mesmo",
+    salvar: "Salvar o foco",
+    cancelar: "Cancelar",
+    corrigir: "Corrigir",
+    estaCerto: "Está certo",
+    tirar: "Tirar o foco",
+    sugestaoTitulo: "A gente sugere, a partir do seu briefing:",
+    sugestaoAviso: "Enquanto você não confirma, a sugestão não entra nos seus roteiros.",
+    confirmadoPorVoce: "Confirmado por você",
+    escritoPorVoce: "Escrito por você",
+    confirmadoAviso: "Os seus roteiros puxam para este assunto e falam com este público.",
+    anuncioConfirmado: "Foco confirmado.",
+    anuncioSalvo: "Foco guardado.",
+    anuncioTirado: "Foco tirado.",
+    anuncioSugerido: "Sugestão de foco pronta para você conferir.",
+    textoCurto: (minimo: number): string => `Escreva um pouco mais: o foco precisa de pelo menos ${minimo} caracteres.`,
+    textoLongo: (maximo: number): string => `Passou de ${maximo} caracteres. Encurte um pouco: o foco é uma frase.`,
+    mudouEnquantoLia: "A sugestão mudou enquanto você olhava. Confira o texto novo e confirme de novo.",
+    erroSugerir: "Não conseguimos sugerir agora. Tente de novo em instantes, ou escreva o foco você mesmo.",
+    erroSugerirLimite: "Você já pediu muitas sugestões hoje. Escreva o foco você mesmo ou tente de novo amanhã.",
+    erroSugerirSemBriefing: "Para a gente sugerir, termine antes o seu briefing. Ou escreva o foco você mesmo.",
+    erroConfirmar: "Não conseguimos confirmar agora. Tente de novo em instantes.",
+    erroSalvar: "Não conseguimos guardar agora. O que você escreveu continua aí; tente de novo em instantes.",
+    erroTirar: "Não conseguimos tirar agora. Tente de novo em instantes.",
+    semConexaoSugerir: "Sem conexão. Não deu para sugerir; tente de novo quando a rede voltar.",
+    semConexaoConfirmar: "Sem conexão. Não deu para confirmar; tente de novo quando a rede voltar.",
+    semConexaoSalvar: "Sem conexão. Não deu para guardar; o que você escreveu continua aí, tente de novo quando a rede voltar.",
+    semConexaoTirar: "Sem conexão. Não deu para tirar; tente de novo quando a rede voltar.",
+  },
   contextoDaMarca: {
     titulo: "O que a IA tirou das suas redes e do seu site",
     abertura:

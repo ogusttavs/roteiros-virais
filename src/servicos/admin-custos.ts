@@ -43,6 +43,7 @@ export const ROTULO_DA_TAREFA: Record<string, string> = {
   pesquisaNaHora: "Pesquisar na hora (busca na web)",
   conferirPremissa: "Pesquisar na hora (conferir a premissa)",
   sugerirPalavrasDoAssunto: "Sugerir palavras para um assunto das Notícias",
+  sugerirFoco: "Sugerir o foco da conta",
 };
 
 export function rotuloDaTarefa(tarefa: string): string {

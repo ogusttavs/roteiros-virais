@@ -56,6 +56,10 @@ ${params.sistemaVariavel ?? ""}`);
   if (params.tarefa === "sugerirPalavrasDoAssunto" && params.entrada.includes("[mock:sugerir-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
+  // E61 PR 1: o modelo barato que sugere o foco da conta fora do ar; a tela diz que não deu e a pessoa escreve o foco.
+  if (params.tarefa === "sugerirFoco" && params.entrada.includes("[mock:foco-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
   // E17 parte 1: o modelo barato que escolhe a prova do tema livre fora do ar; a prova volta a ser a da busca por palavra.
   if (params.tarefa === "reordenarEvidencia" && params.entrada.includes("[mock:reordenar-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
@@ -147,6 +151,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockConferirPremissa(entrada);
     case "sugerirPalavrasDoAssunto":
       return mockSugerirPalavrasDoAssunto(entrada);
+    case "sugerirFoco":
+      return mockSugerirFoco(entrada);
     case "pesquisaNaHora":
       // A busca na web não é saída estruturada: ela tem a própria porta (`busca-na-web.ts`, simulada em `mock-busca.ts`).
       throw new ErroIA('a tarefa "pesquisaNaHora" nao usa saida estruturada; use buscarNaWeb()');
@@ -862,6 +868,17 @@ function mockSugerirPalavrasDoAssunto(entrada: string) {
   const soltas = assunto.split(/\s+/).filter((palavra) => palavra.length >= 4);
   const palavras = [...new Set([assunto, ...soltas, `${assunto} hoje`, `notícias de ${assunto}`].map((p) => p.slice(0, 40)))];
   return { palavras: palavras.slice(0, 5) };
+}
+
+/**
+ * E61 PR 1: o foco sugerido, determinístico. Pega o ramo da entrada e devolve uma frase com assunto e público; "[mock:foco-fora]" faz a IA falhar e "[mock:foco-ruim]" devolve uma frase com
+ * jargão (o código reprova nas duas tentativas), para os testes do caminho de erro.
+ */
+function mockSugerirFoco(entrada: string) {
+  if (entrada.includes("[mock:foco-ruim]")) return { foco: "aumentar o engajamento dos donos de empresa" };
+  const ramo = /Ramo \(o setor da conta\): (.*)/.exec(entrada)?.[1]?.trim() ?? "o seu ramo";
+  const anterior = entrada.includes("A sugestão anterior foi esta");
+  return { foco: anterior ? `${ramo}, com outro recorte, para quem está começando` : `${ramo}, para donos de pequena empresa` };
 }
 
 function mockResumirNoticia(entrada: string) {
