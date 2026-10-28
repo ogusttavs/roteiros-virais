@@ -227,6 +227,8 @@ test.describe("planejador, mover de dia por arrasto (E39c, parte 2b)", () => {
     const origem = page.getByRole("listitem").filter({ hasText: "o item que vai ser arrastado" });
     const destino = page.getByRole("button", { name: new RegExp(`\\b${Number(DIA_VAZIO.slice(8))} de ${nomeDoMes(DIA_VAZIO)}`, "i") });
     await expect(origem).toBeVisible();
+    // Hidratada antes de arrastar, como nos testes da Semana: o arrasto que começa antes dos manipuladores existirem não faz nada.
+    await page.waitForLoadState("networkidle");
 
     await origem.dragTo(destino);
 
