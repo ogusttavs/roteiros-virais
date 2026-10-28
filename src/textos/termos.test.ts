@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { IDADE_MAXIMA_MS, VALIDADE_DO_ENDERECO_MS } from "../lib/video-temporario";
 import {
   MAXIMO_FRACAO_DE_UMA_MARCA,
   MINIMO_DONOS_DO_PADRAO,
@@ -65,9 +66,44 @@ describe("a versão dos termos", () => {
     expect(VERSAO_TERMOS_EM.getTime()).toBeLessThanOrEqual(Date.now());
   });
 
-  it("a data dita na página é a da versão (23/10, meia-noite de Brasília)", () => {
-    expect(textosTermos.atualizadoEm).toBe("atualizado em 23 de outubro de 2026");
-    expect(VERSAO_TERMOS_EM.toISOString()).toBe("2026-10-23T03:00:00.000Z");
+  it("a data dita na página é a da versão (27/10, meia-noite de Brasília) e é mais nova que a de 23/10, para quem aceitou aquela ver o aceite de novo", () => {
+    expect(textosTermos.atualizadoEm).toBe("atualizado em 27 de outubro de 2026");
+    expect(VERSAO_TERMOS_EM.toISOString()).toBe("2026-10-27T03:00:00.000Z");
+    expect(VERSAO_TERMOS_EM.getTime()).toBeGreaterThan(new Date("2026-10-23T03:00:00Z").getTime());
+  });
+});
+
+describe("publicar pelo app, a cópia temporária do vídeo e como retirar o acesso (27/10/2026)", () => {
+  const termos = paragrafosDe(textosTermos.termos.secoes).join("\n");
+  const privacidade = paragrafosDe(textosTermos.privacidade.secoes).join("\n");
+  const dados = paragrafosDe(textosTermos.dados.secoes).join("\n");
+
+  it("os termos não dizem mais que o aplicativo não publica nada: dizem que só publica quando a pessoa toca em publicar", () => {
+    expect(termos).not.toContain("não publica nada em seu nome");
+    expect(termos).toContain("só publica no seu Instagram se você ligar a sua conta e tocar em publicar, vídeo por vídeo");
+    expect(termos).toContain("sem esse toque, nada é publicado em seu nome");
+  });
+
+  it("a privacidade diz o que acontece com o vídeo: até seis horas, só para o Instagram buscar, apagado quando a publicação termina, falha ou é cancelada", () => {
+    expect(privacidade).toContain("fica guardado no nosso servidor por até seis horas, só para o Instagram buscá-lo");
+    expect(privacidade).toContain("apagado assim que a publicação termina, falha ou é cancelada");
+    expect(privacidade).toContain("no máximo, seis horas");
+  });
+
+  it("as seis horas do texto são as do código que varre o vídeo esquecido, e o endereço vale menos que isso", () => {
+    expect(IDADE_MAXIMA_MS).toBe(6 * 60 * 60 * 1000);
+    expect(VALIDADE_DO_ENDERECO_MS).toBeLessThan(IDADE_MAXIMA_MS);
+  });
+
+  it("retirar o acesso: pelo Instagram (Configurações, Apps e sites) na privacidade e na exclusão, e o caminho do Facebook continua para quem ligou pela forma antiga", () => {
+    expect(privacidade).toContain("Configurações, depois Apps e sites");
+    expect(dados).toContain("no Instagram, abra Configurações, depois Apps e sites");
+    expect(dados).toContain("Se você ligou pela forma antiga, com o Facebook");
+    expect(dados).toContain("Aplicativos e sites");
+  });
+
+  it("a exclusão apaga também o vídeo que ainda esteja guardado para publicar", () => {
+    expect(dados).toContain("qualquer vídeo que ainda esteja guardado para publicar");
   });
 });
 

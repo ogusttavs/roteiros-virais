@@ -219,6 +219,55 @@ test.describe("aceite dos termos no primeiro acesso", () => {
     expect(depois.horaLembrete).toBe("07:30");
   });
 
+  /**
+   * 27/10/2026: a versao que corrige as tres linhas sobre publicar pelo app, a copia temporaria do video e como retirar o acesso. Quem aceitou a de 23/10 (a anterior,
+   * por exemplo no dia 24) ve a folha de novo UMA vez e depois nao e perguntado mais.
+   */
+  test("a versao de 27/10 pede aceite de novo de quem aceitou a de 23/10, uma vez so", async ({ page }) => {
+    const id = "e2e-aceite-termos-versao-2310";
+    const email = "e2e-aceite-termos-versao-2310@exemplo.teste";
+    const [existe] = await db().select({ id: user.id }).from(user).where(eq(user.id, id));
+    if (!existe) {
+      const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
+      await db().insert(user).values({ id, name: "[teste] Aceite Termos 23/10", email });
+      await db()
+        .insert(account)
+        .values({ id: `${id}-credential`, issuer: "local:credential", accountId: id, providerId: "credential", userId: id, password: await hashPassword(SENHA) });
+      const [cliente] = await db().insert(clientes).values({ usuarioId: id, nome: "[teste] Aceite Termos 23/10", nichoId: nicho.id }).returning();
+      await db().insert(membrosMarca).values({ usuarioId: id, clienteId: cliente.id, papel: "dono" });
+      await db().insert(briefings).values({ clienteId: cliente.id, completo: true });
+    }
+    const aceitouAntes = new Date("2026-10-24T15:00:00Z");
+    await db()
+      .insert(preferenciasUsuario)
+      .values({ usuarioId: id, aceitouTermosEm: aceitouAntes })
+      .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { aceitouTermosEm: aceitouAntes } });
+
+    await entrar(page, email);
+    await expect(page).toHaveURL(/\/hoje/);
+    await expect(page.getByRole("heading", { name: "Antes de entrar" })).toBeVisible();
+    await page.getByRole("button", { name: "li e aceito" }).click();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Antes de entrar" })).not.toBeVisible();
+
+    const [depois] = await db().select().from(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, id));
+    expect(depois.aceitouTermosEm!.getTime()).toBeGreaterThan(new Date("2026-10-27T03:00:00Z").getTime());
+  });
+
+  test("as paginas dizem que o app so publica quando a pessoa toca, que o video fica ate seis horas e como retirar o acesso pelo Instagram", async ({ page }) => {
+    await page.goto("/termos");
+    await expect(page.getByText("sem esse toque, nada é publicado em seu nome", { exact: false })).toBeVisible();
+
+    await page.goto("/privacidade");
+    await expect(page.getByText("por até seis horas, só para o Instagram buscá-lo")).toBeVisible();
+
+    await page.goto("/dados");
+    await expect(page.getByText("no Instagram, abra Configurações, depois Apps e sites")).toBeVisible();
+  });
+
   test("a pagina dos termos traz a clausula do que circula entre marcas", async ({ page }) => {
     await page.goto("/termos");
     await expect(page.getByText("circula o padrão, nunca o que é seu")).toBeVisible();
@@ -231,7 +280,7 @@ test.describe("aceite dos termos no primeiro acesso", () => {
     const guardamos = "o que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou";
 
     await page.goto("/termos");
-    await expect(page.getByText("atualizado em 23 de outubro de 2026")).toBeVisible();
+    await expect(page.getByText("atualizado em 27 de outubro de 2026")).toBeVisible();
     await expect(page.getByText(leitura)).toBeVisible();
 
     await page.goto("/privacidade");

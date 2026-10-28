@@ -29,11 +29,17 @@ import { config } from "@/lib/config";
  * subir a versão (o Instagram ligado, E19, e quem pede para testar, E57a). Esta é a única subida de versão para tudo isso: cada pessoa aceita de novo uma
  * vez. O instante é a meia-noite de Brasília de 23/10, anterior ao deploy.
  */
-export const VERSAO_TERMOS_EM = new Date("2026-10-23T03:00:00Z");
+/**
+ * 27/10/2026 (revisão do Fable, achado 1): três linhas que contradiziam o que o aplicativo faz desde a E56 e a E19b. Os termos diziam que o aplicativo não publica nada em nome da
+ * pessoa (agora publica, mas só quando ela toca em publicar); a privacidade não falava da cópia temporária do vídeo (guardada até 6 horas, `lib/video-temporario.ts`); e o caminho para
+ * retirar o acesso só existia pelo Facebook (agora também pelo Instagram). Esta é a subida de versão para tudo isso: cada pessoa aceita de novo uma vez. O instante é a meia-noite de
+ * Brasília de 27/10, anterior ao deploy.
+ */
+export const VERSAO_TERMOS_EM = new Date("2026-10-27T03:00:00Z");
 
 export const textosTermos = {
   avisoRevisaoPendente: "texto base, revisão jurídica pendente",
-  atualizadoEm: "atualizado em 23 de outubro de 2026",
+  atualizadoEm: "atualizado em 27 de outubro de 2026",
   voltar: "voltar",
 
   termos: {
@@ -42,7 +48,7 @@ export const textosTermos = {
       {
         titulo: "1. O que você contrata",
         paragrafos: [
-          `Uma assinatura mensal que entrega, todo dia, temas e roteiros para você gravar vídeos sobre o seu negócio. Você grava, edita e publica; ${config.appName} não publica nada em seu nome.`,
+          `Uma assinatura mensal que entrega, todo dia, temas e roteiros para você gravar vídeos sobre o seu negócio. Você grava e edita. O ${config.appName} só publica no seu Instagram se você ligar a sua conta e tocar em publicar, vídeo por vídeo, na tela do roteiro; sem esse toque, nada é publicado em seu nome.`,
           "Os roteiros são sugestões escritas com ajuda de inteligência artificial, a partir do que você respondeu no briefing e da pesquisa do seu nicho. Quem decide o que vai para o vídeo, grava e publica é sempre você.",
         ],
       },
@@ -83,7 +89,8 @@ export const textosTermos = {
         paragrafos: [
           "O briefing (as respostas sobre o seu negócio), os roteiros gerados para você, e os links dos vídeos que você marca como postado. Guardamos também os perfis que você informa em Conta (Instagram, TikTok, YouTube).",
           "Guardamos também o que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou.",
-          "Se você ligar o seu Instagram ao aplicativo (em Conta), guardamos o nome da conta, o acesso que a Meta nos dá para ler os números dos seus vídeos (cifrado, nunca à vista) e esses números: visualizações, curtidas e comentários. Usamos só para acompanhar o desempenho dos seus vídeos. Você desliga quando quiser, em Conta, e desligar apaga o acesso na hora.",
+          "Se você ligar o seu Instagram ao aplicativo (em Conta), guardamos o nome da conta, o acesso que a Meta nos dá para ler os números dos seus vídeos e para publicar na sua conta quando você pedir (cifrado, nunca à vista) e esses números: visualizações, curtidas e comentários. Usamos só para acompanhar o desempenho dos seus vídeos e para publicar o que você mandar publicar. Você desliga quando quiser, em Conta, e desligar apaga o acesso na hora. Também pode retirar o acesso pelo próprio Instagram: Configurações, depois Apps e sites.",
+          "Quando você toca em publicar pelo aplicativo, o vídeo fica guardado no nosso servidor por até seis horas, só para o Instagram buscá-lo, por um endereço com código que não dá para adivinhar e que vale por poucas horas. Ele é apagado assim que a publicação termina, falha ou é cancelada, e o que sobrar por algum problema nosso é apagado em, no máximo, seis horas. Depois disso, não guardamos cópia do vídeo.",
         ],
       },
       {
@@ -132,14 +139,14 @@ export const textosTermos = {
         titulo: "1. Como pedir a exclusão",
         paragrafos: [
           `Escreva para ${config.emailContato}, do mesmo e-mail que você usa para entrar na plataforma, pedindo a exclusão dos seus dados.`,
-          "Se você ligou o seu Instagram, também pode pedir pela própria Meta: no Facebook, abra Configurações e privacidade, depois Configurações, depois Aplicativos e sites, remova este aplicativo e peça a exclusão dos dados. Recebemos o pedido sozinhos, apagamos a ligação e você vê a confirmação em uma página que a Meta mostra.",
+          "Se você ligou o seu Instagram, também pode retirar o acesso pela própria Meta: no Instagram, abra Configurações, depois Apps e sites, e remova este aplicativo. O acesso deixa de valer na hora; para apagar também os dados que guardamos, escreva para o contato acima. Se você ligou pela forma antiga, com o Facebook, abra no Facebook Configurações e privacidade, depois Configurações, depois Aplicativos e sites, remova este aplicativo e peça a exclusão dos dados: recebemos o pedido sozinhos, apagamos a ligação e você vê a confirmação em uma página que a Meta mostra.",
         ],
       },
       {
         titulo: "2. O que é apagado",
         paragrafos: [
           "O briefing (as respostas sobre o seu negócio), os roteiros gerados para você, os perfis informados em Conta (Instagram, TikTok, YouTube) e os links dos vídeos que você marcou como postado. O que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou também é apagado.",
-          "Se você ligou o seu Instagram: o acesso guardado, o nome da conta ligada e os números dos seus vídeos que lemos por essa ligação.",
+          "Se você ligou o seu Instagram: o acesso guardado, o nome da conta ligada, os números dos seus vídeos que lemos por essa ligação e qualquer vídeo que ainda esteja guardado para publicar.",
         ],
       },
       {
