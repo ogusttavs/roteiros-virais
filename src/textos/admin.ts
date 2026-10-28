@@ -500,7 +500,7 @@ export const textosAdmin = {
     colunaStatus: "estado",
     /** V8, item 3: de onde veio a ultima medida do video postado (nulo em branco: nao postado, ou medido antes desta etapa). */
     colunaFonte: "fonte da medida",
-    fonteRotulo: { youtube: "youtube", apify: "apify", meta: "meta" },
+    fonteRotulo: { youtube: "youtube", apify: "apify", meta: "meta", ytdlp: "yt-dlp" },
     vazioRoteiros: "nenhum roteiro ainda",
     /** E27 parte 2, item 5: "O que ele já reprovou", AdminCliente.dc.html. So leitura. */
     aprendizadoTitulo: "o que ele já reprovou",
