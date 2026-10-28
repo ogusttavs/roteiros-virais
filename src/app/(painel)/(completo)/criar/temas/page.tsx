@@ -16,7 +16,7 @@ import { perguntasDaTelaSemFalha } from "@/servicos/vozes-do-publico";
 import { textosHoje } from "@/textos/hoje";
 import type { EvidenciaTema, FonteNoticiaTema } from "@/ui/componentes/TemaCartao";
 
-import { avisoSemTema } from "./aviso-sem-tema";
+import { avisoSemTema, deveRenovarTemaVelho } from "./aviso-sem-tema";
 import { TemasTela } from "./TemasTela";
 
 function paraEvidenciaTema(resumo: EvidenciaResumo | null): EvidenciaTema | null {
@@ -90,6 +90,10 @@ export default async function Temas({ searchParams }: Props) {
   const podePedirTema =
     resultado.status === "sem_tema" && cliente.nichoId !== null && !("aindaLendo" in estadoDoRamo && (estadoDoRamo.aindaLendo || estadoDoRamo.semBase));
   const gerando = podePedirTema ? (await pedirTemaDeHoje(cliente.nichoId!)) === "gerando" : false;
+  // A pessoa que volta depois de o ramo ficar parado (27/10/2026: 5 dias sem abrir o aplicativo) vê o tema que ainda vale e o de hoje é pedido em silêncio; a próxima abertura já o traz.
+  if (cliente.nichoId !== null && deveRenovarTemaVelho(resultado, hojeISO(), new Date(), dataInicial)) {
+    await pedirTemaDeHoje(cliente.nichoId);
+  }
   // E55 PR 2b: o assunto em alta hoje (o tema do momento) sai da lista comum e vira o cartão, só para hoje: quem escolhe o tema para outro dia (`?data=`) não o recebe.
   const emAlta = resultado.status === "ok" && (!dataInicial || dataInicial === hojeISO()) ? await cartaoEmAltaSemFalha(cliente, hojeISO()) : null;
   // Se o dia só tinha o assunto do momento e o cartão não vem (já foi usado e arquivado, ou se escolhe para outro dia), a lista ficaria em branco: o aviso entra no lugar, com o caminho do assunto próprio.

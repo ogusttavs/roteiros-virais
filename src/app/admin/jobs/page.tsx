@@ -67,7 +67,7 @@ function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[], agora: Date): E
 function resultadoEmFrase(e: ExecucaoResumo | undefined, proxy: ProxyParado | null, ramosComTemaDoMomento = 0): string {
   if (!e) return t.rotinas.semExecucao;
   if (e.status === "erro") return fraseDoErro(e.erro);
-  // Os temas do dia só saem para ramo em uso (alguma marca gerou roteiro nos últimos 3 dias): o cartão diz quantos ramos tiveram tema e quantos ficaram sem uso.
+  // Os temas do dia só saem para ramo em uso (alguém abriu o aplicativo nos últimos 5 dias): o cartão diz quantos ramos tiveram tema e quantos ficaram sem uso.
   if (e.nome === "temas-do-dia" && typeof e.resumo?.semUso === "number" && typeof e.resumo?.nichos === "number") {
     const sem = e.resumo.semUso;
     // E55 PR 2c: o tema do momento nasce depois da leitura do que está em alta e entra no dia do ramo: o fim da frase diz quantos ramos o têm hoje.
