@@ -27,7 +27,6 @@ import {
   nichos,
   pesquisasNaHora,
   preferenciasUsuario,
-  roteiros,
   temasDia,
   user,
   videosCliente,
@@ -44,7 +43,7 @@ import { rodarLembrete } from "@/jobs/lembrete";
 import { rodarPesquisaNaHora } from "@/jobs/pesquisa-na-hora";
 import { atualizarTemasDoMomentoDosSetoresEmUso } from "@/jobs/tema-do-momento";
 import { rodarTemasDoDia, setoresEmUso } from "@/jobs/temas-do-dia";
-import { config, hojeISO } from "@/lib/config";
+import { config } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { marcaPodeReceberTarefa, separarMarcasPorAssinatura } from "@/servicos/assinatura-tarefas";
 
@@ -69,16 +68,8 @@ async function assinar(clienteId: number, status: "active" | "trialing" | "cance
   });
 }
 
-async function roteiroHaDias(clienteId: number, dias: number): Promise<void> {
-  await db().insert(roteiros).values({
-    clienteId,
-    data: hojeISO(),
-    tema: "t",
-    origem: "livre",
-    objetivo: "reconhecimento",
-    conteudo: { gancho: "g", corpo: "c", fechamento: "f", chamadaFinal: "x" },
-    criadoEm: new Date(Date.now() - dias * DIA),
-  } as never);
+async function acessoHaDias(clienteId: number, dias: number): Promise<void> {
+  await db().update(clientes).set({ ultimoAcessoEm: new Date(Date.now() - dias * DIA) }).where(eq(clientes.id, clienteId));
 }
 
 function cobranca(ligada: boolean): void {
@@ -115,7 +106,7 @@ beforeAll(async () => {
   await assinar(marca.mistoPaga, "trialing", new Date(Date.now() + 5 * DIA));
 
   // Todas, menos a nova, usaram o aplicativo ontem: o ramo delas está "em uso".
-  for (const chave of ["sem", "cortesia", "ativa", "vencida", "mistoSem", "mistoPaga"] as Chave[]) await roteiroHaDias(marca[chave], 1);
+  for (const chave of ["sem", "cortesia", "ativa", "vencida", "mistoSem", "mistoPaga"] as Chave[]) await acessoHaDias(marca[chave], 1);
 }, 60_000);
 
 afterEach(() => {

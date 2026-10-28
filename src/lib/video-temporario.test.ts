@@ -1,7 +1,7 @@
 /**
  * E19b: o vídeo guardado por pouco tempo para a Meta baixar (`lib/video-temporario.ts`), em disco de verdade (uma pasta só deste teste) e sem rede.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -78,6 +78,60 @@ describe("guardar o vídeo em disco", () => {
     expect(existsSync(caminhoDoVideo(5))).toBe(false);
     await expect(descartarVideo(5)).resolves.toBeUndefined();
     expect(await tamanhoDoVideoGuardado(5)).toBeNull();
+  });
+});
+
+describe("dois envios do mesmo vídeo (revisão do Fable de 27/10, achado 3)", () => {
+  const nomesNaPasta = () => readdirSync(process.env.PUBLICAR_PASTA_TEMP as string);
+
+  it("grava num arquivo temporário e só renomeia no fim: no meio do envio o endereço servido ainda não existe", async () => {
+    let liberar!: () => void;
+    const portao = new Promise<void>((resolver) => (liberar = resolver));
+    let primeira = true;
+    const emDois = new ReadableStream<Uint8Array>({
+      async pull(controle) {
+        if (primeira) {
+          primeira = false;
+          controle.enqueue(new Uint8Array(10).fill(7));
+          return;
+        }
+        await portao;
+        controle.enqueue(new Uint8Array(10).fill(8));
+        controle.close();
+      },
+    });
+    const gravando = guardarVideo(20, emDois, 20);
+    await new Promise((resolver) => setTimeout(resolver, 50));
+    expect(existsSync(caminhoDoVideo(20))).toBe(false);
+    expect(nomesNaPasta().some((n) => /^pub-20\.[0-9a-f]{12}\.parte$/.test(n))).toBe(true);
+    liberar();
+    await gravando;
+    expect(readFileSync(caminhoDoVideo(20)).length).toBe(20);
+    expect(nomesNaPasta().filter((n) => n.startsWith("pub-20."))).toEqual(["pub-20.video"]);
+  });
+
+  it("um envio que falha apaga só o próprio arquivo temporário, nunca o vídeo inteiro que outro envio já deixou", async () => {
+    await guardarVideo(21, fluxo([new Uint8Array(6).fill(1)]), 6);
+    await expect(guardarVideo(21, fluxo([new Uint8Array(3).fill(2)]), 6)).rejects.toThrow("menor do que o declarado");
+    expect(readFileSync(caminhoDoVideo(21))).toEqual(Buffer.alloc(6, 1));
+    expect(nomesNaPasta().filter((n) => n.startsWith("pub-21."))).toEqual(["pub-21.video"]);
+  });
+
+  it("dois gravando ao mesmo tempo no mesmo número: o arquivo fica sempre inteiro, sem sobra", async () => {
+    await Promise.all([guardarVideo(22, fluxo([new Uint8Array(500_000).fill(1)]), 500_000), guardarVideo(22, fluxo([new Uint8Array(500_000).fill(2)]), 500_000)]);
+    const bytes = readFileSync(caminhoDoVideo(22));
+    expect(bytes.length).toBe(500_000);
+    expect(new Set(bytes).size).toBe(1);
+    expect(nomesNaPasta().filter((n) => n.startsWith("pub-22."))).toEqual(["pub-22.video"]);
+  });
+
+  it("a varredura também leva embora o temporário esquecido por um processo que caiu", async () => {
+    const orfao = join(process.env.PUBLICAR_PASTA_TEMP as string, "pub-23.0123456789ab.parte");
+    writeFileSync(orfao, "x");
+    const velho = new Date(Date.now() - IDADE_MAXIMA_MS - 60_000);
+    utimesSync(orfao, velho, velho);
+    expect(await varrerVideosVelhos(new Date())).toBeGreaterThanOrEqual(1);
+    expect(existsSync(orfao)).toBe(false);
   });
 });
 

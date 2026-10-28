@@ -27,6 +27,7 @@ export type CodigoDeRecusa =
   | "legenda-marcacoes"
   | "limite"
   | "em-andamento"
+  | "envio-em-curso"
   | "ja-publicado"
   | "nao-comecou"
   | "nao-achou";
@@ -68,6 +69,7 @@ export const textosPublicar = {
     "legenda-marcacoes": `A legenda marca mais de ${LIMITES_DA_LEGENDA.marcacoes} pessoas com @, o máximo do Instagram. Tire algumas.`,
     limite: "O Instagram só deixa publicar um número de posts por dia nesta conta, e esse limite foi usado. Tente de novo amanhã.",
     "em-andamento": "Este roteiro já está sendo publicado. Espere terminar.",
+    "envio-em-curso": "Este vídeo já está sendo enviado. Espere terminar, sem tocar de novo, que a tela avisa quando acabar.",
     "ja-publicado": "Este roteiro já foi publicado nesta conta.",
     "nao-comecou": "Não deu para começar a publicação agora. Tente de novo em um minuto.",
     "nao-achou": "Não achamos essa publicação.",

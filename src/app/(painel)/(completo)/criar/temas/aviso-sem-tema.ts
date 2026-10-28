@@ -53,3 +53,22 @@ export function avisoSemTema(
     ? { titulo: textosHoje.semTemaDepoisTitulo, texto: textosHoje.semTemaDepois }
     : { titulo: textosHoje.vazioTitulo, texto: textosHoje.vazio };
 }
+
+/**
+ * Decisão do Gustavo em 27/10/2026: o ramo que ficou 5 dias sem ninguém abrir o aplicativo não ganha tema de madrugada (`setoresEmUso`). Quando alguém volta, o tema de hoje não existe
+ * e, se o ramo teve tema nos últimos 3 dias, a tela mostra o dele (regra de estabilidade, `temasDoDiaOuRecente`): uma tela cheia de tema velho não é "vazia", mas também não é o de hoje.
+ * Esta regra diz quando, além de mostrar o antigo, vale pedir o de hoje em silêncio: a tela é a de hoje (sem `?data=`), o tema que ela mostra não é de hoje, e a hora já passou das 06:30
+ * (antes disso o de ontem é o esperado e a rodada da madrugada ainda vai chegar). O pedido em si (`pedirTemaDeHoje`) não duplica: só sai sem linha de hoje, e uma vez por 10 minutos.
+ * O caso sem tema nenhum não passa por aqui: ele pede sempre e mostra "estamos escolhendo os temas".
+ */
+export function deveRenovarTemaVelho(
+  resultado: ResultadoTemasHoje | { status: "erro" },
+  hoje: string,
+  agora: Date,
+  dataInicial?: string,
+): boolean {
+  if (resultado.status !== "ok") return false;
+  if (dataInicial && dataInicial !== hoje) return false;
+  if (resultado.dataUsada === hoje) return false;
+  return horaMinutoAtualISO(agora) >= HORA_TEMAS_PRONTOS;
+}
