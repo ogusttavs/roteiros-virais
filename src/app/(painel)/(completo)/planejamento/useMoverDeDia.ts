@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition, type DragEvent } from "react";
 
 import type { FormatoRoteiro } from "@/db/schema";
@@ -30,7 +29,6 @@ type ItemArrastavel = { id: number; tipo: FormatoRoteiro; titulo: string };
  * passado ou o próprio dia de origem).
  */
 export function useMoverDeDia() {
-  const router = useRouter();
   const [itemArrastando, setItemArrastando] = useState<(ItemArrastavel & { deData: string }) | null>(null);
   const [diaAlvo, setDiaAlvo] = useState<string | null>(null);
   const [pendente, setPendente] = useState<(ItemArrastavel & { paraData: string }) | null>(null);
@@ -71,8 +69,10 @@ export function useMoverDeDia() {
     setErro(null);
     iniciarTransicao(async () => {
       try {
+        // Sem `router.refresh()` aqui: a ação já revalida `/planejamento` (`revalidarAgenda`), e o Next.js reexecuta a tela como parte da resposta dela. Um refresh
+        // a mais disputa a mesma transição com essa revalidação e, com o servidor rápido da CI, a tela ficava presa no dia antigo (o mesmo achado do PR #47,
+        // `useTrocarMarca.ts`). Um caminho só.
         dadoOuErro(await mudarDataAtrasadoAction(item.id, paraData));
-        router.refresh();
       } catch (falha) {
         // A frase de recusa do servidor ("Não muda de dia: ...") chega inteira; qualquer outra falha cai no texto de sempre.
         setErro(falha instanceof ErroDeAcao ? falha.message : textosHoje.agenda.planejador.erroMover);
