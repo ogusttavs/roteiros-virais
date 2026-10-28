@@ -183,7 +183,7 @@ export const textosRotinasAdmin = {
     tentarDeNovo: "Rodar agora",
     falhouEm: (nome: string, quando: string, frase: string) => `${nome.charAt(0).toUpperCase()}${nome.slice(1)} falhou ${quando}. ${frase}`,
     temasDoDia: (comTema: number, semUso: number) => `${comTema === 1 ? "1 ramo com tema" : `${comTema} ramos com tema`}, ${semUso === 1 ? "1 sem uso" : `${semUso} sem uso`}`,
-    semTemaPorFaltaDeUso: "sem tema hoje: ninguém gerou roteiro em 3 dias",
+    semTemaPorFaltaDeUso: "sem tema hoje: ninguém abriu o aplicativo em 5 dias",
     /** E55 PR 2c: o fim da frase da rotina que monta os temas do dia: quantos ramos ganharam um tema do momento hoje (a lista do que está em alta, lida de graça, vira tema no mesmo dia). */
     temasDoMomento: (ramos: number) => `Hoje, ${ramos === 1 ? "1 ramo" : `${ramos} ramos`} com tema do momento.`,
     paradoNoLimite: "Parou no limite da Meta e continua na hora seguinte.",

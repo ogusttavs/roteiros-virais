@@ -552,16 +552,20 @@ async function gerarTemasDoNicho(
  * segurança de não piorar o que já está lá continua em `podeSobrescreverTemasDoDia`, que roda
  * de qualquer jeito na escrita.
  */
-/** Há quantos dias, no máximo, uma marca do setor precisa ter gerado roteiro para o setor ganhar tema de madrugada (decisão do Gustavo, 05/10/2026). */
-export const DIAS_DE_USO_PARA_TEMA = 3;
+/**
+ * Há quantos dias, no máximo, alguém com acesso a uma marca do setor pode ficar sem abrir o aplicativo para o setor continuar ganhando tema de madrugada. Decisão do Gustavo em
+ * 27/10/2026: conta acesso ao aplicativo (`clientes.ultimoAcessoEm`, gravado pelo layout do painel uma vez por dia por qualquer pessoa com acesso), não roteiro gerado, e a janela
+ * passou de 3 para 5 dias (05/10/2026 era "roteiro em 3 dias"; quem lê o tema mas ainda não gerou roteiro estava sendo tratado como parado).
+ */
+export const DIAS_DE_USO_PARA_TEMA = 5;
 
 /** A frase do resumo da rotina quando um setor fica sem tema por falta de uso (o cartão de Rotinas a mostra em língua de gente). */
-export const MOTIVO_SEM_USO = "sem tema hoje: ninguém gerou roteiro em 3 dias";
+export const MOTIVO_SEM_USO = "sem tema hoje: ninguém abriu o aplicativo em 5 dias";
 
 /**
- * Os setores "em uso": os que têm ao menos uma marca ATIVA com roteiro gerado nos últimos `DIAS_DE_USO_PARA_TEMA` dias (a marca conta pelo ramo principal e pelos alternativos que o
+ * Os setores "em uso": os que têm ao menos uma marca ATIVA que alguém abriu nos últimos `DIAS_DE_USO_PARA_TEMA` dias (a marca conta pelo ramo principal e pelos alternativos que o
  * admin ligou). Só esses ganham tema novo de madrugada (o tema é o item mais caro do dia e ninguém lê o de um setor que ninguém abre); a coleta, a transcrição, a extração e o modelo
- * do setor continuam todos os dias, porque a base não pode envelhecer. Quem abre o Hoje ou o Criar num setor sem tema gera na hora (`opts.aoAbrir`).
+ * do setor continuam todos os dias, porque a base não pode envelhecer. Quem abre os temas ou o Criar num setor sem tema gera na hora (`opts.aoAbrir`, `pedirTemaDeHoje`).
  */
 export async function setoresEmUso(agora: Date = new Date()): Promise<Set<number>> {
   return (await setoresEmUsoComContagem(agora)).setores;
@@ -573,19 +577,17 @@ export async function setoresEmUso(agora: Date = new Date()): Promise<Set<number
  */
 export async function setoresEmUsoComContagem(agora: Date = new Date()): Promise<{ setores: Set<number>; marcasPuladasPorAssinatura: number; idsDasMarcasPuladas: number[] }> {
   const desde = new Date(agora.getTime() - DIAS_DE_USO_PARA_TEMA * 24 * 60 * 60 * 1000);
-  const marcasComRoteiro = db()
-    .selectDistinct({ clienteId: roteiros.clienteId })
-    .from(roteiros)
-    .where(gte(roteiros.criadoEm, desde));
+  // Acesso ao aplicativo da marca inteira: qualquer pessoa com acesso que abriu o painel (a visita do admin no "ver como" não grava, `layout.tsx`).
+  const marcasComAcesso = db().select({ clienteId: clientes.id }).from(clientes).where(gte(clientes.ultimoAcessoEm, desde));
   const principais = await db()
     .selectDistinct({ id: clientes.id, nichoId: clientes.nichoId })
     .from(clientes)
-    .where(and(eq(clientes.ativo, true), isNotNull(clientes.nichoId), inArray(clientes.id, marcasComRoteiro)));
+    .where(and(eq(clientes.ativo, true), isNotNull(clientes.nichoId), inArray(clientes.id, marcasComAcesso)));
   const alternativos = await db()
     .selectDistinct({ id: clientes.id, nichoId: ramosDaConta.nichoId })
     .from(ramosDaConta)
     .innerJoin(clientes, eq(clientes.id, ramosDaConta.clienteId))
-    .where(and(eq(clientes.ativo, true), inArray(clientes.id, marcasComRoteiro)));
+    .where(and(eq(clientes.ativo, true), inArray(clientes.id, marcasComAcesso)));
   const { liberadas, puladas } = await separarMarcasPorAssinatura([...principais, ...alternativos].map((l) => l.id), { agora });
   const setores = new Set([...principais, ...alternativos].filter((l) => liberadas.has(l.id)).map((l) => l.nichoId).filter((id): id is number => id !== null));
   return { setores, marcasPuladasPorAssinatura: puladas.length, idsDasMarcasPuladas: puladas };
@@ -676,7 +678,7 @@ export async function rodarTemasDoDia(
     // Hotfix de 23/10/2026: quantos temas do dia nasceram de notícia (completam o que a prova de vídeo não fechou).
     deNoticia,
     falhas,
-    // Os setores que ficaram sem tema novo por falta de uso (ninguém gerou roteiro em 3 dias): o admin vê quantos em Rotinas.
+    // Os setores que ficaram sem tema novo por falta de uso (ninguém abriu o aplicativo em 5 dias): o admin vê quantos em Rotinas.
     semUso,
     ...resumoDasMarcasPuladas(marcasPuladasPorAssinatura),
     temasDoMomento,

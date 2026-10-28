@@ -78,7 +78,7 @@ beforeAll(async () => {
   const [semUso] = await db().insert(nichos).values({ slug: "tendencias-sem-uso", nome: "Setor parado", termos: [] }).returning();
   nichoSemUsoId = semUso.id;
   await db().insert(user).values({ id: "tendencias-usuario", name: "Marca", email: "tendencias@exemplo.teste" });
-  const [cliente] = await db().insert(clientes).values({ usuarioId: "tendencias-usuario", nome: "Marca", nichoId }).returning();
+  const [cliente] = await db().insert(clientes).values({ usuarioId: "tendencias-usuario", nome: "Marca", nichoId, ultimoAcessoEm: new Date() }).returning();
   clienteId = cliente.id;
   await db()
     .insert(briefings)
