@@ -8,6 +8,7 @@ import type { AvaliacaoResposta, PerfilCompilado, TipoMarca } from "@/db/schema"
 import type { RegraCliente } from "@/servicos/aprendizado";
 import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
 import type { SecaoContextoMarca } from "@/servicos/contexto-marca";
+import type { FocoParaATela } from "@/servicos/foco-da-conta";
 import type { PerfilAnalisadoComTipo } from "@/servicos/perfis-analisados";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
@@ -21,6 +22,7 @@ import { avaliarRespostaAction, salvarRascunhoAction } from "./acoes";
 import { AprendizadoCard } from "./AprendizadoCard";
 import styles from "./BriefingVivo.module.css";
 import { ContextoMarcaCard } from "./ContextoMarcaCard";
+import { FocoDaContaCard } from "./FocoDaContaCard";
 import { PerfisAnalisadosCard } from "./PerfisAnalisadosCard";
 
 type Props = {
@@ -32,6 +34,8 @@ type Props = {
   perfisAnalisados: PerfilAnalisadoComTipo[];
   /** E38 PR 2: "o que a IA tirou das suas redes e do seu site", para confirmar ou corrigir. */
   contextoMarca: SecaoContextoMarca;
+  /** E61 PR 1: o foco da conta ("sobre o que você fala e para quem"), com o estado em que está. */
+  foco: FocoParaATela;
   meta: number;
   tipo: TipoMarca;
   /** E44 PR 2: os tipos de vídeo da marca e quando o cliente respondeu ("3 de outubro"), para o cartão editável no lugar. */
@@ -74,6 +78,7 @@ export function BriefingVivo({
   regrasIniciais,
   perfisAnalisados,
   contextoMarca,
+  foco,
   meta,
   tipo,
   tiposIniciais,
@@ -142,6 +147,9 @@ export function BriefingVivo({
               <p className={styles.perfilRodape}>{textosBriefing.briefing.perfilRodape}</p>
             </Cartao>
           ) : null}
+
+          {/* E61 PR 1: o foco da conta, logo depois de "Como o sistema te entende": é o que a pessoa diz de si dentro do setor. */}
+          <FocoDaContaCard inicial={foco} />
 
           {/* Depois de "Como o sistema te entende", antes do aprendizado: a ordem do desenho aprovado (`Briefing.dc.html`). */}
           <ContextoMarcaCard secao={contextoMarca} />

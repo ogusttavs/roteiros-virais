@@ -7,6 +7,7 @@ import { regrasDoCliente } from "@/servicos/aprendizado";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { secaoDoCliente } from "@/servicos/contexto-marca";
+import { focoParaATela } from "@/servicos/foco-da-conta";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { leiturasDoCliente } from "@/servicos/perfis-analisados";
 
@@ -43,6 +44,7 @@ export default async function Briefing() {
       regrasIniciais={regras}
       perfisAnalisados={perfisAnalisados}
       contextoMarca={contextoMarca}
+      foco={focoParaATela(cliente)}
       meta={config.regras.notaMinimaBriefing}
       tipo={cliente.tipo}
       tiposIniciais={tipos.map((t) => ({ chave: t.chave, ligada: t.ligada }))}

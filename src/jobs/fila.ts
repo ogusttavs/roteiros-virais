@@ -236,13 +236,15 @@ export function garantirBossPronto(): Promise<void> {
  * mecanismo de deduplicacao da lib (singletonKey), para o criterio ficar
  * explicito e facil de testar.
  */
-export async function existeJobPendente(nome: string, nichoId?: number): Promise<boolean> {
+export async function existeJobPendente(nome: string, nichoId?: number, opcoes?: { semClienteId?: boolean }): Promise<boolean> {
   // Sem `nichoId` (o disparo para todos os ramos): vale um pendente que também seja para todos. Com ele: um pendente daquele ramo.
+  // E61 PR 2: `semClienteId` deixa de fora o pedido de uma conta só (os temas da conta, `{ nichoId, clienteId }`): ele não é o tema do ramo.
   const resultado = await db().execute(sql`
     select 1
     from pgboss.job
     where name = ${nome}
       and ${nichoId === undefined ? sql`(data is null or data ->> 'nichoId' is null)` : sql`(data ->> 'nichoId')::int = ${nichoId}`}
+      and ${opcoes?.semClienteId ? sql`(data is null or data ->> 'clienteId' is null)` : sql`true`}
       and state in ('created', 'retry', 'active')
     limit 1
   `);

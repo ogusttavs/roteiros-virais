@@ -73,6 +73,7 @@ import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { desempenhoDaConta } from "./desempenho-da-conta";
 import { montarEntregaDaPesquisa, paraEntradaDaPesquisa } from "./entrega-da-pesquisa";
+import { focoConfirmado, focoParaOPrompt } from "./foco-da-conta";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { noticiaPorId } from "./noticias";
 import { diaPorExtenso } from "./noticias-assuntos";
@@ -495,10 +496,15 @@ function resolverQuemAparece(override: QuemGrava | undefined, cliente: Cliente):
 export type LeituraPerfilExclusiva = { handle: string; leitura: string };
 
 export function formatarCamadaExclusiva(
-  cliente: Pick<Cliente, "alcance" | "regiao" | "pais" | "paises" | "camadaExclusiva">,
+  cliente: Pick<Cliente, "alcance" | "regiao" | "pais" | "paises" | "camadaExclusiva"> & Partial<Pick<Cliente, "foco" | "focoOrigem" | "focoConfirmadoEm">>,
   leiturasPerfis: LeituraPerfilExclusiva[] = [],
 ): string {
   const linhas: string[] = [];
+  // E61 PR 1: o foco da conta (o assunto e o público que a PESSOA confirmou dentro do setor) vem primeiro e manda no assunto; uma sugestão sem resposta nunca entra (`focoConfirmado`).
+  const foco = focoConfirmado(cliente);
+  if (foco) {
+    linhas.push(`Foco desta conta, escolhido pela própria pessoa (o assunto e o público dela dentro do ramo): ${focoParaOPrompt(foco)}. O roteiro puxa para este assunto e fala com este público, sem inventar fato que não esteja na entrada.`);
+  }
   if (cliente.alcance === "local" && cliente.regiao) {
     linhas.push(`Região: ${cliente.regiao}.`);
   } else if (cliente.alcance === "brasil") {

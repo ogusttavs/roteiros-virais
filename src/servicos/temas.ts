@@ -39,6 +39,7 @@ import { avisoLinhaEditorial, fraseAvisoLinhaEditorial } from "./linha-editorial
 import { diaPorExtenso } from "./noticias-assuntos";
 import { noticiasQueTocamOTema } from "./noticias-do-tema";
 import { objetivoQueRendeNaConta, ordenarTemasPeloQueRende } from "./ordem-dos-temas";
+import { hashDoFoco, temasDaContaDeHoje } from "./temas-da-conta";
 import { assuntoEmAltaDaLista, listaDeTendenciasDeAgora, temasQueAindaValem, tendenciasQueTocamOTema } from "./tendencias";
 import { listaDePlataformas, perguntaDoPublicoPelaChave } from "./vozes-do-publico";
 
@@ -228,11 +229,27 @@ export async function pedirTemaDeHoje(nichoId: number, data: string = hojeISO())
   if (jaTentou) return "nao";
   try {
     await garantirBossPronto();
-    if (await existeJobPendente(FILAS.temasDoDia, nichoId)) return "gerando";
+    if (await existeJobPendente(FILAS.temasDoDia, nichoId, { semClienteId: true })) return "gerando";
     const id = await boss().send(FILAS.temasDoDia, { nichoId, aoAbrir: true }, { singletonKey: `tema-ao-abrir-${nichoId}`, singletonSeconds: 600 });
     return id === null ? "nao" : "gerando";
   } catch (erro) {
     logger.error({ err: erro, nichoId }, "nao foi possivel pedir o tema de hoje ao abrir a tela");
+    return "nao";
+  }
+}
+
+/**
+ * E61 PR 2: a pessoa confirmou ou mudou o foco no meio do dia, e os temas dela precisam nascer na hora (no máximo uma vez por foco a cada 10 minutos). Enfileira o mesmo job dos temas do dia só para
+ * esta conta (`{ nichoId, clienteId }`): ele não mexe nos temas do setor. Nunca derruba quem chama: fila fora do ar é só "não pediu", e a conta segue lendo os temas do setor até o job rodar.
+ */
+export async function pedirTemasDaConta(clienteId: number, nichoId: number | null, foco: string): Promise<"gerando" | "nao"> {
+  if (nichoId === null) return "nao";
+  try {
+    await garantirBossPronto();
+    const id = await boss().send(FILAS.temasDoDia, { nichoId, clienteId, aoAbrir: true }, { singletonKey: `tema-da-conta-${clienteId}-${hashDoFoco(foco)}`, singletonSeconds: 600 });
+    return id === null ? "nao" : "gerando";
+  } catch (erro) {
+    logger.error({ err: erro, clienteId }, "nao foi possivel pedir os temas da conta depois de mudar o foco");
     return "nao";
   }
 }
@@ -267,12 +284,18 @@ export async function temasParaCliente(cliente: Cliente, data: string = hojeISO(
 
   if (!cliente.nichoId) return { status: "sem_tema", constancia };
 
-  const [achado, historico, objetivoQueRende] = await Promise.all([
+  const [achadoDoSetor, historico, objetivoQueRende, daConta] = await Promise.all([
     temasDoDiaOuRecente(cliente.nichoId, data),
     historicoDeObjetivos(cliente.id),
     objetivoQueRendeNaConta(cliente.id),
+    // E61 PR 2: a conta com foco confirmado lê os temas escritos para o foco dela, quando a linha de hoje existe e é do foco de agora; senão, os do setor, como sempre (nada some, nada quebra).
+    temasDaContaDeHoje(cliente, data),
   ]);
 
+  // O tema do momento é do setor e do dia (E55): vem junto da lista da conta, porque ela não o copia.
+  const achado = daConta
+    ? { temas: [...daConta, ...(achadoDoSetor?.dataUsada === data ? achadoDoSetor.temas.filter((t) => t.doMomento) : [])], dataUsada: data }
+    : achadoDoSetor;
   if (!achado) return { status: "sem_tema", constancia };
 
   // E16 PR 4: a lista e o texto são do setor; só a ordem é da marca, pelo objetivo que mais rendeu na conta dela (sem dado suficiente, a ordem é a do setor). A linha editorial, abaixo, mexe depois

@@ -315,7 +315,11 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * pelo papel, nunca pelo nome ("duas figuras eleitorais muito conhecidas"); quem grava escolhe as pessoas e continua no quadro, comentando. O SCHEMA NÃO MUDOU (a sugestão mora em `edicao.recursos` e na cena que
  * a usa): o do roteiro curto está sem folga na gramática da API.
  */
-export const versao = "2.23.0";
+/**
+ * 2.24.0 (E61 PR 1, 28/10/2026, o foco da conta): a camada exclusiva ganha, quando a pessoa confirmou um foco ("sobre o que você fala e para quem", dentro do setor), a linha "Foco desta conta", e o
+ * título do bloco diz que ela manda no assunto e no público. Sem foco confirmado o bloco é o da 2.23.0, palavra por palavra, fora o título. O schema de saída não muda.
+ */
+export const versao = "2.24.0";
 
 /**
  * E59: o bloco da entrada que liga a prova visual com imagem de outro (`R-ROTEIRO-20`). Só entra quando `motivosDaProvaVisualDeOutro` devolve algum motivo; sem motivo, nada entra e a regra do sistema
@@ -711,7 +715,8 @@ Perfil do cliente:
 ${dados.perfilCompilado}${blocoRegrasCliente}${blocoDesempenhoDaConta}
 
 O que só este cliente tem (cidade, concorrentes, perfis que admira; use quando fizer sentido
-no gancho ou na chamada final, nunca force):
+no gancho ou na chamada final, nunca force). Quando houver a linha "Foco desta conta", ela manda
+no assunto e no público do roteiro:
 ${dados.camadaExclusiva}
 
 Modelo do nicho:

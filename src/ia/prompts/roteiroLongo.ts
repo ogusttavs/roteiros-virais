@@ -60,7 +60,11 @@ import {
  * 1.5.0 (E59, 22/10/2026): o sistema ganha a regra de conformidade nova `R-CONF-10` (nunca nome de candidato nem de partido; imagem de pessoa pública só com quem grava no quadro e sem sugerir apoio), que vem
  * pela tabela da seção 11 (`regras-copy-roteiro.ts` 1.2.0) e que o verificador aplica também aqui. A prova visual com imagem de outro (`R-ROTEIRO-20`) NÃO entra no roteiro longo: só no Reels falado.
  */
-export const versao = "1.5.0";
+/**
+ * 1.6.0 (E61 PR 1, 28/10/2026, o foco da conta): o mesmo do roteiro curto (2.24.0). A camada exclusiva ganha a linha "Foco desta conta" quando a pessoa confirmou um foco, e o título do bloco diz
+ * que ela manda no assunto e no público. O schema de saída não muda.
+ */
+export const versao = "1.6.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -237,7 +241,7 @@ ${pedidoPorQueDosBlocos("longo")}
 Perfil do cliente:
 ${dados.perfilCompilado}${blocoRegrasCliente}${blocoDesempenhoDaConta}
 
-O que só este cliente tem (cidade, concorrentes, perfis que admira; use quando fizer sentido, nunca force):
+O que só este cliente tem (cidade, concorrentes, perfis que admira; use quando fizer sentido, nunca force). Quando houver a linha "Foco desta conta", ela manda no assunto e no público do roteiro:
 ${dados.camadaExclusiva}
 
 Modelo do nicho (os vídeos curtos do ramo; a duração e a estrutura do vídeo longo vêm da entrada):

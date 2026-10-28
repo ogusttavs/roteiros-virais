@@ -56,6 +56,7 @@ import { listaDeTendenciasDeAgora, temasQueAindaValem } from "@/servicos/tendenc
 import { vozesDoSetor, vozesParaOPrompt, type VozNumerada } from "@/servicos/vozes-do-publico";
 
 import { atualizarTemaDoMomento } from "./tema-do-momento";
+import { gerarTemasDasContas, type FerramentasDosTemas, type ResumoDosTemasDasContas } from "./temas-do-dia-conta";
 
 const VINTE_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 /** Quantas notícias relevantes, no máximo, vão como evidência na chamada forte dos temas. */
@@ -116,6 +117,9 @@ async function tentarGerarTemas(dados: {
   noticiasCount: number;
   /** E28: as vozes que foram para a entrada, para traduzir de volta o número que o modelo devolveu. */
   vozes?: VozNumerada[];
+  /** E61 PR 2: os temas de UMA conta com foco (o custo vai para a conta); o hash do foco fica nas entradas, nunca o texto dele. */
+  clienteId?: number;
+  focoHash?: string;
 }): Promise<{ valido: boolean; temas: TemaDoDia[] }> {
   const resultado = await gerarEstruturado({
     tarefa: "temasDoDia",
@@ -140,8 +144,10 @@ async function tentarGerarTemas(dados: {
     versaoPrompt: temasDoDiaIA.versao,
     modelo: resultado.modelo,
     nivel: temasDoDiaIA.nivel,
+    clienteId: dados.clienteId,
     entradas: {
       nichoId: dados.nicho.id,
+      ...(dados.clienteId !== undefined ? { modo: "foco_da_conta", focoHash: dados.focoHash } : {}),
       subindoHoje: dados.subindoCount,
       noticias: dados.noticiasCount,
       // E28: quantas perguntas do público foram para a entrada (zero sem leitura da semana).
@@ -593,10 +599,55 @@ export async function setoresEmUsoComContagem(agora: Date = new Date()): Promise
   return { setores, marcasPuladasPorAssinatura: puladas.length, idsDasMarcasPuladas: puladas };
 }
 
+/** O resumo dos temas por conta, nos nomes que o cartão de Rotinas lê. */
+function resumoDasContas(r: ResumoDosTemasDasContas): Record<string, unknown> {
+  return { contas: r.contas, contasGeradas: r.gerados, contasSemNovidade: r.semNovidade, contasSemProva: r.semProva, contasMantidas: r.mantidos, contasFalhas: r.falhas };
+}
+
+/**
+ * E61 PR 2: o que o passo por conta empresta do job do setor (a chamada com conferência de id, a conferência da prova por código e o sistema estável com o modelo do setor, que é o mesmo dos temas do
+ * setor e por isso aproveita o cache de prompt). O passo por conta mora em outro arquivo e não importa este.
+ */
+function ferramentasDosTemasDaConta(nicho: NichoAtivo): FerramentasDosTemas {
+  let sistema: Promise<string> | null = null;
+  const sistemaEstavel = () => {
+    sistema ??= modeloNichoAtual(nicho.id).then((modelo) => temasDoDiaIA.montarSistemaEstavel({ modeloNicho: formatarModeloNicho(modelo?.modelo ?? null) }));
+    return sistema;
+  };
+  return {
+    diasDeUso: DIAS_DE_USO_PARA_TEMA,
+    tentarGerar: async (dados) =>
+      tentarGerarTemas({
+        nicho,
+        sistemaEstavel: await sistemaEstavel(),
+        entrada: dados.entrada,
+        idsValidos: dados.idsValidos,
+        idsValidosNoticias: new Set(),
+        subindoCount: dados.subindoCount,
+        noticiasCount: 0,
+        clienteId: dados.clienteId,
+        focoHash: dados.focoHash,
+      }),
+    filtrarProva: async (temas) => {
+      const regua = await reguaDoSetor(nicho.id);
+      const { temasComProva, barrados } = await filtrarTemasComProva(temas, nicho, new Date(), regua.proporcaoBrasil);
+      return { temasComProva, barrados };
+    },
+  };
+}
+
 export async function rodarTemasDoDia(
   nichoId?: number,
-  opts?: { forcar?: boolean; aoAbrir?: boolean },
+  opts?: { forcar?: boolean; aoAbrir?: boolean; clienteId?: number },
 ): Promise<Record<string, unknown>> {
+  // E61 PR 2: o pedido de UMA conta (a pessoa acabou de confirmar ou mudar o foco): só os temas dela, sem tocar nos do setor.
+  if (opts?.clienteId !== undefined && nichoId !== undefined) {
+    const [nicho] = await db().select().from(nichos).where(and(eq(nichos.id, nichoId), eq(nichos.ativo, true)));
+    if (!nicho) return { nichos: 0, contas: 0 };
+    const contas = await gerarTemasDasContas({ nichoId, clienteId: opts.clienteId, ferramentas: ferramentasDosTemasDaConta(nicho) });
+    return { nichos: 1, ...resumoDasContas(contas) };
+  }
+
   if (nichoId !== undefined && !opts?.forcar) {
     const [existente] = await db()
       .select({ temas: temasDia.temas })
@@ -643,6 +694,7 @@ export async function rodarTemasDoDia(
   let falhas = 0;
   const erros: string[] = [];
   const temasDoMomento: Record<string, number> = {};
+  const contasSomadas: ResumoDosTemasDasContas = { contas: 0, gerados: 0, semNovidade: 0, semProva: 0, mantidos: 0, falhas: 0, erros: [] };
 
   for (const nicho of nichosAtivos) {
     try {
@@ -665,6 +717,20 @@ export async function rodarTemasDoDia(
       falhas += 1;
       erros.push(`nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
     }
+    // E61 PR 2: depois dos temas do setor (que já estão gravados, deram certo ou não), os das contas com foco. Falha aqui nunca derruba o setor.
+    try {
+      const contas = await gerarTemasDasContas({ nichoId: nicho.id, ferramentas: ferramentasDosTemasDaConta(nicho) });
+      contasSomadas.contas += contas.contas;
+      contasSomadas.gerados += contas.gerados;
+      contasSomadas.semNovidade += contas.semNovidade;
+      contasSomadas.semProva += contas.semProva;
+      contasSomadas.mantidos += contas.mantidos;
+      contasSomadas.falhas += contas.falhas;
+      erros.push(...contas.erros.map((e) => `nicho "${nicho.slug}", ${e}`));
+    } catch (erro) {
+      contasSomadas.falhas += 1;
+      erros.push(`temas por conta do nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
+    }
   }
 
   return {
@@ -682,6 +748,8 @@ export async function rodarTemasDoDia(
     semUso,
     ...resumoDasMarcasPuladas(marcasPuladasPorAssinatura),
     temasDoMomento,
+    // E61 PR 2: os temas por conta com foco (quantas contas, quantas ganharam tema do foco, quantas caíram para o setor).
+    ...resumoDasContas(contasSomadas),
     motivoSemUso: semUso > 0 ? MOTIVO_SEM_USO : undefined,
     erros: erros.length > 0 ? erros : undefined,
   };
