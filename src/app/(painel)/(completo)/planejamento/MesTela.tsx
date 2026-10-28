@@ -2,7 +2,7 @@
 
 import { ChevronRight, Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useTransition } from "react";
 
 import type { DataMarcada } from "@/config/datas";
 import { rotuloParaQue } from "@/config/fichas";
@@ -19,6 +19,7 @@ import { MenuAcoesAgenda } from "../hoje/MenuAcoesAgenda";
 import { useDesfazerArquivar } from "../hoje/useDesfazerArquivar";
 
 import styles from "./MesTela.module.css";
+import { useMovidosDeDia } from "./MovidosDeDia";
 import { useAbrirContarAgenda } from "./PlanejadorShell";
 import { useMoverDeDia } from "./useMoverDeDia";
 
@@ -93,9 +94,9 @@ function perguntaSeConflitoMes(dias: DiaDoMes[], tipo: "reels" | "story", titulo
  */
 export function MesConteudo({
   anoMes,
-  dias,
+  dias: diasDoServidor,
   diaSelecionado,
-  agendaDoDiaSelecionado,
+  agendaDoDiaSelecionado: agendaDoServidor,
   planoSugeridoDoDia,
   hoje,
   proximoMarcado,
@@ -106,6 +107,34 @@ export function MesConteudo({
   const [ocupado, iniciarTransicao] = useTransition();
   const { arquivar: arquivarComDesfazer, toast: toastArquivar } = useDesfazerArquivar();
   const mover = useMoverDeDia();
+  const { movidos, esquecer, esquecerTodos } = useMovidosDeDia();
+
+  // O item que a pessoa acabou de mudar de dia sai da lista e das marcas já, sem esperar o servidor (`MovidosDeDia.tsx`). Só vale enquanto a lista ainda o mostra no dia
+  // de antes; quando o servidor entrega a lista sem ele, o aviso local sai. Tocar em outro dia ou mês é uma tela nova do servidor: nada mais a corrigir.
+  const idsNaLista = new Set([...agendaDoServidor.reels, ...agendaDoServidor.stories].map((item) => item.id));
+  const pendentesNaLista = movidos.filter((movido) => movido.de === diaSelecionado && idsNaLista.has(movido.id));
+  const agendaDoDiaSelecionado: AgendaDoDia = {
+    reels: agendaDoServidor.reels.filter((item) => !pendentesNaLista.some((movido) => movido.id === item.id)),
+    stories: agendaDoServidor.stories.filter((item) => !pendentesNaLista.some((movido) => movido.id === item.id)),
+  };
+  const dias = diasDoServidor.map((dia) => {
+    let qtdReels = dia.marca.qtdReels;
+    let qtdStories = dia.marca.qtdStories;
+    for (const movido of pendentesNaLista) {
+      const ehReels = agendaDoServidor.reels.some((item) => item.id === movido.id);
+      const delta = (dia.data === movido.para ? 1 : 0) - (dia.data === movido.de ? 1 : 0);
+      if (ehReels) qtdReels = Math.max(0, qtdReels + delta);
+      else qtdStories = Math.max(0, qtdStories + delta);
+    }
+    return qtdReels === dia.marca.qtdReels && qtdStories === dia.marca.qtdStories ? dia : { ...dia, marca: { qtdReels, qtdStories } };
+  });
+  useEffect(() => {
+    esquecer(movidos.filter((movido) => movido.de === diaSelecionado && !idsNaLista.has(movido.id)).map((movido) => movido.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `idsNaLista` e `movidos` mudam juntos com a lista do servidor
+  }, [agendaDoServidor, movidos, diaSelecionado, esquecer]);
+  useEffect(() => {
+    esquecerTodos();
+  }, [anoMes, diaSelecionado, esquecerTodos]);
 
   function ir(destino: string) {
     if (ocupado) return;
