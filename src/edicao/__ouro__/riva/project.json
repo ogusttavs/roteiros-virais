@@ -1,0 +1,135 @@
+{
+ "name": "RIVA Motorsports",
+ "format": "vertical",
+ "preset": "vlog",
+ "zoom_jumpcuts": 0,
+ "selects": [
+  [
+   1.3,
+   15.7,
+   "gancho: parque de diversões pra quem gosta de jet ski, off-road, moto"
+  ],
+  [
+   16.6,
+   27.0,
+   "área externa: off-road, jet ski que mistura com barco"
+  ],
+  [
+   30.5,
+   35.4,
+   "o mais legal tá dentro da loja, vamos lá"
+  ],
+  [
+   38.9,
+   43.3,
+   "dentro: linha de jet skis novos e usados",
+   "combinar"
+  ],
+  [
+   44.1,
+   45.2,
+   "linha de moto"
+  ],
+  [
+   47.0,
+   49.4,
+   "esportivas"
+  ],
+  [
+   50.6,
+   53.5,
+   "CFMoto, marca forte aqui",
+   "direita"
+  ],
+  [
+   54.5,
+   63.1,
+   "chegando no Brasil, mas sem as esportivas"
+  ],
+  [
+   63.6,
+   64.95,
+   "tem as 600"
+  ],
+  [
+   73.6,
+   81.6,
+   "ZX-6R: 14 mil dólares, no Brasil passa dos 100 mil reais"
+  ],
+  [
+   82.8,
+   110.2,
+   "trail, choppers, todas as marcas, acessórios, quadriciclos",
+   "direita"
+  ],
+  [
+   112.7,
+   116.4,
+   "quadriciclo infantil 3.976 dólares",
+   "combinar"
+  ],
+  [
+   125.6,
+   135.4,
+   "fechamento: você quer levar tudo (sem o 'obrigado': a gravação parou no meio dele)",
+   "desfocar"
+  ]
+ ],
+ "caption_fixes": [
+  [
+   "Trail tem",
+   "trail, tem"
+  ],
+  [
+   "CFMoto shoppers",
+   "CFMoto,"
+  ],
+  [
+   "tem Indian Kawasaki todas",
+   "tem Indian, Kawasaki, todas"
+  ],
+  [
+   "RIVA Race",
+   "RIVA Motorsports"
+  ],
+  [
+   "relacionado a mala para viagem a bolsa a colete",
+   "relacionado à mala de viagem, à bolsa, ao colete"
+  ],
+  [
+   "tem uns gigantes aqui tem infantil roupa",
+   "tem uns gigantes aqui, tem infantil, roupa"
+  ],
+  [
+   "novos usados",
+   "novos, usados"
+  ],
+  [
+   "como eu isso",
+   "como eu, isso"
+  ],
+  [
+   "É isso Obrigado",
+   "É isso, obrigado!"
+  ],
+  [
+   "3 .956",
+   "3.976"
+  ],
+  [
+   "os caras tem",
+   "os caras têm"
+  ],
+  [
+   "parte aqui dali",
+   "parte dali"
+  ]
+ ],
+ "title": {
+  "style": "destaque",
+  "text": "POR DENTRO DA\nRIVA MOTORSPORTS",
+  "subtitle": "DEERFIELD BEACH • FLÓRIDA",
+  "duration": 3.0
+ },
+ "energia": "riva"
+}

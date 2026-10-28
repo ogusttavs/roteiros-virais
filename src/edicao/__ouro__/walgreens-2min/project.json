@@ -1,0 +1,126 @@
+{
+ "name": "Walgreens - 2min",
+ "format": "vertical",
+ "preset": "vlog",
+ "zoom_jumpcuts": 0,
+ "selects": [
+  [
+   1.1,
+   6.95,
+   "gancho: por dentro da Walgreens, recanto dos brasileiros"
+  ],
+  [
+   13.1,
+   15.35,
+   "vou mostrar pra vocês"
+  ],
+  [
+   24.5,
+   36.1,
+   "tem de tudo: skincare, maquiagem, bebidas, comidas"
+  ],
+  [
+   36.2,
+   46.3,
+   "promoção: segundo produto com 50%"
+  ],
+  [
+   64.7,
+   69.95,
+   "variedade que não tem no Brasil, preço atrativo",
+   "combinar"
+  ],
+  [
+   81.3,
+   86.1,
+   "escovas elétricas"
+  ],
+  [
+   111.0,
+   117.5,
+   "Tide e Gain"
+  ],
+  [
+   137.7,
+   147.3,
+   "paraíso do band-aid",
+   "direita"
+  ],
+  [
+   153.0,
+   155.7,
+   "mês do Halloween",
+   "direita"
+  ],
+  [
+   169.6,
+   175.8,
+   "farmácia que vende de tudo",
+   "combinar"
+  ],
+  [
+   186.0,
+   203.0,
+   "health & wellness, compra um ganha outro",
+   "combinar"
+  ],
+  [
+   205.5,
+   211.2,
+   "eletrólitos em alta, Liquid IV",
+   "combinar"
+  ],
+  [
+   260.2,
+   265.95,
+   "é isso galera, pra quem ainda não conhece esse tipo de loja",
+   "desfocar"
+  ],
+  [
+   277.4,
+   281.5,
+   "um pouquinho de tudo que a Walgreens oferece"
+  ]
+ ],
+ "caption_fixes": [
+  [
+   "a Greens",
+   "a Walgreens"
+  ],
+  [
+   "a Algrims",
+   "a Walgreens"
+  ],
+  [
+   "Da Game",
+   "da Gain"
+  ],
+  [
+   "os eletrolites",
+   "os eletrólitos"
+  ],
+  [
+   "essa marca líquida aqui",
+   "essa marca aqui, Liquid IV,"
+  ],
+  [
+   "eles tem",
+   "eles têm"
+  ],
+  [
+   "health wellness",
+   "Health & Wellness"
+  ],
+  [
+   "tudo o que",
+   "tudo que"
+  ]
+ ],
+ "title": {
+  "style": "destaque",
+  "text": "POR DENTRO DA\nFARMÁCIA AMERICANA",
+  "subtitle": "WALGREENS • EUA",
+  "duration": 3.0
+ },
+ "energia": "walgreens"
+}
