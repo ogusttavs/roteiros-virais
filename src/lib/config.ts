@@ -152,10 +152,14 @@ export const config = {
     de: env("EMAIL_FROM", "painel@localhost"),
   },
   /**
-   * E19 PR 1, o Instagram ligado pela própria pessoa (Login do Facebook para Empresas, fluxo de código). `appId` e `appSecret` são do aplicativo da Meta; `loginConfigId` é o
-   * `config_id` da configuração de login criada no painel da Meta (define as permissões e os ativos pedidos); `tokenChave` cifra o token de cada conta ligada (AES-256-GCM,
-   * 32 bytes em base64 ou em 64 caracteres hexadecimais; `openssl rand -base64 32`). `redirectUri` é a URI cadastrada no aplicativo, exata. `ativa` só com os quatro dados: sem
-   * eles, ninguém consegue começar a ligação e a curva segue pelos outros dois caminhos, sem erro de boot.
+   * E19 PR 1 e E19b, o Instagram ligado pela própria pessoa. Há duas vias; a E19b (27/10/2026) fez a do Instagram ser a de verdade:
+   *  - `instagram` (E19b): API do Instagram com o Login do Instagram, sem Página do Facebook. `appId` e `appSecret` são os do PRODUTO Instagram do aplicativo da Meta (painel do aplicativo,
+   *    Instagram, "Configuração da API com o login do Instagram", "Configurações de login da empresa": "ID do app do Instagram" e "Chave secreta do app do Instagram"; são DIFERENTES dos
+   *    do aplicativo do Facebook: `pesquisa/plataformas/docs/meta/ig-login-business-login.md`). `redirectUri` é a URI cadastrada ali, exata.
+   *  - `facebook` (E19 PR 1, código antigo): Login do Facebook para Empresas. `META_APP_ID`, `META_APP_SECRET` e `META_LOGIN_CONFIG_ID` (o `config_id`). Fica DESLIGADA por padrão: só liga com
+   *    `META_VIA_FACEBOOK=1` junto dos três dados (e só vale quando a via do Instagram não está ativa).
+   * `tokenChave` cifra o token de cada conta ligada (AES-256-GCM, 32 bytes em base64 ou em 64 caracteres hexadecimais; `openssl rand -base64 32`) e é a mesma nas duas vias. `ativa` é "alguma via
+   * pode começar uma ligação"; sem ela ninguém começa e a curva segue pelos outros dois caminhos, sem erro de boot.
    */
   metaConexao: {
     appId: env("META_APP_ID"),
@@ -163,7 +167,17 @@ export const config = {
     loginConfigId: env("META_LOGIN_CONFIG_ID"),
     tokenChave: env("META_TOKEN_CHAVE"),
     redirectUri: env("META_REDIRECT_URI", `${env("APP_URL", "http://localhost:3000")}/api/meta/retorno`),
-    ativa: env("META_APP_ID") !== "" && env("META_APP_SECRET") !== "" && env("META_LOGIN_CONFIG_ID") !== "" && env("META_TOKEN_CHAVE") !== "",
+    instagram: {
+      appId: env("META_IG_APP_ID"),
+      appSecret: env("META_IG_APP_SECRET"),
+      redirectUri: env("META_IG_REDIRECT_URI", `${env("APP_URL", "http://localhost:3000")}/api/meta/retorno`),
+      ativa: env("META_IG_APP_ID") !== "" && env("META_IG_APP_SECRET") !== "" && env("META_TOKEN_CHAVE") !== "",
+    },
+    viaFacebookLigada:
+      env("META_VIA_FACEBOOK") === "1" && env("META_APP_ID") !== "" && env("META_APP_SECRET") !== "" && env("META_LOGIN_CONFIG_ID") !== "" && env("META_TOKEN_CHAVE") !== "",
+    ativa:
+      (env("META_IG_APP_ID") !== "" && env("META_IG_APP_SECRET") !== "" && env("META_TOKEN_CHAVE") !== "") ||
+      (env("META_VIA_FACEBOOK") === "1" && env("META_APP_ID") !== "" && env("META_APP_SECRET") !== "" && env("META_LOGIN_CONFIG_ID") !== "" && env("META_TOKEN_CHAVE") !== ""),
     /**
      * E19 PR 2: `META_APP_APROVADO=1` quando a Meta aprovar o aplicativo para todo mundo. Enquanto não for, o aplicativo está em modo de desenvolvimento e só quem tem papel nele
      * consegue passar pelo diálogo; a tela de Conta avisa isso com calma (`textos/conta-conectada.ts`, `tela.emTeste`).
@@ -445,6 +459,8 @@ export function verificarSegredosDeProducao(
     META_APP_SECRET?: string;
     META_LOGIN_CONFIG_ID?: string;
     META_TOKEN_CHAVE?: string;
+    META_IG_APP_ID?: string;
+    META_IG_APP_SECRET?: string;
   } = process.env,
 ): void {
   if (env.NODE_ENV !== "production") return;
@@ -475,15 +491,27 @@ export function verificarSegredosDeProducao(
   }
 
   /**
-   * E19 PR 1: a ligação do Instagram guarda um token de acesso por conta. Qualquer um dos dados da ligação preenchido exige os quatro, e a chave que cifra o token precisa ter 32 bytes
-   * (base64 ou 64 caracteres hexadecimais): subir com a ligação pela metade deixaria a pessoa chegar ao diálogo da Meta e voltar sem poder guardar o token, ou, pior, guardar com uma chave
-   * fraca. Melhor não subir do que subir assim.
+   * E19 PR 1 e E19b: a ligação do Instagram guarda um token de acesso por conta. Cada via exige os seus dados juntos, e a chave que cifra o token (`META_TOKEN_CHAVE`, a mesma nas duas) precisa ter
+   * 32 bytes (base64 ou 64 caracteres hexadecimais): subir com a ligação pela metade deixaria a pessoa chegar ao diálogo da Meta e voltar sem poder guardar o token, ou, pior, guardar com uma
+   * chave fraca. Via do Instagram: `META_IG_APP_ID` e `META_IG_APP_SECRET` juntos (e com a chave). Via do Facebook (código antigo): `META_APP_ID`, `META_APP_SECRET` e `META_LOGIN_CONFIG_ID` juntos
+   * (e com a chave). Melhor não subir do que subir assim.
    */
-  const dadosDaLigacao = [env.META_APP_ID, env.META_APP_SECRET, env.META_LOGIN_CONFIG_ID, env.META_TOKEN_CHAVE];
-  if (dadosDaLigacao.some(Boolean)) {
-    if (!dadosDaLigacao.every(Boolean)) {
-      throw new ErroConfiguracao("A ligacao do Instagram exige META_APP_ID, META_APP_SECRET, META_LOGIN_CONFIG_ID e META_TOKEN_CHAVE juntos; falta pelo menos um.");
-    }
+  const dadosDaViaInstagram = [env.META_IG_APP_ID, env.META_IG_APP_SECRET];
+  const dadosDaViaFacebook = [env.META_APP_ID, env.META_APP_SECRET, env.META_LOGIN_CONFIG_ID];
+  if (dadosDaViaInstagram.some(Boolean) && !dadosDaViaInstagram.every(Boolean)) {
+    throw new ErroConfiguracao("A ligacao do Instagram exige META_IG_APP_ID e META_IG_APP_SECRET juntos; falta um.");
+  }
+  if (dadosDaViaFacebook.some(Boolean) && !dadosDaViaFacebook.every(Boolean)) {
+    throw new ErroConfiguracao("A ligacao pelo Facebook exige META_APP_ID, META_APP_SECRET e META_LOGIN_CONFIG_ID juntos; falta pelo menos um.");
+  }
+  const algumaVia = dadosDaViaInstagram.some(Boolean) || dadosDaViaFacebook.some(Boolean);
+  if (algumaVia && !env.META_TOKEN_CHAVE) {
+    throw new ErroConfiguracao("Os dados da ligacao do Instagram vao juntos: com os dados do aplicativo falta META_TOKEN_CHAVE, a chave que cifra o token.");
+  }
+  if (env.META_TOKEN_CHAVE && !algumaVia) {
+    throw new ErroConfiguracao("Os dados da ligacao do Instagram vao juntos: META_TOKEN_CHAVE sozinha nao serve, falta META_IG_APP_ID e META_IG_APP_SECRET.");
+  }
+  if (algumaVia) {
     if (!chaveDoTokenValida(env.META_TOKEN_CHAVE)) {
       throw new ErroConfiguracao("META_TOKEN_CHAVE precisa ter 32 bytes (base64 de 32 bytes, p. ex. `openssl rand -base64 32`, ou 64 caracteres hexadecimais).");
     }

@@ -48,7 +48,7 @@ import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 
 import { buscarInstagramPorUrl, buscarTiktokPorUrl, type TiktokItemBruto } from "./apify-api";
 import { definirRamoDoContexto, restaurarRamoDoContexto } from "./contexto-execucao";
-import { buscarMediaDaConta, buscarMediaPorId, ErroMetaApi, erroMetaEhTokenOuLimite, type MetaMediaItem } from "./meta-api";
+import { buscarMediaDaConta, buscarMediaPorId, buscarViewsDaMidia, ErroMetaApi, erroMetaEhTokenOuLimite, type MetaMediaItem, type TokenOuAcesso } from "./meta-api";
 import type { ExecutorDeProcesso } from "./processo";
 import {
   ErroYtdlpTiktok,
@@ -296,6 +296,17 @@ function classificarErroDaMeta(erro: unknown, comAcessoDaConta: boolean): { tipo
   return erroMetaEhTokenOuLimite(erro) ? { tipo: "global" } : { tipo: "outro" };
 }
 
+/** E19b: a via do Instagram não devolve `total_views_count` na mídia; as visualizações vêm do `insights` (`meta-api.ts`, `buscarViewsDaMidia`), só para vídeo. */
+function precisaDeViewsPeloInsights(acesso: TokenOuAcesso | undefined, item: MetaMediaItem): boolean {
+  if (acesso === undefined || typeof acesso === "string" || acesso.via !== "instagram") return false;
+  return item.media_type === "VIDEO" || item.media_product_type === "REELS";
+}
+
+async function viewsDaMidia(item: MetaMediaItem, acesso: TokenOuAcesso | undefined): Promise<number> {
+  if (acesso !== undefined && precisaDeViewsPeloInsights(acesso, item)) return buscarViewsDaMidia(item.id, acesso);
+  return item.total_views_count ?? 0;
+}
+
 /**
  * Mede a Instagram de UM cliente pela Graph API da Meta (V8, item 2). Devolve
  * os que nao deu para medir por essa via (`restantes`, seguem para o
@@ -309,7 +320,7 @@ async function medirInstagramMeta(
   igId: string,
   agora: Date,
   erros: string[],
-  tokenDaConta?: string,
+  tokenDaConta?: TokenOuAcesso,
 ): Promise<ResultadoInstagramMeta> {
   const semMediaId = videos.filter((v) => !v.metaMediaId);
   const comMediaId = videos.filter((v) => v.metaMediaId);
@@ -345,13 +356,27 @@ async function medirInstagramMeta(
         restantes.push(video);
         continue;
       }
-      await gravarMetrica(
-        video,
-        { views: item.total_views_count ?? 0, likes: item.like_count ?? 0, comentarios: item.comments_count ?? 0 },
-        agora,
-        FONTE_META,
-        item.id,
-      );
+      let views: number;
+      try {
+        views = await viewsDaMidia(item, tokenDaConta);
+      } catch (erro) {
+        const tipo = classificarErroDaMeta(erro, tokenDaConta !== undefined);
+        if (tipo.tipo === "conta") {
+          erros.push(`instagram (${origem}) ${video.idExterno}: acesso recusado ou sem permissao`);
+          restantes.push(...semMediaId.slice(semMediaId.indexOf(video)));
+          return { medidos, restantes: [...restantes, ...comMediaId], indisponivel: false, erroDaConta: tipo.frase };
+        }
+        if (tipo.tipo === "global") {
+          erros.push(`instagram (${origem}) ${video.idExterno}: token ou limite atingido: ${(erro as Error).message}`);
+          restantes.push(...semMediaId.slice(semMediaId.indexOf(video)));
+          return { medidos, restantes: [...restantes, ...comMediaId], indisponivel: true };
+        }
+        // Erro passageiro nas visualizações (a Meta ainda não tem o número): este vídeo segue para o caminho de sempre.
+        erros.push(`instagram (${origem}) ${video.idExterno}: ${erro instanceof Error ? erro.message : String(erro)}`);
+        restantes.push(video);
+        continue;
+      }
+      await gravarMetrica(video, { views, likes: item.like_count ?? 0, comentarios: item.comments_count ?? 0 }, agora, FONTE_META, item.id);
       medidos += 1;
     }
   }
@@ -360,12 +385,8 @@ async function medirInstagramMeta(
     const video = comMediaId[i];
     try {
       const item = await buscarMediaPorId(video.metaMediaId!, tokenDaConta);
-      await gravarMetrica(
-        video,
-        { views: item.total_views_count ?? 0, likes: item.like_count ?? 0, comentarios: item.comments_count ?? 0 },
-        agora,
-        FONTE_META,
-      );
+      const views = await viewsDaMidia(item, tokenDaConta);
+      await gravarMetrica(video, { views, likes: item.like_count ?? 0, comentarios: item.comments_count ?? 0 }, agora, FONTE_META);
       medidos += 1;
     } catch (erro) {
       const tipo = classificarErroDaMeta(erro, tokenDaConta !== undefined);
@@ -429,7 +450,7 @@ async function medirInstagram(
     if (!limiteDaMeta) {
       const conta = await contaParaLeitura(clienteId, agora);
       if (conta) {
-        const resultado = await medirInstagramMeta(pendentes, conta.igId, agora, erros, conta.token);
+        const resultado = await medirInstagramMeta(pendentes, conta.igId, agora, erros, conta.via === "instagram" ? { token: conta.token, via: conta.via } : conta.token);
         medidosMeta += resultado.medidos;
         medidosContaLigada += resultado.medidos;
         pendentes = resultado.restantes;

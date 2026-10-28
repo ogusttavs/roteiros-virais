@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { textosHoje } from "@/textos/hoje";
 
-import { avisoSemTema } from "./aviso-sem-tema";
+import { avisoSemTema, deveRenovarTemaVelho } from "./aviso-sem-tema";
 
 /** "2026-09-30T08:00:00Z" é 05:00 em America/Sao_Paulo (UTC-3, sem horário de verão desde 2019). */
 const ANTES_DAS_0630 = new Date("2026-09-30T08:00:00Z");
@@ -115,5 +115,40 @@ describe("avisoSemTema: o estado do ramo", () => {
 
   it("com tema ou com erro, o estado do ramo não muda nada", () => {
     expect(avisoSemTema({ status: "erro" }, DEPOIS_DAS_0630, { semBase: true })?.titulo).toBe(textosHoje.erroTitulo);
+  });
+});
+
+describe("deveRenovarTemaVelho (27/10/2026: a pessoa volta depois da pausa dos temas)", () => {
+  const ok = (dataUsada: string) => ({
+    status: "ok" as const,
+    temas: [],
+    dataUsada,
+    avisoLinhaEditorial: null,
+    objetivoRecomendado: null,
+    constancia: { tipo: "primeiro_dia" as const },
+  });
+
+  it("o tema que a tela mostra é de ontem e já passou das 6h30: pede o de hoje", () => {
+    expect(deveRenovarTemaVelho(ok("2026-09-29"), "2026-09-30", DEPOIS_DAS_0630)).toBe(true);
+    expect(deveRenovarTemaVelho(ok("2026-09-29"), "2026-09-30", NO_CORTE)).toBe(true);
+  });
+
+  it("antes das 6h30 o de ontem é o esperado: não pede", () => {
+    expect(deveRenovarTemaVelho(ok("2026-09-29"), "2026-09-30", ANTES_DAS_0630)).toBe(false);
+    expect(deveRenovarTemaVelho(ok("2026-09-29"), "2026-09-30", UM_MINUTO_ANTES)).toBe(false);
+  });
+
+  it("o tema já é de hoje: não pede", () => {
+    expect(deveRenovarTemaVelho(ok("2026-09-30"), "2026-09-30", DEPOIS_DAS_0630)).toBe(false);
+  });
+
+  it("sem tema ou com erro não passa por aqui (o sem tema pede sempre, por outro caminho)", () => {
+    expect(deveRenovarTemaVelho({ status: "sem_tema", constancia: { tipo: "primeiro_dia" } }, "2026-09-30", DEPOIS_DAS_0630)).toBe(false);
+    expect(deveRenovarTemaVelho({ status: "erro" }, "2026-09-30", DEPOIS_DAS_0630)).toBe(false);
+  });
+
+  it("a tela de outro dia (?data=) não pede o tema de hoje; a de hoje explícita pede", () => {
+    expect(deveRenovarTemaVelho(ok("2026-09-29"), "2026-09-30", DEPOIS_DAS_0630, "2026-10-02")).toBe(false);
+    expect(deveRenovarTemaVelho(ok("2026-09-29"), "2026-09-30", DEPOIS_DAS_0630, "2026-09-30")).toBe(true);
   });
 });

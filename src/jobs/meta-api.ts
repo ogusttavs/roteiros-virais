@@ -15,11 +15,22 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { asc, count, eq, gte, lt } from "drizzle-orm";
 
 import { db } from "@/db";
-import { chamadasMetaApi, configuracaoAdmin } from "@/db/schema";
+import { chamadasMetaApi, configuracaoAdmin, type ViaDaLigacao } from "@/db/schema";
 import { config } from "@/lib/config";
-import { provaDoSegredo } from "@/lib/meta-oauth";
+import { enderecoDoGraphDaVia, provaDoSegredo } from "@/lib/meta-oauth";
 
 const BASE = "https://graph.facebook.com/v26.0";
+
+/**
+ * E19b: o acesso de uma conta ligada pela própria pessoa. `via` diz em que servidor ele vale: `facebook` é `graph.facebook.com` (como sempre); `instagram` é `graph.instagram.com`
+ * (`pesquisa/plataformas/docs/meta/ig-media-referencia.md`, `ig-media-insights.md`: coluna "URL de hospedagem"). Uma `string` sozinha é o acesso da via do Facebook (os chamadores de antes).
+ */
+export type AcessoDaConta = { token: string; via: ViaDaLigacao };
+export type TokenOuAcesso = string | AcessoDaConta;
+
+function acessoDe(valor: TokenOuAcesso): AcessoDaConta {
+  return typeof valor === "string" ? { token: valor, via: "facebook" } : valor;
+}
 
 /**
  * 200 chamadas por hora por conta profissional conectada (o item i do
@@ -508,7 +519,7 @@ export async function aguardarJanela(opts?: {
  * de 200 por hora e o registro dela NAO: aquele limite e da conta chamadora do sistema (Business Discovery, item i do plano), e a conta da pessoa tem o limite dela. O endereco leva o
  * token (e a `appsecret_proof`, quando o segredo do aplicativo existe): nunca vai para log, nem aqui nem em erro.
  */
-async function chamar<T>(caminho: string, parametros: Record<string, string>, tokenDaConta?: string, classe: ClasseDeChamada = "geral"): Promise<T> {
+async function chamar<T>(caminho: string, parametros: Record<string, string>, tokenDaConta?: TokenOuAcesso, classe: ClasseDeChamada = "geral"): Promise<T> {
   const medidor = armazenamentoDoMedidor.getStore();
   const pausa = await pausaVigenteComCausa(new Date(), classe);
   if (pausa) {
@@ -518,13 +529,15 @@ async function chamar<T>(caminho: string, parametros: Record<string, string>, to
   if (tokenDaConta === undefined) await aguardarJanela();
   await esperarRitmo();
 
-  const url = new URL(`${BASE}/${caminho}`);
+  const acesso = tokenDaConta === undefined ? undefined : acessoDe(tokenDaConta);
+  const url = new URL(`${acesso?.via === "instagram" ? enderecoDoGraphDaVia("instagram") : BASE}/${caminho}`);
   for (const [chave, valor] of Object.entries(parametros)) {
     url.searchParams.set(chave, valor);
   }
-  url.searchParams.set("access_token", tokenDaConta ?? config.coleta.metaToken);
-  if (tokenDaConta !== undefined && config.metaConexao.appSecret) {
-    url.searchParams.set("appsecret_proof", provaDoSegredo(tokenDaConta));
+  url.searchParams.set("access_token", acesso?.token ?? config.coleta.metaToken);
+  // A prova do segredo é da via do Facebook (`graph-requisicoes-seguras.md`); a via do Instagram não a prevê.
+  if (acesso?.via === "facebook" && config.metaConexao.appSecret) {
+    url.searchParams.set("appsecret_proof", provaDoSegredo(acesso.token));
   }
 
   /**
@@ -594,7 +607,7 @@ export async function buscarTodasAsPaginas<T>(
   caminho: string,
   parametros: Record<string, string>,
   maxPaginas = 10,
-  tokenDaConta?: string,
+  tokenDaConta?: TokenOuAcesso,
 ): Promise<T[]> {
   let resultado: T[] = [];
   let after: string | undefined;
@@ -769,6 +782,15 @@ export type MetaMediaItem = {
 };
 
 const CAMPOS_MEDIA_DA_CONTA = "permalink,media_type,media_product_type,like_count,comments_count,total_views_count";
+/**
+ * E19b, via do Instagram: `total_views_count` é "Disponível apenas para a API do Instagram com o Login do Facebook" (`ig-media-referencia.md`), então a lista não o pede; `like_count` e
+ * `comments_count` valem nas duas vias. As visualizações vêm de `buscarViewsDaMidia` (métrica `views` do `insights`, permissão `instagram_business_manage_insights`).
+ */
+const CAMPOS_MEDIA_DA_CONTA_INSTAGRAM = "permalink,media_type,media_product_type,like_count,comments_count";
+
+function camposDaMidia(acesso?: TokenOuAcesso): string {
+  return acesso !== undefined && acessoDe(acesso).via === "instagram" ? CAMPOS_MEDIA_DA_CONTA_INSTAGRAM : CAMPOS_MEDIA_DA_CONTA;
+}
 
 /**
  * A midia da propria conta do cliente, mais recente primeiro (V8, item 2):
@@ -778,8 +800,8 @@ const CAMPOS_MEDIA_DA_CONTA = "permalink,media_type,media_product_type,like_coun
  * paginas (250 midias) cobrem de sobra um cliente que posta com frequencia
  * normal e cujo video tem no maximo 30 dias (`LIMITE_DIAS` de `curva.ts`).
  */
-export async function buscarMediaDaConta(igId: string, maxPaginas = 10, tokenDaConta?: string): Promise<MetaMediaItem[]> {
-  return buscarTodasAsPaginas<MetaMediaItem>(`${igId}/media`, { fields: CAMPOS_MEDIA_DA_CONTA }, maxPaginas, tokenDaConta);
+export async function buscarMediaDaConta(igId: string, maxPaginas = 10, tokenDaConta?: TokenOuAcesso): Promise<MetaMediaItem[]> {
+  return buscarTodasAsPaginas<MetaMediaItem>(`${igId}/media`, { fields: camposDaMidia(tokenDaConta) }, maxPaginas, tokenDaConta);
 }
 
 /**
@@ -787,8 +809,20 @@ export async function buscarMediaDaConta(igId: string, maxPaginas = 10, tokenDaC
  * (V8, item 2, "nas seguintes leia a midia direto pelo id, uma chamada so"):
  * evita listar a conta inteira de novo a cada medicao.
  */
-export async function buscarMediaPorId(mediaId: string, tokenDaConta?: string): Promise<MetaMediaItem> {
-  return chamar<MetaMediaItem>(mediaId, { fields: CAMPOS_MEDIA_DA_CONTA }, tokenDaConta);
+export async function buscarMediaPorId(mediaId: string, tokenDaConta?: TokenOuAcesso): Promise<MetaMediaItem> {
+  return chamar<MetaMediaItem>(mediaId, { fields: camposDaMidia(tokenDaConta) }, tokenDaConta);
+}
+
+/**
+ * E19b: as visualizações de uma mídia da conta ligada pelo Instagram: `GET /<mídia>/insights?metric=views` (`ig-media-insights.md`: `views` vale para FEED, REELS e STORY; só orgânico).
+ * A resposta traz o valor em `values[0].value` ou em `total_value.value`. Sem dado (a Meta devolve um conjunto vazio quando ainda não há, e leva até 48 horas), devolve 0. Erro da Meta sobe como
+ * `ErroMetaApi`, para quem chama decidir se é da conta (permissão) ou passageiro.
+ */
+export async function buscarViewsDaMidia(mediaId: string, acesso: TokenOuAcesso): Promise<number> {
+  const resposta = await chamar<{ data?: { values?: { value?: unknown }[]; total_value?: { value?: unknown } }[] }>(`${mediaId}/insights`, { metric: "views" }, acesso);
+  const linha = resposta.data?.[0];
+  const valor = linha?.total_value?.value ?? linha?.values?.[0]?.value;
+  return typeof valor === "number" && Number.isFinite(valor) && valor >= 0 ? valor : 0;
 }
 
 /** Mesmos campos do `top_media`, mais `media_product_type` (distingue REELS de VIDEO puro, como a Business Discovery). */

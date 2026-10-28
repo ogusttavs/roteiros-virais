@@ -63,6 +63,9 @@ COPY --from=build /app/node_modules/playwright-core ./node_modules/playwright-co
 ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
 RUN node node_modules/playwright/cli.js install --with-deps chromium \
   && chown -R app:app /app/.playwright
+# E19b: ponto de montagem do volume `roteiros_publicar` (video de uma publicacao, compartilhado com o worker, que roda como root): aberto como /tmp, para o volume novo
+# herdar uma pasta que os dois conseguem escrever, qualquer um que o crie primeiro.
+RUN mkdir -p /var/publicar && chmod 1777 /var/publicar
 USER app
 EXPOSE 3000
 CMD ["node", "server.js"]

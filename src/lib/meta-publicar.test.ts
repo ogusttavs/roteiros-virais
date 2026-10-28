@@ -191,3 +191,58 @@ describe("publicarContainer, enderecoDaMidia e usoDoLimite", () => {
     expect(await usoDoLimite("1", TOKEN)).toEqual({ usadas: 1, total: null });
   });
 });
+
+describe("E19b: a via do Instagram (graph.instagram.com, sem envio retomável)", () => {
+  it("Reels: o contêiner nasce com o video_url, no graph.instagram.com, sem upload_type e sem a prova do segredo", async () => {
+    mockFetch.mockResolvedValue(resposta({ id: "container-ig-1" }));
+    const r = await criarContainerDeVideo({ igId: "17841400000000101", token: TOKEN, tipo: "reels", legenda: "Minha legenda", via: "instagram", videoUrl: "https://klaki.exemplo.teste/api/publicar-arquivo/1.2.x/video.mp4" });
+    expect(r).toEqual({ containerId: "container-ig-1" });
+    const c = chamada();
+    expect(c.url.host).toBe("graph.instagram.com");
+    expect(c.url.pathname).toBe("/v26.0/17841400000000101/media");
+    expect(c.url.search).toBe("");
+    expect(c.corpo).toMatchObject({ media_type: "REELS", video_url: "https://klaki.exemplo.teste/api/publicar-arquivo/1.2.x/video.mp4", share_to_feed: "true", caption: "Minha legenda", access_token: TOKEN });
+    expect(c.corpo).not.toHaveProperty("upload_type");
+    expect(c.corpo).not.toHaveProperty("appsecret_proof");
+  });
+
+  it("Story: STORIES com o video_url e sem legenda; sem video_url recusa antes de falar com a Meta", async () => {
+    mockFetch.mockResolvedValue(resposta({ id: "container-ig-2" }));
+    await criarContainerDeVideo({ igId: "1", token: TOKEN, tipo: "story", legenda: "nao vai", via: "instagram", videoUrl: "https://x.teste/v.mp4" });
+    const corpo = chamada().corpo as Record<string, string>;
+    expect(corpo.media_type).toBe("STORIES");
+    expect(corpo).not.toHaveProperty("caption");
+    mockFetch.mockClear();
+    await expect(criarContainerDeVideo({ igId: "1", token: TOKEN, tipo: "reels", legenda: "", via: "instagram" })).rejects.toThrow("Faltou o endereco do video");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("status do contêiner, publicar, endereço da mídia e limite do dia: tudo no graph.instagram.com", async () => {
+    mockFetch.mockResolvedValueOnce(resposta({ status_code: "FINISHED", id: "c" }));
+    expect(await statusDoContainer("container-ig-1", TOKEN, "instagram")).toBe("FINISHED");
+    expect(chamada(0).url.host).toBe("graph.instagram.com");
+    expect(chamada(0).url.searchParams.has("appsecret_proof")).toBe(false);
+
+    mockFetch.mockResolvedValueOnce(resposta({ id: "midia-1" }));
+    expect(await publicarContainer({ igId: "9", containerId: "container-ig-1", token: TOKEN, via: "instagram" })).toEqual({ midiaId: "midia-1" });
+    expect(chamada(1).url.host).toBe("graph.instagram.com");
+    expect(chamada(1).url.pathname).toBe("/v26.0/9/media_publish");
+    expect(chamada(1).corpo).toMatchObject({ creation_id: "container-ig-1" });
+
+    mockFetch.mockResolvedValueOnce(resposta({ permalink: "https://www.instagram.com/reel/ABC/" }));
+    expect(await enderecoDaMidia("midia-1", TOKEN, "instagram")).toBe("https://www.instagram.com/reel/ABC/");
+    expect(chamada(2).url.host).toBe("graph.instagram.com");
+
+    mockFetch.mockResolvedValueOnce(resposta({ data: [{ quota_usage: 3, config: { quota_total: 100 } }] }));
+    expect(await usoDoLimite("9", TOKEN, "instagram")).toEqual({ usadas: 3, total: 100 });
+    expect(chamada(3).url.host).toBe("graph.instagram.com");
+    expect(chamada(3).url.pathname).toBe("/v26.0/9/content_publishing_limit");
+  });
+
+  it("a via do Facebook segue igual: graph.facebook.com e envio retomável", async () => {
+    mockFetch.mockResolvedValue(resposta({ id: "c" }));
+    await criarContainerDeVideo({ igId: "1", token: TOKEN, tipo: "reels", legenda: "" });
+    expect(chamada().url.host).toBe("graph.facebook.com");
+    expect((chamada().corpo as Record<string, string>).upload_type).toBe("resumable");
+  });
+});

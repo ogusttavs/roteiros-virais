@@ -2,6 +2,9 @@
  * E56 PR 1: publicar no Instagram da própria marca, pela conta que ela ligou (E19). Reels ou Story, com um vídeo que a pessoa já gravou: o aplicativo cria o envio na Meta, o vídeo passa do
  * navegador direto para a Meta (nada fica guardado aqui), o aplicativo espera a Meta preparar, publica, e liga o link do post ao roteiro (o "postei" que já existia vira automático).
  *
+ * E19b, duas vias (`contas_conectadas.via`): pela do Facebook o vídeo passa do navegador para a Meta em fluxo (envio retomável); pela do Instagram esse envio não existe, então o vídeo é guardado
+ * em disco POR POUCO TEMPO (`lib/video-temporario.ts`), a Meta o baixa por um endereço público assinado (`video_url`), e o arquivo é apagado quando a publicação termina, falha ou é cancelada.
+ *
  * Regras que valem aqui (e têm teste):
  *  - Só o DONO da marca publica (`ehDonoDaMarca`), e o "ver como" nunca (as ações e a rota conferem antes de chamar). A marca vem da sessão: toda leitura e toda gravação filtram pela marca recebida,
  *    então uma marca nunca vê, confere nem publica o que é de outra, e nunca usa o acesso de outra.
@@ -13,7 +16,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { ENVIO_PARADO_APOS_MS, esperaDaConferencia, LIMITE_DE_PUBLICACOES_PADRAO, LIMITES_DA_LEGENDA, LIMITES_DA_PUBLICACAO, PREPARO_DA_META_PRAZO_MS, PUBLICANDO_PARADO_APOS_MS, tipoDeVideoAceito } from "@/config/publicacao";
-import { db } from "@/db";
+import { db, getPool } from "@/db";
 import { ESTADOS_VIVOS_DA_PUBLICACAO, publicacoes, videosCliente, type EstadoDaPublicacao, type Publicacao, type TipoDePublicacao } from "@/db/schema";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { problemaDaLegenda } from "@/lib/legenda-do-instagram";
@@ -21,6 +24,7 @@ import { logger } from "@/lib/log";
 import { ErroMetaLogin } from "@/lib/meta-oauth";
 import { criarContainerDeVideo, enderecoDaMidia, enviarVideo, ErroDeEnvioDoVideo, publicarContainer, statusDoContainer, usoDoLimite } from "@/lib/meta-publicar";
 import { ErroTokenCifrado } from "@/lib/meta-token";
+import { descartarVideo, enderecoPublicoDoVideo, guardarVideo, varrerVideosVelhos } from "@/lib/video-temporario";
 import { contaLigadaDaMarca, contaParaPublicar, ehDonoDaMarca, erroDaContaPara, ligacaoDisponivel, registrarErroDaConta, type RecusaDePublicar } from "@/servicos/conta-conectada";
 import { corpoDoRoteiro, marcarPostado, roteiroPorId, type RoteiroLinha } from "@/servicos/roteiro";
 import { textosLigacao } from "@/textos/conta-conectada";
@@ -216,6 +220,9 @@ async function falhar(linha: Pick<Publicacao, "id" | "clienteId" | "tipo">, falh
     .update(publicacoes)
     .set({ estado: "falhou", motivo, codigoMeta: falha.codigoMeta ?? null, subcodigoMeta: falha.subcodigoMeta ?? null, terminadaEm: agora, atualizadaEm: agora })
     .where(and(eq(publicacoes.id, linha.id), eq(publicacoes.clienteId, linha.clienteId), inArray(publicacoes.estado, estados)));
+  // Só some o arquivo temporário (via do Instagram) quando a publicação de fato falhou: um "Cancelar" que não derruba uma já em `publicando` não pode tirar o vídeo debaixo da Meta.
+  const [atual] = await db().select({ estado: publicacoes.estado }).from(publicacoes).where(eq(publicacoes.id, linha.id));
+  if (atual?.estado === "falhou") await descartarVideo(linha.id);
   return motivo;
 }
 
@@ -273,7 +280,7 @@ export async function iniciarPublicacao(entrada: EntradaDeIniciar, deps: DepsDaP
 
   // O limite do dia, da Meta. Uma falha daqui que não é do acesso não barra: a Meta recusa na hora de publicar, com a frase certa.
   try {
-    const uso = await usoDoLimite(conta.igId, conta.token);
+    const uso = await usoDoLimite(conta.igId, conta.token, conta.via);
     if (uso.usadas >= (uso.total ?? LIMITE_DE_PUBLICACOES_PADRAO)) return recusa("limite", tipo);
   } catch (erro) {
     const falha = classificarFalha(erro);
@@ -293,6 +300,12 @@ export async function iniciarPublicacao(entrada: EntradaDeIniciar, deps: DepsDaP
   } catch (erro) {
     if (ehConflitoDeUnico(erro)) return recusa("em-andamento", tipo);
     throw erro;
+  }
+
+  // Pela via do Instagram o contêiner só nasce quando o vídeo chegar (ele leva o endereço do vídeo): aqui só a reserva do roteiro. Aproveita para varrer o que ficou para trás.
+  if (conta.via === "instagram") {
+    void varrerVideosVelhos(agora).catch(() => undefined);
+    return { ok: true, publicacaoId: linha.id };
   }
 
   try {
@@ -346,7 +359,6 @@ function contador(tamanho: number): TransformStream<Uint8Array, Uint8Array> {
  * que foi declarado ao começar. Terminou bem: a publicação passa a `processando` e a primeira conferência é agendada. Falhou: `falhou` com a frase.
  */
 export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicacao = {}): Promise<ResultadoDoVideo> {
-  const agora = relogio(deps);
   const { usuarioId, clienteId, publicacaoId } = entrada;
   const semStatus = (codigo: CodigoDeRecusa | CodigoDeFalha, status: number, tipo: TipoDePublicacao = "reels"): ResultadoDoVideo => ({
     ok: false,
@@ -356,12 +368,76 @@ export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicac
   });
 
   if (!(await ehDonoDaMarca(usuarioId, clienteId))) return semStatus("so-dono", 403);
+  // Um envio por publicação por vez. Quem chega com outro já em curso recebe a recusa SEM tocar em nada: não grava, não abre contêiner, não derruba a publicação e não apaga o arquivo que a Meta baixa.
+  const reserva = await reservarEnvio(publicacaoId);
+  if (reserva === "ocupada") return semStatus("envio-em-curso", 409);
+  if (reserva === "indisponivel") return semStatus("nao-comecou", 503);
+  try {
+    return await receberVideoReservado(entrada, deps, semStatus);
+  } finally {
+    await reserva.soltar();
+  }
+}
+
+/**
+ * A reserva do envio: uma trava de aviso do Postgres (`pg_try_advisory_lock`) por publicação, segurada por uma conexão só dela até o envio acabar. Sem migração e sem estado novo na tabela; se o
+ * processo cair, a conexão cai e a trava se solta sozinha (um estado `reservado` na tabela ficaria preso para sempre). Custa uma conexão do pool por envio em andamento, e há poucos ao mesmo tempo.
+ */
+async function reservarEnvio(publicacaoId: number): Promise<"ocupada" | "indisponivel" | { soltar: () => Promise<void> }> {
+  let conexao;
+  try {
+    conexao = await getPool().connect();
+  } catch (erro) {
+    logger.warn({ err: erro, publicacaoId }, "publicar: sem conexao para reservar o envio");
+    return "indisponivel";
+  }
+  // Um erro numa conexão emprestada sem ouvinte derrubaria o processo. O ouvinte sai na devolução, para não se acumular na conexão que volta ao pool.
+  const ignorar = () => undefined;
+  conexao.on("error", ignorar);
+  const devolver = (destruir?: boolean) => {
+    conexao.off("error", ignorar);
+    conexao.release(destruir);
+  };
+  try {
+    const { rows } = await conexao.query<{ ok: boolean }>("select pg_try_advisory_lock($1, $2) as ok", [TRAVA_DO_ENVIO, publicacaoId]);
+    if (!rows[0]?.ok) {
+      devolver();
+      return "ocupada";
+    }
+  } catch (erro) {
+    logger.warn({ err: erro, publicacaoId }, "publicar: nao foi possivel reservar o envio");
+    devolver(true);
+    return "indisponivel";
+  }
+  return {
+    soltar: async () => {
+      try {
+        await conexao.query("select pg_advisory_unlock($1, $2)", [TRAVA_DO_ENVIO, publicacaoId]);
+        devolver();
+      } catch {
+        // Destruir a conexão solta a trava do mesmo jeito.
+        devolver(true);
+      }
+    },
+  };
+}
+
+/** Primeira parte do par da trava de aviso: separa esta trava de qualquer outra que o aplicativo venha a ter. */
+const TRAVA_DO_ENVIO = 5619;
+
+async function receberVideoReservado(
+  entrada: EntradaDoVideo,
+  deps: DepsDaPublicacao,
+  semStatus: (codigo: CodigoDeRecusa | CodigoDeFalha, status: number, tipo?: TipoDePublicacao) => ResultadoDoVideo,
+): Promise<ResultadoDoVideo> {
+  const agora = relogio(deps);
+  const { clienteId, publicacaoId } = entrada;
   const [linha] = await db()
     .select()
     .from(publicacoes)
     .where(and(eq(publicacoes.id, publicacaoId), eq(publicacoes.clienteId, clienteId)));
   if (!linha) return semStatus("nao-achou", 404);
-  if (linha.estado !== "enviando" || !linha.containerId) return semStatus("em-andamento", 409, linha.tipo);
+  if (linha.estado !== "enviando") return semStatus("em-andamento", 409, linha.tipo);
   if (!entrada.corpo || entrada.tamanhoDoPedido !== linha.tamanhoBytes) {
     await falhar(linha, { codigo: "envio-interrompido" }, agora);
     return semStatus("envio-interrompido", 400, linha.tipo);
@@ -373,6 +449,10 @@ export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicac
     return semStatus(RECUSA_POR_CONTA[acesso.recusa], 409, linha.tipo);
   }
   const { conta } = acesso;
+
+  if (conta.via === "instagram") return receberPeloInstagram({ linha, conta, corpo: entrada.corpo, publicacaoId, clienteId, semStatus }, deps, agora);
+  // Via do Facebook: o contêiner de envio retomável já foi aberto ao começar.
+  if (!linha.containerId) return semStatus("em-andamento", 409, linha.tipo);
 
   try {
     await enviarVideo({ containerId: linha.containerId, token: conta.token, tamanho: linha.tamanhoBytes, corpo: entrada.corpo.pipeThrough(contador(linha.tamanhoBytes)) });
@@ -392,6 +472,60 @@ export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicac
     await (deps.agendar ?? agendarNaFila)(publicacaoId, esperaDaConferencia(0));
   } catch (erro) {
     // A tela também confere (`conferirPublicacao` pela ação): sem a fila, o vídeo continua sendo publicado enquanto a pessoa estiver nela.
+    logger.warn({ err: erro, publicacaoId }, "publicar: nao foi possivel agendar a conferencia");
+  }
+  return { ok: true };
+}
+
+/**
+ * E19b, via do Instagram: guarda o vídeo em disco, abre o contêiner com o endereço público dele (`video_url`) e passa a `processando`. A Meta baixa o vídeo sozinha; a conferência (tela e worker)
+ * espera o `status_code` e publica, como na outra via. Falhou em qualquer ponto: o arquivo some e a publicação vira `falhou` com a frase.
+ */
+async function receberPeloInstagram(
+  ctx: {
+    linha: Publicacao;
+    conta: { id: number; igId: string; token: string };
+    corpo: ReadableStream<Uint8Array>;
+    publicacaoId: number;
+    clienteId: number;
+    semStatus: (codigo: CodigoDeRecusa | CodigoDeFalha, status: number, tipo?: TipoDePublicacao) => ResultadoDoVideo;
+  },
+  deps: DepsDaPublicacao,
+  agora: Date,
+): Promise<ResultadoDoVideo> {
+  const { linha, conta, publicacaoId, clienteId, semStatus } = ctx;
+  try {
+    await guardarVideo(publicacaoId, ctx.corpo, linha.tamanhoBytes);
+  } catch (erro) {
+    logger.warn({ clienteId, publicacaoId, motivo: erro instanceof Error ? erro.message : "erro" }, "publicar: o video nao chegou inteiro");
+    await falhar(linha, { codigo: "envio-interrompido" }, agora);
+    return semStatus("envio-interrompido", 400, linha.tipo);
+  }
+
+  let containerId: string;
+  try {
+    ({ containerId } = await criarContainerDeVideo({ igId: conta.igId, token: conta.token, tipo: linha.tipo, legenda: linha.legenda, via: "instagram", videoUrl: enderecoPublicoDoVideo(publicacaoId, agora) }));
+  } catch (erro) {
+    const falha = classificarFalha(erro);
+    logger.warn({ clienteId, publicacaoId, codigo: falha.codigoMeta, subcodigo: falha.subcodigoMeta }, "publicar: a Meta nao abriu o envio");
+    await falhar(linha, falha, agora);
+    await registrarFalhaNaConta(conta.id, falha, agora);
+    return semStatus(falha.codigo, 502, linha.tipo);
+  }
+
+  // O mesmo passo da outra via ("o vídeo terminou de subir"): guarda o contêiner e `atualizadaEm` passa a contar o prazo de preparo. Se a pessoa cancelou no meio, não sobra nada vivo.
+  const [seguiu] = await db()
+    .update(publicacoes)
+    .set({ containerId, estado: "processando", atualizadaEm: agora })
+    .where(and(eq(publicacoes.id, publicacaoId), eq(publicacoes.clienteId, clienteId), eq(publicacoes.estado, "enviando")))
+    .returning({ id: publicacoes.id });
+  if (!seguiu) {
+    await descartarVideo(publicacaoId);
+    return semStatus("envio-interrompido", 409, linha.tipo);
+  }
+  try {
+    await (deps.agendar ?? agendarNaFila)(publicacaoId, esperaDaConferencia(0));
+  } catch (erro) {
     logger.warn({ err: erro, publicacaoId }, "publicar: nao foi possivel agendar a conferencia");
   }
   return { ok: true };
@@ -481,7 +615,7 @@ export async function conferirPublicacao(publicacaoId: number, opcoes: DepsDaPub
 
   let status: Awaited<ReturnType<typeof statusDoContainer>>;
   try {
-    status = await statusDoContainer(linha.containerId, conta.token);
+    status = await statusDoContainer(linha.containerId, conta.token, conta.via);
   } catch (erro) {
     const falha = classificarFalha(erro);
     if (falha.codigo === "acesso-perdido" || falha.codigo === "sem-permissao") {
@@ -515,7 +649,7 @@ export async function conferirPublicacao(publicacaoId: number, opcoes: DepsDaPub
 
   let midiaId: string;
   try {
-    ({ midiaId } = await publicarContainer({ igId: conta.igId, containerId: linha.containerId, token: conta.token }));
+    ({ midiaId } = await publicarContainer({ igId: conta.igId, containerId: linha.containerId, token: conta.token, via: conta.via }));
   } catch (erro) {
     const falha = classificarFalha(erro);
     if (falha.subcodigoMeta === 2207027) {
@@ -530,7 +664,7 @@ export async function conferirPublicacao(publicacaoId: number, opcoes: DepsDaPub
     return { vista: vista((await carregar(publicacaoId, opcoes.clienteId)) ?? linha), reconferirEmSeg: null };
   }
 
-  const permalink = await enderecoDaMidia(midiaId, conta.token);
+  const permalink = await enderecoDaMidia(midiaId, conta.token, conta.via);
   await concluir(reservada, { midiaId, permalink }, conta.nome, agora);
   return { vista: vista((await carregar(publicacaoId, opcoes.clienteId)) ?? linha), reconferirEmSeg: null };
 }
@@ -542,6 +676,7 @@ async function concluir(linha: Publicacao, resultado: { midiaId: string | null; 
     .set({ estado: "publicada", midiaId: resultado.midiaId, permalink: resultado.permalink, motivo: null, terminadaEm: agora, atualizadaEm: agora })
     .where(and(eq(publicacoes.id, linha.id), eq(publicacoes.clienteId, linha.clienteId)));
   logger.info({ clienteId: linha.clienteId, publicacaoId: linha.id, tipo: linha.tipo }, "publicar: publicado no instagram");
+  await descartarVideo(linha.id);
 
   try {
     const roteiro = await roteiroPorId(linha.roteiroId, linha.clienteId);
@@ -565,6 +700,8 @@ async function concluir(linha: Publicacao, resultado: { midiaId: string | null; 
  * Para o worker: confere e, se ainda falta esperar, agenda a próxima conferência. O resumo vai para `execucoes_job`: só números e o estado, nunca nome de conta nem acesso.
  */
 export async function rodarConferenciaDaPublicacao(publicacaoId: number, deps: DepsDaPublicacao = {}): Promise<Record<string, unknown>> {
+  // Pasta compartilhada com o app (volume em produção): quem roda a conferência aproveita para varrer vídeo velho esquecido.
+  void varrerVideosVelhos(relogio(deps)).catch(() => undefined);
   const resultado = await conferirPublicacao(publicacaoId, deps);
   if (resultado.reconferirEmSeg !== null) await (deps.agendar ?? agendarNaFila)(publicacaoId, resultado.reconferirEmSeg);
   return { publicacaoId, estado: resultado.vista?.estado ?? "inexistente", reconferirEmSeg: resultado.reconferirEmSeg };

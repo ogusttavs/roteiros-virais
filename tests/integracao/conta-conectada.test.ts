@@ -183,6 +183,9 @@ beforeAll(async () => {
   config.metaConexao.tokenChave = Buffer.alloc(32, 11).toString("base64");
   config.metaConexao.redirectUri = "http://localhost:3000/api/meta/retorno";
   config.metaConexao.ativa = true;
+  // E19b: estes testes cobrem a via do Facebook (código antigo, desligada por padrão); a do Instagram tem os seus.
+  config.metaConexao.viaFacebookLigada = true;
+  config.metaConexao.instagram.ativa = false;
 
   const [nicho] = await db().insert(nichos).values({ slug: "conta-conectada-teste", nome: "Conta conectada teste", termos: [] }).returning();
   await db().insert(user).values([
@@ -221,6 +224,9 @@ beforeEach(async () => {
   estado.sessao = null;
   estado.verComo = false;
   config.metaConexao.ativa = true;
+  // E19b: estes testes cobrem a via do Facebook (código antigo, desligada por padrão); a do Instagram tem os seus.
+  config.metaConexao.viaFacebookLigada = true;
+  config.metaConexao.instagram.ativa = false;
   config.metaConexao.appSecret = SEGREDO_DO_APP;
 });
 
@@ -631,6 +637,9 @@ describe("isolamento entre marcas", () => {
     expect(await contaParaLeitura(marcaA)).toBeNull();
     expect((await linhas())[0].erro).toBeNull();
     config.metaConexao.ativa = true;
+    // E19b: estes testes cobrem a via do Facebook (código antigo, desligada por padrão); a do Instagram tem os seus.
+    config.metaConexao.viaFacebookLigada = true;
+    config.metaConexao.instagram.ativa = false;
     expect((await contaParaLeitura(marcaA))?.token).toBe("EAA-LONGO-A");
   });
 

@@ -2530,6 +2530,11 @@ export const hashtagsMetaUsadas = pgTable(
  * `erro` é a frase curta do último problema (token que a Meta recusou, renovação que falhou), nunca com token; vazio quando está tudo bem.
  */
 export type EstadoContaConectada = "ativa" | "escolher";
+/**
+ * E19b: de qual via a conta foi ligada. `instagram` = API do Instagram com o Login do Instagram (`graph.instagram.com`, sem Página do Facebook); `facebook` = Login do Facebook para Empresas (E19, `graph.facebook.com`).
+ * Contas anteriores a E19b ficam `facebook`.
+ */
+export type ViaDaLigacao = "facebook" | "instagram";
 
 export const contasConectadas = pgTable(
   "contas_conectadas",
@@ -2545,6 +2550,8 @@ export const contasConectadas = pgTable(
     paginaNome: text("pagina_nome"),
     metaUsuarioId: text("meta_usuario_id").notNull(),
     estado: text("estado").$type<EstadoContaConectada>().notNull().default("ativa"),
+    /** E19b: a via da ligação (ver `ViaDaLigacao`). Define o endereço da Graph API, o jeito de renovar o acesso e o jeito de enviar o vídeo. */
+    via: text("via").$type<ViaDaLigacao>().notNull().default("facebook"),
     tokenCifrado: text("token_cifrado").notNull(),
     /** Quando o token vence (a Meta diz em segundos, na troca); nulo quando ela não disse. */
     tokenExpiraEm: timestamp("token_expira_em", { withTimezone: true }),

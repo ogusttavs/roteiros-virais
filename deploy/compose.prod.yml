@@ -33,6 +33,12 @@ services:
     container_name: roteiros-app
     restart: unless-stopped
     env_file: .env
+    # E19b: o video de uma publicacao pelo Instagram espera a Meta baixar numa pasta que o app (upload e entrega do arquivo) e o worker (conferencia, que apaga) enxergam
+    # juntos: volume nomeado, mesmo caminho nos dois. PUBLICAR_PASTA_TEMP aponta para ele.
+    environment:
+      PUBLICAR_PASTA_TEMP: /var/publicar
+    volumes:
+      - roteiros_publicar:/var/publicar
     depends_on:
       roteiros-postgres:
         condition: service_healthy
@@ -55,6 +61,11 @@ services:
     # chegar ao worker: toda variavel do .env passa, sem precisar listar em
     # "environment:".
     env_file: .env
+    # E19b: o mesmo volume do app (ver la). O worker apaga o video quando a publicacao termina e varre o que ficou velho.
+    environment:
+      PUBLICAR_PASTA_TEMP: /var/publicar
+    volumes:
+      - roteiros_publicar:/var/publicar
     depends_on:
       roteiros-postgres:
         condition: service_healthy
@@ -110,5 +121,7 @@ networks:
 volumes:
   roteiros_pg:
     name: roteiros_pg
+  roteiros_publicar:
+    name: roteiros_publicar
   roteiros_backups:
     name: roteiros_backups

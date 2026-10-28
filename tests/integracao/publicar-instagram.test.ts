@@ -257,6 +257,9 @@ beforeAll(async () => {
   config.metaConexao.tokenChave = Buffer.alloc(32, 13).toString("base64");
   config.metaConexao.redirectUri = "http://localhost:3000/api/meta/retorno";
   config.metaConexao.ativa = true;
+  // E19b: estes testes cobrem a via do Facebook (código antigo, desligada por padrão); a do Instagram tem os seus.
+  config.metaConexao.viaFacebookLigada = true;
+  config.metaConexao.instagram.ativa = false;
 
   const [nicho] = await db().insert(nichos).values({ slug: "publicar-instagram-teste", nome: "Publicar Instagram teste", termos: [] }).returning();
   nichoId = nicho.id;
@@ -313,6 +316,9 @@ beforeEach(async () => {
   estado.verComo = false;
   estado.barrada = false;
   config.metaConexao.ativa = true;
+  // E19b: estes testes cobrem a via do Facebook (código antigo, desligada por padrão); a do Instagram tem os seus.
+  config.metaConexao.viaFacebookLigada = true;
+  config.metaConexao.instagram.ativa = false;
   instalarMeta();
 });
 

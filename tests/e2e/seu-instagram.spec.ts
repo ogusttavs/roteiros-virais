@@ -80,6 +80,9 @@ test.describe("Seu Instagram, em Conta", () => {
     await expect(c).toContainText("o nome da sua conta");
     await expect(c).toContainText("ler as suas mensagens nem postar sem você pedir");
     await expect(c).toContainText("a ligação direta abre para todos quando a Meta aprovar o aplicativo");
+    // E19b: a frase de quem tem conta pessoal (precisa trocar para profissional, de graça).
+    await expect(c.locator('[data-parte="conta-profissional"]')).toContainText("precisa ser uma conta profissional");
+    await expect(c.locator('[data-parte="conta-profissional"]')).toContainText("Mudar para conta profissional");
     await expect(c.getByRole("link", { name: "Ligar o meu Instagram" })).toHaveAttribute("href", "/api/meta/conectar");
     // Nada foi pedido à Meta só por abrir a tela.
     expect(meta.chamadas).toHaveLength(0);
@@ -96,25 +99,32 @@ test.describe("Seu Instagram, em Conta", () => {
     await expect(c).toHaveAttribute("data-estado", "ligada");
     await expect(c.getByRole("status")).toContainText(textosLigacao.retorno.ligada);
     await expect(c.getByText("@casa.em.ordem.e2e")).toBeVisible();
-    await expect(c.getByText("Casa em Ordem E2E")).toBeVisible();
+    // Pela via do Instagram não há Página do Facebook no caminho: o cartão não mostra nome de Página.
+    await expect(c).not.toContainText("Casa em Ordem E2E");
     await expect(c.getByText(/^\d\d\/\d\d\/\d{4}$/)).toBeVisible();
     await expect(c).toContainText(t.semLeitura);
     await expect(c.getByRole("button", { name: "Desligar" })).toBeVisible();
     await expect(c.getByRole("link")).toHaveCount(0);
 
-    // O que o aplicativo pediu à Meta: o diálogo com o fluxo de código e a configuração, depois a troca do código e do acesso longo, só no simulador.
-    const dialogo = meta.chamadas.find((x) => x.caminho === "/dialog/oauth");
-    expect(dialogo?.parametros.response_type).toBe("code");
-    expect(dialogo?.parametros.config_id).toBe("2000000000000002");
-    expect(dialogo?.parametros.client_id).toBe("1000000000000001");
-    const troca = meta.chamadas.find((x) => x.caminho === "/graph/oauth/access_token" && !x.parametros.grant_type);
-    expect(troca?.parametros.code).toBe(CODIGO_SIMULADO);
-    expect(meta.chamadas.some((x) => x.caminho === "/graph/me/accounts" && x.parametros.appsecret_proof)).toBe(true);
+    // O que o aplicativo pediu à Meta (E19b, Login do Instagram): o diálogo do Instagram com o fluxo de código e os escopos, a troca do código, a troca para o acesso longo e quem é a conta. Só no simulador.
+    const dialogo = meta.chamadas.find((x) => x.caminho === "/instagram/oauth/authorize");
+    expect(dialogo?.parametros).toMatchObject({
+      response_type: "code",
+      client_id: "1000000000000001",
+      scope: "instagram_business_basic,instagram_business_manage_insights,instagram_business_content_publish",
+    });
+    expect(dialogo?.parametros.config_id).toBeUndefined();
+    const troca = meta.chamadas.find((x) => x.caminho === "/instagram/api/oauth/access_token");
+    expect(troca).toMatchObject({ metodo: "POST", parametros: { code: CODIGO_SIMULADO, grant_type: "authorization_code", segredoEnviado: "sim" } });
+    expect(meta.chamadas.some((x) => x.caminho === "/graph-ig/access_token" && x.parametros.grant_type === "ig_exchange_token")).toBe(true);
+    expect(meta.chamadas.some((x) => x.caminho === "/graph-ig/me")).toBe(true);
+    // Nada do caminho do Facebook: sem Página, sem diálogo do Facebook, sem `/me/accounts`.
+    expect(meta.chamadas.some((x) => x.caminho.startsWith("/graph/") || x.caminho === "/dialog/oauth")).toBe(false);
 
     // No banco: a conta ativa da marca, com o acesso cifrado (nunca o texto do acesso).
     const linhas = await db().select().from(contasConectadas).where(eq(contasConectadas.clienteId, marca));
     expect(linhas).toHaveLength(1);
-    expect(linhas[0]).toMatchObject({ contaId: CONTA_PADRAO.igId, nome: CONTA_PADRAO.username, estado: "ativa", conectadoPor: DONO });
+    expect(linhas[0]).toMatchObject({ contaId: CONTA_PADRAO.igId, nome: CONTA_PADRAO.username, estado: "ativa", conectadoPor: DONO, via: "instagram", paginaId: null, publicarLiberado: true });
     expect(linhas[0].tokenCifrado).not.toContain(TOKEN_LONGO_SIMULADO);
     expect(linhas[0].tokenCifrado).not.toContain(TOKEN_CURTO_SIMULADO);
 
@@ -155,59 +165,34 @@ test.describe("Seu Instagram, em Conta", () => {
     await expect(cartao(page)).toHaveAttribute("data-estado", "sem-ligacao");
     expect(await db().select().from(contasConectadas).where(eq(contasConectadas.clienteId, marca))).toHaveLength(0);
     // O acesso nunca foi pedido: a pessoa cancelou antes.
-    expect(meta.chamadas.some((x) => x.caminho.startsWith("/graph/"))).toBe(false);
+    expect(meta.chamadas.some((x) => x.caminho.startsWith("/graph-ig/") || x.caminho.startsWith("/instagram/api/"))).toBe(false);
   });
 
-  test("sem Instagram profissional na Página, e com uma permissão que ficou sem liberar: cada uma com a sua frase", async ({ page }) => {
+  test("conta pessoal, permissão que ficou sem liberar e erro da Meta: cada um com a sua frase, e nada é ligado", async ({ page }) => {
     await entrar(page, DONO_EMAIL, /\/(hoje|comecar)/);
 
-    meta.cenario = { contas: [] };
+    meta.cenario = { tipoDeConta: "PERSONAL" };
     await page.goto("/api/meta/conectar");
-    await expect(cartao(page).getByRole("alert")).toContainText("Não achamos um Instagram profissional");
+    await expect(cartao(page).getByRole("alert")).toContainText("é uma conta pessoal");
+    await expect(cartao(page).getByRole("alert")).toContainText("Mudar para conta profissional");
     expect(await db().select().from(contasConectadas).where(eq(contasConectadas.clienteId, marca))).toHaveLength(0);
 
-    meta.cenario = { permissoesLiberadas: ["instagram_basic", "pages_show_list"] };
+    meta.cenario = { permissoesLiberadas: ["instagram_business_basic"] };
     await page.goto("/api/meta/conectar");
     await expect(cartao(page).getByRole("alert")).toContainText(textosLigacao.retorno.permissao);
     expect(await db().select().from(contasConectadas).where(eq(contasConectadas.clienteId, marca))).toHaveLength(0);
 
-    meta.cenario = { erroEm: "contas" };
+    meta.cenario = { erroEm: "usuario" };
     await page.goto("/api/meta/conectar");
     await expect(cartao(page).getByRole("alert")).toContainText(textosLigacao.retorno.falhou);
-  });
-
-  test("mais de um Instagram nas Páginas: a lista para escolher, e a escolha liga só a escolhida", async ({ page }) => {
-    meta.cenario = {
-      contas: [
-        { paginaId: "p1", paginaNome: "Pagina Um", igId: "17841400000000201", username: "loja.um" },
-        { paginaId: "p2", paginaNome: "Pagina Dois", igId: "17841400000000202", username: "loja.dois" },
-      ],
-    };
-    await entrar(page, DONO_EMAIL, /\/(hoje|comecar)/);
-    await page.goto("/api/meta/conectar");
-    const c = cartao(page);
-    await expect(c).toHaveAttribute("data-estado", "escolher");
-    await expect(c.getByRole("status")).toContainText(textosLigacao.retorno.escolher);
-    const itens = c.getByRole("listitem");
-    await expect(itens).toHaveCount(2);
-    await expect(itens.nth(0)).toContainText("@loja.dois");
-    await expect(itens.nth(1)).toContainText("@loja.um");
-    // Nada está ativo ainda: as duas são só candidatas.
-    expect((await db().select().from(contasConectadas).where(eq(contasConectadas.clienteId, marca))).map((l) => l.estado)).toEqual(["escolher", "escolher"]);
-
-    await itens.nth(1).getByRole("button", { name: "Escolher" }).click();
-    await expect(c).toHaveAttribute("data-estado", "ligada");
-    await expect(c.getByText("@loja.um")).toBeVisible();
-    await expect(c.getByRole("listitem")).toHaveCount(0);
-    const linhas = await db().select().from(contasConectadas).where(eq(contasConectadas.clienteId, marca));
-    expect(linhas).toHaveLength(1);
-    expect(linhas[0]).toMatchObject({ contaId: "17841400000000201", estado: "ativa" });
+    expect(await db().select().from(contasConectadas).where(eq(contasConectadas.clienteId, marca))).toHaveLength(0);
   });
 
   test("o problema guardado na conta aparece com a frase pronta, e 'Ligar de novo' refaz o caminho", async ({ page }) => {
     await db().insert(contasConectadas).values({
       clienteId: marca,
       plataforma: "instagram",
+      via: "instagram",
       contaId: CONTA_PADRAO.igId,
       nome: CONTA_PADRAO.username,
       paginaNome: CONTA_PADRAO.paginaNome,
@@ -236,6 +221,7 @@ test.describe("Seu Instagram, em Conta", () => {
     await db().insert(contasConectadas).values({
       clienteId: marca,
       plataforma: "instagram",
+      via: "instagram",
       contaId: CONTA_PADRAO.igId,
       nome: CONTA_PADRAO.username,
       metaUsuarioId: "meta-pessoa-e2e",
@@ -264,6 +250,7 @@ test.describe("Seu Instagram, em Conta", () => {
     await db().insert(contasConectadas).values({
       clienteId: marca,
       plataforma: "instagram",
+      via: "instagram",
       contaId: CONTA_PADRAO.igId,
       nome: CONTA_PADRAO.username,
       metaUsuarioId: "meta-pessoa-e2e",
