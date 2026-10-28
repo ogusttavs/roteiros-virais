@@ -18,6 +18,7 @@ import { HojeCabecalho } from "../hoje/HojeCabecalho";
 import styles from "../hoje/HojeTela.module.css";
 
 import { CabecaPlano, type Visao } from "./CabecaPlano";
+import { ProvedorMovidosDeDia } from "./MovidosDeDia";
 
 export type PropsCabecaPlano = {
   rotuloPeriodo: string;
@@ -116,7 +117,9 @@ export function PlanejadorTela({ visao, cabeca, marcaAtiva, marcas, nomePessoa, 
       ) : (
         <div className={styles.miolo}>
           <CabecaPlano visao={visao} {...cabeca} aoAbrirContarAgenda={abrirContarAgenda} />
-          <ContextoContarAgenda.Provider value={abrirContarAgenda}>{children}</ContextoContarAgenda.Provider>
+          <ContextoContarAgenda.Provider value={abrirContarAgenda}>
+            <ProvedorMovidosDeDia>{children}</ProvedorMovidosDeDia>
+          </ContextoContarAgenda.Provider>
         </div>
       )}
 

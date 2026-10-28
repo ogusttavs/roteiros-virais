@@ -232,8 +232,8 @@ test.describe("planejador, mover de dia por arrasto (E39c, parte 2b)", () => {
 
     await origem.dragTo(destino);
 
-    // O dia 9 continua selecionado: espera na própria página até o `router.refresh()` esvaziar a
-    // lista dele, antes de navegar para o dia 11 (navegar cedo demais corre com a escrita no banco).
+    // O dia 9 continua selecionado: espera na própria página até a lista dele esvaziar (o item sai na hora que a ação termina, `MovidosDeDia.tsx`, sem depender de o
+    // Next.js aplicar a revalidação), antes de navegar para o dia 11 (navegar cedo demais corre com a escrita no banco).
     await expect(page.getByText("o item que vai ser arrastado")).toHaveCount(0);
 
     await page.goto(`/planejamento?visao=mes&mes=${MES_DO_TESTE}&dia=${DIA_VAZIO}`);

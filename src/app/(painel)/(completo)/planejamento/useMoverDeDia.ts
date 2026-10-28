@@ -8,11 +8,14 @@ import { textosHoje } from "@/textos/hoje";
 
 import { mudarDataAtrasadoAction } from "../hoje/agenda-acoes";
 
+import { useMovidosDeDia } from "./MovidosDeDia";
+
 /** Do tablet deitado para cima (passo 12 do Opus); abaixo disso o arrasto não começa e o menu
  * de três ações continua sendo o único caminho, como em qualquer tamanho de tela. */
 const LARGURA_ARRASTO = 1024;
 
 type ItemArrastavel = { id: number; tipo: FormatoRoteiro; titulo: string };
+type ItemComOrigem = ItemArrastavel & { deData: string };
 
 /**
  * E39c, parte 2b: mover um item de dia arrastando, na Semana e no Mês, do tablet deitado para
@@ -29,9 +32,10 @@ type ItemArrastavel = { id: number; tipo: FormatoRoteiro; titulo: string };
  * passado ou o próprio dia de origem).
  */
 export function useMoverDeDia() {
-  const [itemArrastando, setItemArrastando] = useState<(ItemArrastavel & { deData: string }) | null>(null);
+  const { registrar } = useMovidosDeDia();
+  const [itemArrastando, setItemArrastando] = useState<ItemComOrigem | null>(null);
   const [diaAlvo, setDiaAlvo] = useState<string | null>(null);
-  const [pendente, setPendente] = useState<(ItemArrastavel & { paraData: string }) | null>(null);
+  const [pendente, setPendente] = useState<(ItemArrastavel & { deData: string; paraData: string }) | null>(null);
   const [movendo, iniciarTransicao] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
 
@@ -65,14 +69,14 @@ export function useMoverDeDia() {
     setDiaAlvo(null);
   }
 
-  function mover(item: ItemArrastavel, paraData: string) {
+  function mover(item: ItemArrastavel, deData: string, paraData: string) {
     setErro(null);
     iniciarTransicao(async () => {
       try {
-        // Sem `router.refresh()` aqui: a ação já revalida `/planejamento` (`revalidarAgenda`), e o Next.js reexecuta a tela como parte da resposta dela. Um refresh
-        // a mais disputa a mesma transição com essa revalidação e, com o servidor rápido da CI, a tela ficava presa no dia antigo (o mesmo achado do PR #47,
-        // `useTrocarMarca.ts`). Um caminho só.
+        // Sem `router.refresh()` aqui: a ação já revalida `/planejamento` (`revalidarAgenda`), e o Next.js reexecuta a tela como parte da resposta dela; um refresh a mais
+        // disputa a mesma transição (o mesmo achado do PR #47, `useTrocarMarca.ts`). O que a pessoa vê não espera por isso: o item já aparece no dia novo (`MovidosDeDia.tsx`).
         dadoOuErro(await mudarDataAtrasadoAction(item.id, paraData));
+        registrar({ id: item.id, de: deData, para: paraData });
       } catch (falha) {
         // A frase de recusa do servidor ("Não muda de dia: ...") chega inteira; qualquer outra falha cai no texto de sempre.
         setErro(falha instanceof ErroDeAcao ? falha.message : textosHoje.agenda.planejador.erroMover);
@@ -86,15 +90,15 @@ export function useMoverDeDia() {
     aoTerminarArrasto();
     if (!item || data === item.deData) return;
     if (temConflito) {
-      setPendente({ id: item.id, tipo: item.tipo, titulo: item.titulo, paraData: data });
+      setPendente({ id: item.id, tipo: item.tipo, titulo: item.titulo, deData: item.deData, paraData: data });
       return;
     }
-    mover(item, data);
+    mover(item, item.deData, data);
   }
 
   function confirmarMoverMesmoAssim() {
     if (!pendente) return;
-    mover(pendente, pendente.paraData);
+    mover(pendente, pendente.deData, pendente.paraData);
     setPendente(null);
   }
 
