@@ -950,6 +950,23 @@ function mockTemasDoDia(entrada: string) {
     };
   }
 
+  // E61 PR 2: com o foco da conta na entrada, os temas nascem para ele (o título leva o começo do foco, para o teste ver que o texto é da conta e não do setor).
+  const foco = /<foco>([^<]*)<\/foco>/.exec(entrada)?.[1]?.trim();
+  if (foco) {
+    // "dois-temas-simulado" no foco: o modelo propõe só dois (o terceiro vem do setor), para o teste do dia completado.
+    return {
+      temas: [0, 1, 2].slice(0, foco.includes("dois-temas-simulado") ? 2 : 3).map((i) => ({
+        titulo: `tema do foco simulado ${i + 1}: ${foco.slice(0, 40)}`,
+        descricao: `tema escrito para o foco desta conta: ${foco.slice(0, 80)}`,
+        porQue: "os videos da lista tratam do assunto do foco e passaram da prova",
+        evidencias: ids,
+        evidenciasNoticias: [],
+        puxaPara: puxaPara[i],
+        perguntaNumero: null,
+      })),
+    };
+  }
+
   return {
     // V2b, item 8: cada tema cita todos os ids de video disponiveis (não so
     // um por rodizio), para o mock simular uma prova de verdade quando o

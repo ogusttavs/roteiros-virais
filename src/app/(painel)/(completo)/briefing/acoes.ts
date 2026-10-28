@@ -19,6 +19,7 @@ import {
   tirarFoco,
   type FocoParaATela,
 } from "@/servicos/foco-da-conta";
+import { pedirTemasDaConta } from "@/servicos/temas";
 import { textosBriefing } from "@/textos/briefing";
 
 /**
@@ -97,7 +98,7 @@ export type ResultadoFoco = { ok: true; foco: FocoParaATela } | { ok: false; err
 const tf = textosBriefing.focoDaConta;
 
 /** Cada ação abaixo chama `exigirForaDoVerComo` e `exigirAssinaturaValida` antes (o `checar-ver-como` e o `checar-portao-cobranca` exigem a chamada em cada uma); aqui só roda a tarefa. */
-async function comOFoco(tarefa: (clienteId: number) => Promise<void>, frasePadrao: string): Promise<ResultadoFoco> {
+async function comOFoco(tarefa: (clienteId: number) => Promise<void>, frasePadrao: string, opcoes?: { pedirTemas?: boolean }): Promise<ResultadoFoco> {
   const cliente = await clienteDaSessaoAtual();
   let erro: string | null = null;
   try {
@@ -121,6 +122,10 @@ async function comOFoco(tarefa: (clienteId: number) => Promise<void>, frasePadra
   // Lê a linha de novo (e não a `cliente` da sessão, que pode ser a de antes da escrita).
   const atual = await clientePorId(cliente.id);
   const foco: FocoParaATela = atual ? focoParaATela(atual) : { estado: "sem" };
+  // E61 PR 2: o foco acabou de ficar confirmado (a pessoa disse "Está certo" ou escreveu o dela): os temas do dia dela nascem agora, sem esperar a madrugada. Falha aqui nunca vira erro na tela.
+  if (erro === null && opcoes?.pedirTemas && foco.estado === "confirmado" && atual) {
+    await pedirTemasDaConta(atual.id, atual.nichoId, foco.texto).catch(() => "nao");
+  }
   return erro === null ? { ok: true, foco } : { ok: false, erro, foco };
 }
 
@@ -137,13 +142,13 @@ export async function confirmarFocoAction(textoVisto: string): Promise<Resultado
   await exigirAssinaturaValida();
   return comOFoco(async (clienteId) => {
     if ((await confirmarFoco(clienteId, textoVisto)) === "mudou") throw new ErroFoco("a sugestao mudou", "ja_confirmado");
-  }, tf.erroConfirmar);
+  }, tf.erroConfirmar, { pedirTemas: true });
 }
 
 export async function escreverFocoAction(texto: string): Promise<ResultadoFoco> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  return comOFoco((clienteId) => escreverFoco(clienteId, texto), tf.erroSalvar);
+  return comOFoco((clienteId) => escreverFoco(clienteId, texto), tf.erroSalvar, { pedirTemas: true });
 }
 
 export async function tirarFocoAction(): Promise<ResultadoFoco> {

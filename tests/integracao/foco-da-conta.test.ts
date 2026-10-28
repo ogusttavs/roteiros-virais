@@ -16,6 +16,12 @@ vi.mock("@/ia/cliente", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/ia/cliente")>();
   return { ...original, gerarEstruturado: vi.fn(original.gerarEstruturado) };
 });
+// E61 PR 2: confirmar ou escrever o foco pede os temas do dia da conta pela fila; aqui a fila é um espião (a geração em si tem o próprio teste).
+const enviosDaFila = vi.hoisted(() => ({ send: vi.fn<(nome: string, dados: object, opcoes: object) => Promise<string>>(async () => "job") }));
+vi.mock("@/jobs/fila", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/jobs/fila")>();
+  return { ...original, garantirBossPronto: vi.fn(async () => undefined), boss: vi.fn(() => ({ send: enviosDaFila.send })) };
+});
 vi.mock("@/lib/ver-como", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/ver-como")>();
   return { ...original, exigirForaDoVerComo: vi.fn(original.exigirForaDoVerComo) };
@@ -110,6 +116,7 @@ beforeEach(async () => {
   await db().delete(roteiros);
   await db().delete(geracoesIA);
   vi.mocked(cliente.gerarEstruturado).mockClear();
+  enviosDaFila.send.mockClear();
   vi.mocked(exigirForaDoVerComo).mockClear();
   vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("fc-a"));
   config.cobranca.ativa = false;
@@ -352,6 +359,25 @@ describe("as Server Actions", () => {
 
     expect(await escreverFocoAction("automação de atendimento para clínicas")).toMatchObject({ ok: true, foco: { estado: "confirmado", origem: "escrito" } });
     expect(await tirarFocoAction()).toEqual({ ok: true, foco: { estado: "sem" } });
+  });
+
+  it("confirmar ou escrever o foco pede os temas do dia só dessa conta; sugerir, tirar e o erro não pedem nada", async () => {
+    await sugerirFocoAction();
+    expect(enviosDaFila.send).not.toHaveBeenCalled();
+
+    const sugerida = (await clientePorId(contaA))!.foco!;
+    await confirmarFocoAction(sugerida);
+    expect(enviosDaFila.send).toHaveBeenCalledTimes(1);
+    expect(enviosDaFila.send).toHaveBeenLastCalledWith("temas-do-dia", { nichoId, clienteId: contaA, aoAbrir: true }, expect.objectContaining({ singletonSeconds: 600 }));
+
+    await escreverFocoAction("automação de atendimento para clínicas");
+    expect(enviosDaFila.send).toHaveBeenCalledTimes(2);
+    // Nunca o texto do foco na fila: só o id da conta.
+    expect(JSON.stringify(enviosDaFila.send.mock.calls)).not.toContain("clínicas");
+
+    await escreverFocoAction("IA");
+    await tirarFocoAction();
+    expect(enviosDaFila.send).toHaveBeenCalledTimes(2);
   });
 
   it("a frase do erro vem do motivo, e o foco devolvido é o que o servidor tem", async () => {

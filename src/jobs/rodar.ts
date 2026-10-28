@@ -125,7 +125,9 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.temasDoDia]: () => {
     const nichoIdArg = process.argv.slice(3).find((arg) => /^\d+$/.test(arg));
     const forcar = process.argv.includes("--refazer");
-    return rodarTemasDoDia(nichoIdArg === undefined ? undefined : Number(nichoIdArg), { forcar });
+    // E61 PR 2: `--conta=<clienteId>` refaz só os temas por foco dessa conta (precisa do `nichoId` dela antes).
+    const contaArg = process.argv.find((arg) => /^--conta=\d+$/.test(arg));
+    return rodarTemasDoDia(nichoIdArg === undefined ? undefined : Number(nichoIdArg), { forcar, clienteId: contaArg === undefined ? undefined : Number(contaArg.slice("--conta=".length)) });
   },
   [FILAS.pesquisaDeSetor]: () => {
     const nichoIdArg = process.argv[3];

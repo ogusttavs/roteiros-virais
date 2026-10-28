@@ -18,7 +18,7 @@ export const ROTINAS: Rotina[] = [
   { chave: "publico", titulo: "Ler o que o público comenta", faz: "Lê os comentários dos vídeos mais vistos de cada ramo e junta o que o público pergunta, reclama e pede.", filas: [FILAS.comentariosSemana] },
   { chave: "longos", titulo: "Ler os vídeos longos", faz: "Uma vez por semana, escreve o que é dito nos vídeos longos do YouTube que mais se destacaram em cada ramo e lê a estrutura deles (a abertura, os capítulos, onde a pessoa sairia).", filas: [FILAS.lerLongos] },
   { chave: "modelo", titulo: "Montar o modelo do ramo", faz: "Resume o que funciona em cada ramo, com exemplos reais.", filas: [FILAS.modeloNicho] },
-  { chave: "temas", titulo: "Montar os temas do dia", faz: "Escolhe os três temas de cada ramo a partir do que subiu.", filas: [FILAS.temasDoDia] },
+  { chave: "temas", titulo: "Montar os temas do dia", faz: "Escolhe os três temas de cada ramo a partir do que subiu e, para a conta que tem foco, os três dela.", filas: [FILAS.temasDoDia] },
   { chave: "mercado", titulo: "Pesquisar o mercado de um ramo", faz: "Acha e confere as maiores contas de um ramo novo, e de novo todo mês.", filas: [FILAS.pesquisaDeSetor] },
   { chave: "lembrete", titulo: "Mandar o lembrete", faz: "Avisa cada pessoa, na hora dela, que o roteiro do dia está pronto.", filas: [FILAS.lembrete] },
   { chave: "curva", titulo: "Medir os vídeos postados", faz: "Segue o desempenho dos vídeos que as contas postaram.", filas: [FILAS.curvaCliente] },

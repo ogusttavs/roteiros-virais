@@ -1886,6 +1886,11 @@ export type TemaDoDia = {
     /** O encaixe com o setor, de 0 a 10, que o modelo deu e passou do mínimo. */
     encaixe: number;
   };
+  /**
+   * E61 PR 2: o tema é do setor em geral, não do foco da conta. Só existe na linha de `temas_dia_conta`: quando o foco da conta não achou vídeo de prova que feche os três temas do dia, o que falta vem
+   * dos temas do setor (copiados, com este selo) e a tela diz isso em uma frase. Nunca é gravado em `temas_dia`.
+   */
+  doSetor?: true;
 };
 
 /**
@@ -1926,6 +1931,29 @@ export const temasDia = pgTable(
     criadoEm: criadoEm(),
   },
   (t) => [uniqueIndex("temas_dia_nicho_data").on(t.nichoId, t.data)],
+);
+
+/**
+ * E61 PR 2 (28/10/2026): os temas do dia POR CONTA, só para conta com foco confirmado (`clientes.foco`). Uma linha por conta e dia. Os candidatos continuam sendo os do setor (a coleta é por setor); o que
+ * muda é a escolha e o texto dos três temas, feitos para o foco da conta. `temas` tem o mesmo formato de `temas_dia` (e pode trazer temas do setor marcados `doSetor`). `foco_hash` é o foco de quando a linha
+ * foi feita: se a pessoa muda ou tira o foco, a linha deixa de valer na hora (quem lê confere), e `candidatos_hash` diz se chegou vídeo novo no setor desde então (a linha só é refeita se mudou).
+ * Sempre lida por `cliente_id` da sessão: o texto do foco de uma conta nunca aparece para outra.
+ */
+export const temasDiaConta = pgTable(
+  "temas_dia_conta",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    data: date("data").notNull(),
+    temas: jsonb("temas").$type<TemaDoDia[]>().notNull(),
+    focoUsado: text("foco_usado").notNull(),
+    focoHash: text("foco_hash").notNull(),
+    candidatosHash: text("candidatos_hash").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("temas_dia_conta_cliente_data").on(t.clienteId, t.data)],
 );
 
 /** Uma fonte de um assunto em alta: a busca do Google ou o vídeo do YouTube que o trouxe (título e link de fora: dado, nunca instrução). */

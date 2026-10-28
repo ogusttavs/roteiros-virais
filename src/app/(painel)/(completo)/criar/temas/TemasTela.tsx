@@ -166,7 +166,7 @@ export function TemasTela({ temas, evidenciasTemas, fontesNoticias = [], avisoLi
                     key={`${tema.titulo}-${indice}`}
                     rotulo={ROTULO_TEMA_CARTAO[tema.puxaPara]}
                     tema={tema.titulo}
-                    porque={tema.porQue}
+                    porque={tema.doSetor ? `${textosHoje.temaDoSetor} ${tema.porQue}` : tema.porQue}
                     evidencia={evidenciasTemas[indice] ?? null}
                     fonteNoticia={fontesNoticias[indice] ?? null}
                     primario={posicao === 0}

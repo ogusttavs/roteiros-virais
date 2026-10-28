@@ -58,6 +58,8 @@ export const textosHoje = {
     quando: (dias: number) => (dias <= 0 ? "hoje" : dias === 1 ? "ontem" : `há ${dias} dias`),
     veiculoEQuando: (veiculo: string | null, quando: string) => (veiculo ? `${veiculo}, ${quando}` : quando),
   },
+  /** E61 PR 2: o tema que veio do setor e não do foco da conta (o foco não achou vídeo que mostre que o assunto funciona); vai na frente do "por que" do cartão. */
+  temaDoSetor: "Do seu setor em geral: ainda não achamos um vídeo do seu assunto que mostre que o tema funciona.",
   /** Hotfix de 23/10/2026: menos de três temas no dia (o último recurso, sem notícia nem assunto em alta que sirva); fala calma, sem culpa e sem inventar tema. */
   poucosTemas: (quantos: number) =>
     `Hoje o seu setor trouxe ${quantos === 1 ? "só um tema" : `só ${quantos === 2 ? "dois" : quantos} temas`} com fonte de verdade. Preferimos mostrar menos a inventar um tema sem base. Se quiser mais, escreva o seu assunto.`,
