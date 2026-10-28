@@ -5,7 +5,7 @@
  * código certo, só enquanto a publicação vive), o arquivo apagado em cada fim possível, o isolamento entre marcas (o acesso de cada uma), só o dono, o "ver como", o limite do dia e que o acesso
  * nunca vai para log nem para a tabela. A via do Facebook tem os testes dela em `publicar-instagram.test.ts`.
  */
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -52,6 +52,7 @@ import { config } from "@/lib/config";
 import { cifrarToken, contextoDoToken } from "@/lib/meta-token";
 import { caminhoDoVideo, criarCodigoDoVideo, VALIDADE_DO_ENDERECO_MS } from "@/lib/video-temporario";
 import { cancelarEnvio, conferirPublicacao, iniciarPublicacao, receberVideo } from "@/servicos/publicar-instagram";
+import { fraseDeRecusa } from "@/textos/publicar";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -188,6 +189,8 @@ function entrar(usuarioId: string | null): void {
 }
 
 const agoraFixo = new Date("2026-10-27T15:00:00Z");
+// O relógio da máquina é congelado em `agoraFixo` (só o `Date`; timers e rede seguem reais). Sem isso a rota do endereço público, que lê o relógio de verdade, via o código assinado com
+// `agoraFixo` como vencido assim que passassem 3 horas de 27/10 15:00Z, e a varredura comparava a idade do arquivo (mtime real) com o relógio injetado: o teste só passava no dia em que foi escrito.
 const deps = (agendar = vi.fn(async () => undefined)) => ({ agora: () => agoraFixo, agendar });
 
 function entradaDeIniciar(extra: Partial<Parameters<typeof iniciarPublicacao>[0]> & { roteiroId: number }): Parameters<typeof iniciarPublicacao>[0] {
@@ -231,6 +234,7 @@ function baixar(url: URL, metodo: "GET" | "HEAD" = "GET", cabecalhos: Record<str
 }
 
 beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ["Date"], now: agoraFixo });
   pasta = mkdtempSync(join(tmpdir(), "teste-publicar-ig-"));
   process.env.PUBLICAR_PASTA_TEMP = pasta;
   await resetarSchema(db());
@@ -294,6 +298,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  vi.useRealTimers();
   rmSync(pasta, { recursive: true, force: true });
   delete process.env.PUBLICAR_PASTA_TEMP;
   await getPool().end();
@@ -385,19 +390,24 @@ describe("a varredura no worker", () => {
     const { guardarVideo, IDADE_MAXIMA_MS } = await import("@/lib/video-temporario");
     const { utimesSync } = await import("node:fs");
     for (const id of [9001, 9002, 9003]) await guardarVideo(id, fluxoDe([1, 2, 3]), 3);
-    const velho = new Date(Date.now() - IDADE_MAXIMA_MS - 60_000);
+    // A idade vem do mtime do arquivo contra o relógio da varredura (congelado em agoraFixo): o velho passou do limite por um minuto, o recente tem um minuto de vida.
+    const velho = new Date(agoraFixo.getTime() - IDADE_MAXIMA_MS - 60_000);
+    const recente = new Date(agoraFixo.getTime() - 60_000);
     utimesSync(caminhoDoVideo(9001), velho, velho);
     utimesSync(caminhoDoVideo(9002), velho, velho);
+    utimesSync(caminhoDoVideo(9003), recente, recente);
 
     await rodarConferenciaDaPublicacao(99999999, deps());
-    await new Promise((r) => setTimeout(r, 100));
-    expect(existsSync(caminhoDoVideo(9001))).toBe(false);
-    expect(existsSync(caminhoDoVideo(9002))).toBe(false);
+    // A varredura da conferência roda solta (`void`): espera pelo efeito, não por um tempo fixo.
+    await vi.waitFor(() => {
+      expect(existsSync(caminhoDoVideo(9001))).toBe(false);
+      expect(existsSync(caminhoDoVideo(9002))).toBe(false);
+    });
     expect(existsSync(caminhoDoVideo(9003))).toBe(true);
 
     await guardarVideo(9004, fluxoDe([1]), 1);
     utimesSync(caminhoDoVideo(9004), velho, velho);
-    const resumo = await rodarRenovarContasLigadas(new Date());
+    const resumo = await rodarRenovarContasLigadas(agoraFixo);
     expect(resumo.videosVarridos).toBe(1);
     expect(existsSync(caminhoDoVideo(9004))).toBe(false);
     expect(existsSync(caminhoDoVideo(9003))).toBe(true);
@@ -580,6 +590,81 @@ describe("quem pode publicar e o limite do dia", () => {
     expect(await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA }), deps())).toMatchObject({ ok: false, codigo: "acesso-perdido" });
     const [conta] = await db().select().from(contasConectadas).where(eq(contasConectadas.clienteId, marcaA));
     expect(conta.erro).toContain("Ligue de novo");
+  });
+});
+
+describe("dois envios do mesmo vídeo ao mesmo tempo (revisão do Fable de 27/10, achado 3)", () => {
+  const partesNaPasta = () => readdirSync(pasta).filter((n) => n.endsWith(".parte"));
+
+  it("o segundo, com o primeiro ainda subindo, recebe a recusa em língua de gente e não toca em nada: o primeiro termina, um só contêiner, o arquivo inteiro", async () => {
+    const dependencias = deps();
+    const inicio = await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA, tamanhoBytes: 10 }), dependencias);
+    if (!inicio.ok) throw new Error("nao iniciou");
+
+    let liberar!: () => void;
+    const portao = new Promise<void>((resolver) => (liberar = resolver));
+    let metade = false;
+    const primeiroCorpo = new ReadableStream<Uint8Array>({
+      async pull(controle) {
+        if (!metade) {
+          metade = true;
+          controle.enqueue(new Uint8Array([1, 1, 1, 1, 1]));
+          return;
+        }
+        await portao;
+        controle.enqueue(new Uint8Array([1, 1, 1, 1, 1]));
+        controle.close();
+      },
+    });
+    const entradaBase = { usuarioId: "pv-dono-a", clienteId: marcaA, publicacaoId: inicio.publicacaoId, tamanhoDoPedido: 10 };
+    const primeiro = receberVideo({ ...entradaBase, corpo: primeiroCorpo }, dependencias);
+    // Espera o primeiro estar de fato gravando.
+    for (let i = 0; i < 100 && partesNaPasta().length === 0; i += 1) await new Promise((resolver) => setTimeout(resolver, 20));
+    expect(partesNaPasta()).toHaveLength(1);
+
+    const segundo = await receberVideo({ ...entradaBase, corpo: fluxoDe([2, 2, 2, 2, 2, 2, 2, 2, 2, 2]) }, dependencias);
+    expect(segundo).toMatchObject({ ok: false, codigo: "envio-em-curso", status: 409 });
+    if (!segundo.ok) expect(segundo.frase).toBe(fraseDeRecusa("envio-em-curso"));
+    // O segundo não derrubou a publicação, não abriu contêiner e não mexeu no arquivo.
+    expect((await linha(inicio.publicacaoId)).estado).toBe("enviando");
+    expect(dasChamadas("container")).toHaveLength(0);
+    expect(existsSync(caminhoDoVideo(inicio.publicacaoId))).toBe(false);
+    expect(partesNaPasta()).toHaveLength(1);
+
+    liberar();
+    expect(await primeiro).toEqual({ ok: true });
+    expect(await linha(inicio.publicacaoId)).toMatchObject({ estado: "processando", containerId: "container-ig-1" });
+    expect(dasChamadas("container")).toHaveLength(1);
+    expect(readFileSync(caminhoDoVideo(inicio.publicacaoId))).toEqual(Buffer.alloc(10, 1));
+    expect(partesNaPasta()).toHaveLength(0);
+
+    // A reserva se soltou: um terceiro envio depois do fim é recusado pelo estado (já processando), não pela reserva, e não apaga o vídeo.
+    const terceiro = await receberVideo({ ...entradaBase, corpo: fluxoDe([3, 3, 3, 3, 3, 3, 3, 3, 3, 3]) }, dependencias);
+    expect(terceiro).toMatchObject({ ok: false, codigo: "em-andamento", status: 409 });
+    expect(existsSync(caminhoDoVideo(inicio.publicacaoId))).toBe(true);
+  });
+
+  it("dois PUT disparados juntos pela rota: um recebe 200, o outro 409, um só contêiner e o vídeo intacto", async () => {
+    const inicio = await iniciarPublicacao(entradaDeIniciar({ roteiroId: roteiroA, tamanhoBytes: 400_000 }), deps());
+    if (!inicio.ok) throw new Error("nao iniciou");
+    entrar("pv-dono-a");
+    const pedidoRota = (n: number): [Request, { params: Promise<{ id: string }> }] => {
+      const init: RequestInit & { duplex?: string } = {
+        method: "PUT",
+        headers: { "content-type": "video/mp4", "content-length": "400000" },
+        body: new Uint8Array(400_000).fill(n) as BodyInit,
+        duplex: "half",
+      };
+      return [new Request(`http://localhost/api/publicar/${inicio.publicacaoId}/video`, init), { params: Promise.resolve({ id: String(inicio.publicacaoId) }) }];
+    };
+    const [a, b] = await Promise.all([enviarVideoRota(...pedidoRota(1)), enviarVideoRota(...pedidoRota(2))]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    expect(dasChamadas("container")).toHaveLength(1);
+    expect((await linha(inicio.publicacaoId)).estado).toBe("processando");
+    const bytes = readFileSync(caminhoDoVideo(inicio.publicacaoId));
+    expect(bytes.length).toBe(400_000);
+    expect(new Set(bytes).size).toBe(1);
+    expect(partesNaPasta()).toHaveLength(0);
   });
 });
 
