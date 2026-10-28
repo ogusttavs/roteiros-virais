@@ -188,6 +188,8 @@ function entrar(usuarioId: string | null): void {
 }
 
 const agoraFixo = new Date("2026-10-27T15:00:00Z");
+// O relógio da máquina é congelado em `agoraFixo` (só o `Date`; timers e rede seguem reais). Sem isso a rota do endereço público, que lê o relógio de verdade, via o código assinado com
+// `agoraFixo` como vencido assim que passassem 3 horas de 27/10 15:00Z, e a varredura comparava a idade do arquivo (mtime real) com o relógio injetado: o teste só passava no dia em que foi escrito.
 const deps = (agendar = vi.fn(async () => undefined)) => ({ agora: () => agoraFixo, agendar });
 
 function entradaDeIniciar(extra: Partial<Parameters<typeof iniciarPublicacao>[0]> & { roteiroId: number }): Parameters<typeof iniciarPublicacao>[0] {
@@ -231,6 +233,7 @@ function baixar(url: URL, metodo: "GET" | "HEAD" = "GET", cabecalhos: Record<str
 }
 
 beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ["Date"], now: agoraFixo });
   pasta = mkdtempSync(join(tmpdir(), "teste-publicar-ig-"));
   process.env.PUBLICAR_PASTA_TEMP = pasta;
   await resetarSchema(db());
@@ -294,6 +297,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  vi.useRealTimers();
   rmSync(pasta, { recursive: true, force: true });
   delete process.env.PUBLICAR_PASTA_TEMP;
   await getPool().end();
@@ -385,19 +389,24 @@ describe("a varredura no worker", () => {
     const { guardarVideo, IDADE_MAXIMA_MS } = await import("@/lib/video-temporario");
     const { utimesSync } = await import("node:fs");
     for (const id of [9001, 9002, 9003]) await guardarVideo(id, fluxoDe([1, 2, 3]), 3);
-    const velho = new Date(Date.now() - IDADE_MAXIMA_MS - 60_000);
+    // A idade vem do mtime do arquivo contra o relógio da varredura (congelado em agoraFixo): o velho passou do limite por um minuto, o recente tem um minuto de vida.
+    const velho = new Date(agoraFixo.getTime() - IDADE_MAXIMA_MS - 60_000);
+    const recente = new Date(agoraFixo.getTime() - 60_000);
     utimesSync(caminhoDoVideo(9001), velho, velho);
     utimesSync(caminhoDoVideo(9002), velho, velho);
+    utimesSync(caminhoDoVideo(9003), recente, recente);
 
     await rodarConferenciaDaPublicacao(99999999, deps());
-    await new Promise((r) => setTimeout(r, 100));
-    expect(existsSync(caminhoDoVideo(9001))).toBe(false);
-    expect(existsSync(caminhoDoVideo(9002))).toBe(false);
+    // A varredura da conferência roda solta (`void`): espera pelo efeito, não por um tempo fixo.
+    await vi.waitFor(() => {
+      expect(existsSync(caminhoDoVideo(9001))).toBe(false);
+      expect(existsSync(caminhoDoVideo(9002))).toBe(false);
+    });
     expect(existsSync(caminhoDoVideo(9003))).toBe(true);
 
     await guardarVideo(9004, fluxoDe([1]), 1);
     utimesSync(caminhoDoVideo(9004), velho, velho);
-    const resumo = await rodarRenovarContasLigadas(new Date());
+    const resumo = await rodarRenovarContasLigadas(agoraFixo);
     expect(resumo.videosVarridos).toBe(1);
     expect(existsSync(caminhoDoVideo(9004))).toBe(false);
     expect(existsSync(caminhoDoVideo(9003))).toBe(true);
