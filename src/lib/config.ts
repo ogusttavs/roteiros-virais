@@ -97,6 +97,11 @@ export const config = {
      * proxy engasgado.
      */
     ytdlpLimiteS: envNumero("YTDLP_LIMITE_S", 90),
+    /**
+     * Tempo limite de UMA leitura de vídeo do TikTok por URL pelo `yt-dlp` (curva do cliente), em segundos. O estudo de 27/10/2026
+     * mediu de 2,7 a 4 s por vídeo; 60 s já é proxy ou firewall engasgado.
+     */
+    tiktokYtdlpLimiteS: envNumero("TIKTOK_YTDLP_LIMITE_S", 60),
     /** Tempo limite de UMA transcrição na Groq (todas as tentativas do SDK juntas), em segundos (M5c). */
     groqLimiteS: envNumero("GROQ_LIMITE_S", 60),
   },
@@ -109,6 +114,11 @@ export const config = {
     apifyMaxItems: envNumero("APIFY_MAX_ITEMS", process.env.NODE_ENV === "production" ? 200 : 50),
     /** Teto diario de resultados do Apify (fonte "apify" em consumo_api), somando TikTok e Instagram. */
     apifyMaxResultadosDia: envNumero("APIFY_MAX_RESULTADOS_DIA", 1000),
+    /**
+     * Ler o vídeo do TikTok por URL (a curva do cliente) pelo `yt-dlp` e deixar a Apify só de reserva (27/10/2026, `tiktok-ytdlp.ts`). Ligado por padrão;
+     * `TIKTOK_YTDLP=0` volta para a Apify sozinha, sem novo deploy de código.
+     */
+    tiktokYtdlp: env("TIKTOK_YTDLP") !== "0",
     /** Id numerico da conta Instagram que enxerga a Business Discovery e a Hashtag Search (a Velura). */
     metaIgId: env("META_IG_ID"),
     /** Token permanente de usuario do sistema do Portfolio empresarial (acessos/meta-app.md). */

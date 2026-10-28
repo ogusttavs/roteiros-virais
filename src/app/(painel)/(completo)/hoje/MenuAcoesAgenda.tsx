@@ -16,6 +16,7 @@ import { Toast } from "@/ui/componentes/Toast";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
+import { useMovidosDeDia } from "../planejamento/MovidosDeDia";
 import { reprovarERescreverAction } from "../roteiros/[id]/acoes";
 
 import { mudarDataAtrasadoAction } from "./agenda-acoes";
@@ -63,6 +64,7 @@ type Props = {
 export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", aoArquivar, perguntaSeConflito, doMomento = false }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
+  const { registrar: registrarMovido } = useMovidosDeDia();
   const idDaNota = useId();
   const [menuAberto, setMenuAberto] = useState(false);
   const { fechar: fecharMenu } = useFolhaNoHistorico(menuAberto, () => setMenuAberto(false));
@@ -121,8 +123,10 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
 
   async function efetivarMudarDia(novaData: string) {
     // Sem `router.refresh()`: a ação já revalida a agenda (`revalidarAgenda`) e o Next.js reexecuta a tela com a resposta dela; um refresh a mais disputa a
-    // mesma transição e deixava a tela presa no dia antigo (ver `useMoverDeDia.ts` e `useTrocarMarca.ts`).
+    // mesma transição (ver `useMoverDeDia.ts` e `useTrocarMarca.ts`). O que a pessoa vê não espera por isso: no planejador o item já aparece no dia novo
+    // (`MovidosDeDia.tsx`; fora dele, no Hoje, o registro não faz nada).
     dadoOuErro(await mudarDataAtrasadoAction(roteiroId, novaData));
+    registrarMovido({ id: roteiroId, de: data, para: novaData });
     setFolhaMudarDiaAberta(false);
     setConfirmarMudarDia(null);
   }

@@ -9,6 +9,9 @@
  * `consumo_api`, decisao do PROXIMO.md: "Apify por cliente" soma no mesmo
  * teto do "Apify por nicho").
  *
+ * 27/10/2026: o TikTok por URL passa a ser lido primeiro pelo `yt-dlp` (`tiktok-ytdlp.ts`, de graca, pelo proxy), e a Apify fica de reserva, so quando o `yt-dlp`
+ * falha e ela tem saldo; o resumo do job conta de onde veio cada leitura (`porYtdlp`, `porApify`).
+ *
  * Instagram passa a preferir a Graph API da Meta, de graca, quando o cliente
  * tem `clientes.meta_ig_id` resolvido (`meta-ig-cliente.ts`, opportunista
  * aqui tambem, na primeira medicao de um cliente sem id ainda): lista a
@@ -43,9 +46,17 @@ import { contaParaLeitura, erroDaContaPara, registrarErroDaConta, registrarLeitu
 import { estaNaHoraDeMedir, shortcodeDoPermalink, videosParaMedir, type VideoParaMedir } from "@/servicos/curva";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 
-import { buscarInstagramPorUrl, buscarTiktokPorUrl } from "./apify-api";
+import { buscarInstagramPorUrl, buscarTiktokPorUrl, type TiktokItemBruto } from "./apify-api";
 import { definirRamoDoContexto, restaurarRamoDoContexto } from "./contexto-execucao";
 import { buscarMediaDaConta, buscarMediaPorId, buscarViewsDaMidia, ErroMetaApi, erroMetaEhTokenOuLimite, type MetaMediaItem, type TokenOuAcesso } from "./meta-api";
+import type { ExecutorDeProcesso } from "./processo";
+import {
+  ErroYtdlpTiktok,
+  FALHAS_SEGUIDAS_PARA_PARAR,
+  lerTiktokPorYtdlp,
+  motivoParaTodaARodada,
+  pausaEntreLeiturasTiktok,
+} from "./tiktok-ytdlp";
 import { buscarVideosPorId, CUSTO_LISTA } from "./youtube-api";
 
 const FONTE_YOUTUBE = "youtube";
@@ -135,40 +146,93 @@ async function medirYoutube(videos: VideoParaMedir[], agora: Date, erros: string
   return medidos;
 }
 
-async function medirTiktok(videos: VideoParaMedir[], agora: Date, erros: string[]): Promise<number> {
+/** O que a leitura do TikTok precisa de fora, trocável pelo teste: o processo do `yt-dlp` e a espera entre as leituras. */
+export type OpcoesCurva = {
+  executarYtdlp?: ExecutorDeProcesso;
+  esperar?: (ms: number) => Promise<void>;
+};
+
+type ItemTiktokLido = { item: TiktokItemBruto | null; fonte: "ytdlp" | "apify" };
+
+/**
+ * TikTok por URL (27/10/2026, `tiktok-ytdlp.ts`): o `yt-dlp` pelo proxy primeiro, em fila, com pausa de 3 a 6 s entre uma leitura e outra; a Apify só de reserva,
+ * quando o `yt-dlp` falha E ela tem saldo (chave e dentro do teto diário). Vídeo que não existe mais (o `yt-dlp` diz) não vai para a Apify: ela também não o acharia e
+ * cobraria um resultado. Falha que vale para a rodada (firewall do TikTok, proxy) ou três falhas seguidas param o `yt-dlp` até a próxima hora, sem insistir no IP de casa.
+ * `TIKTOK_YTDLP=0` pula o `yt-dlp` e volta para a Apify sozinha.
+ */
+async function medirTiktok(videos: VideoParaMedir[], agora: Date, erros: string[], opcoes: OpcoesCurva): Promise<{ medidos: number; porYtdlp: number; porApify: number }> {
   let medidos = 0;
+  let porYtdlp = 0;
+  let porApify = 0;
   const teto = config.coleta.apifyMaxResultadosDia;
   let usados = await consumoDeHoje(FONTE_APIFY);
+  let ytdlpAtivo = config.coleta.tiktokYtdlp;
+  let falhasSeguidas = 0;
+  let jaLeuPeloYtdlp = false;
+
+  async function lerPelaApify(video: VideoParaMedir, motivoDoYtdlp: string | null): Promise<ItemTiktokLido | null> {
+    const aviso = motivoDoYtdlp ? `${motivoDoYtdlp}; ` : "";
+    if (!config.coleta.apifyToken) {
+      erros.push(`tiktok ${video.idExterno}: ${aviso}sem reserva (apify sem chave), tenta na proxima hora`);
+      return null;
+    }
+    if (usados >= teto) {
+      erros.push(`tiktok ${video.idExterno}: ${aviso}teto diario do apify atingido, tenta na proxima hora`);
+      return null;
+    }
+    definirRamoDoContexto(await ramoDaMarca(video.clienteId));
+    const {
+      itens: [item],
+    } = await buscarTiktokPorUrl([`https://www.tiktok.com/@x/video/${video.idExterno}`]);
+    usados += 1;
+    await registrarConsumo(FONTE_APIFY, 1);
+    return { item: item ?? null, fonte: "apify" };
+  }
 
   for (const video of videos) {
-    if (usados >= teto) {
-      erros.push(`tiktok ${video.idExterno}: teto diario do apify atingido, tenta na proxima hora`);
-      continue;
-    }
     try {
-      definirRamoDoContexto(await ramoDaMarca(video.clienteId));
-      const {
-        itens: [item],
-      } = await buscarTiktokPorUrl([`https://www.tiktok.com/@x/video/${video.idExterno}`]);
-      usados += 1;
-      await registrarConsumo(FONTE_APIFY, 1);
-      if (!item) {
+      let lido: ItemTiktokLido | null = null;
+      let motivoDoYtdlp: string | null = null;
+
+      if (ytdlpAtivo) {
+        if (jaLeuPeloYtdlp) await pausaEntreLeiturasTiktok(opcoes.esperar);
+        jaLeuPeloYtdlp = true;
+        try {
+          const item = await lerTiktokPorYtdlp(`https://www.tiktok.com/@x/video/${video.idExterno}`, { executar: opcoes.executarYtdlp });
+          falhasSeguidas = 0;
+          lido = { item, fonte: "ytdlp" };
+        } catch (erro) {
+          if (!(erro instanceof ErroYtdlpTiktok)) throw erro;
+          falhasSeguidas += 1;
+          motivoDoYtdlp = `yt-dlp: ${erro.message}`;
+          if (motivoParaTodaARodada(erro.motivo) || falhasSeguidas >= FALHAS_SEGUIDAS_PARA_PARAR) {
+            ytdlpAtivo = false;
+            erros.push(`tiktok: yt-dlp parado ate a proxima hora (${erro.motivo})`);
+          }
+        }
+      }
+      if (!lido) lido = await lerPelaApify(video, motivoDoYtdlp);
+      if (!lido) continue;
+
+      if (!lido.item) {
         erros.push(`tiktok ${video.idExterno}: nao encontrado (video apagado ou privado)`);
         continue;
       }
       await gravarMetrica(
         video,
-        { views: item.playCount ?? 0, likes: item.diggCount ?? 0, comentarios: item.commentCount ?? 0 },
+        { views: lido.item.playCount ?? 0, likes: lido.item.diggCount ?? 0, comentarios: lido.item.commentCount ?? 0 },
         agora,
-        FONTE_APIFY,
+        lido.fonte,
       );
       medidos += 1;
+      if (lido.fonte === "ytdlp") porYtdlp += 1;
+      else porApify += 1;
     } catch (erro) {
       erros.push(`tiktok ${video.idExterno}: ${erro instanceof Error ? erro.message : String(erro)}`);
     }
   }
   restaurarRamoDoContexto();
-  return medidos;
+  return { medidos, porYtdlp, porApify };
 }
 
 /** Mede pelo Apify por URL, como sempre: quem chega aqui e quem nao tem `meta_ig_id`, ou a Meta nao achou/falhou (V8). */
@@ -428,7 +492,7 @@ async function medirInstagram(
   return { medidosMeta, medidosContaLigada, medidosApify };
 }
 
-export async function rodarCurvaCliente(agora = new Date()): Promise<Record<string, unknown>> {
+export async function rodarCurvaCliente(agora = new Date(), opcoes: OpcoesCurva = {}): Promise<Record<string, unknown>> {
   const candidatos = await videosParaMedir(agora);
   // E22 PR 3: marca sem assinatura (cobrança ligada) não é medida (Meta, Apify e YouTube são chamadas por ela). O que já foi medido fica guardado; se ela assinar de novo, volta a ser medida.
   // Só conta como pulada a marca que teria vídeo para medir nesta hora.
@@ -445,7 +509,7 @@ export async function rodarCurvaCliente(agora = new Date()): Promise<Record<stri
 
   const erros: string[] = [];
   const medidosYoutube = await medirYoutube(porPlataforma.youtube, agora, erros);
-  const medidosTiktok = await medirTiktok(porPlataforma.tiktok, agora, erros);
+  const { medidos: medidosTiktok, porYtdlp: medidosTiktokYtdlp, porApify: medidosTiktokApify } = await medirTiktok(porPlataforma.tiktok, agora, erros, opcoes);
   const {
     medidosMeta: medidosInstagramMeta,
     medidosContaLigada: medidosInstagramContaLigada,
@@ -462,6 +526,9 @@ export async function rodarCurvaCliente(agora = new Date()): Promise<Record<stri
     ...resumoDasMarcasPuladas(puladas.length),
     medidosYoutube,
     medidosTiktok,
+    /** De onde veio cada leitura do TikTok: `porYtdlp` (de graça, pelo proxy) e `porApify` (a reserva, paga por resultado). */
+    porYtdlp: medidosTiktokYtdlp,
+    porApify: medidosTiktokApify,
     medidosInstagramMeta,
     medidosInstagramContaLigada,
     medidosInstagramApify,
