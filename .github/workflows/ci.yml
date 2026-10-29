@@ -49,6 +49,9 @@ jobs:
 
       - run: npm ci
 
+      # E47 PR 2: a edicao de video confere o video com o ffprobe e extrai o audio com o ffmpeg; os testes de integracao e o e2e geram videos sinteticos com ele.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - run: npm run lint
 
       - run: npm run typecheck

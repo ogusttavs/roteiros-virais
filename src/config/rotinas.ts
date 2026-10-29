@@ -26,6 +26,7 @@ export const ROTINAS: Rotina[] = [
   { chave: "marca", titulo: "Entender a marca", faz: "Lê o site e as redes da marca para ela confirmar o que entendemos.", filas: [FILAS.entenderMarca, FILAS.analisarPerfil] },
   { chave: "pesquisa", titulo: "Pesquisar na hora para um vídeo", faz: "Busca, em portais grandes e órgãos oficiais, os dados de verdade que a pessoa pediu antes de escrever um roteiro.", filas: [FILAS.pesquisaNaHora] },
   { chave: "publicar", titulo: "Publicar no Instagram", faz: "Espera a Meta preparar o vídeo que a pessoa enviou e o publica no Instagram dela; depois liga o link do post ao roteiro.", filas: [FILAS.publicarInstagram] },
+  { chave: "edicao", titulo: "Editar os vídeos das pessoas", faz: "Escreve o que a pessoa falou no vídeo que enviou para editar (com a hora de cada palavra) e, de hora em hora, apaga os vídeos que passaram do prazo de guarda: o bruto em 48 horas e o editado em 7 dias.", filas: [FILAS.transcreverEdicao, FILAS.limparEdicoes] },
   { chave: "aprender", titulo: "Aprender com as reprovações", faz: "Transforma o que a pessoa reprovou em regras daquela conta.", filas: [FILAS.aprenderCliente] },
   { chave: "faxina", titulo: "Limpar as versões que ninguém escolheu", faz: "Apaga as versões de roteiro que ficaram sem escolha em grupos parados há mais de 30 dias.", filas: [FILAS.faxinaVersoes] },
   { chave: "instagram-ligado", titulo: "Renovar o acesso dos Instagram ligados", faz: "Renova, antes de vencer, o acesso que as pessoas deram ao próprio Instagram, e avisa o dono da conta quando não dá mais para renovar.", filas: [FILAS.renovarContasLigadas] },
@@ -70,6 +71,8 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.analisarPerfil]: "a leitura do perfil",
   [FILAS.pesquisaNaHora]: "a pesquisa na hora",
   [FILAS.publicarInstagram]: "a publicação no Instagram",
+  [FILAS.transcreverEdicao]: "a leitura da fala do vídeo para editar",
+  [FILAS.limparEdicoes]: "a limpeza dos vídeos guardados para editar",
 };
 
 /** "30 3 * * *" em língua de gente. O que não cabe nos formatos que o agendamento usa volta cru, para nunca mentir. */

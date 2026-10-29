@@ -1,4 +1,13 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { defineConfig, devices } from "@playwright/test";
+
+/**
+ * E47 PR 2: o volume da edicao de video do servidor do e2e. Definido aqui (e nao so no `webServer.env`) para os arquivos de teste, que herdam o ambiente deste processo, apontarem para a mesma pasta
+ * que o `next start` usa e conferirem o que ele guardou. Uma pasta de teste, apagada pelo proprio spec.
+ */
+process.env.EDICAO_PASTA ??= join(tmpdir(), "roteiros-edicao-e2e");
 
 /**
  * A 3000 costuma estar ocupada por outro projeto do Gustavo na mesma
@@ -151,6 +160,7 @@ export default defineConfig({
       META_APP_APROVADO: "",
       META_SIMULADOR_E2E: `http://127.0.0.1:${portaMeta}`,
       GROQ_API_KEY: "",
+      EDICAO_PASTA: process.env.EDICAO_PASTA,
       APIFY_TOKEN: "",
       YOUTUBE_API_KEY: "",
       /**

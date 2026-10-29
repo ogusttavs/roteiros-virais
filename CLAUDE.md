@@ -32,6 +32,8 @@ deploy/ensaio/ensaiar.sh   # ensaio do Compose de produção nesta máquina, ant
                             # deploy (`deploy/README.md`)
 ```
 
+A edição de vídeo (E47 PR 2) precisa de `ffmpeg` e `ffprobe` no PATH para os testes de integração e o e2e (eles geram vídeos sintéticos; a CI instala os dois). `EDICAO_PASTA` é a pasta dos vídeos guardados; os testes usam uma pasta temporária própria.
+
 `MODO_E2E` liga o modo da suíte e2e (limite de taxa desligado, e-mail simulado mesmo com
 `NODE_ENV=production`); é ligado só pelo `playwright.config.ts` (`webServer.env`) e nunca
 entra no `.env`.

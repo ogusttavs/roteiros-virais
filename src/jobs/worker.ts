@@ -42,6 +42,7 @@ import { rodarFiltroDeNoticias } from "./filtrar-noticias";
 import { rodarGuardarCapas } from "./guardar-capas";
 import { rodarLembrete } from "./lembrete";
 import { rodarLerLongos } from "./ler-longos";
+import { rodarLimparEdicoes } from "./limpar-edicoes";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
@@ -55,6 +56,7 @@ import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
+import { type PayloadTranscreverEdicao, rodarTranscreverEdicao } from "./transcrever-edicao";
 import { rodarVigilancia } from "./vigilancia";
 
 /**
@@ -241,6 +243,14 @@ async function main(): Promise<void> {
   /** Por evento (E56 PR 1): `receberVideo` manda `{ publicacaoId }` quando o vídeo termina de subir; o job reagenda a si mesmo até a Meta preparar o vídeo. */
   await boss().work<PayloadPublicarInstagram>(FILAS.publicarInstagram, async (job) => {
     await executarComRegistro(FILAS.publicarInstagram, () => rodarPublicarInstagram(job[0].data.publicacaoId));
+  });
+
+  /** Por evento (E47 PR 2): `receberVideoDaEdicao` manda `{ edicaoId }` quando o vídeo bruto termina de chegar. */
+  await boss().work<PayloadTranscreverEdicao>(FILAS.transcreverEdicao, async (job) => {
+    await executarComRegistro(FILAS.transcreverEdicao, () => rodarTranscreverEdicao(job[0].data.edicaoId));
+  });
+  await boss().work(FILAS.limparEdicoes, async () => {
+    await executarComRegistro(FILAS.limparEdicoes, () => rodarLimparEdicoes());
   });
 
   console.log("worker no ar.");

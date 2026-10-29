@@ -36,6 +36,7 @@ import { rodarFiltroDeNoticias } from "./filtrar-noticias";
 import { rodarGuardarCapas } from "./guardar-capas";
 import { rodarLembrete } from "./lembrete";
 import { rodarLerLongos } from "./ler-longos";
+import { rodarLimparEdicoes } from "./limpar-edicoes";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
@@ -48,6 +49,7 @@ import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
+import { rodarTranscreverEdicao } from "./transcrever-edicao";
 import { rodarVigilancia } from "./vigilancia";
 
 /**
@@ -148,6 +150,10 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.pesquisaNaHora]: () => rodarPesquisaNaHora(Number(process.argv[3])),
   /** Por evento (E56): `npm run job -- publicar-instagram <publicacaoId>` confere (e publica, se o vídeo estiver pronto) uma publicação já criada. */
   [FILAS.publicarInstagram]: () => rodarPublicarInstagram(Number(process.argv[3])),
+  /** Por evento (E47 PR 2): `npm run job -- transcrever-edicao <edicaoId>` transcreve uma edição já guardada (usa a chave da Groq do ambiente). */
+  [FILAS.transcreverEdicao]: () => rodarTranscreverEdicao(Number(process.argv[3])),
+  /** E47 PR 2: apaga o que passou do prazo de guarda e o que não tem dono no volume de edição. */
+  [FILAS.limparEdicoes]: () => rodarLimparEdicoes(),
   /**
    * Por evento, nao por horario, sempre para um cliente so (E27, parte 2,
    * item 2): sem um "todos os clientes" que faca sentido, o disparo manual

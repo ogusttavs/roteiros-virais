@@ -3,10 +3,13 @@
  * dólar (o que a API devolve, ou o preço da data de `config/precos-ia.ts` quando ela não devolve), a unidade medida e, quando se sabe, a execução e o ramo. Registrar nunca derruba o que
  * está sendo feito: se o banco falhar, o gasto só fica sem linha e o log avisa.
  */
+import { sql } from "drizzle-orm";
+
 import { precoApifyPorMilResultados, PRECO_GROQ_USD_POR_HORA, PRECO_PROXY_USD_POR_GB, SEGUNDOS_MINIMOS_COBRADOS_GROQ } from "@/config/precos-ia";
 import { db } from "@/db";
-import { custosExternos, type CustoExterno } from "@/db/schema";
+import { consumoApi, custosExternos, type CustoExterno } from "@/db/schema";
 import { contextoDaExecucao } from "@/jobs/contexto-execucao";
+import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 
 /** O custo estimado de uma transcrição pela Groq: segundos de áudio (com o mínimo cobrado por pedido) a US$ por hora. */
@@ -54,5 +57,21 @@ export async function registrarCustoExterno(dados: NovoCusto): Promise<void> {
       });
   } catch (erro) {
     logger.warn({ err: erro, fonte: dados.fonte }, "nao foi possivel registrar o custo fora da IA");
+  }
+}
+
+/**
+ * O contador do dia da Groq em `consumo_api` (fonte "groq", em segundos de áudio), o mesmo que o "gravar agora" (`momento.ts`) alimenta e que o admin mostra. A edição de vídeo (E47 PR 2) soma aqui o áudio que
+ * transcreveu. Nunca lança: o contador não pode derrubar uma transcrição que já foi paga.
+ */
+export async function registrarConsumoDeAudioGroq(segundos: number): Promise<void> {
+  try {
+    const unidades = Math.max(1, Math.round(segundos));
+    await db()
+      .insert(consumoApi)
+      .values({ fonte: "groq", data: hojeISO(), unidades })
+      .onConflictDoUpdate({ target: [consumoApi.fonte, consumoApi.data], set: { unidades: sql`${consumoApi.unidades} + ${unidades}`, atualizadoEm: new Date() } });
+  } catch (erro) {
+    logger.warn({ err: erro }, "nao foi possivel somar o audio no contador do dia da Groq");
   }
 }

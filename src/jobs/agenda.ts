@@ -262,6 +262,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "renovacao do acesso das contas de Instagram ligadas pelas pessoas, e aviso quando nao da mais (E19), todo dia as 06:20",
   },
   {
+    fila: FILAS.limparEdicoes,
+    cron: "25 * * * *",
+    descricao: "limpeza dos videos guardados para editar (bruto em 48 h, editado em 7 dias) e dos arquivos sem dono (E47 PR 2), de hora em hora, aos 25 minutos",
+  },
+  {
     fila: FILAS.emailAcompanhamento,
     cron: "0 8 * * *",
     descricao: "e-mail diario de acompanhamento da viagem para o Fable, todo dia as 08:00",

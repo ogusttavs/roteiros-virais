@@ -35,10 +35,13 @@ services:
     env_file: .env
     # E19b: o video de uma publicacao pelo Instagram espera a Meta baixar numa pasta que o app (upload e entrega do arquivo) e o worker (conferencia, que apaga) enxergam
     # juntos: volume nomeado, mesmo caminho nos dois. PUBLICAR_PASTA_TEMP aponta para ele.
+    # E47 PR 2: o volume da edicao de video (bruto por 48 h, editado por 7 dias): o app recebe e confere o video, o worker transcreve e apaga. Mesmo caminho nos dois; EDICAO_PASTA aponta para ele.
     environment:
       PUBLICAR_PASTA_TEMP: /var/publicar
+      EDICAO_PASTA: /var/edicao
     volumes:
       - roteiros_publicar:/var/publicar
+      - roteiros_edicao:/var/edicao
     depends_on:
       roteiros-postgres:
         condition: service_healthy
@@ -62,10 +65,13 @@ services:
     # "environment:".
     env_file: .env
     # E19b: o mesmo volume do app (ver la). O worker apaga o video quando a publicacao termina e varre o que ficou velho.
+    # E47 PR 2: o mesmo volume de edicao do app (ver la). O worker extrai o audio, transcreve e apaga o video no prazo.
     environment:
       PUBLICAR_PASTA_TEMP: /var/publicar
+      EDICAO_PASTA: /var/edicao
     volumes:
       - roteiros_publicar:/var/publicar
+      - roteiros_edicao:/var/edicao
     depends_on:
       roteiros-postgres:
         condition: service_healthy
@@ -123,5 +129,7 @@ volumes:
     name: roteiros_pg
   roteiros_publicar:
     name: roteiros_publicar
+  roteiros_edicao:
+    name: roteiros_edicao
   roteiros_backups:
     name: roteiros_backups
