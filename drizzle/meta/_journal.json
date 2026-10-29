@@ -736,6 +736,13 @@
       "when": 1793223010483,
       "tag": "0105_temas-do-dia-por-conta",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1793232395882,
+      "tag": "0106_pesquisa-do-foco",
+      "breakpoints": true
     }
   ]
 }

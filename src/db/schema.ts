@@ -1956,6 +1956,53 @@ export const temasDiaConta = pgTable(
   (t) => [uniqueIndex("temas_dia_conta_cliente_data").on(t.clienteId, t.data)],
 );
 
+/** Um canal de referência do foco de uma conta, já conferido na API do YouTube (o modelo só sugere o nome; o código confere que o canal existe antes de usar). */
+export type CanalDoFoco = { handle: string; canalId: string; nome: string; uploadsId: string };
+
+/**
+ * E61 PR 3 (28/10/2026), a pesquisa do foco: o que se busca para uma conta com foco confirmado ter prova do assunto dela no banco do setor. Uma linha por conta. Os termos de busca e os canais de
+ * referência saem do foco UMA vez (modelo barato) e valem enquanto o foco for o mesmo (`foco_hash`): a pessoa muda o foco, a linha é refeita. `canais_sugeridos` são os nomes que o modelo deu; `canais` só os
+ * que a API do YouTube confirmou (`conferidos_em` diz que a conferência já foi feita, para não repetir todo dia). Dado de UMA conta: sempre lido por `cliente_id`, nunca mostrado a outra conta. Os vídeos achados
+ * entram no banco do setor como qualquer outro (público), sem marca de qual termo os trouxe.
+ */
+export const pesquisaDoFoco = pgTable(
+  "pesquisa_do_foco",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    focoUsado: text("foco_usado").notNull(),
+    focoHash: text("foco_hash").notNull(),
+    termos: jsonb("termos").$type<string[]>().notNull().default([]),
+    canaisSugeridos: jsonb("canais_sugeridos").$type<string[]>().notNull().default([]),
+    canais: jsonb("canais").$type<CanalDoFoco[]>().notNull().default([]),
+    conferidosEm: timestamp("conferidos_em", { withTimezone: true }),
+    ultimaColetaEm: timestamp("ultima_coleta_em", { withTimezone: true }),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("pesquisa_do_foco_cliente").on(t.clienteId)],
+);
+
+export type PesquisaDoFoco = typeof pesquisaDoFoco.$inferSelect;
+
+/** E61 PR 3: o que a pesquisa do foco já gastou hoje por conta (buscas, unidades de cota do YouTube e vídeos guardados), para o teto por conta e por dia valer mesmo com duas rodadas no mesmo dia. */
+export const pesquisaDoFocoDia = pgTable(
+  "pesquisa_do_foco_dia",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    data: date("data").notNull(),
+    buscas: integer("buscas").notNull().default(0),
+    unidades: integer("unidades").notNull().default(0),
+    videos: integer("videos").notNull().default(0),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("pesquisa_do_foco_dia_cliente_data").on(t.clienteId, t.data)],
+);
+
 /** Uma fonte de um assunto em alta: a busca do Google ou o vídeo do YouTube que o trouxe (título e link de fora: dado, nunca instrução). */
 export type FonteDaTendencia = { fonte: "google" | "youtube"; titulo: string; url: string | null; trafego: string | null; posicao: number };
 

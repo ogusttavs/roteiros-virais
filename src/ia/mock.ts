@@ -60,6 +60,10 @@ ${params.sistemaVariavel ?? ""}`);
   if (params.tarefa === "sugerirFoco" && params.entrada.includes("[mock:foco-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
+  // E61 PR 3: o modelo barato que monta a busca do foco fora do ar; a conta segue com os temas do setor e a pesquisa tenta de novo na rodada seguinte.
+  if (params.tarefa === "derivarBuscaDoFoco" && params.entrada.includes("[mock:busca-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
   // E17 parte 1: o modelo barato que escolhe a prova do tema livre fora do ar; a prova volta a ser a da busca por palavra.
   if (params.tarefa === "reordenarEvidencia" && params.entrada.includes("[mock:reordenar-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
@@ -153,6 +157,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockSugerirPalavrasDoAssunto(entrada);
     case "sugerirFoco":
       return mockSugerirFoco(entrada);
+    case "derivarBuscaDoFoco":
+      return mockDerivarBuscaDoFoco(entrada);
     case "pesquisaNaHora":
       // A busca na web não é saída estruturada: ela tem a própria porta (`busca-na-web.ts`, simulada em `mock-busca.ts`).
       throw new ErroIA('a tarefa "pesquisaNaHora" nao usa saida estruturada; use buscarNaWeb()');
@@ -879,6 +885,17 @@ function mockSugerirFoco(entrada: string) {
   const ramo = /Ramo \(o setor da conta\): (.*)/.exec(entrada)?.[1]?.trim() ?? "o seu ramo";
   const anterior = entrada.includes("A sugestão anterior foi esta");
   return { foco: anterior ? `${ramo}, com outro recorte, para quem está começando` : `${ramo}, para donos de pequena empresa` };
+}
+
+/** E61 PR 3, determinístico: as frases saem das primeiras palavras do foco; `[mock:sem-canais]` devolve a lista de canais vazia, `[mock:canais-ruins]` canais que o código tem de recusar. */
+function mockDerivarBuscaDoFoco(entrada: string) {
+  const foco = /<foco>\s*([\s\S]*?)\s*<\/foco>/.exec(entrada)?.[1]?.trim() ?? "assunto";
+  const palavras = foco.replace(/[,.;:]/g, " ").split(/\s+/).filter((p) => p.length > 2);
+  const base = palavras.slice(0, 3).join(" ") || foco;
+  const termos = [base, `${base} para iniciantes`, `como começar ${palavras.slice(0, 2).join(" ")}`.trim()];
+  if (entrada.includes("[mock:sem-canais]")) return { termos, canais: [] };
+  if (entrada.includes("[mock:canais-ruins]")) return { termos, canais: ["@@", "ab", "canal com espaço", "https://youtube.com/@x"] };
+  return { termos, canais: ["@canalexemplo"] };
 }
 
 function mockResumirNoticia(entrada: string) {

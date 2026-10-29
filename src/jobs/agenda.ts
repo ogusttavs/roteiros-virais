@@ -144,6 +144,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     condicao: () => config.coleta.metaAtivo,
   },
   {
+    fila: FILAS.pesquisaDoFoco,
+    cron: "20 3 * * *",
+    descricao: "pesquisa do foco das contas (E61 PR 3: frases e canais de referencia no YouTube, com teto por conta), todo dia as 03:20, depois da coleta do setor (03:00) e antes de pontuar (03:45)",
+  },
+  {
     fila: FILAS.pontuar,
     cron: "45 3 * * *",
     descricao: "pontuacao (fora-da-curva, velocidade), todo dia as 03:45, depois das coletas e do contas-base",

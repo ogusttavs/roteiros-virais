@@ -19,6 +19,7 @@ import {
   tirarFoco,
   type FocoParaATela,
 } from "@/servicos/foco-da-conta";
+import { pedirPesquisaDoFoco } from "@/servicos/pesquisa-do-foco";
 import { pedirTemasDaConta } from "@/servicos/temas";
 import { textosBriefing } from "@/textos/briefing";
 
@@ -125,6 +126,8 @@ async function comOFoco(tarefa: (clienteId: number) => Promise<void>, frasePadra
   // E61 PR 2: o foco acabou de ficar confirmado (a pessoa disse "Está certo" ou escreveu o dela): os temas do dia dela nascem agora, sem esperar a madrugada. Falha aqui nunca vira erro na tela.
   if (erro === null && opcoes?.pedirTemas && foco.estado === "confirmado" && atual) {
     await pedirTemasDaConta(atual.id, atual.nichoId, foco.texto).catch(() => "nao");
+    // E61 PR 3: a pesquisa do assunto dela (frases e canais de referência) também começa agora, só para esta conta.
+    await pedirPesquisaDoFoco(atual.id, foco.texto).catch(() => "nao");
   }
   return erro === null ? { ok: true, foco } : { ok: false, erro, foco };
 }
