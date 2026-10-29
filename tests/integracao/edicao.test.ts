@@ -357,6 +357,11 @@ describe("subir, guardar e transcrever", () => {
     const pronta = await linha(id);
     expect(pronta.estado).toBe("transcrito");
     expect(pronta.tentativas).toBe(1);
+    // E47 PR 3: a transcrição pronta enfileira a decisão da edição.
+    expect(estado.enfileirados).toEqual([
+      { fila: "transcrever-edicao", dados: { edicaoId: id } },
+      { fila: "decidir-edicao", dados: { edicaoId: id } },
+    ]);
     expect(pronta.idioma).toBe("pt");
     expect(pronta.palavras).toHaveLength(12);
     expect(pronta.palavras![0]).toEqual({ texto: "Hoje", inicio: 0.1, fim: 0.4, abreTrecho: true });

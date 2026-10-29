@@ -21,6 +21,7 @@ import { apagarArquivoDaEdicao, arquivoExiste, caminhoNoVolume } from "@/edicao/
 import { prepararAudio } from "@/edicao/audio";
 import { energiaParaBanco } from "@/edicao/guardada";
 import { promptDeNomes } from "@/edicao/nomes";
+import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { logger } from "@/lib/log";
 import { perfilDoCliente } from "@/servicos/briefing";
 import { clientePorId } from "@/servicos/clientes";
@@ -33,6 +34,8 @@ export type PayloadTranscreverEdicao = { edicaoId: number };
 
 export type DepsDaTranscricao = {
   agora?: () => Date;
+  /** Quem enfileira a decisão da edição depois da transcrição (o padrão põe na fila `decidir-edicao`). Os testes trocam para não depender da fila. */
+  enfileirarDecisao?: (edicaoId: number) => Promise<void>;
   transcrever?: (caminhoDoAudio: string, opcoes: { idiomaConhecido?: "pt"; prompt?: string; detalheDoCusto?: Record<string, unknown> }) => Promise<ResultadoComPalavras>;
 };
 
@@ -46,6 +49,11 @@ async function falhar(edicaoId: number, codigo: CodigoDaEdicao, agora: Date): Pr
   if (!linha) return;
   await apagarArquivoDaEdicao(linha.caminhoBruto);
   await db().update(edicoes).set({ caminhoBruto: null, brutoApagadoEm: agora }).where(eq(edicoes.id, edicaoId));
+}
+
+async function enfileirarDecisao(edicaoId: number): Promise<void> {
+  await garantirBossPronto();
+  await boss().send(FILAS.decidirEdicao, { edicaoId }, { singletonKey: `decisao-${edicaoId}` });
 }
 
 export async function rodarTranscreverEdicao(edicaoId: number, deps: DepsDaTranscricao = {}): Promise<Record<string, unknown>> {
@@ -112,7 +120,7 @@ export async function rodarTranscreverEdicao(edicaoId: number, deps: DepsDaTrans
       return { edicaoId, estado: "falhou", motivo: "sem-fala", segundosDeAudio: Math.round(resultado.duracaoS) };
     }
 
-    await db()
+    const [transcrita] = await db()
       .update(edicoes)
       .set({
         estado: "transcrito",
@@ -122,7 +130,16 @@ export async function rodarTranscreverEdicao(edicaoId: number, deps: DepsDaTrans
         custoTranscricaoUsd: resultado.custoUsd.toFixed(6),
         atualizadaEm: agora,
       })
-      .where(and(eq(edicoes.id, edicaoId), eq(edicoes.estado, "transcrevendo")));
+      .where(and(eq(edicoes.id, edicaoId), eq(edicoes.estado, "transcrevendo")))
+      .returning({ id: edicoes.id });
+    if (transcrita) {
+      // A decisão da edição (E47 PR 3) nasce daqui. Se a fila falhar, a limpeza de hora em hora enfileira de novo a edição que ficou `transcrito` sem ninguém pegar.
+      try {
+        await (deps.enfileirarDecisao ?? enfileirarDecisao)(edicaoId);
+      } catch (erro) {
+        logger.warn({ err: erro, edicaoId }, "edicao: nao foi possivel enfileirar a decisao");
+      }
+    }
     return { edicaoId, estado: "transcrito", palavras: resultado.palavras.length, segundosDeAudio: Math.round(resultado.duracaoS), custoUsd: Number(resultado.custoUsd.toFixed(6)) };
   } finally {
     await rm(pasta, { recursive: true, force: true }).catch(() => undefined);

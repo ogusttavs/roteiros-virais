@@ -5,6 +5,7 @@
  * mesmo schema Zod que a chamada real usaria, entao um mock mal formado
  * quebra o teste que o usa, não passa disfarcado.
  */
+import { distanciaDeEdicao, normalizar } from "@/edicao/transcricao";
 import { config } from "@/lib/config";
 import { pesoPelaMaisComprida, TOM_PADRAO_DO_BLOCO, type BlocoFalado, type TomDoBloco } from "@/lib/marcas-de-fala";
 
@@ -62,6 +63,13 @@ ${params.sistemaVariavel ?? ""}`);
   }
   // E61 PR 3: o modelo barato que monta a busca do foco fora do ar; a conta segue com os temas do setor e a pesquisa tenta de novo na rodada seguinte.
   if (params.tarefa === "derivarBuscaDoFoco" && params.entrada.includes("[mock:busca-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
+  // E47 PR 3: a IA da decisão da edição (e a do verificador) fora do ar; a edição volta ao passo anterior e tenta de novo.
+  if (params.tarefa === "decidirEdicao" && params.entrada.includes("[mock:edicao-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
+  if (params.tarefa === "verificarEdicao" && params.entrada.includes("[mock:verificador-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
   // E17 parte 1: o modelo barato que escolhe a prova do tema livre fora do ar; a prova volta a ser a da busca por palavra.
@@ -159,6 +167,10 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockSugerirFoco(entrada);
     case "derivarBuscaDoFoco":
       return mockDerivarBuscaDoFoco(entrada);
+    case "decidirEdicao":
+      return mockDecidirEdicao(entrada);
+    case "verificarEdicao":
+      return mockVerificarEdicao(entrada);
     case "pesquisaNaHora":
       // A busca na web não é saída estruturada: ela tem a própria porta (`busca-na-web.ts`, simulada em `mock-busca.ts`).
       throw new ErroIA('a tarefa "pesquisaNaHora" nao usa saida estruturada; use buscarNaWeb()');
@@ -1470,6 +1482,82 @@ function mockNotaDaVersao(entrada: string) {
     fraseDoObjetivo: "responde uma dúvida que aparece bem antes da compra.",
     jeitoDiferente: "começa pelo problema e só explica depois que a pessoa já o viu.",
   };
+}
+
+/**
+ * E47 PR 3: a decisão da edição, determinística, lida da própria transcrição do prompt. Divide a fala em frases nas pausas de 1 s ou mais; uma frase que recomeça com as duas mesmas
+ * primeiras palavras da frase seguinte é uma tentativa descartada (o retake), e uma frase solta de até 3 palavras no começo também sai. O que sobra vira os trechos; a abertura é o primeiro trecho. O título vem do título do roteiro. Os nomes
+ * "que devem sair certos" parecidos com uma palavra da fala viram correção. Marcadores no roteiro simulam o modelo com defeito: `[mock:edicao-indice-ruim]` devolve um número de palavra
+ * que não existe na primeira decisão (a segunda, que traz "ATENÇÃO", sai certa), `[mock:edicao-sempre-ruim]` em todas, `[mock:edicao-titulo-ruim-1a]` põe um número que ninguém falou no
+ * título da primeira decisão.
+ */
+function mockDecidirEdicao(entrada: string) {
+  const segunda = entrada.includes("ATENÇÃO: a decisão anterior");
+  const fala = /<fala[^>]*>([\s\S]*?)<\/fala>/.exec(entrada)?.[1] ?? "";
+  const palavras: { indice: number; texto: string }[] = [];
+  const quebras = new Set<number>();
+  for (const linha of fala.split("\n")) {
+    const pausa = /^~ pausa de ([\d.]+) s/.exec(linha);
+    if (pausa) {
+      if (Number(pausa[1]) >= 1.0) quebras.add(palavras.length);
+      continue;
+    }
+    const m = /^(\d+)\|[\d.]+\|(.*)$/.exec(linha);
+    if (m) palavras.push({ indice: Number(m[1]), texto: m[2] });
+  }
+  const frases: { de: number; ate: number }[] = [];
+  let inicio = 0;
+  for (let i = 1; i <= palavras.length; i++) {
+    if (i === palavras.length || quebras.has(i)) {
+      frases.push({ de: inicio, ate: i - 1 });
+      inicio = i;
+    }
+  }
+  const comeco = (f: { de: number }) => [palavras[f.de], palavras[f.de + 1]].map((p) => normalizar(p?.texto ?? "")).join(" ");
+  // Fica uma tentativa de cada recomeço; e uma frase solta de até 3 palavras no começo ("pode gravar") é conversa, não abertura.
+  const ficam = frases.filter((f, k) => k === frases.length - 1 || (comeco(f) !== comeco(frases[k + 1]) && !(k === 0 && f.ate - f.de < 3)));
+  const trechos: { deIndice: number; ateIndice: number; motivo: string; transicao: "nenhuma" }[] = [];
+  for (const f of ficam) {
+    const de = palavras[f.de]?.indice ?? 0;
+    const ate = palavras[f.ate]?.indice ?? 0;
+    const ultimo = trechos[trechos.length - 1];
+    if (ultimo && ultimo.ateIndice + 1 === de) ultimo.ateIndice = ate;
+    else trechos.push({ deIndice: de, ateIndice: ate, motivo: "fica a versão completa", transicao: "nenhuma" });
+  }
+  if (trechos.length === 0) trechos.push({ deIndice: 0, ateIndice: 0, motivo: "fica", transicao: "nenhuma" });
+  const gancho = { deIndice: trechos[0].deIndice, ateIndice: trechos[0].ateIndice, tentativasDescartadas: frases.length - ficam.length, porQue: "a última tentativa completa" };
+  const ruim = entrada.includes("[mock:edicao-sempre-ruim]") || (entrada.includes("[mock:edicao-indice-ruim]") && !segunda);
+  if (ruim) trechos.push({ deIndice: palavras.length + 50, ateIndice: palavras.length + 60, motivo: "índice que não existe", transicao: "nenhuma" });
+
+  const tituloDoRoteiro = /Título: (.*)/.exec(entrada.split("<roteiro>")[1] ?? "")?.[1]?.trim() ?? "Você sabia disso?";
+  let titulo = tituloDoRoteiro.split(/\s+/).slice(0, 8).join(" ").replace(/[!.]+$/, "");
+  if (entrada.includes("[mock:edicao-titulo-ruim-1a]") && !segunda) titulo = "3 mil clientes em 999 dias";
+
+  const nomes = (/Nomes que devem sair certos: (.*)/.exec(entrada)?.[1] ?? "").split(";").map((n) => n.trim()).filter(Boolean);
+  const correcoes: { de: string; para: string }[] = [];
+  for (const nome of nomes) {
+    const alvo = normalizar(nome).replace(/\s+/g, "");
+    if (alvo.length < 5) continue;
+    for (const p of palavras) {
+      const n = normalizar(p.texto).replace(/\s+/g, "");
+      const d = distanciaDeEdicao(n, alvo);
+      if (n !== "" && d >= 1 && d <= 2 && !correcoes.some((c) => c.de === p.texto.replace(/[.,!?]+$/, ""))) {
+        correcoes.push({ de: p.texto.replace(/[.,!?]+$/, ""), para: nome });
+      }
+    }
+  }
+  return { trechos, gancho, titulo: { texto: titulo, subtitulo: null }, correcoesDaLegenda: correcoes, avisos: [] };
+}
+
+/** E47 PR 3: o verificador da edição, determinístico. `[mock:edicao-nome-errado]` no roteiro faz ele reprovar a legenda em toda chamada; `[mock:edicao-aviso]` devolve só um aviso (que não trava). */
+function mockVerificarEdicao(entrada: string) {
+  if (entrada.includes("[mock:edicao-nome-errado]")) {
+    return { problemas: [{ onde: "legenda" as const, bloco: 1, tipo: "nome_errado" as const, gravidade: "reprova" as const, descricao: "O nome da marca está escrito diferente do briefing.", sugestao: null }] };
+  }
+  if (entrada.includes("[mock:edicao-aviso]")) {
+    return { problemas: [{ onde: "legenda" as const, bloco: 1, tipo: "gramatica" as const, gravidade: "aviso" as const, descricao: "Uma frase ficou informal.", sugestao: null }] };
+  }
+  return { problemas: [] };
 }
 
 /**

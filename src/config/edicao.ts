@@ -37,3 +37,31 @@ export const DESLOCAMENTO_DE_BRASILIA_H = 3;
 
 /** Quantas vezes o worker pega a mesma edição para transcrever antes de desistir (a fila repete 2 vezes: 3 ao todo). */
 export const TENTATIVAS_DA_TRANSCRICAO = 3;
+
+/**
+ * E47 PR 3: o que a decisão da edição fixa por código, porque o vídeo do produto é sempre a mesma coisa (a pessoa falando para a câmera, seguindo um roteiro, de 30 s a 3 min). O ritmo é o
+ * "reels" do editor do Gustavo (corte curto, pausa de 0,6 s para 0,35 s). A legenda é o estilo "nativo" que ele aprovou em 27/10/2026 (caixa alta, blocos de até 4 palavras e 18 letras).
+ * O zoom alternado nos cortes é acabamento do PR 5 e fica desligado (o plano de corte já traz a escala de cada trecho, 1 sem zoom).
+ */
+export const AJUSTES_DA_EDICAO = {
+  preset: "reels",
+  zoomEmCortes: 0,
+  estiloDaLegenda: "nativo",
+  /** Menos que isto das palavras mantido, num vídeo com mais de `palavrasParaConferirOQueFica` palavras, é decisão suspeita (o modelo cortou quase tudo). */
+  fracaoMinimaDaFala: 0.25,
+  palavrasParaConferirOQueFica: 20,
+  /** O título do primeiro quadro: no máximo 2 linhas de 3 a 5 palavras. */
+  tituloMaxPalavras: 10,
+  tituloMaxLetras: 70,
+  subtituloMaxPalavras: 6,
+  subtituloMaxLetras: 40,
+  /** Quantas decisões do modelo forte por edição: a primeira e, se a conferência reprovar, uma segunda com o motivo. */
+  decisoesPorEdicao: 2,
+} as const;
+
+/** Quantas vezes o worker pega a mesma edição para decidir antes de desistir (a IA pode estar fora do ar ou sem crédito). */
+export const TENTATIVAS_DA_DECISAO = 3;
+/** Uma edição `transcrito` ou `decidido` que ninguém pegou (a fila perdeu o pedido, a IA estava fora do ar) é enfileirada de novo depois deste tempo. */
+export const DECISAO_ESQUECIDA_APOS_MS = 10 * 60 * 1000;
+/** Uma edição `decidindo` por mais que isto (o worker caiu no meio) volta ao passo anterior. */
+export const DECISAO_PARADA_APOS_MS = 20 * 60 * 1000;

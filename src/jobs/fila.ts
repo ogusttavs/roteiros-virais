@@ -100,6 +100,11 @@ export const FILAS = {
    */
   transcreverEdicao: "transcrever-edicao",
   /**
+   * E47 PR 3: por evento, quando a transcrição termina (`transcrito`): o modelo forte decide o que fica no vídeo, o motor de corte calcula o plano e a legenda e um verificador barato confere.
+   * Sem repetição da fila: cada rodada pode gastar IA; a edição conta as rodadas (3) e a limpeza de hora em hora enfileira de novo a que ficou parada.
+   */
+  decidirEdicao: "decidir-edicao",
+  /**
    * E47 PR 2: de hora em hora, apaga o vídeo bruto que passou de 48 horas e o editado que passou de 7 dias, falha o envio parado, enfileira a transcrição que a fila perdeu e varre
    * do volume o arquivo que não tem dono. Job curto.
    */
@@ -118,7 +123,7 @@ export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
  * `clienteId`, que só `reprovarERescrever` sabe qual é; disparada sem isso,
  * o worker chama o job com `clienteId` indefinido e ele sempre quebra.
  */
-export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram, FILAS.transcreverEdicao]);
+export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram, FILAS.transcreverEdicao, FILAS.decidirEdicao]);
 
 /**
  * As filas que aceitam rodar só para um ramo (`{ nichoId }` no disparo) e gravam o ramo em
