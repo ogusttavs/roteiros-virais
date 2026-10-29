@@ -24,6 +24,7 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
+import type { PalavraFalada } from "@/edicao/tipos";
 import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
 
 const id = () => integer("id").primaryKey().generatedAlwaysAsIdentity();
@@ -2719,6 +2720,68 @@ export const publicacoes = pgTable(
   ],
 );
 export type Publicacao = typeof publicacoes.$inferSelect;
+
+/**
+ * Subindo: a edição foi aberta e o vídeo ainda está chegando. Guardado: o vídeo chegou inteiro, foi conferido (duração, qualidade, som) e espera a transcrição. Transcrevendo: o worker está ouvindo
+ * o áudio. Transcrito: as palavras com tempo e a curva de energia estão guardadas e o motor de corte já pode trabalhar. Falhou: recusada ou parada, com a frase em `motivo`. Expirada: o vídeo
+ * bruto (e o editado, se houve) já foi apagado pela guarda e não há mais o que fazer com ela.
+ */
+export type EstadoDaEdicao = "subindo" | "guardado" | "transcrevendo" | "transcrito" | "falhou" | "expirada";
+
+/** A curva de energia do áudio (dB em janelas de 10 ms, com uma casa) guardada junto das palavras: o motor de corte (`src/edicao/`) precisa dela, e o bruto não fica guardado para recalcular. */
+export type EnergiaGuardada = { db: number[]; duracao: number };
+
+/**
+ * E47 PR 2: uma edição de vídeo pela IA. A pessoa grava com o roteiro do dia, sobe o vídeo bruto (`PUT /api/edicao/<id>/video`), o servidor confere e guarda num volume próprio, e o worker
+ * transcreve com palavras e tempos. Os caminhos dos arquivos são relativos ao volume (`EDICAO_PASTA`), nunca absolutos. O bruto sai sozinho em 48 horas (`bruto_expira_em`) e o editado em
+ * 7 dias (`editado_expira_em`); ao sair, as palavras e a curva de energia também são apagadas (são a fala da pessoa). A linha continua, para a conta do mês e o histórico.
+ * Uma edição que falhou antes de gastar não conta nas 30 do mês.
+ */
+export const edicoes = pgTable(
+  "edicoes",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id),
+    roteiroId: integer("roteiro_id")
+      .notNull()
+      .references(() => roteiros.id),
+    estado: text("estado").$type<EstadoDaEdicao>().notNull().default("subindo"),
+    /** A frase de falha em língua de gente (`textos/edicao.ts`). */
+    motivo: text("motivo"),
+    tamanhoBytes: integer("tamanho_bytes").notNull(),
+    tipoDoArquivo: text("tipo_do_arquivo").notNull(),
+    /** Relativos ao volume de edição. `null` enquanto não existe (ou depois de apagado). */
+    caminhoBruto: text("caminho_bruto"),
+    caminhoEditado: text("caminho_editado"),
+    /** O que o ffprobe leu do bruto: duração, tamanho da imagem como a pessoa vê (já girada) e a rotação gravada no arquivo. */
+    duracaoS: numeric("duracao_s", { precision: 8, scale: 3 }),
+    largura: integer("largura"),
+    altura: integer("altura"),
+    rotacao: integer("rotacao"),
+    /** Quantas vezes o worker pegou esta edição para transcrever (a Groq pode falhar; depois de 3, a edição falha de vez). */
+    tentativas: integer("tentativas").notNull().default(0),
+    /** O idioma que a Groq ouviu, quando ela diz. */
+    idioma: text("idioma"),
+    palavras: jsonb("palavras").$type<PalavraFalada[]>(),
+    energia: jsonb("energia").$type<EnergiaGuardada>(),
+    /** Em dólar: a transcrição na Groq e (nos PRs seguintes) a IA da decisão. */
+    custoTranscricaoUsd: numeric("custo_transcricao_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+    custoIaUsd: numeric("custo_ia_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+    criadaPor: text("criada_por").references(() => user.id, { onDelete: "set null" }),
+    criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
+    atualizadaEm: timestamp("atualizada_em", { withTimezone: true }).notNull().defaultNow(),
+    /** Quando o bruto chegou inteiro e foi aceito. */
+    recebidaEm: timestamp("recebida_em", { withTimezone: true }),
+    brutoExpiraEm: timestamp("bruto_expira_em", { withTimezone: true }),
+    brutoApagadoEm: timestamp("bruto_apagado_em", { withTimezone: true }),
+    editadoExpiraEm: timestamp("editado_expira_em", { withTimezone: true }),
+    editadoApagadoEm: timestamp("editado_apagado_em", { withTimezone: true }),
+  },
+  (t) => [index("edicoes_marca_mes").on(t.clienteId, t.criadaEm), index("edicoes_marca_roteiro").on(t.clienteId, t.roteiroId)],
+);
+export type Edicao = typeof edicoes.$inferSelect;
 
 /**
  * E19 PR 1: os pedidos de exclusão de dados que a Meta mandou (o aviso assinado de "a pessoa removeu o aplicativo e pediu para apagar"). O `codigo` é o que a Meta mostra à pessoa e

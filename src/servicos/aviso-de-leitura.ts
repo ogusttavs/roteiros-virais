@@ -23,7 +23,7 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 
 export type ResultadoDoAviso = { enviado: boolean; motivo?: "nada parado" | "ja enviado hoje" | "sem destinatario" | "falha no envio"; destinatarios?: number };
 
-async function destinatariosDoAviso(): Promise<string[]> {
+export async function destinatariosDoAviso(): Promise<string[]> {
   const admins = await db()
     .select({ email: user.email })
     .from(user)

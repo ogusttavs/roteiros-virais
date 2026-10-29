@@ -214,6 +214,15 @@ export const config = {
     /** A chave de busca do preço do plano trimestral no Stripe (criado por `scripts/stripe-preparar.ts`). */
     precoLookupKey: "roteiros_trimestral",
   },
+  /**
+   * O alarme do disco do servidor (29/10/2026, antes de abrir a edicao de video para clientes): a VPS tem 100 GB e e dividida com outro produto. Com `atencaoPercentual` do disco usado o admin e avisado;
+   * com `criticoPercentual` o envio de video para editar e pausado e a limpeza roda na hora. Valores fora do razoavel (atencao fora de 1 a 99, critico menor ou igual a atencao ou acima de 100) voltam
+   * para 80 e 90 (`limitesDoDisco`, em `servicos/disco.ts`).
+   */
+  disco: {
+    atencaoPercentual: envNumero("DISCO_ATENCAO_PERCENTUAL", 80),
+    criticoPercentual: envNumero("DISCO_CRITICO_PERCENTUAL", 90),
+  },
   /** Contato mostrado em /termos e /privacidade (etapa 12, decisao 7). */
   emailContato: env("EMAIL_CONTATO", "contato@localhost"),
   /**

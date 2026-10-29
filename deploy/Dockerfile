@@ -37,9 +37,9 @@ ENV GIT_SHA=$GIT_SHA
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-# curl para o healthcheck do Compose
+# curl para o healthcheck do Compose; ffmpeg so pelo ffprobe, que a edicao de video (E47 PR 2) usa para conferir duracao, qualidade e som do video que a pessoa envia
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends curl ca-certificates \
+  && apt-get install -y --no-install-recommends curl ca-certificates ffmpeg \
   && rm -rf /var/lib/apt/lists/* \
   && groupadd -r app && useradd -r -g app app
 COPY --from=build --chown=app:app /app/.next/standalone ./
@@ -66,6 +66,8 @@ RUN node node_modules/playwright/cli.js install --with-deps chromium \
 # E19b: ponto de montagem do volume `roteiros_publicar` (video de uma publicacao, compartilhado com o worker, que roda como root): aberto como /tmp, para o volume novo
 # herdar uma pasta que os dois conseguem escrever, qualquer um que o crie primeiro.
 RUN mkdir -p /var/publicar && chmod 1777 /var/publicar
+# E47 PR 2: ponto de montagem do volume `roteiros_edicao` (video bruto e editado da edicao, compartilhado com o worker): aberto como /tmp pelo mesmo motivo.
+RUN mkdir -p /var/edicao && chmod 1777 /var/edicao
 USER app
 EXPOSE 3000
 CMD ["node", "server.js"]

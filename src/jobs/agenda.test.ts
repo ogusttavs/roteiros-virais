@@ -40,6 +40,14 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.renovarContasLigadas)).toBe("20 6 * * *");
   });
 
+  it("limparEdicoes roda de hora em hora, aos 25 minutos (E47 PR 2: bruto em 48 h, editado em 7 dias)", () => {
+    expect(cronDe(FILAS.limparEdicoes)).toBe("25 * * * *");
+  });
+
+  it("vigiarDisco roda a cada 15 minutos (alarme do disco do servidor)", () => {
+    expect(cronDe(FILAS.vigiarDisco)).toBe("*/15 * * * *");
+  });
+
   it("faxinaVersoes roda todo dia as 07:15", () => {
     expect(cronDe(FILAS.faxinaVersoes)).toBe("15 7 * * *");
   });

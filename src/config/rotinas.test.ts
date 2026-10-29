@@ -25,6 +25,7 @@ describe("quandoDoCron", () => {
     expect(quandoDoCron("0 * * * *")).toBe("de hora em hora, em ponto");
     expect(quandoDoCron("20 * * * *")).toBe("de hora em hora, aos 20 minutos");
     expect(quandoDoCron("0 5 * * 0")).toBe("todo domingo às 05:00");
+    expect(quandoDoCron("*/15 * * * *")).toBe("a cada 15 minutos");
     expect(quandoDoCron("0 2 1 * *")).toBe("todo dia 1 do mês às 02:00");
   });
 

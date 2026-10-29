@@ -743,6 +743,13 @@
       "when": 1793232395882,
       "tag": "0106_pesquisa-do-foco",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1793278409465,
+      "tag": "0107_edicoes",
+      "breakpoints": true
     }
   ]
 }

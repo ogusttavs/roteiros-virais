@@ -71,6 +71,8 @@ RUN apt-get update \
 
 # E19b: ponto de montagem do volume `roteiros_publicar`, o mesmo do app (ver Dockerfile): aberto como /tmp.
 RUN mkdir -p /var/publicar && chmod 1777 /var/publicar
+# E47 PR 2: ponto de montagem do volume `roteiros_edicao`, o mesmo do app (ver Dockerfile): aberto como /tmp.
+RUN mkdir -p /var/edicao && chmod 1777 /var/edicao
 WORKDIR /app
 
 COPY package.json package-lock.json ./

@@ -7,6 +7,7 @@ import { proxyEhTunel } from "@/lib/proxy-tunel";
 import { exigirAdmin } from "@/lib/sessao";
 import { inicioDoAdmin, type InicioAdmin, type LinhaDaMadrugada } from "@/servicos/admin-inicio";
 import { dataEHoraPorExtenso, dolares, quandoPorExtenso, reais, textosInicioAdmin as t } from "@/textos/admin-contas";
+import { tamanhoEmTexto } from "@/textos/aviso-disco";
 
 import comum from "./comum.module.css";
 import proprio from "./inicio.module.css";
@@ -47,6 +48,10 @@ function itensDeAtencao(inicio: InicioAdmin): ItemDeAtencao[] {
     if (parada.causa === "bloqueio" || parada.causa === "sem leitura") {
       itens.push({ chave: `leitura-${parada.plataforma}`, ...t.atencao.leituraParada(parada.plataforma, parada.causa, diaDoMes(parada.desde)), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
     }
+  }
+  if (inicio.atencao.disco) {
+    const { nivel, usadoPercentual, livreBytes, desde } = inicio.atencao.disco;
+    itens.push({ chave: "disco", ...t.atencao.disco(nivel, `${String(usadoPercentual).replace(".", ",")}%`, tamanhoEmTexto(livreBytes), `${diaDoMes(desde)}, ${horaDoDia(desde)}`), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
   }
   if (inicio.atencao.pedidosDeRamo > 0) itens.push({ chave: "pedidos", ...t.atencao.pedidosDeRamo(inicio.atencao.pedidosDeRamo), href: "/admin/nichos", rotulo: t.atencao.verRamos });
   return itens;

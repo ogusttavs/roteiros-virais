@@ -193,6 +193,35 @@ worker_fala_com_provedor_pot() {
   printf '%s\n' "$saida" | grep "PO Token Providers:"
 }
 
+# E47 PR 2: o volume da edicao de video (`roteiros_edicao`, em /var/edicao) e o mesmo nos dois containers: o app (usuario sem privilegio) grava, o worker (root) le e apaga, e o app
+# tem o ffprobe que confere o video que a pessoa envia. EDICAO_PASTA aponta para o volume nos dois.
+volume_da_edicao_funciona() {
+  local versao lido
+  versao=$("${COMPOSE[@]}" exec -T roteiros-app sh -c 'ffprobe -version | head -1') || {
+    echo "a imagem do app nao tem o ffprobe" >&2
+    return 1
+  }
+  for servico in roteiros-app roteiros-worker; do
+    "${COMPOSE[@]}" exec -T "$servico" sh -c '[ "$EDICAO_PASTA" = "/var/edicao" ]' || {
+      echo "EDICAO_PASTA nao aponta para /var/edicao em $servico" >&2
+      return 1
+    }
+  done
+  "${COMPOSE[@]}" exec -T roteiros-app sh -c 'mkdir -p /var/edicao/bruto && echo gravado-pelo-app > /var/edicao/bruto/teste-ensaio.txt' || {
+    echo "o app nao conseguiu gravar em /var/edicao" >&2
+    return 1
+  }
+  lido=$("${COMPOSE[@]}" exec -T roteiros-worker sh -c 'cat /var/edicao/bruto/teste-ensaio.txt && rm -f /var/edicao/bruto/teste-ensaio.txt' | tr -d '') || {
+    echo "o worker nao leu o que o app gravou em /var/edicao" >&2
+    return 1
+  }
+  [ "$lido" = "gravado-pelo-app" ] || {
+    echo "o worker leu '$lido' em vez do que o app gravou" >&2
+    return 1
+  }
+  echo "$versao; app grava e worker le e apaga em /var/edicao"
+}
+
 conferir_login_admin() {
   local resposta cookie codigo
   resposta=$(curl -s -i -X POST "$BASE_URL/api/auth/sign-in/email" \
@@ -378,6 +407,7 @@ passo "migra o banco pelo container do worker" migrar
 passo "sobe o app, o worker e o backup" subir_resto
 passo "confere /api/saude em $BASE_URL" conferir_saude
 passo "worker fala com o provedor de PO Token" worker_fala_com_provedor_pot
+passo "o volume de edicao e o ffprobe funcionam no app e no worker" volume_da_edicao_funciona
 passo "semeia o banco pelo container do worker" semear
 passo "login do admin de seed e GET /admin/clientes com o cookie" conferir_login_admin
 passo "dispara coleta-noticias e espera terminar ok (1a vez)" disparar_e_esperar_job

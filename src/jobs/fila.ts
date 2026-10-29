@@ -94,6 +94,20 @@ export const FILAS = {
    * a próxima pergunta (`startAfter`). Job curto: a conferência é idempotente (a reserva `processando` para `publicando` impede publicar duas vezes), então repetir por erro de rede é seguro.
    */
   publicarInstagram: "publicar-instagram",
+  /**
+   * E47 PR 2, a edição de vídeo: por evento (o vídeo bruto terminou de chegar), `{ edicaoId }`. O worker extrai o áudio, transcreve na Groq com o tempo de cada palavra e guarda as palavras e a
+   * curva de energia. Job curto (segundos), com as 2 repetições da fila para uma falha de rede da Groq; a edição conta as tentativas e desiste na terceira.
+   */
+  transcreverEdicao: "transcrever-edicao",
+  /**
+   * E47 PR 2: de hora em hora, apaga o vídeo bruto que passou de 48 horas e o editado que passou de 7 dias, falha o envio parado, enfileira a transcrição que a fila perdeu e varre
+   * do volume o arquivo que não tem dono. Job curto.
+   */
+  limparEdicoes: "limpar-edicoes",
+  /**
+   * Alarme do disco do servidor (29/10/2026): a cada 15 minutos mede o espaço livre e o tamanho dos volumes de vídeo e avisa o admin com 80% (atenção) e 90% (crítico) de uso. Job curto.
+   */
+  vigiarDisco: "vigiar-disco",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
@@ -104,7 +118,7 @@ export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
  * `clienteId`, que só `reprovarERescrever` sabe qual é; disparada sem isso,
  * o worker chama o job com `clienteId` indefinido e ele sempre quebra.
  */
-export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram]);
+export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram, FILAS.transcreverEdicao]);
 
 /**
  * As filas que aceitam rodar só para um ramo (`{ nichoId }` no disparo) e gravam o ramo em
@@ -160,6 +174,9 @@ const FILAS_CURTAS = new Set<string>([
   FILAS.aprenderCliente,
   FILAS.analisarPerfil,
   FILAS.publicarInstagram,
+  FILAS.transcreverEdicao,
+  FILAS.limparEdicoes,
+  FILAS.vigiarDisco,
 ]);
 
 const QUATRO_HORAS_S = 4 * 60 * 60;

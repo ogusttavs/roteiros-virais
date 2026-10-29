@@ -174,3 +174,62 @@ describe("transcreverAudio", () => {
     await expect(transcreverAudio("/tmp/a.mp3")).rejects.toThrow(/limite excedido/);
   });
 });
+
+describe("palavrasDaResposta e transcreverComPalavras (E47 PR 2)", () => {
+  it("palavrasDaResposta tira as vazias, apara o texto e marca a abertura de cada trecho", async () => {
+    const { palavrasDaResposta } = await import("./groq-api");
+    const palavras = palavrasDaResposta(
+      [
+        { word: " Hoje", start: 0.1, end: 0.4 },
+        { word: " ", start: 0.4, end: 0.5 },
+        { word: "vou", start: 0.5, end: 0.7 },
+        { word: "mostrar.", start: 0.7, end: 1.2 },
+        { word: "Depois", start: 2.0, end: 2.4 },
+        { word: "sem tempo", start: Number.NaN, end: 3 },
+        { word: "fim", start: 2.4, end: 2.2 },
+      ],
+      [
+        { no_speech_prob: 0.01, start: 0 },
+        { no_speech_prob: 0.01, start: 2.0 },
+      ],
+    );
+    expect(palavras.map((p) => p.texto)).toEqual(["Hoje", "vou", "mostrar.", "Depois", "fim"]);
+    expect(palavras.filter((p) => p.abreTrecho).map((p) => p.texto)).toEqual(["Hoje", "Depois"]);
+    // O fim nunca vem antes do começo.
+    expect(palavras[4].fim).toBeGreaterThanOrEqual(palavras[4].inicio);
+  });
+
+  it("sem palavras na resposta, devolve lista vazia", async () => {
+    const { palavrasDaResposta } = await import("./groq-api");
+    expect(palavrasDaResposta(undefined, undefined)).toEqual([]);
+  });
+
+  it("pede as palavras com tempo, manda o prompt de nomes e o idioma, e devolve o custo", async () => {
+    const { transcreverComPalavras } = await import("./groq-api");
+    create.mockResolvedValueOnce({
+      text: "Hoje vou mostrar",
+      language: "Portuguese",
+      duration: 30,
+      segments: [{ no_speech_prob: 0.02, start: 0, end: 30 }],
+      words: [{ word: "Hoje", start: 0, end: 0.3 }],
+    });
+    const r = await transcreverComPalavras("/tmp/a.wav", { idiomaConhecido: "pt", prompt: "Vídeo de Klaki." });
+    const args = create.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(args.timestamp_granularities).toEqual(["word", "segment"]);
+    expect(args.prompt).toBe("Vídeo de Klaki.");
+    expect(args.language).toBe("pt");
+    expect(args.response_format).toBe("verbose_json");
+    expect(r.palavras).toHaveLength(1);
+    expect(r.duracaoS).toBe(30);
+    expect(r.custoUsd).toBeCloseTo((30 / 3600) * 0.04, 6);
+    expect(r.idiomaDetectado).toBe("pt");
+  });
+
+  it("transcreverAudio continua sem pedir palavra nem prompt", async () => {
+    create.mockResolvedValueOnce({ text: "x", language: "Portuguese", segments: [] });
+    await transcreverAudio("/tmp/a.mp3", "pt");
+    const args = create.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(args).not.toHaveProperty("timestamp_granularities");
+    expect(args).not.toHaveProperty("prompt");
+  });
+});

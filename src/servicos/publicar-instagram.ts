@@ -16,7 +16,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { ENVIO_PARADO_APOS_MS, esperaDaConferencia, LIMITE_DE_PUBLICACOES_PADRAO, LIMITES_DA_LEGENDA, LIMITES_DA_PUBLICACAO, PREPARO_DA_META_PRAZO_MS, PUBLICANDO_PARADO_APOS_MS, tipoDeVideoAceito } from "@/config/publicacao";
-import { db, getPool } from "@/db";
+import { db } from "@/db";
 import { ESTADOS_VIVOS_DA_PUBLICACAO, publicacoes, videosCliente, type EstadoDaPublicacao, type Publicacao, type TipoDePublicacao } from "@/db/schema";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { problemaDaLegenda } from "@/lib/legenda-do-instagram";
@@ -24,6 +24,7 @@ import { logger } from "@/lib/log";
 import { ErroMetaLogin } from "@/lib/meta-oauth";
 import { criarContainerDeVideo, enderecoDaMidia, enviarVideo, ErroDeEnvioDoVideo, publicarContainer, statusDoContainer, usoDoLimite } from "@/lib/meta-publicar";
 import { ErroTokenCifrado } from "@/lib/meta-token";
+import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 import { descartarVideo, enderecoPublicoDoVideo, guardarVideo, varrerVideosVelhos } from "@/lib/video-temporario";
 import { contaLigadaDaMarca, contaParaPublicar, ehDonoDaMarca, erroDaContaPara, ligacaoDisponivel, registrarErroDaConta, type RecusaDePublicar } from "@/servicos/conta-conectada";
 import { corpoDoRoteiro, marcarPostado, roteiroPorId, type RoteiroLinha } from "@/servicos/roteiro";
@@ -379,51 +380,13 @@ export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicac
   }
 }
 
-/**
- * A reserva do envio: uma trava de aviso do Postgres (`pg_try_advisory_lock`) por publicação, segurada por uma conexão só dela até o envio acabar. Sem migração e sem estado novo na tabela; se o
- * processo cair, a conexão cai e a trava se solta sozinha (um estado `reservado` na tabela ficaria preso para sempre). Custa uma conexão do pool por envio em andamento, e há poucos ao mesmo tempo.
- */
-async function reservarEnvio(publicacaoId: number): Promise<"ocupada" | "indisponivel" | { soltar: () => Promise<void> }> {
-  let conexao;
-  try {
-    conexao = await getPool().connect();
-  } catch (erro) {
-    logger.warn({ err: erro, publicacaoId }, "publicar: sem conexao para reservar o envio");
-    return "indisponivel";
-  }
-  // Um erro numa conexão emprestada sem ouvinte derrubaria o processo. O ouvinte sai na devolução, para não se acumular na conexão que volta ao pool.
-  const ignorar = () => undefined;
-  conexao.on("error", ignorar);
-  const devolver = (destruir?: boolean) => {
-    conexao.off("error", ignorar);
-    conexao.release(destruir);
-  };
-  try {
-    const { rows } = await conexao.query<{ ok: boolean }>("select pg_try_advisory_lock($1, $2) as ok", [TRAVA_DO_ENVIO, publicacaoId]);
-    if (!rows[0]?.ok) {
-      devolver();
-      return "ocupada";
-    }
-  } catch (erro) {
-    logger.warn({ err: erro, publicacaoId }, "publicar: nao foi possivel reservar o envio");
-    devolver(true);
-    return "indisponivel";
-  }
-  return {
-    soltar: async () => {
-      try {
-        await conexao.query("select pg_advisory_unlock($1, $2)", [TRAVA_DO_ENVIO, publicacaoId]);
-        devolver();
-      } catch {
-        // Destruir a conexão solta a trava do mesmo jeito.
-        devolver(true);
-      }
-    },
-  };
-}
-
 /** Primeira parte do par da trava de aviso: separa esta trava de qualquer outra que o aplicativo venha a ter. */
 const TRAVA_DO_ENVIO = 5619;
+
+/** A reserva do envio de uma publicação: uma trava de aviso do Postgres por publicação (`lib/reserva-de-envio.ts`, que a edição de vídeo também usa, com outra trava). */
+function reservarEnvio(publicacaoId: number) {
+  return reservarEnvioPorTrava(TRAVA_DO_ENVIO, publicacaoId, "publicar");
+}
 
 async function receberVideoReservado(
   entrada: EntradaDoVideo,

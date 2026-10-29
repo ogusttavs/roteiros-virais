@@ -83,6 +83,11 @@ export const textosInicioAdmin = {
     }),
     // Achado de 05/10/2026: a API da IA recusou por falta de crédito (a geração do cliente só diz "tente de novo"); some sozinho quando uma geração dá certo depois.
     creditoDaIA: (desde: string) => ({ titulo: "A API da IA está sem crédito", detalhe: `desde ${desde}; nenhuma geração sai enquanto isso; recarregue em Plans & Billing da Anthropic` }),
+    // 29/10/2026: o disco do servidor (100 GB, dividido com o outro produto) passou do limite. No crítico o envio de vídeo para editar fica pausado até o uso baixar.
+    disco: (nivel: "atencao" | "critico", usado: string, livre: string, desde: string) => ({
+      titulo: nivel === "critico" ? `O disco do servidor está com ${usado} de uso e o envio de vídeos está pausado` : `O disco do servidor está com ${usado} de uso`,
+      detalhe: `desde ${desde}; restam ${livre} livres${nivel === "critico" ? "; publicar no Instagram continua funcionando; veja o que ocupa espaço na máquina ou aumente o disco" : "; veja o que ocupa espaço na máquina antes de chegar ao crítico"}`,
+    }),
     pedidosDeRamo: (n: number) => ({ titulo: n === 1 ? "1 pedido de ramo espera você" : `${n} pedidos de ramo esperam você`, detalhe: "a pessoa não achou o ramo na lista" }),
     teto: (reaisHoje: string, teto: string) => ({ titulo: "O gasto de hoje passou do teto do dia", detalhe: `${reaisHoje} de ${teto}` }),
     errosContinuam: (n: number) => ({ titulo: n === 1 ? "1 rotina com erro continua sem rodar certo" : `${n} rotinas com erro continuam sem rodar certo`, detalhe: "o último erro de cada uma segue sem uma execução boa depois" }),
