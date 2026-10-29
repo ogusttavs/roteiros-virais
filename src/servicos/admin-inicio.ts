@@ -11,6 +11,7 @@ import { hojeISO } from "@/lib/config";
 import { estadoPorDia, NOMES_JOB_COLETA, type EstadoAgregado } from "@/servicos/admin-acompanhamento";
 import { listarContasAdmin } from "@/servicos/admin-contas";
 import { fixoMensalEmReais, tetoDiarioEmReais } from "@/servicos/admin-custos";
+import { lerEstadoDoAlarme } from "@/servicos/disco";
 import { estadoAtualDaLeitura, type LeituraParada, outrasParadas, type ProxyParado, proxyDoEstado } from "@/servicos/leitura-parada";
 import { contarPedidosAbertos } from "@/servicos/pedidos-de-ramo";
 
@@ -44,7 +45,7 @@ export type InicioAdmin = {
   dinheiro: { saiuHojeUsd: number; saiu30dUsd: number; saiu30dComFixosBrl: number; fixosBrl: number; fixosCadastrados: number; tetoBrl: number; passouDoTeto: boolean };
   contas: { ativas: number; usaramOntem: number; pararam: number; briefingIncompleto: number; novasNaSemana: number };
   produto: { escritos: number; gravados: number; postados: number; reprovados: number; motivoMaisComum: { rotulo: string; vezes: number } | null };
-  atencao: { pedidosDeRamo: number; /** A API da IA recusou por falta de crédito e nenhuma geração boa veio depois (E-pequena de 05/10/2026), ou nulo. */ creditoDaIA: { desde: Date; tarefa: string } | null; /** O proxy do YouTube parado na última noite que tentou baixar (hotfix do proxy), ou nulo. */ proxy: ProxyParado | null; /** As outras redes cuja leitura parou (bloqueio ou nenhuma leitura boa na rodada), cada uma com a causa e desde quando; vazio quando tudo lê. */ leituraParada: LeituraParada[] };
+  atencao: { pedidosDeRamo: number; /** A API da IA recusou por falta de crédito e nenhuma geração boa veio depois (E-pequena de 05/10/2026), ou nulo. */ creditoDaIA: { desde: Date; tarefa: string } | null; /** O proxy do YouTube parado na última noite que tentou baixar (hotfix do proxy), ou nulo. */ proxy: ProxyParado | null; /** As outras redes cuja leitura parou (bloqueio ou nenhuma leitura boa na rodada), cada uma com a causa e desde quando; vazio quando tudo lê. */ leituraParada: LeituraParada[]; /** O disco do servidor acima do limite de atenção (29/10/2026), com o que o job `vigiar-disco` mediu por último, ou nulo quando está normal. */ disco: { nivel: "atencao" | "critico"; usadoPercentual: number; livreBytes: number; desde: Date } | null };
 };
 
 /** Depois desta hora (Brasil) um ramo sem tema do dia já é problema; antes, a madrugada ainda pode estar rodando. */
@@ -196,5 +197,6 @@ async function contas(agora: Date): Promise<InicioAdmin["contas"]> {
 /** Tudo o que o Início do admin mostra (E46 PR 1), de uma vez. */
 export async function inicioDoAdmin(agora: Date = new Date()): Promise<InicioAdmin> {
   const [m, e, d, c, p, pedidos, leitura, semCredito] = await Promise.all([madrugada(agora), erros(agora), dinheiro(agora), contas(agora), produto(agora), contarPedidosAbertos(), estadoAtualDaLeitura(), faltaDeCreditoDaIA()]);
-  return { agora, madrugada: m, erros: e, dinheiro: d, contas: c, produto: p, atencao: { pedidosDeRamo: pedidos, creditoDaIA: semCredito ? { desde: semCredito.em, tarefa: semCredito.tarefa } : null, proxy: proxyDoEstado(leitura), leituraParada: outrasParadas(leitura) } };
+  const alarme = await lerEstadoDoAlarme();
+  return { agora, madrugada: m, erros: e, dinheiro: d, contas: c, produto: p, atencao: { pedidosDeRamo: pedidos, creditoDaIA: semCredito ? { desde: semCredito.em, tarefa: semCredito.tarefa } : null, proxy: proxyDoEstado(leitura), leituraParada: outrasParadas(leitura), disco: alarme && alarme.nivel !== "normal" ? { nivel: alarme.nivel, usadoPercentual: alarme.usadoPercentual, livreBytes: alarme.livreBytes, desde: new Date(alarme.desde) } : null } };
 }

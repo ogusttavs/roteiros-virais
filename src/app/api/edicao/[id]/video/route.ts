@@ -6,6 +6,7 @@ import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { sessaoAtual } from "@/lib/sessao";
 import { MENSAGEM_VER_COMO_DESLIGADO, modoVerComoLigado } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { recusaPorDiscoCritico } from "@/servicos/disco";
 import { receberVideoDaEdicao } from "@/servicos/edicao";
 import { fraseDaEdicao } from "@/textos/edicao";
 
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
  * `Content-Length`. Mesmas travas de `PUT /api/publicar/<id>/video` (E56): a marca vem da sessão, nunca do pedido; o "ver como" nunca envia (403); marca que precisa assinar recebe 402; só uma
  * edição desta marca que esteja subindo, com o tamanho igual ao declarado ao abrir. Diferente da publicação, o vídeo FICA guardado (até 48 horas) para a edição. O vídeo é conferido na hora
  * (duração, qualidade, som): o que não serve volta com 422 e a frase, e o arquivo é apagado. A resposta é pequena: `{ ok: true }` ou a frase. Rota, não Server Action: a Server Action
- * carrega o corpo na memória e tem teto de tamanho, e um vídeo tem até 300 MB.
+ * carrega o corpo na memória e tem teto de tamanho, e um vídeo tem até 300 MB. Disco do servidor crítico (90% de uso): recusa com 503 e a frase de "envio pausado".
  */
 export async function PUT(request: Request, contexto: { params: Promise<{ id: string }> }) {
   if (await modoVerComoLigado()) return NextResponse.json({ erro: MENSAGEM_VER_COMO_DESLIGADO }, { status: 403 });
@@ -30,6 +31,10 @@ export async function PUT(request: Request, contexto: { params: Promise<{ id: st
   const { id } = await contexto.params;
   const edicaoId = idDoBancoOuNulo(id);
   if (edicaoId === null) return NextResponse.json({ erro: fraseDaEdicao("nao-achou"), codigo: "nao-achou" }, { status: 404 });
+
+  // Alarme do disco (29/10/2026): com o disco crítico o envio para editar fica pausado e a limpeza roda na hora. Só esta rota; publicar no Instagram não passa por aqui.
+  const discoCheio = await recusaPorDiscoCritico();
+  if (discoCheio) return NextResponse.json({ erro: discoCheio.frase, codigo: discoCheio.codigo }, { status: discoCheio.status, headers: { "Cache-Control": "private, no-store", "Retry-After": "300" } });
 
   const bruto = request.headers.get("content-length");
   const tamanhoDoPedido = bruto !== null && /^\d+$/.test(bruto) ? Number(bruto) : null;

@@ -44,6 +44,10 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.limparEdicoes)).toBe("25 * * * *");
   });
 
+  it("vigiarDisco roda a cada 15 minutos (alarme do disco do servidor)", () => {
+    expect(cronDe(FILAS.vigiarDisco)).toBe("*/15 * * * *");
+  });
+
   it("faxinaVersoes roda todo dia as 07:15", () => {
     expect(cronDe(FILAS.faxinaVersoes)).toBe("15 7 * * *");
   });

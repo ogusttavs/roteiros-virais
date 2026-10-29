@@ -320,6 +320,7 @@ A pessoa sobe o video bruto pelo celular (`PUT /api/edicao/<id>/video`), o app o
 - **Transcricao**: o job `transcrever-edicao` (por evento) extrai o audio a 16 kHz mono e chama a Groq com o tempo de cada palavra e um prompt de nomes tirado do briefing. O custo vai para `custos_externos` (em dolar) e os segundos de audio para `consumo_api` (fonte `groq`). Usa a `GROQ_API_KEY` que o worker ja tem.
 - **O ensaio** (`deploy/ensaio/ensaiar.sh`) ganhou um passo: o app grava e o worker le e apaga em `/var/edicao`, `EDICAO_PASTA` aponta para o volume nos dois e a imagem do app tem o `ffprobe`.
 - **Nao ha migracao que apague ou altere coluna**: so `CREATE TABLE edicoes` (migracao 0107).
+- **Alarme do disco** (29/10/2026): o job `vigiar-disco` roda a cada 15 minutos no worker, mede o disco que o conteiner enxerga (`fs.statfs`, a mesma particao da VPS) e o tamanho de `/var/edicao` e `/var/publicar`, e avisa o admin por e-mail (Resend), pelo Sentry e pelo Inicio do admin: **atencao com 80% de uso e critico com 90%** (`DISCO_ATENCAO_PERCENTUAL` e `DISCO_CRITICO_PERCENTUAL`, opcionais). Um aviso por nivel por dia e um de "voltou ao normal" (com folga de 2 pontos para nao piscar). No critico a limpeza (`limpar-edicoes`) roda na hora e `PUT /api/edicao/<id>/video` recusa com 503 ("O envio de videos esta pausado por alguns minutos"); publicar no Instagram continua. Sem migracao (o estado fica em `configuracao_admin`) e sem volume novo.
 
 ## O Instagram ligado pela propria pessoa (E19 PR 1)
 

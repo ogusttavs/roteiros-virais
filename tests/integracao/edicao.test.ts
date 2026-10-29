@@ -860,3 +860,56 @@ describe("limpeza (bruto em 48 horas, editado em 7 dias, sem arquivo órfão)", 
     expect(r).toMatchObject({ ok: true, usadas: 1 });
   });
 });
+
+describe("alarme do disco do servidor (29/10/2026)", () => {
+  const limitesDeAntes = { ...config.disco };
+  afterEach(() => {
+    config.disco.atencaoPercentual = limitesDeAntes.atencaoPercentual;
+    config.disco.criticoPercentual = limitesDeAntes.criticoPercentual;
+  });
+
+  /** Limites de 1% e 2%: qualquer disco de verdade está acima deles, então o nível é crítico sem mexer no disco. */
+  function discoCritico(): void {
+    config.disco.atencaoPercentual = 1;
+    config.disco.criticoPercentual = 2;
+  }
+
+  it("com o disco crítico o envio do vídeo é recusado com a frase clara, nada é gravado e a limpeza é pedida na hora", async () => {
+    entrar("ed-dono-a");
+    const id = await abrir(roteiroA, videos.bom);
+    discoCritico();
+
+    const r = await enviarRota(...pedidoVideo(id, videos.bom));
+
+    expect(r.status).toBe(503);
+    expect(r.headers.get("retry-after")).toBe("300");
+    expect(await r.json()).toEqual({ erro: "O envio de vídeos está pausado por alguns minutos. Tente de novo mais tarde.", codigo: "disco-cheio" });
+    expect(await arquivosDoVolume()).toEqual([]);
+    // A edição segue aberta: quando o disco voltar, o mesmo envio funciona.
+    expect((await linha(id)).estado).toBe("subindo");
+    expect(estado.enfileirados.map((e) => e.fila)).toContain("limpar-edicoes");
+    expect(estado.enfileirados.map((e) => e.fila)).not.toContain("transcrever-edicao");
+  });
+
+  it("quando o disco volta ao normal o mesmo envio passa e a transcrição entra na fila", async () => {
+    entrar("ed-dono-a");
+    const id = await abrir(roteiroA, videos.bom);
+    discoCritico();
+    expect((await enviarRota(...pedidoVideo(id, videos.bom))).status).toBe(503);
+
+    config.disco.atencaoPercentual = limitesDeAntes.atencaoPercentual;
+    config.disco.criticoPercentual = limitesDeAntes.criticoPercentual;
+    const r = await enviarRota(...pedidoVideo(id, videos.bom));
+
+    expect(r.status).toBe(200);
+    expect((await linha(id)).estado).toBe("guardado");
+    expect(estado.enfileirados.map((e) => e.fila)).toContain("transcrever-edicao");
+  });
+
+  it("só o envio para editar pausa: abrir a edição e ler o estado dela continuam funcionando", async () => {
+    entrar("ed-dono-a");
+    discoCritico();
+    const id = await abrir(roteiroA, videos.bom);
+    expect((await lerRota(...pedidoLer(id))).status).toBe(200);
+  });
+});

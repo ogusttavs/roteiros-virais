@@ -161,6 +161,9 @@ export default defineConfig({
       META_SIMULADOR_E2E: `http://127.0.0.1:${portaMeta}`,
       GROQ_API_KEY: "",
       EDICAO_PASTA: process.env.EDICAO_PASTA,
+      // O alarme do disco (29/10/2026) mede o disco de verdade: o e2e que manda video nao pode depender de quanto a maquina de quem roda tem livre.
+      DISCO_ATENCAO_PERCENTUAL: "99",
+      DISCO_CRITICO_PERCENTUAL: "100",
       APIFY_TOKEN: "",
       YOUTUBE_API_KEY: "",
       /**

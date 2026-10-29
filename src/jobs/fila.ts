@@ -104,6 +104,10 @@ export const FILAS = {
    * do volume o arquivo que não tem dono. Job curto.
    */
   limparEdicoes: "limpar-edicoes",
+  /**
+   * Alarme do disco do servidor (29/10/2026): a cada 15 minutos mede o espaço livre e o tamanho dos volumes de vídeo e avisa o admin com 80% (atenção) e 90% (crítico) de uso. Job curto.
+   */
+  vigiarDisco: "vigiar-disco",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
@@ -172,6 +176,7 @@ const FILAS_CURTAS = new Set<string>([
   FILAS.publicarInstagram,
   FILAS.transcreverEdicao,
   FILAS.limparEdicoes,
+  FILAS.vigiarDisco,
 ]);
 
 const QUATRO_HORAS_S = 4 * 60 * 60;

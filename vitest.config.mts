@@ -34,6 +34,9 @@ const envDeTeste = {
   ORCAMENTO_TRANSCREVER_SETOR_MIN: "30",
   ORCAMENTO_TRANSCREVER_TOTAL_MIN: "210",
   TRANSCRICOES_POR_DIA: "40",
+  // O alarme do disco (29/10/2026) mede o disco de verdade; os testes que mandam video (edicao) nao podem depender de quanto a maquina de quem roda tem livre. Os testes do alarme passam os limites 80 e 90 de forma explicita.
+  DISCO_ATENCAO_PERCENTUAL: "99",
+  DISCO_CRITICO_PERCENTUAL: "100",
   TRANSCRICOES_POR_DIA_COM_MARCA: "100",
   ORCAMENTO_TRANSCREVER_SETOR_COM_MARCA_MIN: "90",
   // O ritmo entre chamadas da Meta (padrao 2 s) so atrapalha o teste.

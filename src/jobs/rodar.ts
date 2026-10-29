@@ -50,6 +50,7 @@ import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
 import { rodarTranscreverEdicao } from "./transcrever-edicao";
+import { rodarVigiarDisco } from "./vigiar-disco";
 import { rodarVigilancia } from "./vigilancia";
 
 /**
@@ -154,6 +155,8 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.transcreverEdicao]: () => rodarTranscreverEdicao(Number(process.argv[3])),
   /** E47 PR 2: apaga o que passou do prazo de guarda e o que não tem dono no volume de edição. */
   [FILAS.limparEdicoes]: () => rodarLimparEdicoes(),
+  /** Alarme do disco do servidor: mede agora e avisa se passou do limite. */
+  [FILAS.vigiarDisco]: () => rodarVigiarDisco(),
   /**
    * Por evento, nao por horario, sempre para um cliente so (E27, parte 2,
    * item 2): sem um "todos os clientes" que faca sentido, o disparo manual
