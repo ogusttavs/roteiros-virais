@@ -24,7 +24,7 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
-import type { PalavraFalada } from "@/edicao/tipos";
+import type { Edl, Legendas, PalavraFalada } from "@/edicao/tipos";
 import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
 
 const id = () => integer("id").primaryKey().generatedAlwaysAsIdentity();
@@ -2725,11 +2725,39 @@ export type Publicacao = typeof publicacoes.$inferSelect;
  * Subindo: a edição foi aberta e o vídeo ainda está chegando. Guardado: o vídeo chegou inteiro, foi conferido (duração, qualidade, som) e espera a transcrição. Transcrevendo: o worker está ouvindo
  * o áudio. Transcrito: as palavras com tempo e a curva de energia estão guardadas e o motor de corte já pode trabalhar. Falhou: recusada ou parada, com a frase em `motivo`. Expirada: o vídeo
  * bruto (e o editado, se houve) já foi apagado pela guarda e não há mais o que fazer com ela.
+ *
+ * E47 PR 3 (a decisão da edição): Decidindo: o worker está pedindo à IA o que fica no vídeo, o título e as correções da legenda, e conferindo o resultado. Decidido: a decisão passou nas
+ * conferências do código e espera o verificador barato (a edição volta a este estado se a IA do verificador estava fora do ar). Verificado: decisão e verificador aprovaram; `resultado` tem
+ * o plano de corte, a legenda e o título, prontos para o render (PR 4). Para revisão: reprovou nas duas tentativas; a edição não segue sozinha e o que foi tentado fica em `resultado`.
  */
-export type EstadoDaEdicao = "subindo" | "guardado" | "transcrevendo" | "transcrito" | "falhou" | "expirada";
+export type EstadoDaEdicao = "subindo" | "guardado" | "transcrevendo" | "transcrito" | "decidindo" | "decidido" | "verificado" | "para_revisao" | "falhou" | "expirada";
 
 /** A curva de energia do áudio (dB em janelas de 10 ms, com uma casa) guardada junto das palavras: o motor de corte (`src/edicao/`) precisa dela, e o bruto não fica guardado para recalcular. */
 export type EnergiaGuardada = { db: number[]; duracao: number };
+
+/**
+ * E47 PR 3: o que o modelo forte decidiu para uma edição, SEMPRE por índice de palavra (nunca por segundo inventado): quais trechos ficam, qual tentativa do gancho abre o vídeo, o título do
+ * primeiro quadro, as correções de nome para a legenda e os avisos para a pessoa. É a entrada do motor de corte; o cálculo dos tempos é do código (`src/edicao/`).
+ */
+export type DecisaoDaEdicao = {
+  trechos: { deIndice: number; ateIndice: number; motivo: string; transicao: "nenhuma" | "combinar" | "direita" | "desfocar" }[];
+  gancho: { deIndice: number; ateIndice: number; tentativasDescartadas: number; porQue: string };
+  titulo: { texto: string; subtitulo: string | null };
+  correcoesDaLegenda: { de: string; para: string }[];
+  avisos: string[];
+};
+
+/** O plano de edição pronto para o render: o `Edl` do motor, a legenda (blocos e SubRip), o título e o que a conferência achou. Guardado em `edicoes.resultado`. */
+export type ResultadoDaEdicao = {
+  edl: Edl;
+  legenda: Legendas;
+  titulo: { texto: string; subtitulo: string | null };
+  avisos: string[];
+  /** Quantas decisões o modelo forte precisou (1 ou 2) e o que cada conferência achou, em texto técnico (só o admin lê). */
+  tentativas: number;
+  problemas: string[];
+  verificadaEm: string | null;
+};
 
 /**
  * E47 PR 2: uma edição de vídeo pela IA. A pessoa grava com o roteiro do dia, sobe o vídeo bruto (`PUT /api/edicao/<id>/video`), o servidor confere e guarda num volume próprio, e o worker
@@ -2766,7 +2794,12 @@ export const edicoes = pgTable(
     idioma: text("idioma"),
     palavras: jsonb("palavras").$type<PalavraFalada[]>(),
     energia: jsonb("energia").$type<EnergiaGuardada>(),
-    /** Em dólar: a transcrição na Groq e (nos PRs seguintes) a IA da decisão. */
+    /** E47 PR 3: a decisão do modelo forte (por índice de palavra) e o plano que o motor tirou dela. Saem junto com o bruto/editado (têm a fala da pessoa). */
+    decisao: jsonb("decisao").$type<DecisaoDaEdicao>(),
+    resultado: jsonb("resultado").$type<ResultadoDaEdicao>(),
+    /** E47 PR 3: quantas vezes o worker pegou esta edição para decidir (a IA pode estar fora do ar; depois de 3, a edição falha de vez). */
+    tentativasDaDecisao: integer("tentativas_da_decisao").notNull().default(0),
+    /** Em dólar: a transcrição na Groq e a IA da decisão e do verificador (E47 PR 3). */
     custoTranscricaoUsd: numeric("custo_transcricao_usd", { precision: 10, scale: 6 }).notNull().default("0"),
     custoIaUsd: numeric("custo_ia_usd", { precision: 10, scale: 6 }).notNull().default("0"),
     criadaPor: text("criada_por").references(() => user.id, { onDelete: "set null" }),

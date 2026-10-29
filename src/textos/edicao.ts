@@ -28,7 +28,9 @@ export type CodigoDaEdicao =
   | "nao-entendeu"
   | "sumiu"
   | "demorou"
-  | "disco-cheio";
+  | "disco-cheio"
+  | "nao-montou"
+  | "em-revisao";
 
 export const textosEdicao = {
   frases: {
@@ -54,6 +56,8 @@ export const textosEdicao = {
     sumiu: "O vídeo saiu do nosso servidor antes de a edição começar. Envie de novo.",
     demorou: "A edição demorou mais do que devia e foi parada. Envie o vídeo de novo.",
     "disco-cheio": "O envio de vídeos está pausado por alguns minutos. Tente de novo mais tarde.",
+    "nao-montou": "Não conseguimos montar a edição do seu vídeo agora. Envie o vídeo de novo em alguns minutos.",
+    "em-revisao": "A edição desse vídeo precisa de uma conferência nossa antes de ficar pronta. Avisamos quando terminar.",
   } satisfies Record<CodigoDaEdicao, string>,
 } as const;
 

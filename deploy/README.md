@@ -346,3 +346,11 @@ Entra desligado: sem os quatro dados abaixo no `.env` da VPS, ninguem consegue c
 
 Build na VPS; publicar porta; mexer em `/srv/odontotech` ou no bloco do OdontoTech no
 `Caddyfile`; commitar `.env`; deploy sem o Gustavo pedir.
+
+## A decisao da edicao (E47 PR 3)
+
+- **Job `decidir-edicao`** (por evento): a transcricao pronta (`transcrito`) enfileira a decisao. O modelo forte (`decidirEdicao`, esforco medio) decide o que fica no video por numero de palavra, o motor de corte (`src/edicao/`) calcula o plano e a legenda, o codigo confere (corte com palavra soando, nome da marca quase igual na legenda, numero e promessa do titulo) e um modelo barato (`verificarEdicao`) le a legenda e o titulo. Termina em `verificado` (pronta para o render do PR 4) ou `para_revisao` (reprovou nas duas decisoes; nao segue sozinha). Estados novos: `decidindo`, `decidido`, `verificado`, `para_revisao`.
+- **Custo estimado por video**: uns US$ 0,15 para 1 minuto (R$ 0,80) e US$ 0,22 para 2 minutos, com a decisao no modelo forte e o verificador no barato (a conta do estudo); dobra no pior caso (duas decisoes e dois verificadores). Tokens e custo reais ficam em `geracoes_ia` (tarefas `decidirEdicao` e `verificarEdicao`, so numeros: a fala nunca vai para o registro) e a soma em `edicoes.custo_ia_usd`.
+- **Se a IA estiver fora do ar** (sem credito, sobrecarga): a edicao volta ao passo anterior e a limpeza de hora em hora enfileira de novo (ate 3 rodadas; na terceira a edicao falha com a frase e o bruto sai). Se so o verificador cair, o plano fica guardado (`decidido`) e a rodada seguinte retoma dele sem pagar a decisao de novo.
+- **Migracao 0108**: so `ADD COLUMN` (`decisao`, `resultado`, `tentativas_da_decisao`). A decisao e o plano (que tem a fala da pessoa) saem junto com o ultimo arquivo da edicao.
+- Sem infra nova: o job roda no worker de hoje.

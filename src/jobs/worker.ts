@@ -26,6 +26,7 @@ import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarComentariosSemana } from "./comentarios-semana";
 import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
+import { type PayloadDecidirEdicao, rodarDecidirEdicao } from "./decidir-edicao";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { desligarComGraca } from "./desligamento";
 import { rodarEmailAcompanhamento } from "./email-acompanhamento";
@@ -249,6 +250,10 @@ async function main(): Promise<void> {
   /** Por evento (E47 PR 2): `receberVideoDaEdicao` manda `{ edicaoId }` quando o vídeo bruto termina de chegar. */
   await boss().work<PayloadTranscreverEdicao>(FILAS.transcreverEdicao, async (job) => {
     await executarComRegistro(FILAS.transcreverEdicao, () => rodarTranscreverEdicao(job[0].data.edicaoId));
+  });
+  /** Por evento (E47 PR 3): `rodarTranscreverEdicao` manda `{ edicaoId }` quando a fala ficou transcrita. */
+  await boss().work<PayloadDecidirEdicao>(FILAS.decidirEdicao, async (job) => {
+    await executarComRegistro(FILAS.decidirEdicao, () => rodarDecidirEdicao(job[0].data.edicaoId));
   });
   await boss().work(FILAS.limparEdicoes, async () => {
     await executarComRegistro(FILAS.limparEdicoes, () => rodarLimparEdicoes());

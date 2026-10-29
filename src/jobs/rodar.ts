@@ -21,6 +21,7 @@ import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarComentariosSemana } from "./comentarios-semana";
 import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
+import { rodarDecidirEdicao } from "./decidir-edicao";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { rodarEmailAcompanhamento } from "./email-acompanhamento";
 import { rodarEntenderMarca } from "./entender-marca";
@@ -153,6 +154,8 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.publicarInstagram]: () => rodarPublicarInstagram(Number(process.argv[3])),
   /** Por evento (E47 PR 2): `npm run job -- transcrever-edicao <edicaoId>` transcreve uma edição já guardada (usa a chave da Groq do ambiente). */
   [FILAS.transcreverEdicao]: () => rodarTranscreverEdicao(Number(process.argv[3])),
+  /** Por evento (E47 PR 3): `npm run job -- decidir-edicao <edicaoId>` decide a edição de uma fala já transcrita (usa a chave da Anthropic do ambiente). */
+  [FILAS.decidirEdicao]: () => rodarDecidirEdicao(Number(process.argv[3])),
   /** E47 PR 2: apaga o que passou do prazo de guarda e o que não tem dono no volume de edição. */
   [FILAS.limparEdicoes]: () => rodarLimparEdicoes(),
   /** Alarme do disco do servidor: mede agora e avisa se passou do limite. */

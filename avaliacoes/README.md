@@ -169,3 +169,33 @@ vermelho e o código de saída em 1.** Prova com chave real é do Fable.
 
 `npm run avaliar:tema-do-momento` mede o `temaDoMomento` (prompt novo no modelo forte): cada caso traz um setor e uma lista de assuntos em alta no Brasil, e diz se o código de produção deve gerar um tema do momento ou não (encaixe de pelo menos 7, assunto que existe, nunca sensível). O resumo imprime os acertos e, para cada tema gerado, o título e o porquê, para o revisor ler. O arquivo real é `GOLDEN_SET_DIR/tema-do-momento.json`; sem ele, roda com `tema-do-momento.exemplo.json`. Os casos do exemplo: tendência que cabe, que não cabe, sensível, ruído de futebol, reality e celular numa clínica, a escola de idiomas com o show de uma banda internacional (gera, adaptando), que cabe em parte e um serviço (clínica) com tendência de preço. `temas.exemplo.json` ganhou um caso de tema que toca um assunto em alta no Brasil (`tendenciasDoBrasil`).
 
+
+## A edição de vídeo (E47 PR 3)
+
+`npm run avaliar:edicao` roda a decisão da edição de ponta a ponta sobre a fala de um vídeo (sem banco e sem render): o modelo forte decide o que fica (por número de palavra), o motor de corte
+calcula o plano e a legenda, o código e o verificador barato conferem. É o mesmo núcleo que o job `decidir-edicao` usa (`src/servicos/decidir-edicao-nucleo.ts`). As chamadas vão direto, a
+preço cheio (a decisão tem dois passos que dependem um do outro, o lote não serve). O resumo imprime: edições verificadas, abertura certa (meta do PR 3: 4 de 5), legenda sem nome errado nem
+palavra proibida, sem alerta de corte com palavra soando, o título de cada caso (para o Gustavo dizer se é igual à abertura do roteiro ou melhor), os tokens e o custo (teto de US$ 5 por dia).
+
+O arquivo real é `GOLDEN_SET_DIR/edicao.json`; sem ele, roda com `edicao.exemplo.json`, três casos de fala sintética (palavras com tempo montadas de `frases`, com a curva de energia coerente):
+duas tentativas da abertura mais um nome de marca que o transcritor ouve errado; três tentativas da abertura e a última é a boa; uma gravação limpa (caso de controle). Sob o simulador
+(`AI_PROVIDER=mock`) o resultado NÃO mede o modelo.
+
+Um caso:
+
+```json
+{
+  "nome": "um nome curto",
+  "marca": { "nome": "Dr.Wash", "cidade": "Campinas", "concorrentes": [], "resumo": "o briefing em poucas linhas" },
+  "roteiro": { "titulo": "", "gancho": "", "corpo": "", "fechamento": "", "chamadaFinal": "", "textoNaTela": [] },
+  "palavras": [{ "texto": "Oi", "inicio": 0.4, "fim": 0.6 }],
+  "energia": { "db": [-60.1, -59.8], "duracao": 23.4 },
+  "esperado": { "aberturaCerta": { "deIndice": 9, "ateIndice": 38 }, "legendaDeveConter": ["DR.WASH"], "legendaNaoPodeConter": ["UOSH"] },
+  "pontoPrincipal": "por que este caso existe"
+}
+```
+
+- Fala real (o golden set de verdade, depois que o Gustavo gravar os vídeos de referência, a fase 0 do estudo): `palavras` e `energia` vêm de uma edição que chegou a `transcrito` (`edicoes.palavras`
+  e `edicoes.energia`), e `esperado.aberturaCerta` é a tentativa da abertura que ele aprovou na edição de referência (o que conta é a primeira palavra). Fala sintética (só no exemplo): `frases`
+  (cada uma com `pausaAntes`) no lugar de `palavras` e `energia`, e `esperado.aberturaCertaFrase` (o número, de 1, da frase certa).
+- Nada de fala de cliente ou de vídeo de verdade entra no repositório (ele é público): o arquivo real fica em `avaliacoes-privadas/`.

@@ -1,0 +1,92 @@
+[
+  {
+    "nome": "duas tentativas da abertura e um nome de marca que o transcritor ouve errado",
+    "marca": {
+      "nome": "Dr.Wash",
+      "cidade": "Campinas",
+      "concorrentes": [],
+      "resumo": "Marca própria de produtos de limpeza. Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação."
+    },
+    "roteiro": {
+      "titulo": "Por que a mancha de café volta sempre",
+      "gancho": "Você sabe por que a mancha de café volta sempre?",
+      "corpo": "O segredo é passar o produto na direção certa, sem esfregar em círculo.",
+      "fechamento": "Experimente hoje.",
+      "chamadaFinal": "Me conte como ficou.",
+      "textoNaTela": ["A mancha volta porque você esfrega em círculo"]
+    },
+    "frases": [
+      { "texto": "Pode gravar agora" },
+      { "texto": "Você sabe por que a mancha", "pausaAntes": 1.5 },
+      { "texto": "Você sabe por que a mancha de café volta sempre?", "pausaAntes": 1.3 },
+      { "texto": "O segredo é passar o Dr.Uosh na direção certa.", "pausaAntes": 0.5 },
+      { "texto": "Sem esfregar em círculo.", "pausaAntes": 0.4 },
+      { "texto": "Experimente hoje e me conte como ficou.", "pausaAntes": 0.6 }
+    ],
+    "esperado": {
+      "aberturaCertaFrase": 3,
+      "legendaDeveConter": ["DR.WASH"],
+      "legendaNaoPodeConter": ["UOSH", "PODE GRAVAR"]
+    },
+    "pontoPrincipal": "a abertura tem duas tentativas (a primeira largada pela metade) e uma conversa solta antes; fica a completa; o nome da marca sai certo na legenda"
+  },
+  {
+    "nome": "três tentativas da abertura e a última é a boa",
+    "marca": {
+      "nome": "Odontoclin",
+      "cidade": "Valinhos",
+      "concorrentes": [],
+      "resumo": "Clínica odontológica de bairro. Faz limpeza, clareamento e aparelho. Cliente ideal é a família do bairro."
+    },
+    "roteiro": {
+      "titulo": "Quanto custa clarear os dentes",
+      "gancho": "Clarear os dentes custa menos do que você pensa.",
+      "corpo": "O clareamento feito no consultório leva uma hora e o resultado aparece na mesma tarde.",
+      "fechamento": "Agende uma avaliação.",
+      "chamadaFinal": "Chame a gente no WhatsApp.",
+      "textoNaTela": []
+    },
+    "frases": [
+      { "texto": "Clarear os dentes custa menos" },
+      { "texto": "Clarear os dentes custa menos do que", "pausaAntes": 1.4 },
+      { "texto": "Clarear os dentes custa menos do que você pensa.", "pausaAntes": 1.2 },
+      { "texto": "No consultório da Odontoclim leva uma hora.", "pausaAntes": 0.5 },
+      { "texto": "O resultado aparece na mesma tarde.", "pausaAntes": 0.4 },
+      { "texto": "Agende uma avaliação e chame a gente no WhatsApp.", "pausaAntes": 0.6 }
+    ],
+    "esperado": {
+      "aberturaCertaFrase": 3,
+      "legendaDeveConter": ["ODONTOCLIN"],
+      "legendaNaoPodeConter": ["ODONTOCLIM"]
+    },
+    "pontoPrincipal": "três tentativas seguidas da mesma abertura, só a terceira é completa; o nome da clínica sai diferente do transcrito"
+  },
+  {
+    "nome": "uma gravação só, limpa: nada deve ser cortado além das pausas",
+    "marca": {
+      "nome": "Padaria Estrela",
+      "cidade": "Jundiaí",
+      "concorrentes": [],
+      "resumo": "Padaria de bairro. Pão francês saindo de hora em hora e bolo caseiro aos sábados."
+    },
+    "roteiro": {
+      "titulo": "O pão sai às sete",
+      "gancho": "O pão mais quente do bairro sai às sete da manhã.",
+      "corpo": "Aqui o pão francês sai de hora em hora, sempre quentinho.",
+      "fechamento": "Venha provar.",
+      "chamadaFinal": "Passe aqui no sábado.",
+      "textoNaTela": []
+    },
+    "frases": [
+      { "texto": "O pão mais quente do bairro sai às sete da manhã." },
+      { "texto": "Aqui o pão francês sai de hora em hora, sempre quentinho.", "pausaAntes": 0.5 },
+      { "texto": "Venha provar e passe aqui no sábado.", "pausaAntes": 0.5 }
+    ],
+    "esperado": {
+      "aberturaCertaFrase": 1,
+      "legendaDeveConter": [],
+      "legendaNaoPodeConter": []
+    },
+    "pontoPrincipal": "caso de controle: uma tentativa só; o modelo não deve inventar corte nem cortar a abertura"
+  }
+]

@@ -77,7 +77,11 @@ export type TarefaIA =
   /** E61 PR 1 (28/10/2026): uma frase de foco da conta (o assunto e o público dentro do setor), sugerida a partir do briefing para a pessoa confirmar. */
   | "sugerirFoco"
   /** E61 PR 3 (28/10/2026): as frases de busca e os canais de referência do foco confirmado de uma conta, para achar vídeo do assunto dela no YouTube. */
-  | "derivarBuscaDoFoco";
+  | "derivarBuscaDoFoco"
+  /** E47 PR 3 (29/10/2026): a decisão da edição de um vídeo falado, por índice de palavra: o que fica, a tentativa do gancho, o título do primeiro quadro e as correções da legenda. Modelo forte. */
+  | "decidirEdicao"
+  /** E47 PR 3: confere, em modelo barato, a legenda montada e o título da edição (nome de marca certo, palavra estranha, promessa falsa). */
+  | "verificarEdicao";
 
 export type ImagemEntrada = {
   base64: string;
