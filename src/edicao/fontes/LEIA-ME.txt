@@ -1,0 +1,6 @@
+Montserrat Bold (Montserrat-Bold.ttf), de Julieta Ulanovsky e colaboradores, distribuida pelo Google Fonts sob a SIL Open Font License 1.1
+(https://openfontlicense.org). A licenca permite usar, copiar e distribuir a fonte junto com o programa, inclusive em produto comercial, desde que
+o aviso de autoria e a licenca acompanhem a fonte e que ela nao seja vendida sozinha.
+
+Uso aqui: a legenda e o titulo queimados no video editado (src/edicao/ass.ts). A fonte vai dentro da imagem do worker de render porque a imagem do
+sistema (Debian slim) nao traz nenhuma fonte.

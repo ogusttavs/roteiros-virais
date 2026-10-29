@@ -112,6 +112,7 @@ export const textosPublicar = {
     legenda: "Legenda",
     legendaAjuda: "Já vem preenchida com o texto do seu roteiro. Mude o que quiser.",
     contador: (usadas: number) => `${usadas.toLocaleString("pt-BR")} de ${LIMITES_DA_LEGENDA.caracteres.toLocaleString("pt-BR")} letras`,
+    videoEditado: "Vai sair o seu vídeo editado, o que você acabou de aprovar. Ele não leva música: depois de publicar, você pode trocar o áudio no próprio Instagram.",
     escolherVideo: "Escolher o vídeo",
     trocarVideo: "Trocar o vídeo",
     videoEscolhido: (nome: string, megas: string) => `${nome}, ${megas} MB`,

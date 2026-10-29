@@ -32,7 +32,7 @@ deploy/ensaio/ensaiar.sh   # ensaio do Compose de produção nesta máquina, ant
                             # deploy (`deploy/README.md`)
 ```
 
-A edição de vídeo (E47 PR 2) precisa de `ffmpeg` e `ffprobe` no PATH para os testes de integração e o e2e (eles geram vídeos sintéticos; a CI instala os dois). `EDICAO_PASTA` é a pasta dos vídeos guardados; os testes usam uma pasta temporária própria.
+A edição de vídeo (E47 PR 2) precisa de `ffmpeg` e `ffprobe` no PATH para os testes de integração e o e2e (eles geram vídeos sintéticos; a CI instala os dois). `EDICAO_PASTA` é a pasta dos vídeos guardados; os testes usam uma pasta temporária própria. O render (E47 PR 4) roda o ffmpeg de verdade: `npx tsx scripts/render-fumaca.ts --segundos 60 [--hdr]` monta a prévia e o final de um vídeo sintético e imprime o tempo de cada um; em produção ele roda no contêiner `roteiros-render` (mesma imagem do worker, 1 vCPU, um vídeo por vez; `deploy/README.md`). A fonte da legenda está em `src/edicao/fontes/`.
 
 `MODO_E2E` liga o modo da suíte e2e (limite de taxa desligado, e-mail simulado mesmo com
 `NODE_ENV=production`); é ligado só pelo `playwright.config.ts` (`webServer.env`) e nunca

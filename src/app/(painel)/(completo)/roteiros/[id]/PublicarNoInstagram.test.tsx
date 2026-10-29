@@ -13,6 +13,12 @@ import { fraseDeFalha, fraseDeRecusa, textosPublicar } from "@/textos/publicar";
 const iniciarPublicacaoAction = vi.fn();
 const conferirPublicacaoAction = vi.fn();
 const cancelarEnvioAction = vi.fn();
+const publicarEdicaoAction = vi.fn();
+
+// E47 PR 4: publicar o vídeo editado que já está no servidor.
+vi.mock("./edicao-acoes", () => ({
+  publicarEdicaoAction: (...args: unknown[]) => publicarEdicaoAction(...args),
+}));
 
 vi.mock("./publicar-acoes", () => ({
   iniciarPublicacaoAction: (...args: unknown[]) => iniciarPublicacaoAction(...args),
@@ -87,7 +93,7 @@ const VISAO: VisaoDePublicar = {
 const aoEnviando = vi.fn();
 const aoMudarObservado = vi.fn();
 
-function Pai({ visao = VISAO, inicial = null }: { visao?: VisaoDePublicar; inicial?: VistaDaPublicacao | null }) {
+function Pai({ visao = VISAO, inicial = null, edicaoPronta = null }: { visao?: VisaoDePublicar; inicial?: VistaDaPublicacao | null; edicaoPronta?: { id: number; duracaoS: number | null } | null }) {
   const [publicacao, setPublicacao] = useState<VistaDaPublicacao | null>(inicial);
   return (
     <PublicarNoInstagram
@@ -100,6 +106,7 @@ function Pai({ visao = VISAO, inicial = null }: { visao?: VisaoDePublicar; inici
       }}
       aoEnviando={aoEnviando}
       semConexao={false}
+      edicaoPronta={edicaoPronta}
     />
   );
 }
@@ -120,6 +127,7 @@ beforeEach(() => {
   iniciarPublicacaoAction.mockReset();
   conferirPublicacaoAction.mockReset();
   cancelarEnvioAction.mockReset();
+  publicarEdicaoAction.mockReset();
   aoEnviando.mockReset();
   aoMudarObservado.mockReset();
   EnvioFalso.ultimo = null;
@@ -437,5 +445,36 @@ describe("a espera da Meta: o ritmo é o do servidor, e dá para cancelar", () =
     expect(screen.getByText(t.publicando)).toBeTruthy();
     expect(screen.queryByRole("button", { name: t.cancelarPublicacao })).toBeNull();
     expect(screen.queryByRole("button", { name: t.cancelar })).toBeNull();
+  });
+});
+
+describe("com o vídeo editado do servidor (E47 PR 4)", () => {
+  it("não pede o arquivo: diz que vai sair o vídeo editado e deixa publicar na hora", async () => {
+    publicarEdicaoAction.mockResolvedValue({ ok: true, dado: { publicacaoId: 31 } });
+    render(<Pai edicaoPronta={{ id: 9, duracaoS: 42 }} />);
+    expect(document.querySelector("input[type=file]")).toBeNull();
+    expect(screen.getByText(t.videoEditado)).toBeTruthy();
+    const botao = screen.getByRole("button", { name: t.publicar }) as HTMLButtonElement;
+    expect(botao.disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText(t.legenda), { target: { value: "Minha legenda" } });
+    fireEvent.click(botao);
+    await waitFor(() => expect(publicarEdicaoAction).toHaveBeenCalledWith(9, { tipo: "reels", legenda: "Minha legenda" }));
+    await waitFor(() => expect(aoMudarObservado).toHaveBeenCalledWith({ id: 31, tipo: "reels", estado: "processando", motivo: null, permalink: null }));
+    // Nada do caminho do arquivo do navegador: nem abre publicação pelo caminho antigo nem sobe bytes.
+    expect(iniciarPublicacaoAction).not.toHaveBeenCalled();
+    expect(EnvioFalso.ultimo).toBeNull();
+  });
+
+  it("a recusa do servidor aparece como frase na folha, e Story com vídeo editado longo demais é barrado antes", async () => {
+    publicarEdicaoAction.mockResolvedValue({ ok: false, erro: fraseDeRecusa("limite") });
+    render(<Pai edicaoPronta={{ id: 9, duracaoS: 42 }} />);
+    fireEvent.click(screen.getByRole("button", { name: t.publicar }));
+    expect((await screen.findByRole("alert")).textContent).toContain(fraseDeRecusa("limite"));
+    cleanup();
+    publicarEdicaoAction.mockClear();
+    render(<Pai visao={{ ...VISAO, tipoInicial: "story" }} edicaoPronta={{ id: 9, duracaoS: 95 }} />);
+    expect((await screen.findByRole("alert")).textContent).toContain(t.duracaoLonga("story", "60 segundos"));
+    fireEvent.click(screen.getByRole("button", { name: t.publicar }));
+    expect(publicarEdicaoAction).not.toHaveBeenCalled();
   });
 });

@@ -222,6 +222,43 @@ volume_da_edicao_funciona() {
   echo "$versao; app grava e worker le e apaga em /var/edicao"
 }
 
+# E47 PR 4: o contêiner de render. A mesma imagem do worker, outro papel: tem de estar no ar com 1 vCPU (a trava que protege o painel e o OdontoTech), o ffmpeg dele tem os filtros que o render usa
+# (legenda queimada, transição, conversão de HDR), a fonte da legenda está na imagem e um render DE VERDADE (vídeo sintético, prévia e final) sai com a duração do plano. Como o exec roda dentro
+# do contêiner limitado, o tempo impresso é o de 1 vCPU, o número do aceite ("60 s de bruto com prévia em menos de 5 minutos").
+render_funciona() {
+  local nano saida i
+  nano=$(docker inspect -f '{{.HostConfig.NanoCpus}}' roteiros-render-ensaio) || return 1
+  [ "$nano" = "1000000000" ] || {
+    echo "o roteiros-render nao esta limitado a 1 vCPU (NanoCpus=$nano)" >&2
+    return 1
+  }
+  for i in $(seq 1 30); do
+    "${COMPOSE[@]}" logs roteiros-render 2>/dev/null | grep -q "render no ar" && break
+    sleep 2
+  done
+  "${COMPOSE[@]}" logs roteiros-render 2>/dev/null | grep -q "render no ar" || {
+    echo "o roteiros-render nao disse 'render no ar'" >&2
+    "${COMPOSE[@]}" logs --tail 30 roteiros-render >&2
+    return 1
+  }
+  "${COMPOSE[@]}" exec -T roteiros-render sh -c 'ffmpeg -hide_banner -filters 2>/dev/null | grep -E "^ [.TSC]+ (subtitles|xfade|zscale|tonemap|loudnorm) " | wc -l | grep -q "^5$"' || {
+    echo "o ffmpeg do render nao tem os cinco filtros (subtitles, xfade, zscale, tonemap, loudnorm)" >&2
+    return 1
+  }
+  "${COMPOSE[@]}" exec -T roteiros-render sh -c 'test -s /app/src/edicao/fontes/Montserrat-Bold.ttf' || {
+    echo "a fonte da legenda nao esta na imagem" >&2
+    return 1
+  }
+  saida=$("${COMPOSE[@]}" exec -T roteiros-render npx tsx scripts/render-fumaca.ts --segundos 20 --hdr 2>&1) || {
+    echo "o render de verdade falhou:" >&2
+    echo "$saida" >&2
+    return 1
+  }
+  echo "$saida" | tr -d '' | tr '
+' ';'
+  echo
+}
+
 conferir_login_admin() {
   local resposta cookie codigo
   resposta=$(curl -s -i -X POST "$BASE_URL/api/auth/sign-in/email" \
@@ -408,6 +445,7 @@ passo "sobe o app, o worker e o backup" subir_resto
 passo "confere /api/saude em $BASE_URL" conferir_saude
 passo "worker fala com o provedor de PO Token" worker_fala_com_provedor_pot
 passo "o volume de edicao e o ffprobe funcionam no app e no worker" volume_da_edicao_funciona
+passo "o contêiner de render tem 1 vCPU, o ffmpeg e a fonte, e monta um vídeo de verdade" render_funciona
 passo "semeia o banco pelo container do worker" semear
 passo "login do admin de seed e GET /admin/clientes com o cookie" conferir_login_admin
 passo "dispara coleta-noticias e espera terminar ok (1a vez)" disparar_e_esperar_job

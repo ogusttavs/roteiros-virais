@@ -8,6 +8,8 @@
  *     nenhum arquivo, a edição passa a `expirada`; a linha fica, para a cota do mês e o histórico.
  *  4. Enfileira de novo a transcrição que a fila perdeu (edição `guardado` há mais de 10 minutos) e a decisão da edição (E47 PR 3: `transcrito` ou `decidido` há mais de 10 minutos, até 3 rodadas);
  *     a decisão que parou no meio (`decidindo` há mais de 20 minutos) volta ao passo anterior ou, na terceira rodada, falha. O plano e a decisão saem junto com o último arquivo (têm a fala da pessoa).
+ *  4c. (E47 PR 4) O render: o que está sendo montado sem sinal há 40 minutos volta para a vez (ou falha na terceira tentativa) e o que espera a vez há mais de 10 minutos é enfileirado de novo. Junto
+ *     com o bruto sai a prévia (só serve com o bruto por perto).
  *  5. Varre o volume: arquivo cujo nome não está em nenhuma linha viva (a linha foi apagada, o arquivo já tinha sido dado como apagado, o processo caiu antes de gravar o caminho) e `.parte` de
  *     envio que morreu. Assim nunca sobra arquivo órfão.
  *
@@ -20,7 +22,10 @@ import {
   DECISAO_PARADA_APOS_MS,
   ENVIO_DA_EDICAO_PARADO_APOS_MS,
   PARTE_VELHA_APOS_MS,
+  RENDER_ESQUECIDO_APOS_MS,
+  RENDER_PARADO_APOS_MS,
   TENTATIVAS_DA_DECISAO,
+  TENTATIVAS_DO_RENDER,
   TENTATIVAS_DA_TRANSCRICAO,
   TRANSCRICAO_ESQUECIDA_APOS_MS,
   TRANSCRICAO_PARADA_APOS_MS,
@@ -28,8 +33,10 @@ import {
 import { db } from "@/db";
 import { edicoes } from "@/db/schema";
 import { apagarArquivoDaEdicao, varrerSobrasDoVolume } from "@/edicao/arquivos";
+import type { PerfilDeRender } from "@/edicao/render-grafo";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { logger } from "@/lib/log";
+import { enfileirarRender, ESTADOS_DO_RENDER } from "@/servicos/render-edicao";
 import { fraseDaEdicao } from "@/textos/edicao";
 
 /** Um arquivo sem dono só é apagado depois de tanto tempo: o que acabou de ser renomeado ainda não teve o caminho gravado na linha. */
@@ -40,6 +47,8 @@ export type DepsDaLimpeza = {
   enfileirar?: (edicaoId: number) => Promise<void>;
   /** Quem enfileira a decisão da edição que ficou parada (o padrão põe na fila `decidir-edicao`). */
   enfileirarDecisao?: (edicaoId: number) => Promise<void>;
+  /** E47 PR 4: quem enfileira o render da prévia ou do final que ficou parado (o padrão põe na fila `renderizar-edicao`). */
+  enfileirarRender?: (edicaoId: number, perfil: PerfilDeRender, emSegundos: number) => Promise<void>;
 };
 
 async function enfileirarTranscricao(edicaoId: number): Promise<void> {
@@ -110,14 +119,16 @@ export async function rodarLimparEdicoes(deps: DepsDaLimpeza = {}): Promise<Reco
 
   // 3. A guarda: o bruto em 48 horas e o editado em 7 dias.
   const brutosVencidos = await db()
-    .select({ id: edicoes.id, caminhoBruto: edicoes.caminhoBruto })
+    .select({ id: edicoes.id, caminhoBruto: edicoes.caminhoBruto, caminhoPrevia: edicoes.caminhoPrevia })
     .from(edicoes)
     .where(and(isNull(edicoes.brutoApagadoEm), isNotNull(edicoes.brutoExpiraEm), lte(edicoes.brutoExpiraEm, agora)));
   for (const vencido of brutosVencidos) {
     await apagarArquivoDaEdicao(vencido.caminhoBruto);
+    // A prévia só serve enquanto o bruto existe (aprovar e refazer precisam dele): sai junto.
+    await apagarArquivoDaEdicao(vencido.caminhoPrevia);
     await db()
       .update(edicoes)
-      .set({ caminhoBruto: null, brutoApagadoEm: agora, palavras: null, energia: null })
+      .set({ caminhoBruto: null, caminhoPrevia: null, brutoApagadoEm: agora, palavras: null, energia: null, pedidosDeAjuste: null, progressoDoRender: null })
       .where(eq(edicoes.id, vencido.id));
   }
   const editadosVencidos = await db()
@@ -132,7 +143,14 @@ export async function rodarLimparEdicoes(deps: DepsDaLimpeza = {}): Promise<Reco
   const expiradas = await db()
     .update(edicoes)
     .set({ estado: "expirada", decisao: null, resultado: null, atualizadaEm: agora })
-    .where(and(inArray(edicoes.estado, ["guardado", "transcrevendo", "transcrito", "decidindo", "decidido", "verificado", "para_revisao"]), isNotNull(edicoes.brutoApagadoEm), isNull(edicoes.caminhoBruto), isNull(edicoes.caminhoEditado)))
+    .where(
+      and(
+        inArray(edicoes.estado, ["guardado", "transcrevendo", "transcrito", "decidindo", "decidido", "verificado", "montando_previa", "previa_pronta", "aprovada", "montando_final", "pronta", "para_revisao"]),
+        isNotNull(edicoes.brutoApagadoEm),
+        isNull(edicoes.caminhoBruto),
+        isNull(edicoes.caminhoEditado),
+      ),
+    )
     .returning({ id: edicoes.id });
 
   // 4. A transcrição que a fila perdeu.
@@ -165,15 +183,71 @@ export async function rodarLimparEdicoes(deps: DepsDaLimpeza = {}): Promise<Reco
     }
   }
 
+  // 4c. O render (E47 PR 4). O que está sendo montado sem sinal há muito tempo (o contêiner de render caiu) volta para a vez ou, na terceira tentativa perdida, falha; o que espera a vez e a
+  // fila perdeu é enfileirado de novo.
+  let rendersDevolvidos = 0;
+  let rendersDesistidos = 0;
+  let rendersReenfileirados = 0;
+  for (const perfil of ["previa", "final"] as const) {
+    const { espera, montando } = ESTADOS_DO_RENDER[perfil];
+    const paradas = await db()
+      .select({ id: edicoes.id, tentativas: edicoes.tentativasDoRender, caminhoBruto: edicoes.caminhoBruto, caminhoPrevia: edicoes.caminhoPrevia })
+      .from(edicoes)
+      .where(and(eq(edicoes.estado, montando), lt(edicoes.atualizadaEm, antes(RENDER_PARADO_APOS_MS))));
+    for (const parada of paradas) {
+      if (parada.tentativas < TENTATIVAS_DO_RENDER) {
+        await db()
+          .update(edicoes)
+          .set({ estado: espera, progressoDoRender: null, atualizadaEm: agora })
+          .where(and(eq(edicoes.id, parada.id), eq(edicoes.estado, montando)));
+        rendersDevolvidos += 1;
+      } else {
+        await apagarArquivoDaEdicao(parada.caminhoBruto);
+        await apagarArquivoDaEdicao(parada.caminhoPrevia);
+        await db()
+          .update(edicoes)
+          .set({
+            estado: "falhou",
+            motivo: fraseDaEdicao("nao-montou"),
+            caminhoBruto: null,
+            caminhoPrevia: null,
+            brutoApagadoEm: agora,
+            palavras: null,
+            energia: null,
+            decisao: null,
+            resultado: null,
+            pedidosDeAjuste: null,
+            progressoDoRender: null,
+            atualizadaEm: agora,
+          })
+          .where(and(eq(edicoes.id, parada.id), eq(edicoes.estado, montando)));
+        rendersDesistidos += 1;
+      }
+    }
+    const esquecidas = await db()
+      .select({ id: edicoes.id, tentativas: edicoes.tentativasDoRender })
+      .from(edicoes)
+      .where(and(eq(edicoes.estado, espera), lt(edicoes.atualizadaEm, antes(RENDER_ESQUECIDO_APOS_MS)), lt(edicoes.tentativasDoRender, TENTATIVAS_DO_RENDER)));
+    for (const esquecida of esquecidas) {
+      try {
+        await (deps.enfileirarRender ?? ((id, p, s) => enfileirarRender(id, p, s, esquecida.tentativas)))(esquecida.id, perfil, 0);
+        rendersReenfileirados += 1;
+      } catch (erro) {
+        logger.warn({ err: erro, edicaoId: esquecida.id }, "edicao: nao foi possivel enfileirar o render esquecido");
+      }
+    }
+  }
+
   // 5. O que ficou no volume sem dono.
   const comArquivo = await db()
-    .select({ bruto: edicoes.caminhoBruto, editado: edicoes.caminhoEditado })
+    .select({ bruto: edicoes.caminhoBruto, editado: edicoes.caminhoEditado, previa: edicoes.caminhoPrevia })
     .from(edicoes)
-    .where(or(isNotNull(edicoes.caminhoBruto), isNotNull(edicoes.caminhoEditado)));
+    .where(or(isNotNull(edicoes.caminhoBruto), isNotNull(edicoes.caminhoEditado), isNotNull(edicoes.caminhoPrevia)));
   const nomesComDono = new Set<string>();
   for (const linha of comArquivo) {
     if (linha.bruto) nomesComDono.add(linha.bruto);
     if (linha.editado) nomesComDono.add(linha.editado);
+    if (linha.previa) nomesComDono.add(linha.previa);
   }
   const sobras = await varrerSobrasDoVolume(nomesComDono, agora, IDADE_MINIMA_DO_ORFAO_MS, PARTE_VELHA_APOS_MS);
 
@@ -184,6 +258,9 @@ export async function rodarLimparEdicoes(deps: DepsDaLimpeza = {}): Promise<Reco
     decisoesDevolvidas,
     decisoesDesistidas,
     decisoesReenfileiradas,
+    rendersDevolvidos,
+    rendersDesistidos,
+    rendersReenfileirados,
     brutosApagados: brutosVencidos.length,
     editadosApagados: editadosVencidos.length,
     expiradas: expiradas.length,

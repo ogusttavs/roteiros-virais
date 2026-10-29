@@ -1,0 +1,239 @@
+/**
+ * A folha "Editar o meu vídeo" do roteiro (E47 PR 4). Mesmo desenho da folha "Publicar no Instagram" (E56): só tokens do painel, as peças (botão, área de texto) trazem o próprio estilo. Aqui ficam o corpo
+ * da folha, a barra de andamento, o campo do arquivo, o player da prévia, os avisos e os links de baixar.
+ */
+
+.corpo {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.explica {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto-suave);
+}
+
+.erro {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+  color: var(--cor-erro);
+}
+
+.erro svg {
+  flex: 0 0 auto;
+  margin-top: 0.15em;
+}
+
+.sucesso {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  color: var(--cor-positivo);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  justify-self: start;
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.link:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+  border-radius: var(--raio-md);
+}
+
+/* O andamento: a barra nativa, pintada com os tokens (sem valor, ela anima sozinha). */
+.barra {
+  width: 100%;
+  height: 0.5rem;
+  appearance: none;
+  border: 0;
+  border-radius: var(--raio-pill);
+  overflow: hidden;
+  background: var(--cor-nota-trilho);
+}
+
+.barra::-webkit-progress-bar {
+  background: var(--cor-nota-trilho);
+}
+
+.barra::-webkit-progress-value {
+  background: var(--cor-acao);
+  border-radius: var(--raio-pill);
+}
+
+.barra::-moz-progress-bar {
+  background: var(--cor-acao);
+  border-radius: var(--raio-pill);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra {
+    transition: none;
+  }
+}
+
+/* O campo do arquivo: o <input> fica fora da vista (continua no teclado e no leitor de tela) e o rótulo faz o papel do botão. */
+.arquivo {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.inputArquivo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.botaoArquivo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque-lg);
+  padding: 0 var(--espaco-6);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  cursor: pointer;
+}
+
+.botaoArquivo:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.inputArquivo:focus-visible + .botaoArquivo {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.nomeDoArquivo {
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+/* O player da prévia e do vídeo pronto: em pé, cabe na folha sem passar de 60% da altura da janela. */
+.video {
+  width: 100%;
+  max-height: 60dvh;
+  aspect-ratio: 9 / 16;
+  background: var(--cor-titulo);
+  border-radius: var(--raio-md);
+  object-fit: contain;
+}
+
+@media (min-width: 768px) {
+  .video {
+    max-width: 18rem;
+    justify-self: center;
+  }
+}
+
+.avisos {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-hover);
+}
+
+.avisos ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto);
+}
+
+.avisosTitulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.botoes {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.ajuste {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+/* Os links de baixar têm cara de botão (o primeiro cheio, o segundo vazado), como os botões da folha. */
+.botaoLink,
+.botaoLinkSecundario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque-lg);
+  padding: 0 var(--espaco-6);
+  border-radius: var(--raio-pill);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  text-decoration: none;
+}
+
+.botaoLink {
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  border: var(--largura-borda) solid transparent;
+}
+
+.botaoLinkSecundario {
+  background: transparent;
+  color: var(--cor-titulo);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+}
+
+.botaoLink:focus-visible,
+.botaoLinkSecundario:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}

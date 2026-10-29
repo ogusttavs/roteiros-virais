@@ -105,6 +105,11 @@ export const FILAS = {
    */
   decidirEdicao: "decidir-edicao",
   /**
+   * E47 PR 4: o render da edição (a prévia 540p e, depois do sim da pessoa, o vídeo final), `{ edicaoId, perfil }`. Por evento, e consumida SÓ pelo contêiner `roteiros-render` (1 vCPU, um vídeo
+   * por vez); o worker comum nunca registra esta fila. Sem repetição da fila: a edição conta as tentativas e o próprio job se enfileira de novo depois de um minuto.
+   */
+  renderizarEdicao: "renderizar-edicao",
+  /**
    * E47 PR 2: de hora em hora, apaga o vídeo bruto que passou de 48 horas e o editado que passou de 7 dias, falha o envio parado, enfileira a transcrição que a fila perdeu e varre
    * do volume o arquivo que não tem dono. Job curto.
    */
@@ -123,7 +128,7 @@ export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
  * `clienteId`, que só `reprovarERescrever` sabe qual é; disparada sem isso,
  * o worker chama o job com `clienteId` indefinido e ele sempre quebra.
  */
-export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram, FILAS.transcreverEdicao, FILAS.decidirEdicao]);
+export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram, FILAS.transcreverEdicao, FILAS.decidirEdicao, FILAS.renderizarEdicao]);
 
 /**
  * As filas que aceitam rodar só para um ramo (`{ nichoId }` no disparo) e gravam o ramo em
@@ -208,6 +213,8 @@ export type OpcoesFila = { retryLimit: number; retryBackoff: boolean; expireInSe
  * 2 repeticoes e espera crescente.
  */
 export function opcoesDaFila(nome: string): OpcoesFila {
+  // O render (E47 PR 4) passa de 15 minutos no pior caso (final de 3 minutos de vídeo, 1 vCPU); o teto de tempo é o do ffmpeg (`limiteDoRenderMs`, no máximo 30 minutos), então a fila espera 45.
+  if (nome === FILAS.renderizarEdicao) return { retryLimit: 0, retryBackoff: false, expireInSeconds: 45 * 60, heartbeatSeconds: PULSO_DO_WORKER_S };
   if (FILAS_CURTAS.has(nome)) {
     return { retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60, heartbeatSeconds: PULSO_DO_WORKER_S };
   }

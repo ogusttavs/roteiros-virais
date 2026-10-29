@@ -6,6 +6,7 @@ import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
+import { visaoDeEditar } from "@/servicos/edicao-tela";
 import { momentoDoRoteiro } from "@/servicos/em-alta";
 import { fontesDosParagrafos, pesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
 import { falaDoRoteiro } from "@/servicos/marcar-fala";
@@ -59,6 +60,9 @@ export default async function Roteiro({ params }: Props) {
     visaoDePublicar({ usuarioId: sessao.user.id, clienteId: cliente.id, roteiro, verComo: sessao.verComo != null }).catch(() => null),
   ]);
 
+  // E47 PR 4: "Editar o meu vídeo". Uma falha aqui só tira a função da tela. Publicar o vídeo editado só aparece se "Publicar no Instagram" também aparece (e o roteiro ainda não foi publicado).
+  const editar = await visaoDeEditar({ clienteId: cliente.id, roteiro, verComo: sessao.verComo != null, podePublicar: publicar !== null && publicar.situacao.pode }).catch(() => null);
+
   // E50 parte 2, PR 4: os vídeos do banco que o "Por quê" cita (o link só https, a conta e quantas vezes acima do normal). Uma falha em um vídeo só tira o link dele.
   const idsDosPorQues = [...new Set((corpoDoRoteiro(roteiro).porQueDosBlocos ?? []).flatMap((i) => (i.video ? [i.video.videoId] : [])))].slice(0, 8);
   const videosDoPorQue = Object.fromEntries(
@@ -107,6 +111,7 @@ export default async function Roteiro({ params }: Props) {
       nomePessoa={sessao.user.name}
       conviteInstalarPodeAparecer={conviteDeInstalarPodeAparecer(preferencias, new Date())}
       publicar={publicar}
+      editar={editar}
     />
   );
 }

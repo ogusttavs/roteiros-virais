@@ -36,6 +36,8 @@ export type EntradaDoNucleo = {
   /** Uma decisão que já passou nas conferências do código numa rodada anterior: retoma do verificador, sem pagar a decisão de novo. */
   decisaoGuardada?: DecisaoDaEdicao | null;
   chamar: Chamador;
+  /** E47 PR 4: o que a pessoa pediu ao "Refazer com motivo" depois de ver a prévia. Entra já na primeira decisão desta rodada, como motivo da decisão anterior. */
+  pedidosDaPessoa?: string[];
   /** Chamado quando uma decisão passa nas conferências do código e antes do verificador: o job guarda para poder retomar. */
   aoPassarNoCodigo?: (decisao: DecisaoDaEdicao, resultado: ResultadoDaEdicao) => Promise<void>;
   agora: Date;
@@ -54,7 +56,7 @@ export type SaidaDoNucleo = {
 export async function decidirEVerificar(entrada: EntradaDoNucleo): Promise<SaidaDoNucleo> {
   const { palavras, energia, contexto, chamar } = entrada;
   let guardada: DecisaoDaEdicao | null = entrada.decisaoGuardada ?? null;
-  let motivos: string[] = [];
+  let motivos: string[] = (entrada.pedidosDaPessoa ?? []).map((p) => `a pessoa assistiu à prévia e pediu para refazer: "${p}"`);
   let ultimo: { decisao: DecisaoDaEdicao; resultado: ResultadoDaEdicao } | null = null;
   const limite = AJUSTES_DA_EDICAO.decisoesPorEdicao;
 
