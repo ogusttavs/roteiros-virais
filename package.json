@@ -7,7 +7,9 @@
     "node": ">=24"
   },
   "scripts": {
+    "predev": "tsx scripts/corrigir-ping-do-react.ts",
     "dev": "next dev",
+    "prebuild": "tsx scripts/corrigir-ping-do-react.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
