@@ -399,6 +399,18 @@ export const config = {
     pesquisaNaHoraBuscasAprofundada: envNumero("PESQUISA_NA_HORA_BUSCAS_APROFUNDADA", 10),
     pesquisasNaHoraPorMarcaPorDia: envNumero("PESQUISAS_NA_HORA_MARCA_DIA", 3),
     pesquisaNaHoraDadosMax: 8,
+    /**
+     * E61 PR 3, a pesquisa do foco (28/10/2026): a camada pequena de coleta por conta com foco confirmado, SO com fontes sem custo extra (a API do YouTube dentro da cota). Os tetos valem por conta e por dia:
+     * `focoBuscasPorContaPorDia` buscas por frase (cada uma 100 unidades da cota do YouTube, a cota gratuita de 10 mil por dia), `focoVideosPorContaPorDia` vídeos guardados, `focoCanaisPorConta` canais de referência
+     * (1 unidade cada para ler os últimos vídeos). `focoUnidadesPorDia` é o teto de TODAS as contas juntas, para a camada nunca tirar a cota da coleta do setor. `focoProvaSuficiente`: com tantos vídeos do setor já
+     * tratando do assunto da conta, a camada não gasta busca (só lê os canais de referência). `PESQUISA_DO_FOCO=0` desliga a camada inteira.
+     */
+    focoPesquisaLigada: env("PESQUISA_DO_FOCO", "1") !== "0",
+    focoBuscasPorContaPorDia: envNumero("FOCO_BUSCAS_CONTA_DIA", 2),
+    focoVideosPorContaPorDia: envNumero("FOCO_VIDEOS_CONTA_DIA", 40),
+    focoCanaisPorConta: envNumero("FOCO_CANAIS_CONTA", 3),
+    focoUnidadesPorDia: envNumero("FOCO_UNIDADES_YOUTUBE_DIA", 1500),
+    focoProvaSuficiente: envNumero("FOCO_PROVA_SUFICIENTE", 6),
     pesquisaNaHoraDadoAntigoMeses: 12,
   },
 };

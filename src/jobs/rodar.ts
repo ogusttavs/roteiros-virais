@@ -40,6 +40,7 @@ import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
+import { rodarPesquisaDoFoco } from "./pesquisa-do-foco";
 import { rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
 import { rodarPublicarInstagram } from "./publicar-instagram";
@@ -128,6 +129,11 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
     // E61 PR 2: `--conta=<clienteId>` refaz só os temas por foco dessa conta (precisa do `nichoId` dela antes).
     const contaArg = process.argv.find((arg) => /^--conta=\d+$/.test(arg));
     return rodarTemasDoDia(nichoIdArg === undefined ? undefined : Number(nichoIdArg), { forcar, clienteId: contaArg === undefined ? undefined : Number(contaArg.slice("--conta=".length)) });
+  },
+  /** E61 PR 3: `npm run job -- pesquisa-do-foco [<clienteId>]` pesquisa o foco de uma conta, ou de todas as que estão em uso. */
+  [FILAS.pesquisaDoFoco]: () => {
+    const clienteIdArg = process.argv[3];
+    return rodarPesquisaDoFoco({ clienteId: clienteIdArg === undefined ? undefined : Number(clienteIdArg) });
   },
   [FILAS.pesquisaDeSetor]: () => {
     const nichoIdArg = process.argv[3];

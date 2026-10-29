@@ -8,6 +8,7 @@ export type Rotina = { chave: string; titulo: string; faz: string; filas: string
 
 export const ROTINAS: Rotina[] = [
   { chave: "buscar", titulo: "Buscar vídeos novos", faz: "Procura, em cada rede, os vídeos novos das contas que a gente acompanha.", filas: [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaMeioDia, FILAS.contasBase, FILAS.metaContas, FILAS.metaHashtags, FILAS.descobertaInstagram] },
+  { chave: "foco", titulo: "Pesquisar o assunto de cada conta", faz: "Para a conta que tem foco, busca no YouTube vídeos do assunto dela (e de alguns canais de referência), dentro de um teto por conta, para o ramo ter prova do que ela fala.", filas: [FILAS.pesquisaDoFoco] },
   { chave: "capas", titulo: "Guardar a capa dos vídeos", faz: "Baixa a imagem de capa dos vídeos do Instagram enquanto o link da rede ainda abre, para a referência não aparecer vazia depois.", filas: [FILAS.guardarCapas] },
   { chave: "noticias", titulo: "Ler as notícias do ramo", faz: "Junta as notícias do dia de cada ramo, separa as que importam para quem tem negócio ali e guarda a foto de cada matéria.", filas: [FILAS.coletaNoticias, FILAS.filtrarNoticias] },
   { chave: "tendencias", titulo: "Ver o que está em alta no Brasil", faz: "Junta as buscas e os vídeos em alta no país, para todos os ramos, e põe o tema do momento no dia de cada ramo.", filas: [FILAS.tendenciasBrasil] },
@@ -58,6 +59,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.modeloNicho]: "o modelo do ramo",
   [FILAS.temasDoDia]: "os temas do dia",
   [FILAS.pesquisaDeSetor]: "a pesquisa do mercado",
+  [FILAS.pesquisaDoFoco]: "a pesquisa do assunto de cada conta",
   [FILAS.lembrete]: "o lembrete",
   [FILAS.curvaCliente]: "a medição dos vídeos postados",
   [FILAS.emailAcompanhamento]: "o e-mail de acompanhamento",

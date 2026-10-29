@@ -75,7 +75,9 @@ export type TarefaIA =
   /** Melhoria da E53 (23/10/2026): de 3 a 6 palavras de busca para um assunto de notícias que a pessoa escreveu e o catálogo não tem. */
   | "sugerirPalavrasDoAssunto"
   /** E61 PR 1 (28/10/2026): uma frase de foco da conta (o assunto e o público dentro do setor), sugerida a partir do briefing para a pessoa confirmar. */
-  | "sugerirFoco";
+  | "sugerirFoco"
+  /** E61 PR 3 (28/10/2026): as frases de busca e os canais de referência do foco confirmado de uma conta, para achar vídeo do assunto dela no YouTube. */
+  | "derivarBuscaDoFoco";
 
 export type ImagemEntrada = {
   base64: string;

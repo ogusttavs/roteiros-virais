@@ -59,6 +59,8 @@ export const FILAS = {
   extrairSemFala: "extrair-sem-fala",
   modeloNicho: "modelo-nicho",
   temasDoDia: "temas-do-dia",
+  /** E61 PR 3: a pesquisa do foco das contas (frases e canais de referência no YouTube, com teto por conta); diária de madrugada e por evento, quando a pessoa confirma o foco. */
+  pesquisaDoFoco: "pesquisa-do-foco",
   /** M2: o setor nasce pesquisado (ao criar, "Pesquisar o mercado de novo" no admin, e mensal para os ativos). */
   pesquisaDeSetor: "pesquisa-de-setor",
   lembrete: "lembrete",

@@ -47,6 +47,7 @@ import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
 import { recolherOrfaosDoWorkerAnterior } from "./orfaos";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
+import { rodarPesquisaDoFoco } from "./pesquisa-do-foco";
 import { type PayloadPesquisaNaHora, rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
 import { type PayloadPublicarInstagram, rodarPublicarInstagram } from "./publicar-instagram";
@@ -192,6 +193,10 @@ async function main(): Promise<void> {
   /** M1, item 2: com `nichoId`, só aquele setor, e só se ele ainda não tem tema hoje; sem, comportamento de sempre. */
   await boss().work<{ nichoId?: number; aoAbrir?: boolean; clienteId?: number }>(FILAS.temasDoDia, async (job) => {
     await executarComRegistro(FILAS.temasDoDia, () => rodarTemasDoDia(job[0]?.data?.nichoId, { aoAbrir: job[0]?.data?.aoAbrir === true, clienteId: job[0]?.data?.clienteId }), { ramoId: job[0]?.data?.nichoId ?? null });
+  });
+  /** E61 PR 3: sem `clienteId`, todas as contas com foco confirmado e em uso (o cron diário); com, só aquela conta (a pessoa acabou de confirmar o foco). */
+  await boss().work<{ clienteId?: number }>(FILAS.pesquisaDoFoco, async (job) => {
+    await executarComRegistro(FILAS.pesquisaDoFoco, () => rodarPesquisaDoFoco({ clienteId: job[0]?.data?.clienteId }));
   });
   /** M2: sem `nichoId`, roda para todos os nichos ativos (o cron mensal); com, só aquele setor (criação ou "Pesquisar de novo"). */
   await boss().work<{ nichoId?: number }>(FILAS.pesquisaDeSetor, async (job) => {

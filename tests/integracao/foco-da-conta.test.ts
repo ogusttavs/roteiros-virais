@@ -361,23 +361,25 @@ describe("as Server Actions", () => {
     expect(await tirarFocoAction()).toEqual({ ok: true, foco: { estado: "sem" } });
   });
 
-  it("confirmar ou escrever o foco pede os temas do dia só dessa conta; sugerir, tirar e o erro não pedem nada", async () => {
+  it("confirmar ou escrever o foco pede os temas do dia e a pesquisa do assunto só dessa conta; sugerir, tirar e o erro não pedem nada", async () => {
     await sugerirFocoAction();
     expect(enviosDaFila.send).not.toHaveBeenCalled();
 
     const sugerida = (await clientePorId(contaA))!.foco!;
     await confirmarFocoAction(sugerida);
-    expect(enviosDaFila.send).toHaveBeenCalledTimes(1);
-    expect(enviosDaFila.send).toHaveBeenLastCalledWith("temas-do-dia", { nichoId, clienteId: contaA, aoAbrir: true }, expect.objectContaining({ singletonSeconds: 600 }));
+    // Dois pedidos por confirmação (E61 PR 3): os temas da conta e a pesquisa do assunto dela, os dois só dessa conta.
+    expect(enviosDaFila.send).toHaveBeenCalledTimes(2);
+    expect(enviosDaFila.send).toHaveBeenCalledWith("temas-do-dia", { nichoId, clienteId: contaA, aoAbrir: true }, expect.objectContaining({ singletonSeconds: 600 }));
+    expect(enviosDaFila.send).toHaveBeenCalledWith("pesquisa-do-foco", { clienteId: contaA }, expect.objectContaining({ singletonSeconds: 600 }));
 
     await escreverFocoAction("automação de atendimento para clínicas");
-    expect(enviosDaFila.send).toHaveBeenCalledTimes(2);
+    expect(enviosDaFila.send).toHaveBeenCalledTimes(4);
     // Nunca o texto do foco na fila: só o id da conta.
     expect(JSON.stringify(enviosDaFila.send.mock.calls)).not.toContain("clínicas");
 
     await escreverFocoAction("IA");
     await tirarFocoAction();
-    expect(enviosDaFila.send).toHaveBeenCalledTimes(2);
+    expect(enviosDaFila.send).toHaveBeenCalledTimes(4);
   });
 
   it("a frase do erro vem do motivo, e o foco devolvido é o que o servidor tem", async () => {
