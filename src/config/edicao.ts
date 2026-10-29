@@ -65,3 +65,46 @@ export const TENTATIVAS_DA_DECISAO = 3;
 export const DECISAO_ESQUECIDA_APOS_MS = 10 * 60 * 1000;
 /** Uma edição `decidindo` por mais que isto (o worker caiu no meio) volta ao passo anterior. */
 export const DECISAO_PARADA_APOS_MS = 20 * 60 * 1000;
+
+/**
+ * E47 PR 4: o render (a prévia e o vídeo final). Medido em 28/10/2026 na VPS de produção com 1 vCPU: a prévia 540p de 60 s sai em cerca de 43 s e o final 1080p em cerca de 2 minutos. Os
+ * tempos máximos abaixo são três vezes isso (o teto da fila: passou, o ffmpeg é morto e a edição conta uma tentativa perdida). Sem música no servidor (decisão do Gustavo em 29/10/2026).
+ */
+export const AJUSTES_DO_RENDER = {
+  /** A prévia: pequena, abre no celular sem pesar (uns 35 MB por minuto no estudo). */
+  previa: { largura: 540, altura: 960, crf: 28, audioKbps: 96 },
+  /** O final: 1080p em pé, o que o Instagram e o TikTok pedem. */
+  final: { largura: 1080, altura: 1920, crf: 23, audioKbps: 128 },
+  quadrosPorSegundo: 30,
+  /** A transição "combinar" da troca de assunto: 14 quadros a 30 por segundo (a que o Gustavo aprovou). */
+  transicaoS: 14 / 30,
+  /** Fade curto de cada ponta de áudio em cada corte, para o corte não estalar. */
+  fadeDoCorteS: 0.03,
+  /** O final: a imagem escurece neste tempo, junto com o texto. */
+  fadeFinalS: 0.8,
+  /** O título do primeiro quadro fica no mínimo este tempo na tela. */
+  tituloS: 3.5,
+  /** Quanto o render pode demorar por segundo de vídeo, no pior caso medido, vezes 3 (o teto de tempo): prévia 0,75 e final 2,0 segundos por segundo de vídeo. */
+  razaoDoLimite: { previa: 0.75 * 3, final: 2 * 3 },
+  limiteMinimoMs: { previa: 90_000, final: 180_000 },
+  limiteMaximoMs: { previa: 10 * 60_000, final: 25 * 60_000 },
+} as const;
+
+/** Quantas vezes o worker de render pega a mesma edição antes de desistir (cada tentativa perdida volta para a fila depois de um minuto). */
+export const TENTATIVAS_DO_RENDER = 3;
+/** Uma edição `verificado` ou `aprovada` que ninguém pegou (a fila perdeu o pedido) é enfileirada de novo depois deste tempo. */
+export const RENDER_ESQUECIDO_APOS_MS = 10 * 60 * 1000;
+/** Uma edição `montando_previa` ou `montando_final` sem sinal por mais que isto (o contêiner de render caiu) volta para a fila ou, na terceira vez, falha. */
+export const RENDER_PARADO_APOS_MS = 40 * 60 * 1000;
+/** Quantos pedidos de "Refazer com motivo" uma edição aceita (cada um é outra decisão da IA e outra prévia). */
+export const REFAZERES_POR_EDICAO = 3;
+/** O motivo do "Refazer" cabe em tantas letras. */
+export const MOTIVO_DO_REFAZER_MAX = 300;
+/** Quanto tempo a posição na fila conta por vídeo que está na frente (para a frase "cerca de N minutos"), em segundos por vídeo de 1 minuto: prévia e final. */
+export const ESTIMATIVA_POR_VIDEO_S = { previa: 60, final: 150 } as const;
+
+/** Tempo máximo do ffmpeg para um render, em milissegundos: três vezes o tempo esperado, com piso e teto. */
+export function limiteDoRenderMs(perfil: "previa" | "final", duracaoDoVideoS: number): number {
+  const bruto = duracaoDoVideoS * AJUSTES_DO_RENDER.razaoDoLimite[perfil] * 1000;
+  return Math.round(Math.min(AJUSTES_DO_RENDER.limiteMaximoMs[perfil], Math.max(AJUSTES_DO_RENDER.limiteMinimoMs[perfil], bruto)));
+}

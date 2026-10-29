@@ -23,12 +23,17 @@ import type { ResultadoGeracao, TarefaIA } from "@/ia/tipos";
 import { logger } from "@/lib/log";
 import { formatarPerfilCompilado, perfilDoCliente } from "@/servicos/briefing";
 import { clientePorId } from "@/servicos/clientes";
+import { enfileirarRender } from "@/servicos/render-edicao";
 import { roteiroPorId } from "@/servicos/roteiro";
 import { fraseDaEdicao, type CodigoDaEdicao } from "@/textos/edicao";
 
 import { decidirEVerificar, type ContextoDaEdicao } from "./decidir-edicao-nucleo";
 
-export type DepsDaDecisao = { agora?: () => Date };
+export type DepsDaDecisao = {
+  agora?: () => Date;
+  /** Quem enfileira a prévia quando o plano fica pronto (o padrão põe na fila `renderizar-edicao`). Os testes trocam para não depender da fila. */
+  enfileirarRender?: (edicaoId: number, perfil: "previa" | "final", emSegundos: number) => Promise<void>;
+};
 
 async function lerContexto(edicao: Edicao): Promise<ContextoDaEdicao | null> {
   const [roteiro, marca, perfil] = await Promise.all([roteiroPorId(edicao.roteiroId, edicao.clienteId), clientePorId(edicao.clienteId), perfilDoCliente(edicao.clienteId)]);
@@ -108,7 +113,7 @@ export async function rodarDecidirEdicao(edicaoId: number, deps: DepsDaDecisao =
   }
 
   try {
-    return await decidir(edicao, agora);
+    return await decidir(edicao, agora, deps);
   } catch (erro) {
     // A IA fora do ar ou qualquer erro: a edição volta ao passo anterior (sem perder o plano já guardado). Na última rodada, a edição falha com a frase.
     if (edicao.tentativasDaDecisao >= TENTATIVAS_DA_DECISAO) {
@@ -121,7 +126,7 @@ export async function rodarDecidirEdicao(edicaoId: number, deps: DepsDaDecisao =
   }
 }
 
-async function decidir(edicao: Edicao, agora: Date): Promise<Record<string, unknown>> {
+async function decidir(edicao: Edicao, agora: Date, deps: DepsDaDecisao): Promise<Record<string, unknown>> {
   const palavras: PalavraFalada[] | null = edicao.palavras;
   if (!palavras || palavras.length === 0 || !edicao.energia) {
     await falhar(edicao.id, "sumiu", agora);
@@ -141,6 +146,7 @@ async function decidir(edicao: Edicao, agora: Date): Promise<Record<string, unkn
     contexto,
     // Uma rodada que parou depois da decisão e antes do verificador retoma de lá, sem pagar a decisão de novo.
     decisaoGuardada: edicao.decisao && edicao.resultado ? edicao.decisao : null,
+    pedidosDaPessoa: edicao.pedidosDeAjuste ?? [],
     chamar: (tarefa, versao, nivel, detalhes, fazer) => chamar(edicao, tarefa, versao, nivel, detalhes, fazer),
     // Passou nas conferências do código: guarda a decisão e o plano (se o verificador falhar, a próxima rodada retoma daqui).
     aoPassarNoCodigo: async (decisao, resultado) => {
@@ -158,6 +164,12 @@ async function decidir(edicao: Edicao, agora: Date): Promise<Record<string, unkn
       .set({ estado: "verificado", decisao: saida.decisao, resultado: saida.resultado, motivo: null, atualizadaEm: agora })
       .where(and(eq(edicoes.id, edicao.id), eq(edicoes.estado, "decidindo")));
     const r = saida.resultado!;
+    // O plano está pronto: a prévia entra na fila do render. Se a fila falhar, a limpeza de hora em hora enfileira de novo o que ficou `verificado` sem ninguém pegar.
+    try {
+      await (deps.enfileirarRender ?? ((id, perfil, s) => enfileirarRender(id, perfil, s)))(edicao.id, "previa", 0);
+    } catch (erro) {
+      logger.warn({ err: erro, edicaoId: edicao.id }, "edicao: nao foi possivel enfileirar a previa");
+    }
     return { edicaoId: edicao.id, estado: "verificado", decisoes: saida.decisoes, trechos: r.edl.trechos.length, blocosDeLegenda: r.legenda.blocos.length, duracaoS: r.edl.duracao };
   }
   // Reprovou nas duas decisões: a edição não segue sozinha. O que foi tentado fica guardado para a conferência (admin) e a pessoa recebe a frase.

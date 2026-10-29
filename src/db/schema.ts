@@ -2730,7 +2730,26 @@ export type Publicacao = typeof publicacoes.$inferSelect;
  * conferências do código e espera o verificador barato (a edição volta a este estado se a IA do verificador estava fora do ar). Verificado: decisão e verificador aprovaram; `resultado` tem
  * o plano de corte, a legenda e o título, prontos para o render (PR 4). Para revisão: reprovou nas duas tentativas; a edição não segue sozinha e o que foi tentado fica em `resultado`.
  */
-export type EstadoDaEdicao = "subindo" | "guardado" | "transcrevendo" | "transcrito" | "decidindo" | "decidido" | "verificado" | "para_revisao" | "falhou" | "expirada";
+/**
+ * Os passos de uma edição. E47 PR 4 acrescenta o render: `verificado` (o plano está pronto) é também "esperando a vez da prévia"; `montando_previa` -> `previa_pronta` (a pessoa assiste e
+ * decide); `aprovada` é "esperando a vez do vídeo final"; `montando_final` -> `pronta` (o MP4 final, com 7 dias de guarda). "Refazer com motivo" volta de `previa_pronta` a `transcrito`.
+ */
+export type EstadoDaEdicao =
+  | "subindo"
+  | "guardado"
+  | "transcrevendo"
+  | "transcrito"
+  | "decidindo"
+  | "decidido"
+  | "verificado"
+  | "montando_previa"
+  | "previa_pronta"
+  | "aprovada"
+  | "montando_final"
+  | "pronta"
+  | "para_revisao"
+  | "falhou"
+  | "expirada";
 
 /** A curva de energia do áudio (dB em janelas de 10 ms, com uma casa) guardada junto das palavras: o motor de corte (`src/edicao/`) precisa dela, e o bruto não fica guardado para recalcular. */
 export type EnergiaGuardada = { db: number[]; duracao: number };
@@ -2811,6 +2830,16 @@ export const edicoes = pgTable(
     brutoApagadoEm: timestamp("bruto_apagado_em", { withTimezone: true }),
     editadoExpiraEm: timestamp("editado_expira_em", { withTimezone: true }),
     editadoApagadoEm: timestamp("editado_apagado_em", { withTimezone: true }),
+    /** E47 PR 4: a prévia 540p (`previa/ed-<id>.mp4`), que sai junto com o bruto; o que a pessoa assiste antes de aprovar. */
+    caminhoPrevia: text("caminho_previa"),
+    /** E47 PR 4: quanto do render em curso já foi feito (0 a 100), para a tela mostrar o andamento. `null` fora de um render. */
+    progressoDoRender: integer("progresso_do_render"),
+    /** E47 PR 4: quantas vezes o worker de render pegou esta edição (a prévia e o final contam separado, zerando entre eles); depois de 3 a edição falha de vez. */
+    tentativasDoRender: integer("tentativas_do_render").notNull().default(0),
+    /** E47 PR 4: o que a pessoa pediu ao "Refazer com motivo" (até 3 pedidos); entra na decisão seguinte. Saem junto com o bruto (podem citar a fala). */
+    pedidosDeAjuste: jsonb("pedidos_de_ajuste").$type<string[]>(),
+    /** E47 PR 4: quantas vezes a pessoa pediu para refazer (teto de 3, porque cada uma é outra decisão da IA e outra prévia). */
+    refeitas: integer("refeitas").notNull().default(0),
   },
   (t) => [index("edicoes_marca_mes").on(t.clienteId, t.criadaEm), index("edicoes_marca_roteiro").on(t.clienteId, t.roteiroId)],
 );

@@ -15,6 +15,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { Chips } from "@/ui/componentes/Chips";
 import { useTratarFalha } from "@/ui/ConexaoContext";
 
+import { publicarEdicaoAction } from "./edicao-acoes";
 import { cancelarEnvioAction, conferirPublicacaoAction, iniciarPublicacaoAction } from "./publicar-acoes";
 import styles from "./PublicarNoInstagram.module.css";
 
@@ -31,7 +32,7 @@ const ESPERA_SEM_NUMERO_MS = 10_000;
 const OPCOES: TipoDePublicacao[] = ["reels", "story"];
 const ROTULOS = [t.reels, t.story];
 
-function megasDoArquivo(bytes: number): string {
+export function megasDoArquivo(bytes: number): string {
   return (bytes / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 }
 
@@ -41,7 +42,7 @@ function duracaoPorExtenso(segundos: number): string {
 }
 
 /** A duração do vídeo, lida no próprio aparelho (o navegador só lê o cabeçalho). `null` quando ele não consegue (alguns formatos de celular em computador): a Meta confere do mesmo jeito. */
-function lerDuracao(arquivo: File): Promise<number | null> {
+export function lerDuracao(arquivo: File): Promise<number | null> {
   return new Promise((resolver) => {
     const endereco = URL.createObjectURL(arquivo);
     const video = document.createElement("video");
@@ -73,6 +74,8 @@ type Props = {
   /** Enquanto o vídeo sobe, a folha não fecha. */
   aoEnviando: (enviando: boolean) => void;
   semConexao: boolean;
+  /** E47 PR 4: o vídeo editado que já está no servidor (a pessoa aprovou). Com ele, a folha não pede o arquivo: o servidor lê o MP4 do volume e o entrega à Meta pelo mesmo caminho. */
+  edicaoPronta?: { id: number; duracaoS: number | null } | null;
 };
 
 /**
@@ -80,7 +83,7 @@ type Props = {
  * direto para a Meta (`PUT /api/publicar/<id>/video`), com o andamento; depois a Meta prepara e o aplicativo publica, e a folha pergunta de tempos em tempos até terminar (o worker também
  * confere, então fechar a folha não perde nada). Usa as peças da tela do roteiro: folha, chips, área de texto e botão.
  */
-export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoEnviando, semConexao }: Props) {
+export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoEnviando, semConexao, edicaoPronta = null }: Props) {
   const tratarFalha = useTratarFalha();
   const idArquivo = useId();
   const [tipo, setTipo] = useState<TipoDePublicacao>(visao.tipoInicial);
@@ -153,12 +156,13 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
   useEffect(() => () => requisicao.current?.abort(), []);
 
   const limites = LIMITES_DA_PUBLICACAO[tipo];
+  const duracaoDoVideo = edicaoPronta ? edicaoPronta.duracaoS : duracao;
   const problemaDeDuracao =
-    duracao === null || arquivo === null
+    duracaoDoVideo === null || (arquivo === null && !edicaoPronta)
       ? null
-      : duracao < limites.segundosMin
+      : duracaoDoVideo < limites.segundosMin
         ? t.duracaoCurta(limites.segundosMin)
-        : duracao > limites.segundosMax
+        : duracaoDoVideo > limites.segundosMax
           ? t.duracaoLonga(tipo, duracaoPorExtenso(limites.segundosMax))
           : null;
 
@@ -209,7 +213,7 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
 
   async function publicar() {
     if (comecando || enviando || semConexao) return;
-    if (!arquivo) {
+    if (!arquivo && !edicaoPronta) {
       setErro(t.escolherVideo);
       return;
     }
@@ -227,6 +231,18 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
     setPorcento(0);
     let id: number | null = null;
     try {
+      if (edicaoPronta) {
+        // O vídeo editado já está no servidor: uma ação só começa a publicação e entrega o arquivo à Meta. Depois a folha segue perguntando, como com qualquer outro vídeo.
+        const feita = await publicarEdicaoAction(edicaoPronta.id, { tipo, legenda });
+        if (!feita.ok) {
+          setErro(feita.erro);
+          return;
+        }
+        aoMudar({ id: feita.dado.publicacaoId, tipo, estado: "processando", motivo: null, permalink: null });
+        setPorcento(100);
+        return;
+      }
+      if (!arquivo) return;
       const inicio = await iniciarPublicacaoAction(roteiroId, { tipo, legenda, tamanhoBytes: arquivo.size, tipoDoArquivo: arquivo.type, nomeDoArquivo: arquivo.name });
       if (!inicio.ok) {
         setErro(inicio.erro);
@@ -377,14 +393,20 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
         />
       ) : null}
 
-      <div className={styles.arquivo}>
-        <input id={idArquivo} className={styles.inputArquivo} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" onChange={(evento) => escolherArquivo(evento.target.files)} />
-        <label htmlFor={idArquivo} className={styles.botaoArquivo}>
-          <Upload size={18} strokeWidth={1.75} aria-hidden="true" />
-          {arquivo ? t.trocarVideo : t.escolherVideo}
-        </label>
-        {arquivo ? <span className={styles.nomeDoArquivo}>{t.videoEscolhido(arquivo.name, megasDoArquivo(arquivo.size))}</span> : null}
-      </div>
+      {edicaoPronta ? (
+        <p className={styles.explica} data-parte="video-editado">
+          {t.videoEditado}
+        </p>
+      ) : (
+        <div className={styles.arquivo}>
+          <input id={idArquivo} className={styles.inputArquivo} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" onChange={(evento) => escolherArquivo(evento.target.files)} />
+          <label htmlFor={idArquivo} className={styles.botaoArquivo}>
+            <Upload size={18} strokeWidth={1.75} aria-hidden="true" />
+            {arquivo ? t.trocarVideo : t.escolherVideo}
+          </label>
+          {arquivo ? <span className={styles.nomeDoArquivo}>{t.videoEscolhido(arquivo.name, megasDoArquivo(arquivo.size))}</span> : null}
+        </div>
+      )}
 
       {erro ?? problemaDeDuracao ? (
         <p className={styles.erro} role="alert">
@@ -393,7 +415,7 @@ export function PublicarNoInstagram({ roteiroId, visao, publicacao, aoMudar, aoE
         </p>
       ) : null}
 
-      <Botao type="button" precisaDeRede disabled={!arquivo || semConexao} onClick={publicar}>
+      <Botao type="button" precisaDeRede disabled={(!arquivo && !edicaoPronta) || semConexao} onClick={publicar}>
         {motivoDaFalha ? t.tentarDeNovo : t.publicar}
       </Botao>
       <p className={styles.nota}>{t.avisoFinal}</p>

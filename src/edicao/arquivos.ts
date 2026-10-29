@@ -1,6 +1,6 @@
 /**
- * E47 PR 2: os arquivos da edição no volume próprio (`EDICAO_PASTA`, volume `roteiros_edicao` em produção, montado no app e no worker no mesmo caminho). Dois subdiretórios: `bruto/`
- * (o vídeo que a pessoa mandou, `ed-<id>.video`) e `editado/` (o vídeo pronto, `ed-<id>.mp4`, que os PRs seguintes criam). O banco guarda só o caminho RELATIVO ao volume; aqui está a única
+ * E47 PR 2: os arquivos da edição no volume próprio (`EDICAO_PASTA`, volume `roteiros_edicao` em produção, montado no app e no worker no mesmo caminho). Três subdiretórios: `bruto/`
+ * (o vídeo que a pessoa mandou, `ed-<id>.video`) e `editado/` (o vídeo pronto, `ed-<id>.mp4`) e `previa/` (a prévia 540p, E47 PR 4). O banco guarda só o caminho RELATIVO ao volume; aqui está a única
  * função que o transforma em caminho de disco, e ela recusa tudo que não seja o nome que nós mesmos geramos (nada de `..` nem de caminho absoluto).
  *
  * Regras:
@@ -21,6 +21,8 @@ export function pastaDaEdicao(): string {
 
 export const SUBPASTA_DO_BRUTO = "bruto";
 export const SUBPASTA_DO_EDITADO = "editado";
+/** E47 PR 4: a prévia 540p (`previa/ed-<id>.mp4`): sai junto com o bruto, quando a pessoa aprova (e o final fica pronto) ou em 48 horas. */
+export const SUBPASTA_DA_PREVIA = "previa";
 
 export function nomeRelativoDoBruto(edicaoId: number): string {
   return `${SUBPASTA_DO_BRUTO}/ed-${edicaoId}.video`;
@@ -30,7 +32,38 @@ export function nomeRelativoDoEditado(edicaoId: number): string {
   return `${SUBPASTA_DO_EDITADO}/ed-${edicaoId}.mp4`;
 }
 
-const NOME_VALIDO = /^(bruto\/ed-\d{1,9}\.video|editado\/ed-\d{1,9}\.mp4)$/;
+const NOME_VALIDO = /^(bruto\/ed-\d{1,9}\.video|editado\/ed-\d{1,9}\.mp4|previa\/ed-\d{1,9}\.mp4)$/;
+
+export function nomeRelativoDaPrevia(edicaoId: number): string {
+  return `${SUBPASTA_DA_PREVIA}/ed-${edicaoId}.mp4`;
+}
+
+/** O arquivo que o render escreve enquanto o ffmpeg trabalha: nome único por tentativa, no mesmo padrão `.parte` que a varredura reconhece. Vira o nome final por `rename` quando termina bem. */
+export function caminhoDeSaidaDoRender(subpasta: typeof SUBPASTA_DA_PREVIA | typeof SUBPASTA_DO_EDITADO, edicaoId: number): string {
+  return join(pastaDaEdicao(), subpasta, `ed-${edicaoId}.${randomBytes(6).toString("hex")}.parte`);
+}
+
+/** Cria a subpasta do volume (o render escreve nela antes de o arquivo existir). */
+export async function garantirSubpasta(subpasta: string): Promise<void> {
+  await mkdir(join(pastaDaEdicao(), subpasta), { recursive: true });
+}
+
+/** Põe o arquivo que o render terminou no nome final. Devolve o nome relativo. */
+export async function concluirSaidaDoRender(parcial: string, relativo: string): Promise<string> {
+  await rename(parcial, caminhoNoVolume(relativo));
+  return relativo;
+}
+
+/** O tamanho do arquivo no volume, ou `null` se não existe. */
+export async function tamanhoDoArquivoDaEdicao(relativo: string | null): Promise<number | null> {
+  if (!relativo) return null;
+  try {
+    const info = await stat(caminhoNoVolume(relativo));
+    return info.isFile() ? info.size : null;
+  } catch {
+    return null;
+  }
+}
 
 /** O caminho de disco de um nome relativo. Lança se o nome não é um dos que `nomeRelativoDoBruto` e `nomeRelativoDoEditado` geram. */
 export function caminhoNoVolume(relativo: string): string {
@@ -125,7 +158,7 @@ export type SobrasDoVolume = { orfaos: number; partes: number };
 export async function varrerSobrasDoVolume(nomesComDono: ReadonlySet<string>, agora: Date, idadeMinimaMs: number, idadeMinimaDaParteMs: number): Promise<SobrasDoVolume> {
   let orfaos = 0;
   let partes = 0;
-  for (const sub of [SUBPASTA_DO_BRUTO, SUBPASTA_DO_EDITADO]) {
+  for (const sub of [SUBPASTA_DO_BRUTO, SUBPASTA_DO_EDITADO, SUBPASTA_DA_PREVIA]) {
     let nomes: string[];
     try {
       nomes = await readdir(join(pastaDaEdicao(), sub));

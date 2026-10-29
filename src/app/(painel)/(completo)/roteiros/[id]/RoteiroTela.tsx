@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CircleAlert, Copy, Download, Ellipsis, ExternalLink, Eye, HelpCircle, History, ImageDown, Mic, Music, Newspaper, Pencil, Play, RotateCcw, Scissors, Search, Send, Sparkles, TrendingUp, Type, Undo2, Video, X } from "lucide-react";
+import { ArrowLeft, Check, Clapperboard, CircleAlert, Copy, Download, Ellipsis, ExternalLink, Eye, HelpCircle, History, ImageDown, Mic, Music, Newspaper, Pencil, Play, RotateCcw, Scissors, Search, Send, Sparkles, TrendingUp, Type, Undo2, Video, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -24,6 +24,7 @@ import { baixarArquivo, guardarImagens, pedirImagensDoRoteiro, pedirPdfDoRoteiro
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { ehFalhaDeRede } from "@/lib/offline";
+import type { VisaoDeEditar } from "@/servicos/edicao-tela";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { PesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
@@ -31,6 +32,7 @@ import type { VisaoDePublicar, VistaDaPublicacao } from "@/servicos/publicar-ins
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
+import { textosEdicao } from "@/textos/edicao";
 import { textosGravacao } from "@/textos/gravacao";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 import { textosPesquisa } from "@/textos/pesquisa";
@@ -65,6 +67,7 @@ import {
   reprovarERescreverAction,
   salvarEdicaoAction,
 } from "./acoes";
+import { EditarMeuVideo } from "./EditarMeuVideo";
 import { PublicarNoInstagram } from "./PublicarNoInstagram";
 import { RoteiroLongo, type EdicaoDoCapitulo } from "./RoteiroLongo";
 import styles from "./RoteiroTela.module.css";
@@ -227,7 +230,7 @@ function normalizarLink(texto: string): string | null {
 const LIMIAR_DEMORANDO_MS = 10000;
 const ID_ERRO_POSTEI = "erro-postei";
 
-type Painel = "menu" | "postei" | "publicar" | "reprovar" | "versoes" | null;
+type Painel = "menu" | "postei" | "publicar" | "editar" | "reprovar" | "versoes" | null;
 
 type Props = {
   roteiro: RoteiroLinha;
@@ -259,6 +262,8 @@ type Props = {
   conviteInstalarPodeAparecer: boolean;
   /** E56 PR 1: "Publicar no Instagram" (Reels ou Story, pela conta ligada). Nulo quando a função não aparece: no "ver como", para quem não é dono, no vídeo longo e com a publicação fechada no ambiente. */
   publicar?: VisaoDePublicar | null;
+  /** E47 PR 4: "Editar o meu vídeo" (a IA corta, legenda e põe o título; a pessoa aprova a prévia). Nulo quando a função não aparece: no vídeo longo e no estilo sem fala. */
+  editar?: VisaoDeEditar | null;
 };
 
 /**
@@ -283,6 +288,7 @@ export function RoteiroTela({
   nomePessoa,
   conviteInstalarPodeAparecer,
   publicar = null,
+  editar = null,
 }: Props) {
   const router = useRouter();
   const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
@@ -297,6 +303,12 @@ export function RoteiroTela({
   const publicandoRef = useRef(false);
   const avisarEnviando = useCallback((enviando: boolean) => {
     publicandoRef.current = enviando;
+  }, []);
+  /** E47 PR 4: a edição pronta que a folha de publicar vai usar no lugar do arquivo escolhido (nula quando a pessoa abriu "Publicar" pelo menu). */
+  const [edicaoParaPublicar, setEdicaoParaPublicar] = useState<{ id: number; duracaoS: number | null } | null>(null);
+  const publicarEdicaoPronta = useCallback((id: number, duracaoS: number | null) => {
+    setEdicaoParaPublicar({ id, duracaoS });
+    setPainel("publicar");
   }, []);
   const mudouPublicacao = useCallback((vista: VistaDaPublicacao) => {
     setPublicacao(vista);
@@ -1421,8 +1433,14 @@ export function RoteiroTela({
             <MotivoSemRede className={styles.motivoItem} />
           </button>
         ) : null}
+        {editar ? (
+          <button type="button" role="menuitem" onClick={() => setPainel("editar")} className={styles.itemMenu} data-editar-video>
+            <Clapperboard size={20} strokeWidth={1.5} aria-hidden="true" />
+            {textosEdicao.tela.abrir}
+          </button>
+        ) : null}
         {publicar && (!postado || publicacao) ? (
-          <button type="button" role="menuitem" onClick={() => setPainel("publicar")} className={styles.itemMenu} data-publicar-instagram>
+          <button type="button" role="menuitem" onClick={() => { setEdicaoParaPublicar(null); setPainel("publicar"); }} className={styles.itemMenu} data-publicar-instagram>
             <Send size={20} strokeWidth={1.5} aria-hidden="true" />
             {textosPublicar.tela.abrir}
           </button>
@@ -1541,9 +1559,15 @@ export function RoteiroTela({
         ) : null}
       </PainelFlutuante>
 
+      {editar ? (
+        <PainelFlutuante titulo={textosEdicao.tela.titulo} aberto={painel === "editar"} aoFechar={fecharSeLivre}>
+          <EditarMeuVideo roteiroId={roteiro.id} visao={{ ...editar, podePublicar: editar.podePublicar && publicar !== null }} aoEnviando={avisarEnviando} semConexao={semConexao} aoPublicar={publicarEdicaoPronta} />
+        </PainelFlutuante>
+      ) : null}
+
       {publicar ? (
         <PainelFlutuante titulo={textosPublicar.tela.titulo} aberto={painel === "publicar"} aoFechar={fecharSeLivre}>
-          <PublicarNoInstagram roteiroId={roteiro.id} visao={publicar} publicacao={publicacao} aoMudar={mudouPublicacao} aoEnviando={avisarEnviando} semConexao={semConexao} />
+          <PublicarNoInstagram roteiroId={roteiro.id} visao={publicar} publicacao={publicacao} aoMudar={mudouPublicacao} aoEnviando={avisarEnviando} semConexao={semConexao} edicaoPronta={edicaoParaPublicar} />
         </PainelFlutuante>
       ) : null}
 
