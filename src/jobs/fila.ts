@@ -213,8 +213,8 @@ export type OpcoesFila = { retryLimit: number; retryBackoff: boolean; expireInSe
  * 2 repeticoes e espera crescente.
  */
 export function opcoesDaFila(nome: string): OpcoesFila {
-  // O render (E47 PR 4) passa de 15 minutos no pior caso (final de 3 minutos de vídeo, 1 vCPU); o teto de tempo é o do ffmpeg (`limiteDoRenderMs`, no máximo 25 minutos), então a fila espera 30.
-  if (nome === FILAS.renderizarEdicao) return { retryLimit: 0, retryBackoff: false, expireInSeconds: 30 * 60, heartbeatSeconds: PULSO_DO_WORKER_S };
+  // O render (E47 PR 4) passa de 15 minutos no pior caso (final de 3 minutos de vídeo, 1 vCPU); o teto de tempo é o do ffmpeg (`limiteDoRenderMs`, no máximo 30 minutos), então a fila espera 45.
+  if (nome === FILAS.renderizarEdicao) return { retryLimit: 0, retryBackoff: false, expireInSeconds: 45 * 60, heartbeatSeconds: PULSO_DO_WORKER_S };
   if (FILAS_CURTAS.has(nome)) {
     return { retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60, heartbeatSeconds: PULSO_DO_WORKER_S };
   }

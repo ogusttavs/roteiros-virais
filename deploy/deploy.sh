@@ -8,7 +8,7 @@
 #   3. docker compose pull (imagens do GHCR, construidas no CI)
 #   4. sobe o Postgres e espera ficar saudavel
 #   5. roda as migracoes pelo container do worker (tem tsx e a pasta drizzle)
-#   6. sobe tudo (app, worker, backup) e confere /api/saude por dentro da rede
+#   6. sobe tudo (app, worker, render, backup) e confere /api/saude por dentro da rede
 #
 # Uso: deploy/deploy.sh <sha>   (o sha curto ou inteiro do commit que passou na CI: 7 a
 # 40 caracteres hexadecimais). Sem argumento, ou com `latest`, ou com qualquer outra coisa,
@@ -69,7 +69,7 @@ ssh "$ALIAS" "cd $DIR && for i in \$(seq 1 30); do docker compose ps --format '{
 echo "== migrando o banco"
 ssh "$ALIAS" "cd $DIR && TAG=$TAG docker compose run --rm --no-deps roteiros-worker npm run -s db:migrate"
 
-echo "== subindo app, worker e backup"
+echo "== subindo app, worker, render e backup"
 ssh "$ALIAS" "cd $DIR && TAG=$TAG docker compose up -d --remove-orphans"
 
 echo "== conferindo /api/saude"

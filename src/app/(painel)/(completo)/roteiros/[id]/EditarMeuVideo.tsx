@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { LIMITES_DA_EDICAO } from "@/config/edicao";
 import { tipoDeVideoAceito } from "@/config/publicacao";
+import { lerDuracao, megasDoArquivo } from "@/lib/arquivo-de-video";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { VisaoDeEditar, VistaCompletaDaEdicao } from "@/servicos/edicao-tela";
 import { fraseDaEdicao, textosEdicao } from "@/textos/edicao";
@@ -14,7 +15,6 @@ import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import { aprovarEdicaoAction, refazerEdicaoAction } from "./edicao-acoes";
 import styles from "./EditarMeuVideo.module.css";
-import { lerDuracao, megasDoArquivo } from "./PublicarNoInstagram";
 
 const t = textosEdicao.tela;
 

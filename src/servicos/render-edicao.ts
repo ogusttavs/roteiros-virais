@@ -187,3 +187,28 @@ export async function rodarRenderizarEdicao(edicaoId: number, perfil: PerfilDeRe
   }
   return { edicaoId, perfil, estado: perfil === "previa" ? "previa_pronta" : "pronta", duracaoDoVideoS: Math.round(resultado.edl.duracao), segundosDeRender: Math.round((Date.now() - inicio) / 1000) };
 }
+
+/**
+ * Na partida do contêiner de render: o que estava sendo montado quando o contêiner anterior parou (um deploy, uma queda) volta para a vez e é enfileirado de novo, sem esperar os 40 minutos da
+ * limpeza. Só este contêiner monta vídeo, e ele acabou de subir: nenhuma edição `montando_*` pode estar em andamento de verdade.
+ */
+export async function recolherRendersOrfaos(deps: Pick<DepsDoRender, "enfileirar"> = {}): Promise<number> {
+  let recolhidos = 0;
+  for (const perfil of ["previa", "final"] as const) {
+    const { espera, montando } = ESTADOS_DO_RENDER[perfil];
+    const voltaram = await db()
+      .update(edicoes)
+      .set({ estado: espera, progressoDoRender: null, atualizadaEm: new Date() })
+      .where(eq(edicoes.estado, montando))
+      .returning({ id: edicoes.id, tentativas: edicoes.tentativasDoRender });
+    for (const linha of voltaram) {
+      try {
+        await (deps.enfileirar ?? ((id, p, s) => enfileirarRender(id, p, s, linha.tentativas)))(linha.id, perfil, 0);
+      } catch (erro) {
+        logger.warn({ err: erro, edicaoId: linha.id }, "edicao: nao foi possivel enfileirar o render recolhido");
+      }
+      recolhidos += 1;
+    }
+  }
+  return recolhidos;
+}

@@ -84,10 +84,10 @@ export const AJUSTES_DO_RENDER = {
   fadeFinalS: 0.8,
   /** O título do primeiro quadro fica no mínimo este tempo na tela. */
   tituloS: 3.5,
-  /** Quanto o render pode demorar por segundo de vídeo, no pior caso medido, vezes 3 (o teto de tempo): prévia 0,75 e final 2,0 segundos por segundo de vídeo. */
-  razaoDoLimite: { previa: 0.75 * 3, final: 2 * 3 },
+  /** Quanto o render pode demorar por segundo de vídeo (o teto de tempo): a prévia três vezes o medido na VPS (0,75 s por segundo de vídeo); o final 10 s por segundo, porque o vídeo em HDR do iPhone (HEVC 10 bits com conversão de cor) custou 5,2 s por segundo com 1 vCPU na máquina de desenvolvimento em 29/10/2026. */
+  razaoDoLimite: { previa: 0.75 * 3, final: 10 },
   limiteMinimoMs: { previa: 90_000, final: 180_000 },
-  limiteMaximoMs: { previa: 10 * 60_000, final: 25 * 60_000 },
+  limiteMaximoMs: { previa: 10 * 60_000, final: 30 * 60_000 },
 } as const;
 
 /** Quantas vezes o worker de render pega a mesma edição antes de desistir (cada tentativa perdida volta para a fila depois de um minuto). */

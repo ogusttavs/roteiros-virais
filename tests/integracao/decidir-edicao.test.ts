@@ -179,6 +179,38 @@ describe("o fluxo feliz", () => {
     expect(forte.entradas).toEqual({ edicaoId: id, tentativa: 1, palavras: fala.palavras.length });
   });
 
+  it("quando o plano fica pronto a prévia entra na fila do render (E47 PR 4); a fila que falha não derruba a decisão", async () => {
+    const id = await criarEdicao(await criarRoteiro(marcaA));
+    const pedidos: unknown[][] = [];
+    await rodarDecidirEdicao(id, { enfileirarRender: async (...args) => void pedidos.push(args) });
+    expect(pedidos).toEqual([[id, "previa", 0]]);
+    expect((await linha(id)).estado).toBe("verificado");
+
+    const outro = await criarEdicao(await criarRoteiro(marcaA));
+    await rodarDecidirEdicao(outro, {
+      enfileirarRender: async () => {
+        throw new Error("fila fora do ar");
+      },
+    });
+    expect((await linha(outro)).estado).toBe("verificado");
+  });
+
+  it("o que a pessoa pediu ao refazer entra já na primeira decisão da rodada, como motivo da anterior (E47 PR 4)", async () => {
+    const id = await criarEdicao(await criarRoteiro(marcaA));
+    await db().update(edicoes).set({ pedidosDeAjuste: ["Deixe a abertura mais curta", "Mantenha a parte do preço"] }).where(eq(edicoes.id, id));
+    await rodarDecidirEdicao(id, { enfileirarRender: async () => undefined });
+    const primeira = vi.mocked(clienteIA.gerarEstruturado).mock.calls.filter((c) => c[0].tarefa === "decidirEdicao")[0][0];
+    expect(primeira.entrada).toContain("ATENÇÃO: a decisão anterior");
+    expect(primeira.entrada).toContain("a pessoa assistiu à prévia e pediu para refazer");
+    expect(primeira.entrada).toContain("Deixe a abertura mais curta");
+    expect(primeira.entrada).toContain("Mantenha a parte do preço");
+    // Sem pedido, a primeira decisão não leva o aviso.
+    vi.mocked(clienteIA.gerarEstruturado).mockClear();
+    const limpo = await criarEdicao(await criarRoteiro(marcaA));
+    await rodarDecidirEdicao(limpo, { enfileirarRender: async () => undefined });
+    expect(vi.mocked(clienteIA.gerarEstruturado).mock.calls.filter((c) => c[0].tarefa === "decidirEdicao")[0][0].entrada).not.toContain("a decisão anterior");
+  });
+
   it("é idempotente: rodar de novo uma edição que já terminou não faz nada nem gasta", async () => {
     const id = await criarEdicao(await criarRoteiro(marcaA));
     await rodarDecidirEdicao(id);

@@ -89,6 +89,32 @@ services:
     tmpfs:
       - /tmp:size=1g
 
+  # E47 PR 4: o render da edicao de video (a previa 540p e o video final 1080p). A MESMA imagem do worker, outro papel (outro comando): so consome a fila `renderizar-edicao`, UM video por vez. O
+  # ffmpeg e o que mais gasta processador nesta maquina compartilhada com o OdontoTech; `cpus: 1.0` e a trava que impede o render de roubar o processador do painel, do worker e do outro produto
+  # (tem de ser 1.0 ou menos: ver `estrategia/e47-edicao-pela-ia.md`, secao 3.2). Sem porta, so na rede interna. O volume `roteiros_edicao` e o mesmo do app e do worker: le o bruto e escreve a previa e o final.
+  # A memoria cobre o ffmpeg com varias entradas do mesmo arquivo; o /tmp guarda so o arquivo de legenda e a fonte (alguns KB), entao e pequeno.
+  roteiros-render:
+    image: ghcr.io/ogusttavs/roteiros-virais/worker:${TAG:-latest}
+    container_name: roteiros-render
+    restart: unless-stopped
+    command: ["node_modules/.bin/tsx", "src/jobs/worker-render.ts"]
+    env_file: .env
+    environment:
+      EDICAO_PASTA: /var/edicao
+    volumes:
+      - roteiros_edicao:/var/edicao
+    depends_on:
+      roteiros-postgres:
+        condition: service_healthy
+    networks:
+      - roteiros-interna
+    cpus: 1.0
+    mem_limit: 1500m
+    # Mesmo SIGTERM do worker (desligarComGraca); o render em andamento volta para a fila sozinho ao subir de novo (`recolherRendersOrfaos`).
+    stop_grace_period: 35s
+    tmpfs:
+      - /tmp:size=256m
+
   # Provedor de PO Token do YouTube (transcricao do YouTube, rodada 2, item
   # 1): so na rede interna, sem porta publicada (o worker fala com ele por
   # nome de servico, `config.transcricao.potBaseUrl`, `http://roteiros-pot:

@@ -7,6 +7,8 @@
  */
 import "dotenv/config";
 
+import { recolherRendersOrfaos } from "@/servicos/render-edicao";
+
 import { desligarComGraca } from "./desligamento";
 import { executarComRegistro } from "./execucoes";
 import { boss, FILAS, garantirFilas } from "./fila";
@@ -32,6 +34,8 @@ async function main(): Promise<void> {
   // Este processo só trabalha; quem agenda cron é o worker comum. `schedule: false` não existe nesta versão como opção de `work`, e o `start()` do pg-boss aceita vários processos.
   await boss().start();
   await garantirFilas();
+  const recolhidos = await recolherRendersOrfaos();
+  if (recolhidos > 0) console.log(`render recolheu ${recolhidos} edicao(oes) que o anterior deixou no meio.`);
 
   await boss().work<PayloadRenderizarEdicao>(FILAS.renderizarEdicao, { batchSize: 1, localConcurrency: 1 }, async (job) => {
     const { edicaoId, perfil } = job[0].data;

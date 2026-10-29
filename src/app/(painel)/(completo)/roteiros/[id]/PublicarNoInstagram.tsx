@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { LIMITES_DA_LEGENDA, LIMITES_DA_PUBLICACAO, tipoDeVideoAceito } from "@/config/publicacao";
 import type { TipoDePublicacao } from "@/db/schema";
+import { lerDuracao, megasDoArquivo } from "@/lib/arquivo-de-video";
 import { problemaDaLegenda } from "@/lib/legenda-do-instagram";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { VisaoDePublicar, VistaDaPublicacao } from "@/servicos/publicar-instagram";
@@ -32,37 +33,9 @@ const ESPERA_SEM_NUMERO_MS = 10_000;
 const OPCOES: TipoDePublicacao[] = ["reels", "story"];
 const ROTULOS = [t.reels, t.story];
 
-export function megasDoArquivo(bytes: number): string {
-  return (bytes / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
-}
-
 function duracaoPorExtenso(segundos: number): string {
   if (segundos >= 120 && segundos % 60 === 0) return `${segundos / 60} minutos`;
   return `${segundos} segundos`;
-}
-
-/** A duração do vídeo, lida no próprio aparelho (o navegador só lê o cabeçalho). `null` quando ele não consegue (alguns formatos de celular em computador): a Meta confere do mesmo jeito. */
-export function lerDuracao(arquivo: File): Promise<number | null> {
-  return new Promise((resolver) => {
-    const endereco = URL.createObjectURL(arquivo);
-    const video = document.createElement("video");
-    const terminar = (valor: number | null) => {
-      URL.revokeObjectURL(endereco);
-      video.removeAttribute("src");
-      resolver(valor);
-    };
-    const prazo = setTimeout(() => terminar(null), 4000);
-    video.preload = "metadata";
-    video.onloadedmetadata = () => {
-      clearTimeout(prazo);
-      terminar(Number.isFinite(video.duration) && video.duration > 0 ? video.duration : null);
-    };
-    video.onerror = () => {
-      clearTimeout(prazo);
-      terminar(null);
-    };
-    video.src = endereco;
-  });
 }
 
 type Props = {
