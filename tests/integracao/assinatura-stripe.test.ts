@@ -90,6 +90,7 @@ function portaSemNada(): PortaStripe {
   return {
     precoDoPlano: vi.fn(),
     criarCheckout: vi.fn(),
+    jaTeveAssinatura: vi.fn(),
     sessaoAberta: vi.fn(),
     expirarSessao: vi.fn(),
     criarPortal: vi.fn(),

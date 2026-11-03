@@ -145,6 +145,8 @@ export default defineConfig({
       STRIPE_SECRET_KEY: "",
       STRIPE_WEBHOOK_SECRET: "whsec_e2e_nao_e_um_segredo_de_verdade",
       COBRANCA_ATIVA: "",
+      COBRANCA_TESTE_DIAS: "7",
+      COBRANCA_TESTE_EXIGE_CARTAO: "0",
       /**
        * E19 PR 2 e E19b: a ligação do Instagram (pela via do Instagram) LIGADA no e2e, mas só contra a Meta simulada (nenhum destes dados é de verdade; o aplicativo da Meta de verdade nunca é tocado). A chave que
        * cifra o acesso é de 32 bytes fixos e só de teste. `META_APP_APROVADO` fica vazio de propósito: a tela mostra o aviso de que a ligação direta ainda abre para poucas pessoas.

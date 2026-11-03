@@ -13,6 +13,8 @@ function sdkDeMentira(estado: {
   portais?: Array<{ id: string; metadata?: Record<string, string> }>;
   sessoes?: Record<string, Record<string, unknown>>;
   erroAoCancelar?: { code?: string };
+  /** O que a busca de assinaturas do Stripe devolve. */
+  assinaturasAchadas?: unknown[];
 }) {
   const chamadas: Chamada[] = [];
   const registrar = (metodo: string, ...args: unknown[]) => chamadas.push({ metodo, args });
@@ -50,6 +52,10 @@ function sdkDeMentira(estado: {
       },
     },
     subscriptions: {
+      async search(...args: unknown[]) {
+        registrar("subscriptions.search", ...args);
+        return { data: estado.assinaturasAchadas ?? [] };
+      },
       async cancel(id: string) {
         registrar("subscriptions.cancel", id);
         if (estado.erroAoCancelar) throw Object.assign(new Error("erro"), estado.erroAoCancelar);
@@ -150,5 +156,72 @@ describe("a porta simulada: as sessões", () => {
     expect(await porta.sessaoAberta(nova.sessaoId, 4)).toBeNull();
     fecharSessaoSimulada(nova.sessaoId);
     expect(await porta.sessaoAberta(nova.sessaoId, 3)).toBeNull();
+  });
+});
+
+describe("a porta de verdade: o teste grátis (E22)", () => {
+  const pedido = { precoId: "price_1", clienteId: 7, stripeClienteId: null, email: "a@b.c", urlDeSucesso: "x", urlDeCancelar: "y" };
+  const dadosDoCheckout = (chamadas: Chamada[]) => chamadas.find((c) => c.metodo === "checkout.sessions.create")!.args[0] as Record<string, unknown>;
+
+  it("sem dias de teste, o Checkout cobra na hora (nenhum campo de teste)", async () => {
+    const { sdk, chamadas } = sdkDeMentira({});
+    await criarPortaComSdk(sdk).criarCheckout(pedido);
+    const dados = dadosDoCheckout(chamadas);
+    expect(dados.subscription_data).toEqual({ metadata: { produto: "roteiros", cliente_id: "7" } });
+    expect(dados).not.toHaveProperty("payment_method_collection");
+  });
+
+  it("teste sem cartão no começo: trial_period_days, cartão só se for preciso, e a assinatura se cancela sozinha no fim do teste sem cartão", async () => {
+    const { sdk, chamadas } = sdkDeMentira({});
+    await criarPortaComSdk(sdk).criarCheckout({ ...pedido, diasDeTeste: 7, exigeCartao: false });
+    const dados = dadosDoCheckout(chamadas);
+    expect(dados.subscription_data).toEqual({
+      metadata: { produto: "roteiros", cliente_id: "7" },
+      trial_period_days: 7,
+      trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+    });
+    expect(dados.payment_method_collection).toBe("if_required");
+    expect(dados.mode).toBe("subscription");
+  });
+
+  it("teste com cartão no começo: trial_period_days e o cartão sempre pedido (sem if_required)", async () => {
+    const { sdk, chamadas } = sdkDeMentira({});
+    await criarPortaComSdk(sdk).criarCheckout({ ...pedido, diasDeTeste: 7, exigeCartao: true });
+    const dados = dadosDoCheckout(chamadas);
+    expect(dados.subscription_data).toEqual({ metadata: { produto: "roteiros", cliente_id: "7" }, trial_period_days: 7 });
+    expect(dados).not.toHaveProperty("payment_method_collection");
+  });
+
+  it("jaTeveAssinatura: a busca do Stripe acha assinatura deste produto e desta marca em qualquer estado", async () => {
+    const achou = sdkDeMentira({ assinaturasAchadas: [{ id: "sub_velha" }] });
+    expect(await criarPortaComSdk(achou.sdk).jaTeveAssinatura({ clienteId: 7, sessaoAnteriorId: null })).toBe(true);
+    const consulta = (achou.chamadas.find((c) => c.metodo === "subscriptions.search")!.args[0] as { query: string }).query;
+    expect(consulta).toContain("metadata['produto']:'roteiros'");
+    expect(consulta).toContain("metadata['cliente_id']:'7'");
+    const nada = sdkDeMentira({});
+    expect(await criarPortaComSdk(nada.sdk).jaTeveAssinatura({ clienteId: 7, sessaoAnteriorId: null })).toBe(false);
+  });
+
+  it("jaTeveAssinatura: o Checkout anterior concluído vale mesmo que a busca ainda não veja a assinatura; o aberto, o de outra marca e o que sumiu não contam", async () => {
+    const base = { id: "cs", client_reference_id: "7", metadata: { produto: "roteiros" } };
+    const { sdk } = sdkDeMentira({
+      sessoes: {
+        cs_paga: { ...base, status: "complete" },
+        cs_aberta: { ...base, status: "open" },
+        cs_alheia: { ...base, status: "complete", client_reference_id: "8" },
+        cs_odonto: { ...base, status: "complete", metadata: { produto: "odontotech" } },
+      },
+    });
+    const porta = criarPortaComSdk(sdk);
+    expect(await porta.jaTeveAssinatura({ clienteId: 7, sessaoAnteriorId: "cs_paga" })).toBe(true);
+    for (const id of ["cs_aberta", "cs_alheia", "cs_odonto", "cs_sumida"]) expect(await porta.jaTeveAssinatura({ clienteId: 7, sessaoAnteriorId: id }), id).toBe(false);
+  });
+
+  it("jaTeveAssinatura: erro do Stripe na busca sobe (não se promete o teste sem ter conferido)", async () => {
+    const { sdk } = sdkDeMentira({});
+    (sdk as unknown as { subscriptions: { search: () => Promise<never> } }).subscriptions.search = async () => {
+      throw new Error("Stripe fora do ar");
+    };
+    await expect(criarPortaComSdk(sdk).jaTeveAssinatura({ clienteId: 7, sessaoAnteriorId: null })).rejects.toThrow("Stripe fora do ar");
   });
 });

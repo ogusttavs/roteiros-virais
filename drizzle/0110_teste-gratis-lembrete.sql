@@ -1,0 +1,1 @@
+ALTER TABLE "assinaturas" ADD COLUMN "lembrete_fim_do_teste_em" timestamp with time zone;

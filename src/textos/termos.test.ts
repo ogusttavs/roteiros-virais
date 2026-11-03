@@ -176,3 +176,14 @@ describe("a cláusula do que circula entre marcas: circula padrão, nunca o que 
     expect(t).toContain("nenhuma marca responda por mais da metade");
   });
 });
+
+describe("o teste grátis nos termos (E22)", () => {
+  it("a cláusula de cancelamento fala do teste sem cartão no começo, do cancelamento pela conta e de que o pago não é devolvido", () => {
+    const cancelamento = textosTermos.termos.secoes.find((secao) => secao.titulo === "4. Cancelamento")!.paragrafos.join(" ");
+    expect(cancelamento).toContain("7 dias grátis, sem cadastrar o cartão");
+    expect(cancelamento).toContain("a assinatura termina sozinha e nada é cobrado");
+    expect(cancelamento).toContain("O teste vale uma vez por conta");
+    expect(cancelamento).toContain("em Conta, na gestão da assinatura");
+    expect(cancelamento).toContain("O que já foi pago não é devolvido");
+  });
+});

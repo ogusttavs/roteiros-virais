@@ -236,6 +236,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "lembrete por e-mail, a cada hora cheia, para quem ainda nao abriu o painel hoje",
   },
   {
+    fila: FILAS.lembreteFimDoTeste,
+    cron: "40 * * * *",
+    descricao: "e-mail 2 dias antes do fim do teste gratis (E22), de hora em hora aos 40 minutos, so entre 08:00 e 20:00",
+  },
+  {
     fila: FILAS.curvaCliente,
     cron: "5 * * * *",
     descricao: "curva de viralizacao dos videos postados, a cada hora cheia (as :05)",

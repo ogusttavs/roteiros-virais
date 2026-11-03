@@ -3042,6 +3042,8 @@ export const assinaturas = pgTable(
     /** A pessoa cancelou no portal e a assinatura vale até o fim do período já pago. */
     cancelaNoFimDoPeriodo: boolean("cancela_no_fim_do_periodo").notNull().default(false),
     ultimoEventoEm: timestamp("ultimo_evento_em", { withTimezone: true }).notNull(),
+    /** E22, o teste grátis: quando o e-mail "seu teste acaba em 2 dias" saiu (a trava para não mandar duas vezes). Nulo: ainda não mandou. */
+    lembreteFimDoTesteEm: timestamp("lembrete_fim_do_teste_em", { withTimezone: true }),
     criadoEm: criadoEm(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },

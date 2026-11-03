@@ -324,6 +324,7 @@ describe("(b) um Checkout aberto por marca", () => {
       criarCheckout: async () => {
         throw new Error("rede caiu");
       },
+      jaTeveAssinatura: async () => false,
       sessaoAberta: async () => null,
       expirarSessao: async () => undefined,
       criarPortal: async () => ({ url: "x" }),
@@ -374,6 +375,7 @@ describe("(d) apagar uma marca com assinatura cancela no Stripe antes", () => {
     const porta: PortaStripe = {
       precoDoPlano: async () => null,
       criarCheckout: async () => ({ url: "x", sessaoId: "y" }),
+      jaTeveAssinatura: async () => false,
       sessaoAberta: async () => null,
       expirarSessao: async () => undefined,
       criarPortal: async () => ({ url: "x" }),

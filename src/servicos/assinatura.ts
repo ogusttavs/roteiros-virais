@@ -82,6 +82,14 @@ export async function ehDonoDaMarca(usuarioId: string, clienteId: number): Promi
   return linha?.papel === "dono";
 }
 
+/**
+ * A marca pode ganhar o teste grátis? Só a que nunca teve linha em `assinaturas` (nem teste, nem assinatura cancelada), com o teste ligado (`COBRANCA_TESTE_DIAS` acima de 0). É a pergunta
+ * rápida, só com o nosso banco, que a tela de assinar usa para anunciar o teste; na hora de abrir o pagamento, `iniciarAssinatura` confere também no Stripe (`jaTeveAssinatura`).
+ */
+export function marcaPodeGanharTeste(lista: Pick<Assinatura, "id">[], dias: number = config.cobranca.testeDias): boolean {
+  return dias > 0 && lista.length === 0;
+}
+
 export const frasesDaAssinatura = {
   soODono: "Só quem criou a conta pode assinar. Peça para essa pessoa fazer isto.",
   jaAssinada: "Esta conta já tem uma assinatura ativa.",
@@ -123,6 +131,9 @@ export async function iniciarAssinatura(usuario: { id: string; email: string }, 
         logger.error({ clienteId: cliente.id, lookupKey: config.cobranca.precoLookupKey }, "assinatura: o preco do plano nao existe no Stripe (rode scripts/stripe-preparar.ts)");
         throw new ErroAssinatura(frasesDaAssinatura.semPlano);
       }
+      // O teste grátis é uma vez só por marca: quem já teve assinatura (teste, ativa ou cancelada) no nosso banco ou no Stripe abre o Checkout sem teste, cobrando na hora.
+      // `aberto` é o Checkout anterior da marca (aberto, expirado ou pago); se foi pago e o aviso se perdeu, o Stripe ainda diz que a assinatura existe.
+      const diasDeTeste = marcaPodeGanharTeste(lista) && !(await porta.jaTeveAssinatura({ clienteId: cliente.id, sessaoAnteriorId: aberto?.stripeSessaoId ?? null })) ? config.cobranca.testeDias : 0;
       const nova = await porta.criarCheckout({
         precoId: preco.id,
         clienteId: cliente.id,
@@ -131,6 +142,8 @@ export async function iniciarAssinatura(usuario: { id: string; email: string }, 
         email: usuario.email,
         urlDeSucesso: `${config.appUrl}/assinar?assinou=1`,
         urlDeCancelar: `${config.appUrl}/assinar`,
+        diasDeTeste,
+        exigeCartao: config.cobranca.testeExigeCartao,
       });
       await tx
         .insert(checkoutsStripe)
@@ -306,11 +319,12 @@ export function lerEvento(evento: EventoDoStripe): LeituraDoEvento {
     const stripeAssinaturaId = idDe(obj.subscription);
     const stripeClienteId = idDe(obj.customer);
     if (!stripeAssinaturaId || !stripeClienteId) return { tipo: "ignorar", motivo: "checkout sem assinatura ou sem cliente" };
-    const pago = obj.payment_status === "paid" || obj.payment_status === "no_payment_required";
+    // `no_payment_required` é o Checkout de uma assinatura que começa com teste grátis (nada a pagar agora): ela já vale, como `trialing`. O aviso da assinatura (`customer.subscription.*`) confirma o estado.
+    const statusSeNova: StatusAssinatura = obj.payment_status === "paid" ? "active" : obj.payment_status === "no_payment_required" ? "trialing" : "incomplete";
     return {
       tipo: "tratar",
       verificar: false,
-      mudanca: { stripeAssinaturaId, stripeClienteId, clienteId: clienteIdDoAviso(obj.metadata, obj.client_reference_id), statusSeNova: pago ? "active" : "incomplete" },
+      mudanca: { stripeAssinaturaId, stripeClienteId, clienteId: clienteIdDoAviso(obj.metadata, obj.client_reference_id), statusSeNova },
     };
   }
 
@@ -345,6 +359,9 @@ export function lerEvento(evento: EventoDoStripe): LeituraDoEvento {
   if (!stripeAssinaturaId) return { tipo: "ignorar", motivo: "fatura sem assinatura" };
   const metadata = detalhes?.metadata;
   const pago = evento.type === "invoice.paid";
+  // A fatura de R$ 0 que o Stripe emite quando o teste grátis começa também chega como `invoice.paid`. Ela não prova que alguém pagou: não pode virar `active` nem mexer no período
+  // (quem manda no estado e no fim do teste é o aviso da assinatura).
+  const zerada = pago && obj.amount_paid === 0;
   // A fatura pode trazer mais de uma linha (crédito ou ajuste de um período anterior antes da assinatura): vale o período que termina mais tarde.
   const linhas = Array.isArray(objeto(obj.lines)?.data) ? (objeto(obj.lines)!.data as unknown[]) : [];
   let periodo: Objeto | null = null;
@@ -361,12 +378,12 @@ export function lerEvento(evento: EventoDoStripe): LeituraDoEvento {
       stripeAssinaturaId,
       stripeClienteId: idDe(obj.customer),
       clienteId: clienteIdDoAviso(metadata),
-      status: pago ? "active" : "past_due",
+      ...(zerada ? {} : { status: (pago ? "active" : "past_due") as StatusAssinatura }),
       // Fatura que falha para uma assinatura que ainda não conhecemos não pode abrir o acesso: só `active` abre, e o `past_due` só vale para quem já era assinante
       // (`soSobreStatus`: uma assinatura ainda `incomplete`, com o primeiro pagamento em curso, não vira `past_due` e ganha acesso).
-      statusSeNova: pago ? "active" : "incomplete",
+      statusSeNova: zerada ? "trialing" : pago ? "active" : "incomplete",
       ...(pago ? {} : { soSobreStatus: ["active", "trialing", "past_due"] as StatusAssinatura[] }),
-      ...(pago ? { periodoInicio: dataDeSegundos(periodo?.start), periodoFim: dataDeSegundos(periodo?.end) } : {}),
+      ...(pago && !zerada ? { periodoInicio: dataDeSegundos(periodo?.start), periodoFim: dataDeSegundos(periodo?.end) } : {}),
     },
   };
 }

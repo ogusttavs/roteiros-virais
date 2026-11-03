@@ -72,7 +72,7 @@ export function eventoDeCheckout(opcoes: Opcoes & { clienteId?: number; pagament
 
 export function eventoDeFatura(
   tipo: "invoice.paid" | "invoice.payment_failed",
-  opcoes: Opcoes & { clienteId?: number; inicio?: number; fim?: number; antigaApi?: boolean; semAssinatura?: boolean },
+  opcoes: Opcoes & { clienteId?: number; inicio?: number; fim?: number; antigaApi?: boolean; semAssinatura?: boolean; valorPago?: number },
 ): EventoDoStripe {
   const metadata = opcoes.metadata === undefined ? { ...NOSSA_MARCA, cliente_id: String(opcoes.clienteId ?? 1) } : opcoes.metadata;
   const assinaturaId = opcoes.semAssinatura ? null : (opcoes.assinaturaId ?? "sub_teste_1");
@@ -86,6 +86,7 @@ export function eventoDeFatura(
       object: {
         id: proximoId("in"),
         object: "invoice",
+        ...(opcoes.valorPago !== undefined ? { amount_paid: opcoes.valorPago } : {}),
         customer: opcoes.clienteStripeId ?? "cus_teste_1",
         lines: { data: [{ period: { start: inicio, end: fim } }] },
         ...(opcoes.antigaApi
