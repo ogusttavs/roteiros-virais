@@ -24,7 +24,7 @@ import { baixarArquivo, guardarImagens, pedirImagensDoRoteiro, pedirPdfDoRoteiro
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { ehFalhaDeRede } from "@/lib/offline";
-import type { VisaoDeEditar } from "@/servicos/edicao-tela";
+import type { VisaoDeEditar, VistaCompletaDaEdicao } from "@/servicos/edicao-tela";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { PesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
@@ -67,6 +67,7 @@ import {
   reprovarERescreverAction,
   salvarEdicaoAction,
 } from "./acoes";
+import { ChamadoEditarMeuVideo } from "./ChamadoEditarMeuVideo";
 import { EditarMeuVideo } from "./EditarMeuVideo";
 import { PublicarNoInstagram } from "./PublicarNoInstagram";
 import { RoteiroLongo, type EdicaoDoCapitulo } from "./RoteiroLongo";
@@ -310,6 +311,9 @@ export function RoteiroTela({
     setEdicaoParaPublicar({ id, duracaoS });
     setPainel("publicar");
   }, []);
+  /** E47: a edição mais recente deste roteiro como a folha a viu por último; o cartão à vista no corpo do roteiro lê o ponto dela daqui, e a folha reabre nele. */
+  const [edicaoViva, setEdicaoViva] = useState<VistaCompletaDaEdicao | null>(editar?.edicao ?? null);
+  const mudouEdicao = useCallback((vista: VistaCompletaDaEdicao | null) => setEdicaoViva(vista), []);
   const mudouPublicacao = useCallback((vista: VistaDaPublicacao) => {
     setPublicacao(vista);
     // Publicado pelo aplicativo: o "postei" vira automático (o servidor já marcou o roteiro e guardou o link).
@@ -1170,13 +1174,16 @@ export function RoteiroTela({
                 />
               ))
             ) : roteiro.formato === "story" && corpo.cartoes ? (
-              corpo.cartoes.map((cartao, indice) => (
-                <BlocoEdicao
-                  key={indice}
-                  titulo={textosRoteiro.blocos.story(indice + 1, corpo.cartoes!.length)}
-                  itens={itensCartaoStory(cartao)}
-                />
-              ))
+              <>
+                {corpo.cartoes.map((cartao, indice) => (
+                  <BlocoEdicao
+                    key={indice}
+                    titulo={textosRoteiro.blocos.story(indice + 1, corpo.cartoes!.length)}
+                    itens={itensCartaoStory(cartao)}
+                  />
+                ))}
+                {editar ? <ChamadoEditarMeuVideo estado={edicaoViva?.estado ?? null} aoAbrir={() => setPainel("editar")} /> : null}
+              </>
             ) : (
               /*
                * V15, item 4 (correção pedida pelo Fable): mesma posição de sempre no DOM, logo
@@ -1186,6 +1193,8 @@ export function RoteiroTela({
               <div className={styles.ladoGrudado}>
                 <div className={styles.pilhaDoLado}>
                   <BlocoEdicao titulo={ehLongo ? textosRoteiro.capitulos.comoEditarOVideoInteiro : textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+                  {/* E47: o chamado de "Editar o meu vídeo" à vista, logo depois de "Como editar" (o item do menu "Mais opções" continua). Não vem no vídeo longo nem no sem fala: `editar` é nulo neles. */}
+                  {editar ? <ChamadoEditarMeuVideo estado={edicaoViva?.estado ?? null} aoAbrir={() => setPainel("editar")} /> : null}
                   {/* Hotfix de 05/10/2026: no Reels falado "Por que assim" vem junto de "Como editar", na MESMA caixa do lado (eram dois `.ladoGrudado` na mesma área da grade, uma por cima da outra). */}
                   {corpo.porQueAssim.length > 0 ? <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} /> : null}
                 </div>
@@ -1561,7 +1570,7 @@ export function RoteiroTela({
 
       {editar ? (
         <PainelFlutuante titulo={textosEdicao.tela.titulo} aberto={painel === "editar"} aoFechar={fecharSeLivre}>
-          <EditarMeuVideo roteiroId={roteiro.id} visao={{ ...editar, podePublicar: editar.podePublicar && publicar !== null }} aoEnviando={avisarEnviando} semConexao={semConexao} aoPublicar={publicarEdicaoPronta} />
+          <EditarMeuVideo roteiroId={roteiro.id} visao={{ ...editar, edicao: edicaoViva, podePublicar: editar.podePublicar && publicar !== null }} aoEnviando={avisarEnviando} semConexao={semConexao} aoPublicar={publicarEdicaoPronta} aoMudarEdicao={mudouEdicao} />
         </PainelFlutuante>
       ) : null}
 

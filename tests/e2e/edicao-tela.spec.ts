@@ -289,6 +289,28 @@ test.describe("Editar o meu vídeo, na tela do roteiro", () => {
         await expect(folha.getByRole("button", { name: t.escolherVideo }).or(folha.getByText(t.trocarVideo))).toBeVisible();
         expect((await edicaoDoRoteiro(roteiroId)).estado).toBe("falhou");
       });
+
+      test("o chamado à vista no corpo do roteiro abre a folha, sem passar pelo menu", async ({ page }) => {
+        const roteiroId = await novoRoteiro();
+        await entrar(page, DONO_EMAIL);
+        await page.goto(`/roteiros/${roteiroId}`);
+        const chamado = page.locator("[data-chamado-editar-video]");
+        await expect(chamado).toBeVisible();
+        await expect(chamado).toContainText(textosEdicao.chamado.titulo);
+        await chamado.getByRole("button", { name: textosEdicao.chamado.botao }).click();
+        await expect(page.locator("section[data-parte='formulario']")).toBeVisible();
+      });
+
+      test("com a prévia pronta, o chamado diz o ponto e abre a folha na prévia", async ({ page }) => {
+        const roteiroId = await novoRoteiro();
+        await db().insert(edicoes).values({ clienteId: marca, roteiroId, estado: "previa_pronta", tamanhoBytes: 1000, tipoDoArquivo: "video/mp4", atualizadaEm: new Date() });
+        await entrar(page, DONO_EMAIL);
+        await page.goto(`/roteiros/${roteiroId}`);
+        const chamado = page.locator("[data-chamado-editar-video]");
+        await expect(chamado).toContainText(textosEdicao.chamado.previaPronta);
+        await chamado.getByRole("button", { name: textosEdicao.chamado.botaoAbrir }).click();
+        await expect(page.locator("section[data-parte='previa-pronta']")).toBeVisible();
+      });
     });
   }
 
