@@ -37,6 +37,7 @@ export function rotuloDaCobranca(c: ResumoDaCobranca): string {
   const data = (d: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit" }).format(d);
   if (a.vale) {
     if (a.status === "past_due") return t.atrasada;
+    if (a.status === "trialing") return a.cancelaNoFimDoPeriodo && a.periodoFim ? t.testeCancelaEm(data(a.periodoFim)) : a.periodoFim ? t.testeAte(data(a.periodoFim)) : t.teste;
     if (a.cancelaNoFimDoPeriodo && a.periodoFim) return t.cancelaEm(data(a.periodoFim));
     return a.periodoFim ? t.ativaAte(data(a.periodoFim)) : t.ativa;
   }
@@ -184,6 +185,10 @@ export const textosContasAdmin = {
     cortesia: "Cortesia",
     ativa: "Ativa",
     ativaAte: (data: string) => `Ativa até ${data}`,
+    /** O teste grátis (E22): vale até a data, que é também a da primeira cobrança. */
+    teste: "Teste grátis",
+    testeAte: (data: string) => `Teste grátis até ${data}`,
+    testeCancelaEm: (data: string) => `Teste grátis, cancela em ${data}`,
     cancelaEm: (data: string) => `Cancela em ${data}`,
     atrasada: "Pagamento atrasado",
     cancelada: "Cancelada",

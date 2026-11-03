@@ -35,6 +35,11 @@ import { config } from "@/lib/config";
  * retirar o acesso só existia pelo Facebook (agora também pelo Instagram). Esta é a subida de versão para tudo isso: cada pessoa aceita de novo uma vez. O instante é a meia-noite de
  * Brasília de 27/10, anterior ao deploy.
  */
+/** "7 dias", "1 dia". */
+function diasDoTeste(dias: number): string {
+  return dias === 1 ? "1 dia" : `${dias} dias`;
+}
+
 export const VERSAO_TERMOS_EM = new Date("2026-10-27T03:00:00Z");
 
 export const textosTermos = {
@@ -71,7 +76,14 @@ export const textosTermos = {
       {
         titulo: "4. Cancelamento",
         paragrafos: [
-          "Você cancela quando quiser, escrevendo para o contato abaixo; o acesso continua até o fim do período já pago, sem multa.",
+          ...(config.cobranca.testeDias > 0
+            ? [
+                config.cobranca.testeExigeCartao
+                  ? `Quem assina pela primeira vez tem ${diasDoTeste(config.cobranca.testeDias)} grátis. O cartão é pedido no começo e só é cobrado depois do teste; se você cancelar antes do fim do teste, nada é cobrado. O teste vale uma vez por conta.`
+                  : `Quem assina pela primeira vez tem ${diasDoTeste(config.cobranca.testeDias)} grátis, sem cadastrar o cartão. Para continuar depois do teste, você cadastra o cartão antes do fim dele; sem o cartão, a assinatura termina sozinha e nada é cobrado. O teste vale uma vez por conta.`,
+              ]
+            : []),
+          "Você cancela quando quiser, em Conta, na gestão da assinatura, ou escrevendo para o contato abaixo. Cancelar encerra a renovação: o acesso continua até o fim do período já pago, sem multa. O que já foi pago não é devolvido.",
         ],
       },
       {

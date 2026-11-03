@@ -22,6 +22,7 @@ function sub(parcial: Partial<Assinatura>): Assinatura {
     periodoFim: new Date(AGORA.getTime() + 30 * DIA),
     cancelaNoFimDoPeriodo: false,
     ultimoEventoEm: AGORA,
+    lembreteFimDoTesteEm: null,
     criadoEm: new Date(AGORA.getTime() - 60 * DIA),
     atualizadoEm: AGORA,
     ...parcial,
@@ -77,5 +78,15 @@ describe("situacaoDaAssinatura", () => {
     const velha = sub({ id: 1, status: "canceled", stripeAssinaturaId: "sub_velha", criadoEm: new Date(AGORA.getTime() - 200 * DIA) });
     const nova = sub({ id: 2, stripeAssinaturaId: "sub_nova", criadoEm: new Date(AGORA.getTime() - 5 * DIA) });
     expect(situacaoDaAssinatura(false, [nova, velha], AGORA)).toMatchObject({ tipo: "ativa", status: "active" });
+  });
+
+  it("em teste grátis (trialing) dentro do prazo: teste, com acesso e a data do fim; cancelando, continua teste e diz que não renova", () => {
+    const fim = new Date(AGORA.getTime() + 5 * DIA);
+    expect(situacaoDaAssinatura(false, [sub({ status: "trialing", periodoFim: fim })], AGORA)).toMatchObject({ tipo: "teste", temAcesso: true, status: "trialing", cancelaNoFim: false, podeAbrirOPortal: true });
+    expect(situacaoDaAssinatura(false, [sub({ status: "trialing", periodoFim: fim, cancelaNoFimDoPeriodo: true })], AGORA)).toMatchObject({ tipo: "teste", cancelaNoFim: true });
+  });
+
+  it("teste que passou do fim mais a folga sem aviso nenhum: cartão, sem acesso (o Stripe cancela ou cobra; o portão não deixa o teste valer para sempre)", () => {
+    expect(situacaoDaAssinatura(false, [sub({ status: "trialing", periodoFim: new Date(AGORA.getTime() - 10 * DIA) })], AGORA)).toMatchObject({ tipo: "cartao", temAcesso: false });
   });
 });

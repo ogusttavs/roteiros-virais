@@ -42,6 +42,7 @@ import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarFiltroDeNoticias } from "./filtrar-noticias";
 import { rodarGuardarCapas } from "./guardar-capas";
 import { rodarLembrete } from "./lembrete";
+import { rodarLembreteFimDoTeste } from "./lembrete-fim-do-teste";
 import { rodarLerLongos } from "./ler-longos";
 import { rodarLimparEdicoes } from "./limpar-edicoes";
 import { rodarMetaContas } from "./meta-contas";
@@ -208,6 +209,9 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.lembrete, async () => {
     await executarComRegistro(FILAS.lembrete, () => rodarLembrete());
+  });
+  await boss().work(FILAS.lembreteFimDoTeste, async () => {
+    await executarComRegistro(FILAS.lembreteFimDoTeste, () => rodarLembreteFimDoTeste());
   });
   await boss().work(FILAS.curvaCliente, async () => {
     await executarComRegistro(FILAS.curvaCliente, () => rodarCurvaCliente());

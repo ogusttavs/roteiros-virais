@@ -119,17 +119,20 @@ test.describe("assinatura pelo Stripe", () => {
     await db().delete(checkoutsStripe).where(eq(checkoutsStripe.clienteId, marca));
     await entrar(page, DONO_EMAIL, /\/(hoje|comecar)/);
     await page.goto("/assinar");
-    await expect(page.getByRole("heading", { name: "Assine para continuar" })).toBeVisible();
+    // E22, o teste grátis: a marca que nunca assinou vê o convite do teste de 7 dias, sem cartão no começo.
+    await expect(page.getByRole("heading", { name: "Teste 7 dias grátis" })).toBeVisible();
     await expect(page.getByText("R$ 397", { exact: true })).toBeVisible();
-    await expect(page.getByText("Cobrado R$ 1.191 a cada 3 meses, só no cartão.", { exact: false })).toBeVisible();
+    await expect(page.getByText("Os primeiros 7 dias são grátis, sem cadastrar o cartão agora.", { exact: false })).toBeVisible();
+    await expect(page.getByText("R$ 1.191 a cada 3 meses, só no cartão.", { exact: false })).toBeVisible();
+    await expect(page.getByText("Não pedimos o cartão agora.", { exact: false })).toBeVisible();
     await expect(page.getByRole("heading", { name: "O que você recebe" })).toBeVisible();
-    await page.getByRole("button", { name: "Assinar por R$ 1.191 a cada 3 meses" }).click();
+    await page.getByRole("button", { name: "Começar 7 dias grátis" }).click();
     await expect(page).toHaveURL(/\/assinar\?simulado=checkout&sessao=cs_simulada_\d+/);
     const primeiro = page.url();
 
     // A pessoa volta sem pagar e clica de novo: a mesma sessão do Stripe, nenhuma segunda.
     await page.goto("/assinar");
-    await page.getByRole("button", { name: "Assinar por R$ 1.191 a cada 3 meses" }).click();
+    await page.getByRole("button", { name: "Começar 7 dias grátis" }).click();
     await expect(page).toHaveURL(primeiro);
     expect(await db().select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, marca))).toHaveLength(1);
   });
@@ -182,6 +185,58 @@ test.describe("assinatura pelo Stripe", () => {
     await expect(cartao).toContainText(/Renova em/);
     await cartao.getByRole("button", { name: "Gerenciar a assinatura" }).click();
     await expect(page).toHaveURL(/\/assinar\?simulado=portal/);
+    await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
+  });
+
+  test("em teste grátis: /assinar diz até quando vai e manda cadastrar o cartão (nada de primeira cobrança), e Conta mostra o teste com o botão do portal", async ({ page }) => {
+    await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
+    await entrar(page, DONO_EMAIL, /\/(hoje|comecar)/);
+    const agora = new Date();
+    await db().insert(assinaturas).values({
+      clienteId: marca,
+      status: "trialing",
+      stripeClienteId: "cus_e2e_teste",
+      stripeAssinaturaId: "sub_e2e_teste",
+      periodoFim: new Date(agora.getTime() + 5 * 86400 * 1000),
+      ultimoEventoEm: agora,
+    });
+    await page.goto("/assinar");
+    await expect(page.getByRole("heading", { name: "Você está no teste grátis" })).toBeVisible();
+    await expect(page.getByText(/Seu teste grátis termina em .*\. Para continuar, cadastre o cartão\./)).toBeVisible();
+    await expect(page.getByText("primeira cobrança")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Cadastrar o cartão" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ir para o Hoje" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Assinar|grátis$/ })).toHaveCount(0);
+
+    // Voltando do pagamento já em teste: a confirmação diz que o teste começou.
+    await page.goto("/assinar?assinou=1");
+    await expect(page.getByRole("heading", { name: "Seu teste grátis começou" })).toBeVisible();
+
+    await page.goto("/conta");
+    const cartao = page.getByTestId("sua-assinatura");
+    await expect(cartao).toContainText("Teste grátis");
+    await expect(cartao).toContainText("Para continuar, cadastre o cartão.");
+    await cartao.getByRole("button", { name: "Cadastrar o cartão" }).click();
+    await expect(page).toHaveURL(/\/assinar\?simulado=portal/);
+    await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
+  });
+
+  test("quem já teve assinatura não vê o teste: a tela é a de assinar de novo, sem a palavra grátis", async ({ page }) => {
+    await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
+    await entrar(page, DONO_EMAIL, /\/(hoje|comecar)/);
+    const agora = new Date();
+    await db().insert(assinaturas).values({
+      clienteId: marca,
+      status: "canceled",
+      stripeClienteId: "cus_e2e_velho",
+      stripeAssinaturaId: "sub_e2e_velho",
+      periodoFim: new Date(agora.getTime() - 30 * 86400 * 1000),
+      ultimoEventoEm: agora,
+    });
+    await page.goto("/assinar");
+    await expect(page.getByRole("heading", { name: "Sua assinatura terminou" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Assinar de novo" })).toBeVisible();
+    await expect(page.getByText(/grátis/i)).toHaveCount(0);
     await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
   });
 });
