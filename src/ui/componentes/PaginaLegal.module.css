@@ -63,3 +63,10 @@
   margin: var(--espaco-4) 0 0;
   text-wrap: pretty;
 }
+
+/* O resumo em inglês do topo: separado do resto por uma linha lateral, para o revisor achar de cara. */
+.resumoEmIngles {
+  margin-top: var(--espaco-6);
+  padding-left: var(--espaco-4);
+  border-left: 2px solid var(--cor-borda-forte);
+}
