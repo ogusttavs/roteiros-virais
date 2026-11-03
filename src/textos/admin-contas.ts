@@ -88,6 +88,16 @@ export const textosInicioAdmin = {
       titulo: nivel === "critico" ? `O disco do servidor está com ${usado} de uso e o envio de vídeos está pausado` : `O disco do servidor está com ${usado} de uso`,
       detalhe: `desde ${desde}; restam ${livre} livres${nivel === "critico" ? "; publicar no Instagram continua funcionando; veja o que ocupa espaço na máquina ou aumente o disco" : "; veja o que ocupa espaço na máquina antes de chegar ao crítico"}`,
     }),
+    // Achado 6 da revisão de 03/11/2026: a IA não fechou a edição do vídeo de uma conta sozinha (a pessoa vê "não deu para editar sozinhos" e pode enviar de novo); o vídeo dela sai do servidor em 48 horas.
+    edicoesParaRevisao: (n: number, marcas: string[], desde: string) => ({
+      titulo: n === 1 ? "1 edição de vídeo não fechou sozinha" : `${n} edições de vídeo não fecharam sozinhas`,
+      detalhe: `${listar(marcas)}${n > marcas.length ? " e outras" : ""}; a mais antiga desde ${desde}; a pessoa já viu a frase pedindo para gravar de novo, e o vídeo enviado sai do servidor em 48 horas`,
+    }),
+    // Achado 5 da revisão de 03/11/2026: o teto de gasto de IA da edição de vídeo por conta e por mês.
+    tetoDaEdicao: (marcas: string[]) => ({
+      titulo: marcas.length === 1 ? "1 conta chegou ao teto de gasto da edição de vídeo deste mês" : `${marcas.length} contas chegaram ao teto de gasto da edição de vídeo deste mês`,
+      detalhe: `${listar(marcas)}; edição nova e pedido de ajuste dessas contas ficam recusados até o dia 1; o teto é TETO_CUSTO_EDICAO_MES_USD`,
+    }),
     pedidosDeRamo: (n: number) => ({ titulo: n === 1 ? "1 pedido de ramo espera você" : `${n} pedidos de ramo esperam você`, detalhe: "a pessoa não achou o ramo na lista" }),
     teto: (reaisHoje: string, teto: string) => ({ titulo: "O gasto de hoje passou do teto do dia", detalhe: `${reaisHoje} de ${teto}` }),
     errosContinuam: (n: number) => ({ titulo: n === 1 ? "1 rotina com erro continua sem rodar certo" : `${n} rotinas com erro continuam sem rodar certo`, detalhe: "o último erro de cada uma segue sem uma execução boa depois" }),

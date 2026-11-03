@@ -69,6 +69,11 @@ RUN apt-get update \
   && curl -fL "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_POT_VERSION}/bgutil-ytdlp-pot-provider.zip" -o "$PLUGIN_ROOT/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip" \
   && rm -rf /var/lib/apt/lists/*
 
+# Achado 4 da revisao de 03/11/2026: o worker e o render abrem (ffmpeg, ffprobe, yt-dlp) arquivo que o cliente ou a internet mandou, entao NAO rodam como root. O usuario `app` aqui tem o mesmo
+# uid e gid (999) do `app` da imagem do app (`deploy/Dockerfile`, `groupadd -r app && useradd -r`, o primeiro id de sistema livre da imagem base), que e quem grava os arquivos do volume de
+# edicao; ids iguais e o que deixa o worker apagar o que o app gravou numa pasta com o bit de "so o dono apaga". Fixados de proposito, e o `-m` cria uma pasta pessoal para o cache do yt-dlp.
+RUN groupadd -g 999 app && useradd -r -u 999 -g app -m -d /home/app app
+
 # E19b: ponto de montagem do volume `roteiros_publicar`, o mesmo do app (ver Dockerfile): aberto como /tmp.
 RUN mkdir -p /var/publicar && chmod 1777 /var/publicar
 # E47 PR 2: ponto de montagem do volume `roteiros_edicao`, o mesmo do app (ver Dockerfile): aberto como /tmp.
@@ -102,4 +107,5 @@ ENV GIT_SHA=$GIT_SHA
 # deste servico e TIMEOUT_DESLIGAMENTO_MS existem para permitir. Rodando o
 # binario direto (exec, sem shell no meio), o processo do tsx vira o PID 1
 # do container e recebe o sinal direto.
+USER app
 CMD ["node_modules/.bin/tsx", "src/jobs/worker.ts"]

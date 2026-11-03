@@ -16,7 +16,7 @@ import { edicoes, type Edicao, type EstadoDaEdicao } from "@/db/schema";
 import { apagarArquivoDaEdicao, arquivoExiste } from "@/edicao/arquivos";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { logger } from "@/lib/log";
-import { usoDoMes } from "@/servicos/edicao";
+import { recusaPeloTetoDeGasto, usoDoMes } from "@/servicos/edicao";
 import { enfileirarRender } from "@/servicos/render-edicao";
 import type { RoteiroLinha } from "@/servicos/roteiro";
 import { fraseDaEdicao, type CodigoDaEdicao } from "@/textos/edicao";
@@ -49,6 +49,8 @@ export type VistaCompletaDaEdicao = {
   refazeresRestantes: number;
   /** Quando o vídeo pronto sai do servidor (ISO), ou `null`. */
   prontoAte: string | null;
+  /** Quando o vídeo bruto enviado sai do servidor (ISO), ou `null` (achado 6 da revisão de 03/11/2026: a tela diz até quando ele continua guardado). */
+  brutoAte: string | null;
 };
 
 const ESTADOS_DE_FILA: EstadoDaEdicao[] = ["verificado", "aprovada"];
@@ -92,6 +94,7 @@ async function vistaCompleta(linha: Edicao): Promise<VistaCompletaDaEdicao> {
     temVideoPronto: linha.caminhoEditado !== null,
     refazeresRestantes: Math.max(0, REFAZERES_POR_EDICAO - linha.refeitas),
     prontoAte: linha.editadoExpiraEm ? linha.editadoExpiraEm.toISOString() : null,
+    brutoAte: linha.brutoApagadoEm === null && linha.brutoExpiraEm ? linha.brutoExpiraEm.toISOString() : null,
   };
 }
 
@@ -177,6 +180,12 @@ export async function refazerEdicao(clienteId: number, edicaoId: number, motivo:
   if (linha.estado !== "previa_pronta") return recusa("nao-e-a-hora");
   if (linha.refeitas >= REFAZERES_POR_EDICAO) return recusa("refazer-demais");
   if (!(await arquivoExiste(linha.caminhoBruto)) || !linha.palavras || !linha.energia) return recusa("arquivo-saiu");
+  // O teto de gasto de IA da conta no mês (achado 5 da revisão de 03/11/2026): cada pedido de ajuste é outra decisão do modelo forte.
+  const teto = await recusaPeloTetoDeGasto(db(), clienteId, agora);
+  if (teto) {
+    await teto.aviso();
+    return teto.recusa;
+  }
 
   const [refeita] = await db()
     .update(edicoes)

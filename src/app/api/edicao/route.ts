@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 const SEM_CACHE = { "Cache-Control": "private, no-store" };
 
 /** O status HTTP de cada recusa; as que não estão aqui são 400. */
-const STATUS_DA_RECUSA: Record<string, number> = { "sem-roteiro": 404, "limite-do-mes": 429, "em-andamento": 409 };
+const STATUS_DA_RECUSA: Record<string, number> = { "sem-roteiro": 404, "limite-do-mes": 429, "teto-do-mes": 429, "em-andamento": 409 };
 
 /**
  * E47 PR 2: abre uma edição de vídeo. `POST /api/edicao` com `{ roteiroId, tamanhoBytes, tipoDoArquivo, nomeDoArquivo? }` (o que o navegador já sabe do arquivo escolhido) e responde `{ id, usadas, limite }`.

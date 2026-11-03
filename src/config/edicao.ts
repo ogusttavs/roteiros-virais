@@ -23,7 +23,7 @@ export const LIMITES_DA_EDICAO = {
 export const GUARDA_DO_BRUTO_MS = 48 * 60 * 60 * 1000;
 /** O editado some sozinho 7 dias depois de pronto. */
 export const GUARDA_DO_EDITADO_MS = 7 * 24 * 60 * 60 * 1000;
-/** Uma edição que ficou em `subindo` por mais que isto (o celular dormiu, a aba fechou) falha e o arquivo parcial sai. */
+/** Uma edição que ficou em `subindo` ou `enviando` por mais que isto (o celular dormiu, a aba fechou) falha e o arquivo parcial sai. */
 export const ENVIO_DA_EDICAO_PARADO_APOS_MS = 45 * 60 * 1000;
 /** Uma edição `guardado` que ninguém pegou (a fila perdeu o pedido) é enfileirada de novo depois deste tempo. */
 export const TRANSCRICAO_ESQUECIDA_APOS_MS = 10 * 60 * 1000;

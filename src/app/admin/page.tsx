@@ -53,6 +53,11 @@ function itensDeAtencao(inicio: InicioAdmin): ItemDeAtencao[] {
     const { nivel, usadoPercentual, livreBytes, desde } = inicio.atencao.disco;
     itens.push({ chave: "disco", ...t.atencao.disco(nivel, `${String(usadoPercentual).replace(".", ",")}%`, tamanhoEmTexto(livreBytes), `${diaDoMes(desde)}, ${horaDoDia(desde)}`), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
   }
+  if (inicio.atencao.edicoesParaRevisao) {
+    const { quantas, marcas, desde } = inicio.atencao.edicoesParaRevisao;
+    itens.push({ chave: "edicoes-revisao", ...t.atencao.edicoesParaRevisao(quantas, marcas, `${diaDoMes(desde)}, ${horaDoDia(desde)}`), href: "/admin/clientes", rotulo: t.atencao.verContas });
+  }
+  if (inicio.atencao.contasNoTetoDaEdicao.length > 0) itens.push({ chave: "teto-edicao", ...t.atencao.tetoDaEdicao(inicio.atencao.contasNoTetoDaEdicao), href: "/admin/clientes", rotulo: t.atencao.verContas });
   if (inicio.atencao.pedidosDeRamo > 0) itens.push({ chave: "pedidos", ...t.atencao.pedidosDeRamo(inicio.atencao.pedidosDeRamo), href: "/admin/nichos", rotulo: t.atencao.verRamos });
   return itens;
 }

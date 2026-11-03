@@ -80,6 +80,14 @@ services:
     networks:
       - roteiros-interna
     mem_limit: 1500m
+    # Achado 4 da revisao de 03/11/2026: o ffmpeg e o ffprobe abrem o video que o cliente manda, e o ffmpeg ja teve falha de leitura de arquivo. Entao o worker NAO roda como root: usa o MESMO
+    # usuario do app (uid/gid 999, o `app` da imagem do app e do worker), que e o dono dos arquivos do volume `roteiros_edicao` (a pasta do volume tem o bit de "so o dono apaga", como o /tmp).
+    # Sem nenhuma capacidade extra do Linux e sem poder ganhar privilegio. O dono dos volumes ja existentes e acertado uma vez pelo deploy/deploy.sh.
+    user: "999:999"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     # SIGTERM chama desligarComGraca (src/jobs/desligamento.ts), que espera o
     # pg-boss fechar (graceful: true, teto de 30s da propria lib). O padrao
     # do Docker (10s) mata o processo antes disso; 35s da folga pro pg-boss
@@ -98,9 +106,21 @@ services:
     container_name: roteiros-render
     restart: unless-stopped
     command: ["node_modules/.bin/tsx", "src/jobs/worker-render.ts"]
-    env_file: .env
+    # Achado 4 da revisao de 03/11/2026: o render NAO recebe o `.env` inteiro (Anthropic, Groq, Meta, Stripe, Resend, YouTube, `JOBS_API_KEY`...), que um arquivo feito para explorar o ffmpeg
+    # alcancaria. Recebe so o que precisa: o banco (para a fila e a linha da edicao), a pasta do volume e o Sentry. `GIT_SHA` ja vem da propria imagem. Sem `env_file` de proposito: uma variavel
+    # nova so chega aqui se alguem a listar abaixo.
     environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL precisa estar no .env}
+      SENTRY_DSN: ${SENTRY_DSN:-}
       EDICAO_PASTA: /var/edicao
+      # A configuracao do aplicativo (`src/lib/config.ts`) recusa subir em producao com estas duas em branco ou iguais ao exemplo, mesmo num processo que nao as usa. Valor fixo e sem uso: o render
+      # nunca abre sessao nem chama a API de jobs, entao o segredo de verdade nao precisa chegar aqui.
+      BETTER_AUTH_SECRET: render-sem-uso-nao-e-segredo
+      JOBS_API_KEY: render-sem-uso-nao-e-segredo
+      # O ffmpeg (legenda com fontconfig) e o tsx guardam cache; o contêiner e so de leitura, entao tudo vai para o /tmp.
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/.cache
     volumes:
       - roteiros_edicao:/var/edicao
     depends_on:
@@ -110,6 +130,14 @@ services:
       - roteiros-interna
     cpus: 1.0
     mem_limit: 1500m
+    # Mesmo usuario do app e do worker (ver o worker acima): dono dos arquivos do volume. Sem capacidades, sem ganhar privilegio, e o sistema de arquivos so de leitura: o render escreve apenas
+    # no volume `roteiros_edicao` e no /tmp.
+    user: "999:999"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
     # Mesmo SIGTERM do worker (desligarComGraca); o render em andamento volta para a fila sozinho ao subir de novo (`recolherRendersOrfaos`).
     stop_grace_period: 35s
     tmpfs:

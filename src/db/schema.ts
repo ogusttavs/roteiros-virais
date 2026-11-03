@@ -2722,7 +2722,7 @@ export const publicacoes = pgTable(
 export type Publicacao = typeof publicacoes.$inferSelect;
 
 /**
- * Subindo: a edição foi aberta e o vídeo ainda está chegando. Guardado: o vídeo chegou inteiro, foi conferido (duração, qualidade, som) e espera a transcrição. Transcrevendo: o worker está ouvindo
+ * Subindo: a edição foi aberta e o vídeo ainda não começou a chegar. Enviando: o corpo do vídeo está chegando (a reserva do envio, um UPDATE condicional; a limpeza de 45 minutos recolhe o que morreu). Guardado: o vídeo chegou inteiro, foi conferido (duração, qualidade, som) e espera a transcrição. Transcrevendo: o worker está ouvindo
  * o áudio. Transcrito: as palavras com tempo e a curva de energia estão guardadas e o motor de corte já pode trabalhar. Falhou: recusada ou parada, com a frase em `motivo`. Expirada: o vídeo
  * bruto (e o editado, se houve) já foi apagado pela guarda e não há mais o que fazer com ela.
  *
@@ -2736,6 +2736,7 @@ export type Publicacao = typeof publicacoes.$inferSelect;
  */
 export type EstadoDaEdicao =
   | "subindo"
+  | "enviando"
   | "guardado"
   | "transcrevendo"
   | "transcrito"

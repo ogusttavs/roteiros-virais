@@ -385,6 +385,13 @@ export const config = {
      * aviso até o mês virar. Uma leitura custa centavos; o teto só protege de erro de laço.
      */
     tetoCustoLeituraMarcaMesUsd: envNumero("TETO_CUSTO_LEITURA_MARCA_MES_USD", 5),
+    /**
+     * Achado 5 da revisão de 03/11/2026: teto de custo da edição de vídeo (IA da decisão e do verificador mais a transcrição) POR CONTA e por mês de Brasília, somado de `edicoes.custo_ia_usd` e
+     * `custo_transcricao_usd` (nunca em memória). Passou disto, a edição nova e o "Pedir ajuste" dessa conta são recusados com uma frase até o mês virar, e o admin recebe um e-mail (uma vez por conta
+     * por mês) e uma linha no Início. O pior caso de uma edição é cerca de US$ 1,70 (4 rodadas da decisão); 15 dólares cobre o uso normal de 30 edições com folga e para o erro de laço ou o abuso.
+     * Ainda não há custo medido de uso real: ajuste este número depois das dez primeiras edições com chave de verdade.
+     */
+    tetoCustoEdicaoMesUsd: envNumero("TETO_CUSTO_EDICAO_MES_USD", 15),
     /** Leitura disparada por evento (a pessoa salvou o site ou um perfil) não repete o site em menos de N minutos. */
     minutosEntreLeiturasMarcaPorEvento: envNumero("MINUTOS_ENTRE_LEITURAS_MARCA_EVENTO", 10),
     /**
