@@ -1,4 +1,5 @@
 import { LIMITES_DA_EDICAO, REFAZERES_POR_EDICAO } from "@/config/edicao";
+import type { EstadoDaEdicao } from "@/db/schema";
 
 /**
  * E47 PR 2: as frases de "Editar o meu vídeo" que o servidor devolve (recusas ao começar e ao receber o vídeo, e o motivo de uma edição que não seguiu). Linguagem de quem dirige um negócio
@@ -122,6 +123,20 @@ export const textosEdicao = {
     carregando: "Carregando",
     videoNaoAbriu: "O vídeo não abriu neste aparelho. Use o botão para baixar e assistir.",
   },
+
+  /**
+   * O cartão à vista no corpo do roteiro, logo depois de "Como editar": o mesmo "Editar o meu vídeo" do menu "Mais opções", mas sem a pessoa precisar procurar. Quando já existe uma edição
+   * deste roteiro, o cartão diz em uma linha em que ponto ela está, e o botão abre a folha nesse ponto.
+   */
+  chamado: {
+    titulo: "Gravou? Mande o vídeo que a gente edita para você.",
+    botao: "Editar o meu vídeo",
+    botaoAbrir: "Abrir a edição",
+    montando: "Sua edição está sendo montada",
+    previaPronta: "A prévia está pronta",
+    pronto: "Vídeo pronto para baixar",
+    conferindo: "Estamos conferindo a sua edição",
+  },
 } as const;
 
 export function fraseDaEdicao(codigo: CodigoDaEdicao): string {
@@ -131,4 +146,27 @@ export function fraseDaEdicao(codigo: CodigoDaEdicao): string {
 /** "Você usou 3 de 30 edições neste mês." */
 export function frasePorUso(usadas: number): string {
   return `Você usou ${usadas} de ${LIMITES_DA_EDICAO.edicoesPorMes} edições neste mês.`;
+}
+
+/**
+ * A linha do cartão do roteiro para o ponto em que a edição está, ou `null` quando não há o que dizer (nenhuma edição, uma que falhou ou uma que já saiu do servidor): aí o cartão só convida
+ * a enviar o vídeo.
+ */
+export function linhaDoEstadoDaEdicao(estado: EstadoDaEdicao | null | undefined): string | null {
+  const c = textosEdicao.chamado;
+  switch (estado) {
+    case "previa_pronta":
+      return c.previaPronta;
+    case "pronta":
+      return c.pronto;
+    case "para_revisao":
+      return c.conferindo;
+    case "falhou":
+    case "expirada":
+    case null:
+    case undefined:
+      return null;
+    default:
+      return c.montando;
+  }
 }

@@ -1,0 +1,33 @@
+.chamado {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.texto {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: var(--espaco-3);
+  align-items: start;
+}
+
+.icone {
+  color: var(--cor-texto-suave);
+  margin-top: 2px;
+}
+
+.frases {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.titulo,
+.estado {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-texto);
+}
+
+.estado {
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}

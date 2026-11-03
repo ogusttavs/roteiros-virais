@@ -39,7 +39,7 @@ export const textosLigacao = {
     /** E19b: o Instagram só deixa ligar conta profissional; quem é pessoal precisa trocar (de graça, um minuto). */
     contaProfissional:
       "Para ligar, o seu Instagram precisa ser uma conta profissional (de empresa ou de criador). Se o seu for pessoal, abra o Instagram no celular, vá em Configurações e privacidade, depois em Tipo de conta e ferramentas, e escolha Mudar para conta profissional. É de graça e leva um minuto.",
-    oQueLemos: "O que lemos: o nome da sua conta e, de cada vídeo, quantas pessoas viram, curtiram, comentaram e compartilharam.",
+    oQueLemos: "O que lemos: o nome da sua conta e, de cada vídeo, quantas pessoas viram, curtiram e comentaram.",
     oQueNunca: "O que nunca fazemos: ler as suas mensagens nem postar sem você pedir.",
     /** E56 PR 1: a publicação pelo aplicativo é sempre um pedido da pessoa, vídeo por vídeo. */
     oQuePublicamos: "O que fazemos só quando você pedir: publicar no seu Instagram o vídeo que você escolher, na tela do roteiro.",
