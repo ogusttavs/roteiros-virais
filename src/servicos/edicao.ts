@@ -7,7 +7,9 @@
  * Regras que valem aqui (e têm teste):
  *  - A marca vem da sessão, nunca do pedido: toda leitura e toda gravação filtram pela marca recebida, então uma marca nunca vê, envia nem toca na edição de outra.
  *  - A cota do mês (30) é conferida dentro de uma transação com trava por marca: dois pedidos ao mesmo tempo não passam do teto. Conta o que não falhou; uma edição que falhou antes de gastar não pesa.
- *  - Um envio por edição por vez (`lib/reserva-de-envio.ts`): quem chega com outro já em curso recebe a recusa sem tocar em nada.
+ *  - Um envio por edição por vez: a reserva é o estado `enviando`, gravado com um UPDATE condicional (`subindo` para `enviando`) antes de ler o corpo. Nenhuma conexão do banco fica presa durante a
+ *    transferência (achado 3 da revisão de 03/11/2026: a trava de aviso do Postgres segurava uma conexão do pool de 8 por envio). Quem chega com outro já em curso recebe a recusa sem tocar em nada;
+ *    um envio que morreu é recolhido pela limpeza de 45 minutos (`jobs/limpar-edicoes.ts`).
  *  - O tamanho tem de bater byte a byte com o declarado ao abrir a edição.
  */
 import { and, eq, gte, inArray, ne, sql } from "drizzle-orm";
@@ -19,14 +21,15 @@ import { edicoes, type Edicao, type EstadoDaEdicao } from "@/db/schema";
 import { apagarArquivoDaEdicao, ErroDoArquivoDeEdicao, caminhoNoVolume, guardarBruto } from "@/edicao/arquivos";
 import { ErroDeSondagem, recusaDaSondagem, sondarVideo, type Sondagem } from "@/edicao/sondagem";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
+import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
-import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
+import { avisarTetoDaEdicao } from "@/servicos/aviso-do-teto-da-edicao";
+import { clientePorId } from "@/servicos/clientes";
 import { roteiroPorId } from "@/servicos/roteiro";
 import { fraseDaEdicao, type CodigoDaEdicao } from "@/textos/edicao";
 
-/** Pares das travas de aviso do Postgres: separam a cota da edição e o envio dela de qualquer outra trava do aplicativo (a do envio de publicação é 5619). */
+/** Par da trava de aviso do Postgres da cota da edição: separa a cota de qualquer outra trava do aplicativo (a do envio de publicação é 5619). Vale só até o fim da transação. */
 const TRAVA_DA_COTA_DA_EDICAO = 5620;
-const TRAVA_DO_ENVIO_DA_EDICAO = 5621;
 
 export type DepsDaEdicao = {
   agora?: () => Date;
@@ -66,6 +69,44 @@ async function contarDoMes(consulta: Consulta, clienteId: number, agora: Date): 
   return linha?.total ?? 0;
 }
 
+/** AAAA-MM do mês de Brasília de `agora` (a chave do aviso do teto de gasto). */
+export function mesDeBrasilia(agora: Date): string {
+  return inicioDoMesDeBrasilia(agora).toISOString().slice(0, 7);
+}
+
+/**
+ * Quanto a conta já gastou neste mês de Brasília com a edição, em dólar: a IA da decisão e do verificador mais a transcrição, de TODAS as edições do mês (inclusive as que falharam: o gasto
+ * aconteceu). Somado no banco, nunca em memória (achado 5 da revisão de 03/11/2026).
+ */
+export async function gastoDaEdicaoNoMesUsd(consulta: Consulta, clienteId: number, agora: Date): Promise<number> {
+  const [linha] = await consulta
+    .select({ total: sql<string>`coalesce(sum(${edicoes.custoIaUsd} + ${edicoes.custoTranscricaoUsd}), 0)` })
+    .from(edicoes)
+    .where(and(eq(edicoes.clienteId, clienteId), gte(edicoes.criadaEm, inicioDoMesDeBrasilia(agora))));
+  return Number(linha?.total ?? 0);
+}
+
+/**
+ * Se a conta já chegou ao teto de gasto da edição no mês: devolve a recusa (e `aviso`, que manda o e-mail ao admin uma vez por conta por mês) ou `null`. Quem chama decide onde conferir (dentro
+ * da transação da cota, ou antes de um pedido de ajuste) e chama `aviso` depois. O e-mail nunca derruba a recusa.
+ */
+export async function recusaPeloTetoDeGasto(consulta: Consulta, clienteId: number, agora: Date): Promise<{ recusa: RecusaDaEdicao; aviso: () => Promise<void> } | null> {
+  const teto = config.regras.tetoCustoEdicaoMesUsd;
+  const gasto = await gastoDaEdicaoNoMesUsd(consulta, clienteId, agora);
+  if (gasto < teto) return null;
+  return {
+    recusa: recusa("teto-do-mes"),
+    aviso: async () => {
+      try {
+        const [marca, usadas] = await Promise.all([clientePorId(clienteId), contarDoMes(db(), clienteId, agora)]);
+        await avisarTetoDaEdicao(clienteId, { marca: marca?.nome ?? `conta ${clienteId}`, gastoUsd: gasto, tetoUsd: teto, edicoesNoMes: usadas }, mesDeBrasilia(agora), agora);
+      } catch (erro) {
+        logger.warn({ err: erro, clienteId }, "edicao: nao foi possivel avisar o admin do teto de gasto");
+      }
+    },
+  };
+}
+
 /** Quantas edições a marca já usou neste mês e o teto. */
 export async function usoDoMes(clienteId: number, agora: Date = new Date()): Promise<{ usadas: number; limite: number }> {
   return { usadas: await contarDoMes(db(), clienteId, agora), limite: LIMITES_DA_EDICAO.edicoesPorMes };
@@ -85,7 +126,7 @@ export type EntradaDeIniciarEdicao = {
 };
 export type ResultadoDeIniciarEdicao = { ok: true; edicaoId: number; usadas: number; limite: number } | RecusaDaEdicao;
 
-const ESTADOS_EM_ANDAMENTO: EstadoDaEdicao[] = ["subindo", "guardado", "transcrevendo"];
+const ESTADOS_EM_ANDAMENTO: EstadoDaEdicao[] = ["subindo", "enviando", "guardado", "transcrevendo"];
 
 /**
  * Abre uma edição para um roteiro da marca. Confere o roteiro, o tipo e o tamanho do arquivo (que o navegador já sabe) e a cota do mês, e só então grava a linha. O vídeo vem depois, por
@@ -101,7 +142,8 @@ export async function iniciarEdicao(entrada: EntradaDeIniciarEdicao, deps: DepsD
   if (!Number.isInteger(entrada.tamanhoBytes) || entrada.tamanhoBytes <= 0) return recusa("arquivo-vazio");
   if (entrada.tamanhoBytes > LIMITES_DA_EDICAO.bytesMax) return recusa("arquivo-grande");
 
-  return db().transaction(async (tx) => {
+  let avisarDoTeto: (() => Promise<void>) | null = null;
+  const resultado = await db().transaction(async (tx) => {
     // A trava vale até o fim da transação: dois pedidos da mesma marca ao mesmo tempo se enfileiram aqui e o segundo já enxerga a linha do primeiro.
     await tx.execute(sql`select pg_advisory_xact_lock(${TRAVA_DA_COTA_DA_EDICAO}, ${clienteId})`);
 
@@ -112,15 +154,21 @@ export async function iniciarEdicao(entrada: EntradaDeIniciarEdicao, deps: DepsD
       .where(and(eq(edicoes.clienteId, clienteId), eq(edicoes.roteiroId, roteiroId), inArray(edicoes.estado, ESTADOS_EM_ANDAMENTO)));
     for (const viva of vivas) {
       const parado = agora.getTime() - viva.atualizadaEm.getTime();
-      if (viva.estado !== "subindo" || parado <= ENVIO_DA_EDICAO_PARADO_APOS_MS) return recusa("em-andamento");
+      if ((viva.estado !== "subindo" && viva.estado !== "enviando") || parado <= ENVIO_DA_EDICAO_PARADO_APOS_MS) return recusa("em-andamento");
       await tx
         .update(edicoes)
         .set({ estado: "falhou", motivo: fraseDaEdicao("envio-parado"), atualizadaEm: agora })
-        .where(and(eq(edicoes.id, viva.id), eq(edicoes.estado, "subindo")));
+        .where(and(eq(edicoes.id, viva.id), inArray(edicoes.estado, ["subindo", "enviando"])));
     }
 
     const usadas = await contarDoMes(tx, clienteId, agora);
     if (usadas >= LIMITES_DA_EDICAO.edicoesPorMes) return recusa("limite-do-mes");
+    // O teto de gasto de IA da conta no mês (achado 5 da revisão de 03/11/2026): a edição nova não abre, e o admin é avisado depois da transação.
+    const teto = await recusaPeloTetoDeGasto(tx, clienteId, agora);
+    if (teto) {
+      avisarDoTeto = teto.aviso;
+      return teto.recusa;
+    }
 
     const [linha] = await tx
       .insert(edicoes)
@@ -128,6 +176,8 @@ export async function iniciarEdicao(entrada: EntradaDeIniciarEdicao, deps: DepsD
       .returning({ id: edicoes.id });
     return { ok: true as const, edicaoId: linha.id, usadas: usadas + 1, limite: LIMITES_DA_EDICAO.edicoesPorMes };
   });
+  if (avisarDoTeto) await (avisarDoTeto as () => Promise<void>)();
+  return resultado;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +200,7 @@ async function enfileirarTranscricao(edicaoId: number): Promise<void> {
 }
 
 /** Passa a edição a `falhou` com a frase, só se ela ainda está em um dos estados dados (o envio parado não derruba uma que já seguiu). */
-async function falhar(edicaoId: number, clienteId: number, codigo: CodigoDaEdicao, agora: Date, estados: EstadoDaEdicao[] = ["subindo"]): Promise<void> {
+async function falhar(edicaoId: number, clienteId: number, codigo: CodigoDaEdicao, agora: Date, estados: EstadoDaEdicao[] = ["subindo", "enviando"]): Promise<void> {
   await db()
     .update(edicoes)
     .set({ estado: "falhou", motivo: fraseDaEdicao(codigo), caminhoBruto: null, atualizadaEm: agora })
@@ -158,38 +208,30 @@ async function falhar(edicaoId: number, clienteId: number, codigo: CodigoDaEdica
 }
 
 /**
- * Recebe o vídeo do navegador e o guarda no volume, em fluxo (nunca inteiro na memória). Só vale para uma edição desta marca que esteja `subindo`, com o tamanho igual ao que foi declarado ao
+ * Recebe o vídeo do navegador e o guarda no volume, em fluxo (nunca inteiro na memória). Só vale para uma edição desta marca que esteja `subindo` (passa a `enviando` enquanto o corpo chega), com o tamanho igual ao que foi declarado ao
  * abrir. Depois de guardar, o `ffprobe` confere o vídeo; o que não serve é apagado na hora e a edição falha com a frase. O que serve passa a `guardado`, com a data em que o bruto sai (48 horas),
  * e a transcrição é enfileirada.
  */
 export async function receberVideoDaEdicao(entrada: EntradaDoVideoDaEdicao, deps: DepsDaEdicao = {}): Promise<ResultadoDoVideoDaEdicao> {
-  const { edicaoId } = entrada;
-  const semStatus = (codigo: CodigoDaEdicao, status: number): ResultadoDoVideoDaEdicao => ({ ...recusa(codigo), status });
-
-  // Um envio por edição por vez. Quem chega com outro já em curso recebe a recusa SEM tocar em nada: não grava, não derruba a edição e não apaga o arquivo.
-  const reserva = await reservarEnvioPorTrava(TRAVA_DO_ENVIO_DA_EDICAO, edicaoId, "edicao");
-  if (reserva === "ocupada") return semStatus("envio-em-curso", 409);
-  if (reserva === "indisponivel") return semStatus("nao-comecou", 503);
-  try {
-    return await receberVideoReservado(entrada, deps, semStatus);
-  } finally {
-    await reserva.soltar();
-  }
-}
-
-async function receberVideoReservado(
-  entrada: EntradaDoVideoDaEdicao,
-  deps: DepsDaEdicao,
-  semStatus: (codigo: CodigoDaEdicao, status: number) => ResultadoDoVideoDaEdicao,
-): Promise<ResultadoDoVideoDaEdicao> {
   const agora = relogio(deps);
   const { clienteId, edicaoId } = entrada;
+  const semStatus = (codigo: CodigoDaEdicao, status: number): ResultadoDoVideoDaEdicao => ({ ...recusa(codigo), status });
+
+  // Um envio por edição por vez, sem conexão presa: o UPDATE condicional `subindo` para `enviando` é a reserva. Quem chega com outro já em curso (a edição já está `enviando`) recebe a recusa SEM
+  // tocar em nada: não grava, não derruba a edição e não apaga o arquivo. Se o processo cair no meio, a limpeza de 45 minutos falha a edição e recolhe o `.parte`.
   const [linha] = await db()
-    .select()
-    .from(edicoes)
-    .where(and(eq(edicoes.id, edicaoId), eq(edicoes.clienteId, clienteId)));
-  if (!linha) return semStatus("nao-achou", 404);
-  if (linha.estado !== "subindo") return semStatus("em-andamento", 409);
+    .update(edicoes)
+    .set({ estado: "enviando", atualizadaEm: agora })
+    .where(and(eq(edicoes.id, edicaoId), eq(edicoes.clienteId, clienteId), eq(edicoes.estado, "subindo")))
+    .returning();
+  if (!linha) {
+    const [atual] = await db()
+      .select({ estado: edicoes.estado })
+      .from(edicoes)
+      .where(and(eq(edicoes.id, edicaoId), eq(edicoes.clienteId, clienteId)));
+    if (!atual) return semStatus("nao-achou", 404);
+    return semStatus(atual.estado === "enviando" ? "envio-em-curso" : "em-andamento", 409);
+  }
   if (!entrada.corpo || entrada.tamanhoDoPedido !== linha.tamanhoBytes) {
     await falhar(edicaoId, clienteId, "envio-interrompido", agora);
     return semStatus("envio-interrompido", 400);
@@ -234,7 +276,7 @@ async function receberVideoReservado(
       brutoExpiraEm: new Date(agora.getTime() + GUARDA_DO_BRUTO_MS),
       atualizadaEm: agora,
     })
-    .where(and(eq(edicoes.id, edicaoId), eq(edicoes.clienteId, clienteId), eq(edicoes.estado, "subindo")))
+    .where(and(eq(edicoes.id, edicaoId), eq(edicoes.clienteId, clienteId), eq(edicoes.estado, "enviando")))
     .returning({ id: edicoes.id });
   if (!seguiu) {
     await apagarArquivoDaEdicao(relativo);

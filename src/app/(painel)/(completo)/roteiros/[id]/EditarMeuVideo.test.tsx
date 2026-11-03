@@ -43,6 +43,7 @@ function vista(extra: Partial<VistaCompletaDaEdicao> = {}): VistaCompletaDaEdica
     temVideoPronto: false,
     refazeresRestantes: 3,
     prontoAte: null,
+    brutoAte: null,
     ...extra,
   };
 }
@@ -199,6 +200,15 @@ describe("EditarMeuVideo", () => {
     cleanup();
     folha(visao({ edicao: vista({ estado: "para_revisao", motivo: fraseDaEdicao("em-revisao"), temPrevia: false }) }));
     expect((document.querySelector("[data-parte='para-revisao']") as HTMLElement).textContent).toContain(fraseDaEdicao("em-revisao"));
+  });
+
+  it("a edição parada para revisão não promete aviso: diz o que aconteceu, o que fazer e até quando o vídeo enviado continua guardado (achado 6 da revisão de 03/11/2026)", () => {
+    expect(fraseDaEdicao("em-revisao")).not.toMatch(/avisamos/i);
+    folha(visao({ edicao: vista({ estado: "para_revisao", motivo: fraseDaEdicao("em-revisao"), temPrevia: false, brutoAte: "2026-11-05T15:00:00.000Z" }) }));
+    const parte = document.querySelector("[data-parte='para-revisao']") as HTMLElement;
+    expect(parte.textContent).toContain("Não conseguimos fechar a edição desse vídeo sozinhos");
+    expect(parte.textContent).toContain("continua guardado até");
+    expect(screen.getByRole("button", { name: t.novoVideo })).toBeTruthy();
   });
 
   it("enquanto a edição anda a folha pergunta ao servidor e muda sozinha quando a prévia fica pronta", async () => {

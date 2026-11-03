@@ -69,6 +69,12 @@ ssh "$ALIAS" "cd $DIR && for i in \$(seq 1 30); do docker compose ps --format '{
 echo "== migrando o banco"
 ssh "$ALIAS" "cd $DIR && TAG=$TAG docker compose run --rm --no-deps roteiros-worker npm run -s db:migrate"
 
+# Achado 4 da revisao de 03/11/2026: o worker e o render rodam como o usuario `app` (999:999), nao mais como root. Os volumes de video que ja existem tem arquivos e pastas de root (a previa e o
+# editado eram escritos pelo render como root); sem acertar o dono, o worker nao conseguiria apagar nem o render escrever. `docker run` simples (com as capacidades padrao), nao `compose run`, que
+# aplicaria o `cap_drop` do servico e o root nao poderia trocar o dono. Idempotente e rapido (o que guardamos sao poucos arquivos, por 48 horas e 7 dias).
+echo "== acertando o dono dos volumes de video (999:999)"
+ssh "$ALIAS" "docker run --rm --user root --entrypoint chown -v roteiros_edicao:/var/edicao -v roteiros_publicar:/var/publicar ghcr.io/ogusttavs/roteiros-virais/worker:$TAG -R 999:999 /var/edicao /var/publicar"
+
 echo "== subindo app, worker, render e backup"
 ssh "$ALIAS" "cd $DIR && TAG=$TAG docker compose up -d --remove-orphans"
 

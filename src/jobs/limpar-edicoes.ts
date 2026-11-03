@@ -2,7 +2,7 @@
  * Job `limpar-edicoes` (E47 PR 2): de hora em hora, cuida da guarda dos vídeos da edição. Decisão do Gustavo em 29/10/2026: o vídeo bruto sai sozinho em 48 horas e o editado em 7 dias. O que
  * este job faz, nesta ordem:
  *
- *  1. Falha o envio que parou (a edição ficou `subindo` por mais de 45 minutos: o celular dormiu, a aba fechou).
+ *  1. Falha o envio que parou (a edição ficou `subindo` ou `enviando` por mais de 45 minutos: o celular dormiu, a aba fechou).
  *  2. Devolve a `guardado` (ou falha, se já foram 3 tentativas) a transcrição que parou no meio (o worker caiu).
  *  3. Apaga o bruto que passou de `bruto_expira_em` e o editado que passou de `editado_expira_em`. Junto com o bruto saem as palavras e a curva de energia (são a fala da pessoa). Quando não sobra
  *     nenhum arquivo, a edição passa a `expirada`; a linha fica, para a cota do mês e o histórico.
@@ -10,6 +10,9 @@
  *     a decisão que parou no meio (`decidindo` há mais de 20 minutos) volta ao passo anterior ou, na terceira rodada, falha. O plano e a decisão saem junto com o último arquivo (têm a fala da pessoa).
  *  4c. (E47 PR 4) O render: o que está sendo montado sem sinal há 40 minutos volta para a vez (ou falha na terceira tentativa) e o que espera a vez há mais de 10 minutos é enfileirado de novo. Junto
  *     com o bruto sai a prévia (só serve com o bruto por perto).
+ *  4d. (achado 2 da revisão de 03/11/2026) Apaga a `saida` antiga das gerações `decidirEdicao` e `verificarEdicao`: antes de 03/11 ela guardava texto copiado da fala (motivo do trecho, pares da
+ *     correção da legenda, avisos, descrição do verificador). Hoje essas gerações guardam só números, e o formato antigo (listas em `trechos` e `problemas`) é o que esta rotina reconhece e zera.
+ *     Idempotente e sem apagar coluna.
  *  5. Varre o volume: arquivo cujo nome não está em nenhuma linha viva (a linha foi apagada, o arquivo já tinha sido dado como apagado, o processo caiu antes de gravar o caminho) e `.parte` de
  *     envio que morreu. Assim nunca sobra arquivo órfão.
  *
@@ -31,9 +34,10 @@ import {
   TRANSCRICAO_PARADA_APOS_MS,
 } from "@/config/edicao";
 import { db } from "@/db";
-import { edicoes } from "@/db/schema";
+import { edicoes, geracoesIA } from "@/db/schema";
 import { apagarArquivoDaEdicao, varrerSobrasDoVolume } from "@/edicao/arquivos";
 import type { PerfilDeRender } from "@/edicao/render-grafo";
+import { TAREFAS_DA_EDICAO_COM_FALA } from "@/edicao/resumo-numerico";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { logger } from "@/lib/log";
 import { enfileirarRender, ESTADOS_DO_RENDER } from "@/servicos/render-edicao";
@@ -69,7 +73,7 @@ export async function rodarLimparEdicoes(deps: DepsDaLimpeza = {}): Promise<Reco
   const enviosParados = await db()
     .update(edicoes)
     .set({ estado: "falhou", motivo: fraseDaEdicao("envio-parado"), atualizadaEm: agora })
-    .where(and(eq(edicoes.estado, "subindo"), lt(edicoes.atualizadaEm, antes(ENVIO_DA_EDICAO_PARADO_APOS_MS))))
+    .where(and(inArray(edicoes.estado, ["subindo", "enviando"]), lt(edicoes.atualizadaEm, antes(ENVIO_DA_EDICAO_PARADO_APOS_MS))))
     .returning({ id: edicoes.id });
 
   // 2. A transcrição que parou no meio.
@@ -238,6 +242,18 @@ export async function rodarLimparEdicoes(deps: DepsDaLimpeza = {}): Promise<Reco
     }
   }
 
+  // 4d. O registro de IA que ainda guarda a fala da pessoa (formato antigo da `saida`): zera. O formato novo tem números onde o antigo tinha listas, então não é tocado.
+  const geracoesLimpas = await db()
+    .update(geracoesIA)
+    .set({ saida: null })
+    .where(
+      and(
+        inArray(geracoesIA.tarefa, [...TAREFAS_DA_EDICAO_COM_FALA]),
+        or(sql`jsonb_typeof(${geracoesIA.saida} -> 'trechos') = 'array'`, sql`jsonb_typeof(${geracoesIA.saida} -> 'problemas') = 'array'`),
+      ),
+    )
+    .returning({ id: geracoesIA.id });
+
   // 5. O que ficou no volume sem dono.
   const comArquivo = await db()
     .select({ bruto: edicoes.caminhoBruto, editado: edicoes.caminhoEditado, previa: edicoes.caminhoPrevia })
@@ -265,6 +281,7 @@ export async function rodarLimparEdicoes(deps: DepsDaLimpeza = {}): Promise<Reco
     editadosApagados: editadosVencidos.length,
     expiradas: expiradas.length,
     reenfileiradas,
+    geracoesLimpas: geracoesLimpas.length,
     arquivosSemDono: sobras.orfaos,
     partesVelhas: sobras.partes,
   };

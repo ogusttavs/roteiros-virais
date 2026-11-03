@@ -13,6 +13,7 @@ export type CodigoDaEdicao =
   | "arquivo-vazio"
   | "arquivo-grande"
   | "limite-do-mes"
+  | "teto-do-mes"
   | "em-andamento"
   | "envio-em-curso"
   | "nao-achou"
@@ -46,6 +47,7 @@ export const textosEdicao = {
     "arquivo-vazio": "O vídeo chegou vazio. Escolha o arquivo de novo.",
     "arquivo-grande": `O vídeo passa de ${LIMITES_DA_EDICAO.megasMax} MB. Grave um vídeo mais curto ou em qualidade HD (1080p) e tente de novo.`,
     "limite-do-mes": `Você já usou as ${LIMITES_DA_EDICAO.edicoesPorMes} edições deste mês. Elas voltam no primeiro dia do mês que vem.`,
+    "teto-do-mes": "As edições deste mês acabaram para a sua conta. Elas voltam no primeiro dia do mês que vem.",
     "em-andamento": "Já tem um vídeo seu sendo enviado ou editado para este roteiro. Espere terminar.",
     "envio-em-curso": "Este vídeo já está sendo enviado. Espere ele terminar.",
     "nao-achou": "Não achamos essa edição. Volte para o roteiro e comece de novo.",
@@ -64,7 +66,7 @@ export const textosEdicao = {
     demorou: "A edição demorou mais do que devia e foi parada. Envie o vídeo de novo.",
     "disco-cheio": "O envio de vídeos está pausado por alguns minutos. Tente de novo mais tarde.",
     "nao-montou": "Não conseguimos montar a edição do seu vídeo agora. Envie o vídeo de novo em alguns minutos.",
-    "em-revisao": "A edição desse vídeo precisa de uma conferência nossa antes de ficar pronta. Avisamos quando terminar.",
+    "em-revisao": "Não conseguimos fechar a edição desse vídeo sozinhos. Grave de novo, falando com calma e dizendo o nome da marca com clareza, e envie outra vez.",
     "motivo-vazio": "Conte o que você quer mudar no vídeo, em poucas palavras, para a gente refazer do jeito certo.",
     "refazer-demais": `Você já pediu ${REFAZERES_POR_EDICAO} ajustes neste vídeo. Aprove a versão que está aí ou envie o vídeo de novo para recomeçar.`,
     "nao-e-a-hora": "Esse vídeo ainda não está nessa etapa. Atualize a tela e veja onde ele está.",
@@ -89,7 +91,7 @@ export const textosEdicao = {
     naoFechar: "Deixe esta tela aberta até o envio terminar.",
     cancelarEnvio: "Cancelar o envio",
     usadas: (usadas: number) => frasePorUso(usadas),
-    preparando: "Estamos ouvindo o seu vídeo e decidindo o que fica. Leva cerca de 1 a 2 minutos e você pode sair desta tela: a gente avisa aqui quando a prévia estiver pronta.",
+    preparando: "Estamos ouvindo o seu vídeo e decidindo o que fica. Leva alguns minutos e você pode sair desta tela: a gente avisa aqui quando a prévia estiver pronta.",
     esperandoAVez: (aFrente: number, minutos: number) =>
       aFrente === 0
         ? "Você é o próximo. A montagem começa em instantes."
@@ -115,7 +117,8 @@ export const textosEdicao = {
     legendaAjuda: "A legenda em arquivo serve para quem quer acabar a edição em outro aplicativo.",
     publicar: "Publicar no Instagram",
     novoVideo: "Enviar outro vídeo",
-    revisaoTitulo: "Estamos conferindo",
+    revisaoTitulo: "Não deu para editar sozinhos",
+    revisaoGuarda: (quando: string) => `O vídeo que você enviou continua guardado até ${quando}. Depois disso ele sai do nosso servidor.`,
     falhouTitulo: "Não deu certo desta vez",
     semConexao: "Sem conexão agora. Tente de novo quando voltar a internet.",
     erroGenerico: "Não conseguimos fazer isso agora. Tente de novo em um minuto.",

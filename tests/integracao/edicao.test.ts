@@ -55,13 +55,14 @@ vi.mock("@/jobs/fila", async (importOriginal) => {
 });
 
 import { GUARDA_DO_BRUTO_MS, LIMITES_DA_EDICAO } from "@/config/edicao";
-import { db } from "@/db";
-import { briefings, clientes, consumoApi, custosExternos, edicoes, membrosMarca, nichos, roteiros, user } from "@/db/schema";
+import { db, getPool } from "@/db";
+import { briefings, clientes, configuracaoAdmin, consumoApi, custosExternos, edicoes, membrosMarca, nichos, roteiros, user } from "@/db/schema";
 import { nomeRelativoDoBruto, nomeRelativoDoEditado } from "@/edicao/arquivos";
 import { rodarLimparEdicoes } from "@/jobs/limpar-edicoes";
 import { rodarTranscreverEdicao } from "@/jobs/transcrever-edicao";
 import { config } from "@/lib/config";
-import { iniciarEdicao, receberVideoDaEdicao, usoDoMes } from "@/servicos/edicao";
+import { avisarTetoDaEdicao, chaveDoAvisoDoTeto } from "@/servicos/aviso-do-teto-da-edicao";
+import { iniciarEdicao, mesDeBrasilia, receberVideoDaEdicao, usoDoMes } from "@/servicos/edicao";
 import { fraseDaEdicao } from "@/textos/edicao";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -565,10 +566,126 @@ describe("travas das rotas", () => {
     await new Promise((r) => setTimeout(r, 300));
     const segundo = await receberVideoDaEdicao({ clienteId: marcaA, edicaoId: id, corpo: new ReadableStream({ start: (c) => c.close() }), tamanhoDoPedido: 0 });
     expect(segundo).toMatchObject({ ok: false, codigo: "envio-em-curso", status: 409 });
-    expect((await linha(id)).estado).toBe("subindo");
+    // A reserva é o estado `enviando` (achado 3 da revisão de 03/11/2026), e a recusa do segundo não o desfaz.
+    expect((await linha(id)).estado).toBe("enviando");
     liberar();
     expect(await primeiro).toEqual({ ok: true });
     expect((await linha(id)).estado).toBe("guardado");
+  });
+});
+
+describe("o envio não segura conexão do banco (achado 3 da revisão de 03/11/2026)", () => {
+  it("com oito envios lentos ao mesmo tempo, nenhuma conexão do pool fica emprestada e o painel continua respondendo", async () => {
+    const roteiros8: number[] = [];
+    for (let i = 0; i < 8; i += 1) roteiros8.push(await criarRoteiro(marcaA));
+    entrar("ed-dono-a");
+    const ids: number[] = [];
+    for (const r of roteiros8) ids.push(await abrir(r, videos.bom));
+    let liberar!: () => void;
+    const portao = new Promise<void>((resolver) => (liberar = resolver));
+    const lento = () =>
+      new ReadableStream<Uint8Array>({
+        async pull(controle) {
+          await portao;
+          controle.enqueue(new Uint8Array(videos.bom));
+          controle.close();
+        },
+      });
+    const envios = ids.map((id) => receberVideoDaEdicao({ clienteId: marcaA, edicaoId: id, corpo: lento(), tamanhoDoPedido: videos.bom.byteLength }));
+    await new Promise((r) => setTimeout(r, 500));
+    const pool = getPool();
+    expect(pool.totalCount - pool.idleCount).toBe(0);
+    for (const id of ids) expect((await linha(id)).estado).toBe("enviando");
+    // Uma consulta qualquer do painel responde na hora, mesmo com os oito envios em curso.
+    expect(await usoDoMes(marcaA)).toMatchObject({ limite: 30 });
+    liberar();
+    const resultados = await Promise.all(envios);
+    expect(resultados.every((r) => r.ok)).toBe(true);
+    for (const id of ids) expect((await linha(id)).estado).toBe("guardado");
+  });
+
+  it("um envio que morreu no meio (`enviando` parado há mais de 45 minutos) é recolhido pela limpeza e libera o roteiro; um recente fica", async () => {
+    entrar("ed-dono-a");
+    const velho = await abrir(roteiroA, videos.bom);
+    const roteiroC = await criarRoteiro(marcaA);
+    const novo = await abrir(roteiroC, videos.bom);
+    await db().update(edicoes).set({ estado: "enviando", atualizadaEm: new Date(Date.now() - 50 * 60_000) }).where(eq(edicoes.id, velho));
+    await db().update(edicoes).set({ estado: "enviando", atualizadaEm: new Date(Date.now() - 5 * 60_000) }).where(eq(edicoes.id, novo));
+    const resumo = await rodarLimparEdicoes();
+    expect(resumo).toMatchObject({ enviosParados: 1 });
+    expect(await linha(velho)).toMatchObject({ estado: "falhou", motivo: fraseDaEdicao("envio-parado") });
+    expect((await linha(novo)).estado).toBe("enviando");
+    // Abrir de novo para o mesmo roteiro: o `enviando` parado há muito tempo já não segura.
+    await db().update(edicoes).set({ estado: "enviando", atualizadaEm: new Date(Date.now() - 50 * 60_000) }).where(eq(edicoes.id, novo));
+    const outra = await abrirRota(pedidoAbrir({ roteiroId: roteiroC, tamanhoBytes: 10, tipoDoArquivo: "video/mp4" }));
+    expect(outra.status).toBe(200);
+  });
+});
+
+describe("o teto de gasto de IA da edição por conta e por mês (achado 5 da revisão de 03/11/2026)", () => {
+  async function gastar(clienteId: number, roteiroId: number, usd: number, extra: Partial<typeof edicoes.$inferInsert> = {}): Promise<void> {
+    await db().insert(edicoes).values({ clienteId, roteiroId, tamanhoBytes: 10, tipoDoArquivo: "video/mp4", estado: "pronta", custoIaUsd: usd.toFixed(6), ...extra });
+  }
+
+  it("abaixo do teto a edição abre; passado o teto, a edição nova volta 429 com a frase e o aviso ao admin sai uma vez só", async () => {
+    const teto = config.regras.tetoCustoEdicaoMesUsd;
+    const anteriorEmail = config.emailAcompanhamento;
+    (config as { emailAcompanhamento: string | undefined }).emailAcompanhamento = "admin-do-teto@teste.dev";
+    try {
+      entrar("ed-dono-a");
+      await gastar(marcaA, roteiroB, teto - 1);
+      const aberta = await abrirRota(pedidoAbrir({ roteiroId: roteiroA, tamanhoBytes: 10, tipoDoArquivo: "video/mp4" }));
+      expect(aberta.status).toBe(200);
+      await db().update(edicoes).set({ estado: "falhou" }).where(eq(edicoes.roteiroId, roteiroA));
+      // A transcrição também conta na soma.
+      await gastar(marcaA, roteiroB, 0, { custoTranscricaoUsd: "2.000000" });
+
+      const recusada = await abrirRota(pedidoAbrir({ roteiroId: roteiroA, tamanhoBytes: 10, tipoDoArquivo: "video/mp4" }));
+      expect(recusada.status).toBe(429);
+      expect(await recusada.json()).toEqual({ erro: fraseDaEdicao("teto-do-mes"), codigo: "teto-do-mes" });
+      expect(fraseDaEdicao("teto-do-mes")).toContain("acabaram");
+      const chaves = await db().select().from(configuracaoAdmin).where(eq(configuracaoAdmin.chave, chaveDoAvisoDoTeto(marcaA, mesDeBrasilia(new Date()))));
+      expect(chaves).toHaveLength(1);
+
+      // Outra recusa no mesmo mês não manda outro e-mail (a trava de uma vez por conta por mês).
+      const enviados: string[] = [];
+      const outra = await avisarTetoDaEdicao(marcaA, { marca: "A", gastoUsd: teto, tetoUsd: teto, edicoesNoMes: 2 }, mesDeBrasilia(new Date()), new Date(), async (m) => void enviados.push(m.para));
+      expect(outra).toEqual({ enviado: false, motivo: "ja avisado neste mes" });
+      expect(enviados).toEqual([]);
+
+      // Outra conta, sem gasto, segue abrindo.
+      entrar("ed-dono-b");
+      const deB = await abrirRota(pedidoAbrir({ roteiroId: roteiroB, tamanhoBytes: 10, tipoDoArquivo: "video/mp4" }));
+      expect(deB.status).toBe(200);
+    } finally {
+      (config as { emailAcompanhamento: string | undefined }).emailAcompanhamento = anteriorEmail;
+    }
+  });
+
+  it("o gasto do mês passado não conta para o teto deste mês", async () => {
+    const teto = config.regras.tetoCustoEdicaoMesUsd;
+    entrar("ed-dono-a");
+    const mesPassado = new Date(Date.now() - 40 * 24 * 3_600_000);
+    await gastar(marcaA, roteiroB, teto + 5, { criadaEm: mesPassado });
+    const aberta = await abrirRota(pedidoAbrir({ roteiroId: roteiroA, tamanhoBytes: 10, tipoDoArquivo: "video/mp4" }));
+    expect(aberta.status).toBe(200);
+  });
+
+  it("o aviso sem destinatário solta a trava, para a próxima recusa tentar de novo", async () => {
+    const anteriorEmail = config.emailAcompanhamento;
+    (config as { emailAcompanhamento: string | undefined }).emailAcompanhamento = undefined;
+    try {
+      const mes = mesDeBrasilia(new Date());
+      const semAdmin = await avisarTetoDaEdicao(marcaB, { marca: "B", gastoUsd: 20, tetoUsd: 15, edicoesNoMes: 1 }, mes);
+      if (semAdmin.motivo === "sem destinatario") {
+        expect(await db().select().from(configuracaoAdmin).where(eq(configuracaoAdmin.chave, chaveDoAvisoDoTeto(marcaB, mes)))).toHaveLength(0);
+      } else {
+        // Há admin no banco de teste: o aviso saiu e a trava ficou.
+        expect(semAdmin.enviado).toBe(true);
+      }
+    } finally {
+      (config as { emailAcompanhamento: string | undefined }).emailAcompanhamento = anteriorEmail;
+    }
   });
 });
 
