@@ -177,6 +177,41 @@ describe("o fluxo feliz", () => {
     expect(Number(forte.custoUsd)).toBeCloseTo(0.14, 5);
     // A fala da pessoa nunca vai para o registro: só o número de palavras e a tentativa.
     expect(forte.entradas).toEqual({ edicaoId: id, tentativa: 1, palavras: fala.palavras.length });
+    // E a `saida` também são só números (achado 2 da revisão de 03/11/2026): nenhum motivo de trecho, correção da legenda, aviso nem descrição do verificador copiado da fala.
+    const textoDoRegistro = JSON.stringify(geracoes.map((g) => ({ entradas: g.entradas, saida: g.saida })));
+    for (const trecho of ["mancha", "Dr.Wash", "Uosh", "café", "segredo"]) expect(textoDoRegistro).not.toContain(trecho);
+    expect(forte.saida).toMatchObject({ trechos: expect.any(Number), correcoesDaLegenda: expect.any(Number), avisos: expect.any(Number), ganchoTentativasDescartadas: 2 });
+    const verificador = geracoes.find((g) => g.tarefa === "verificarEdicao")!;
+    expect(verificador.saida).toMatchObject({ problemas: expect.any(Number), aprovado: true });
+    for (const valor of Object.values({ ...(forte.saida ?? {}), ...(verificador.saida ?? {}) })) expect(typeof valor === "string").toBe(false);
+  });
+
+  it("a limpeza apaga a `saida` antiga das gerações da edição, que ainda guardava texto da fala, e deixa as outras e o formato novo", async () => {
+    const antigaDecisao = await db()
+      .insert(geracoesIA)
+      .values({ tarefa: "decidirEdicao", versaoPrompt: "1.0.0", modelo: "m", clienteId: marcaA, entradas: { edicaoId: 1 }, saida: { trechos: [{ deIndice: 0, ateIndice: 3, motivo: "ele disse o preço do produto", transicao: "nenhuma" }], gancho: { porQue: "a frase do preço" }, avisos: ["Você falou 3.956"] } })
+      .returning({ id: geracoesIA.id });
+    const antigaVerificacao = await db()
+      .insert(geracoesIA)
+      .values({ tarefa: "verificarEdicao", versaoPrompt: "1.0.0", modelo: "m", clienteId: marcaA, entradas: { edicaoId: 1 }, saida: { problemas: [{ onde: "legenda", descricao: "a palavra tal saiu errada" }] } })
+      .returning({ id: geracoesIA.id });
+    const nova = await db()
+      .insert(geracoesIA)
+      .values({ tarefa: "decidirEdicao", versaoPrompt: "1.1.0", modelo: "m", clienteId: marcaA, entradas: { edicaoId: 2 }, saida: { trechos: 3, avisos: 1 } })
+      .returning({ id: geracoesIA.id });
+    const outraTarefa = await db()
+      .insert(geracoesIA)
+      .values({ tarefa: "outraCoisa", versaoPrompt: "1", modelo: "m", clienteId: marcaA, entradas: {}, saida: { trechos: [1, 2], problemas: [] } })
+      .returning({ id: geracoesIA.id });
+
+    expect(await rodarLimparEdicoes()).toMatchObject({ geracoesLimpas: 2 });
+    const saidas = async (id: number) => (await db().select({ saida: geracoesIA.saida }).from(geracoesIA).where(eq(geracoesIA.id, id)))[0].saida;
+    expect(await saidas(antigaDecisao[0].id)).toBeNull();
+    expect(await saidas(antigaVerificacao[0].id)).toBeNull();
+    expect(await saidas(nova[0].id)).toEqual({ trechos: 3, avisos: 1 });
+    expect(await saidas(outraTarefa[0].id)).toEqual({ trechos: [1, 2], problemas: [] });
+    // Idempotente: rodar de novo não acha mais nada.
+    expect(await rodarLimparEdicoes()).toMatchObject({ geracoesLimpas: 0 });
   });
 
   it("quando o plano fica pronto a prévia entra na fila do render (E47 PR 4); a fila que falha não derruba a decisão", async () => {

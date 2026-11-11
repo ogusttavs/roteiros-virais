@@ -16,6 +16,7 @@ import { db } from "@/db";
 import { edicoes, type Edicao } from "@/db/schema";
 import { apagarArquivoDaEdicao } from "@/edicao/arquivos";
 import { energiaDoBanco } from "@/edicao/guardada";
+import { resumoNumericoDaSaida } from "@/edicao/resumo-numerico";
 import type { PalavraFalada } from "@/edicao/tipos";
 import { nomesParaGrafar } from "@/edicao/verificacao";
 import { calcularCustoUsd, registrarGeracao } from "@/ia/registro";
@@ -63,7 +64,8 @@ async function chamar<T>(edicao: Edicao, tarefa: TarefaIA, versao: string, nivel
       nivel,
       clienteId: edicao.clienteId,
       entradas: { edicaoId: edicao.id, ...detalhes },
-      saida: saida.dados as unknown as Record<string, unknown>,
+      // Só números: a fala da pessoa não fica em `geracoes_ia` (achado 2 da revisão de 03/11/2026).
+      saida: resumoNumericoDaSaida(tarefa, saida.dados),
       uso,
       duracaoMs: Date.now() - inicio,
     });

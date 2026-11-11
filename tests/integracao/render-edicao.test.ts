@@ -61,6 +61,7 @@ import { ErroDoRender } from "@/edicao/render";
 import { gerarVideoSintetico, montarCasoSintetico, sondarSaida, type CasoSintetico } from "@/edicao/sintetica-video";
 import { FILAS } from "@/jobs/fila";
 import { rodarLimparEdicoes } from "@/jobs/limpar-edicoes";
+import { config } from "@/lib/config";
 import { aprovarEdicao, arquivoDaEdicaoParaVer, edicaoDoRoteiro, legendaDaEdicao, refazerEdicao, vistaCompletaDaEdicao, visaoDeEditar } from "@/servicos/edicao-tela";
 import { recolherRendersOrfaos, rodarRenderizarEdicao } from "@/servicos/render-edicao";
 import { fraseDaEdicao } from "@/textos/edicao";
@@ -396,6 +397,15 @@ describe("aprovar e refazer", () => {
     const semBruto = await criarEdicao(marcaA, roteiroA, "previa_pronta", {}, false);
     expect(await refazerEdicao(marcaA, semBruto, "mudar", semFila)).toMatchObject({ ok: false, codigo: "arquivo-saiu" });
     expect((await linha(semBruto)).refeitas).toBe(0);
+  });
+
+  it("passado o teto de gasto de IA do mês, o pedido de ajuste é recusado com a frase e a edição não muda (achado 5 da revisão de 03/11/2026)", async () => {
+    const id = await criarEdicao(marcaA, roteiroA, "previa_pronta", { custoIaUsd: (config.regras.tetoCustoEdicaoMesUsd + 1).toFixed(6) });
+    expect(await refazerEdicao(marcaA, id, "mudar a abertura", semFila)).toMatchObject({ ok: false, codigo: "teto-do-mes", frase: fraseDaEdicao("teto-do-mes") });
+    expect(await linha(id)).toMatchObject({ estado: "previa_pronta", refeitas: 0 });
+    // Outra conta, sem gasto, segue pedindo ajuste.
+    const deB = await criarEdicao(marcaB, roteiroB, "previa_pronta");
+    expect(await refazerEdicao(marcaB, deB, "mudar a abertura", semFila)).toEqual({ ok: true });
   });
 
   it("dois pedidos de ajuste ao mesmo tempo contam um só", async () => {

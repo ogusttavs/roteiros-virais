@@ -383,7 +383,7 @@ export async function receberVideo(entrada: EntradaDoVideo, deps: DepsDaPublicac
 /** Primeira parte do par da trava de aviso: separa esta trava de qualquer outra que o aplicativo venha a ter. */
 const TRAVA_DO_ENVIO = 5619;
 
-/** A reserva do envio de uma publicação: uma trava de aviso do Postgres por publicação (`lib/reserva-de-envio.ts`, que a edição de vídeo também usa, com outra trava). */
+/** A reserva do envio de uma publicação: uma trava de aviso do Postgres por publicação (`lib/reserva-de-envio.ts`, com teto de reservas simultâneas para o pool do painel nunca ficar sem conexão). */
 function reservarEnvio(publicacaoId: number) {
   return reservarEnvioPorTrava(TRAVA_DO_ENVIO, publicacaoId, "publicar");
 }

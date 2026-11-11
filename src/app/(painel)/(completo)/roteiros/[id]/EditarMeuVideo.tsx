@@ -22,7 +22,7 @@ const t = textosEdicao.tela;
 const ESPERA_DA_CONSULTA_MS = 3000;
 const ESTADOS_PARADOS = new Set(["previa_pronta", "pronta", "falhou", "para_revisao", "expirada"]);
 /** Os passos antes de o plano existir: o servidor ouve o vídeo e decide o que fica. */
-const ESTADOS_DE_PREPARO = new Set(["guardado", "transcrevendo", "transcrito", "decidindo", "decidido"]);
+const ESTADOS_DE_PREPARO = new Set(["enviando", "guardado", "transcrevendo", "transcrito", "decidindo", "decidido"]);
 
 type Props = {
   roteiroId: number;
@@ -38,6 +38,11 @@ type Props = {
 
 function diaDoPrazo(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
+}
+
+/** "5 de novembro às 14:30": até quando o vídeo enviado continua guardado. */
+function diaEHoraDoPrazo(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 }
 
 /** A vista de uma edição que acabou de ser aberta, antes de o servidor responder de novo. */
@@ -56,6 +61,7 @@ function vistaNova(id: number, roteiroId: number): VistaCompletaDaEdicao {
     temVideoPronto: false,
     refazeresRestantes: 3,
     prontoAte: null,
+    brutoAte: null,
   };
 }
 
@@ -470,6 +476,7 @@ export function EditarMeuVideo({ roteiroId, visao, aoEnviando, semConexao, aoPub
       <section className={styles.corpo} data-parte="para-revisao">
         <h2 className={styles.titulo}>{t.revisaoTitulo}</h2>
         <p className={styles.explica}>{edicao.motivo ?? fraseDaEdicao("em-revisao")}</p>
+        {edicao.brutoAte ? <p className={styles.nota}>{t.revisaoGuarda(diaEHoraDoPrazo(edicao.brutoAte))}</p> : null}
         <Botao type="button" variante="ghost" onClick={() => setNovoEnvio(true)}>
           {t.novoVideo}
         </Botao>
