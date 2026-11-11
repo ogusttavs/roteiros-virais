@@ -57,10 +57,13 @@ imprimir_resumo() {
 }
 
 limpar() {
-  [ "$CRIOU_ENV_TEMP" = "1" ] && rm -f "$ENV_TEMP"
+  # O `down` vem ANTES de apagar o .env temporario: o compose interpola as variaveis tambem no `down`, e desde o #252 o render
+  # exige `${DATABASE_URL:?}`; sem o arquivo, o `down` falhava em silencio e o ensaio ficava no ar com o banco (achado de 11/11/2026).
   if [ "$MANTER" = "0" ]; then
-    "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+    "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || echo "aviso: o docker compose down do ensaio falhou; derrube a mao" >&2
   fi
+  [ "$CRIOU_ENV_TEMP" = "1" ] && rm -f "$ENV_TEMP"
+  return 0
 }
 trap limpar EXIT
 
