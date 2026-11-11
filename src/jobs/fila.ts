@@ -64,6 +64,8 @@ export const FILAS = {
   /** M2: o setor nasce pesquisado (ao criar, "Pesquisar o mercado de novo" no admin, e mensal para os ativos). */
   pesquisaDeSetor: "pesquisa-de-setor",
   lembrete: "lembrete",
+  /** E22, o teste gratis: de hora em hora, o e-mail "seu teste gratis termina em 2 dias" para o dono da conta (uma vez por assinatura). */
+  lembreteFimDoTeste: "lembrete-fim-do-teste",
   curvaCliente: "curva-cliente",
   /** V10, item 4: e-mail diario para o Fable com o acompanhamento da viagem. */
   emailAcompanhamento: "email-acompanhamento",
@@ -177,6 +179,7 @@ export function boss(): PgBoss {
  */
 const FILAS_CURTAS = new Set<string>([
   FILAS.lembrete,
+  FILAS.lembreteFimDoTeste,
   FILAS.curvaCliente,
   FILAS.emailAcompanhamento,
   FILAS.faxinaVersoes,

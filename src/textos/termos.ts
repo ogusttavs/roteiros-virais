@@ -35,11 +35,16 @@ import { config } from "@/lib/config";
  * retirar o acesso só existia pelo Facebook (agora também pelo Instagram). Esta é a subida de versão para tudo isso: cada pessoa aceita de novo uma vez. O instante é a meia-noite de
  * Brasília de 27/10, anterior ao deploy.
  */
+/** "7 dias", "1 dia". */
+function diasDoTeste(dias: number): string {
+  return dias === 1 ? "1 dia" : `${dias} dias`;
+}
+
 /**
  * 03/11/2026 (autorizado pelo Gustavo, "pode começar a sua parte já"): a edição do vídeo pela IA (E47) entrou nos termos, na privacidade e na exclusão (o vídeo enviado fica até 48 horas e o editado até 7
  * dias, o áudio vai para a transcrição e o texto da fala para a IA, sem música, ninguém de outra marca vê), mais um parágrafo em inglês no topo da privacidade e da exclusão, para o revisor da Meta (pedido
  * de análise do app, `entregaveis/meta/analise-do-app.md`, 4.4). Esta é a única subida de versão para tudo isso: cada pessoa aceita de novo uma vez. O instante é a meia-noite de Brasília de 03/11,
- * anterior ao deploy.
+ * anterior ao deploy. A mesma subida cobre a cláusula do teste grátis (E22, seção 5), que entrou junto na integração de 11/11/2026.
  */
 export const VERSAO_TERMOS_EM = new Date("2026-11-03T03:00:00Z");
 
@@ -92,7 +97,14 @@ export const textosTermos = {
       {
         titulo: "5. Cancelamento",
         paragrafos: [
-          "Você cancela quando quiser, escrevendo para o contato abaixo; o acesso continua até o fim do período já pago, sem multa.",
+          ...(config.cobranca.testeDias > 0
+            ? [
+                config.cobranca.testeExigeCartao
+                  ? `Quem assina pela primeira vez tem ${diasDoTeste(config.cobranca.testeDias)} grátis. O cartão é pedido no começo e só é cobrado depois do teste; se você cancelar antes do fim do teste, nada é cobrado. O teste vale uma vez por conta.`
+                  : `Quem assina pela primeira vez tem ${diasDoTeste(config.cobranca.testeDias)} grátis, sem cadastrar o cartão. Para continuar depois do teste, você cadastra o cartão antes do fim dele; sem o cartão, a assinatura termina sozinha e nada é cobrado. O teste vale uma vez por conta.`,
+              ]
+            : []),
+          "Você cancela quando quiser, em Conta, na gestão da assinatura, ou escrevendo para o contato abaixo. Cancelar encerra a renovação: o acesso continua até o fim do período já pago, sem multa. O que já foi pago não é devolvido.",
         ],
       },
       {

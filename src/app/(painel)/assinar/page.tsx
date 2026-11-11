@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 
+import { config } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
-import { assinaturasDaMarca, ehDonoDaMarca } from "@/servicos/assinatura";
+import { assinaturasDaMarca, ehDonoDaMarca, marcaPodeGanharTeste } from "@/servicos/assinatura";
 import { situacaoDaAssinatura } from "@/servicos/assinatura-tela";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { textosAssinatura } from "@/textos/assinatura";
@@ -11,7 +12,7 @@ import { Cartao } from "@/ui/componentes/Cartao";
 import { BotoesDaAssinatura } from "./BotoesDaAssinatura";
 import { ConfirmandoPagamento } from "./ConfirmandoPagamento";
 import styles from "./page.module.css";
-import { botaoEhDoDono, botoesDaTela, textosDaTela, visaoDaTela } from "./visao";
+import { botaoEhDoDono, botoesDaTela, textosDaTela, visaoDaTela, type TesteDaTela } from "./visao";
 
 /**
  * `/assinar` (E22 PR 2): onde cai a marca sem assinatura que vale e sem cortesia quando o portão está ligado, e onde a pessoa vê o estado da assinatura (confirmada, ativa, cartão a
@@ -31,11 +32,13 @@ export default async function Assinar({ searchParams }: { searchParams: Promise<
   const verComo = sessao.verComo !== null;
   const dono = verComo ? false : await ehDonoDaMarca(sessao.user.id, cliente.id);
 
-  const todos = botoesDaTela(visao);
+  // O teste grátis só é anunciado a quem ainda pode ganhá-lo (nunca teve assinatura); quem já teve vê o convite de sempre (`assinar de novo`).
+  const teste: TesteDaTela = { dias: config.cobranca.testeDias, exigeCartao: config.cobranca.testeExigeCartao, oferecer: visao === "pitch" && marcaPodeGanharTeste(lista) };
+  const todos = botoesDaTela(visao, teste);
   // Quem não é o dono (e o "ver como") não vê o que mexe em dinheiro; o "Ir para o Hoje" continua para quem tem acesso.
   const botoes = todos.filter((b) => !botaoEhDoDono(b) || dono);
   const faltaPermissao = todos.some(botaoEhDoDono) && !dono;
-  const { titulo, frases } = textosDaTela(visao, situacao);
+  const { titulo, frases } = textosDaTela(visao, situacao, teste);
   const convite = visao === "pitch" || visao === "encerrada";
   const aviso = verComo ? textosAssinatura.verComo : faltaPermissao ? textosAssinatura.semPermissao : null;
 
@@ -58,7 +61,7 @@ export default async function Assinar({ searchParams }: { searchParams: Promise<
             <span className={styles.porMes}>{textosAssinatura.plano.porMes}</span>
           </div>
           <p className={styles.total}>
-            {textosAssinatura.plano.total} {textosAssinatura.plano.semTaxa}
+            {teste.oferecer ? textosAssinatura.teste.total(teste.dias, teste.exigeCartao) : textosAssinatura.plano.total} {textosAssinatura.plano.semTaxa}
           </p>
           <div className={styles.inclui}>
             <h2 className={styles.incluiTitulo}>{textosAssinatura.inclui.titulo}</h2>
@@ -71,7 +74,7 @@ export default async function Assinar({ searchParams }: { searchParams: Promise<
           {aviso ? <p className={styles.aviso}>{aviso}</p> : null}
           {botoes.length > 0 ? <BotoesDaAssinatura botoes={botoes} tamanho="lg" /> : null}
           <ul className={styles.garantias}>
-            {textosAssinatura.garantias.map((g) => (
+            {(teste.oferecer ? [textosAssinatura.teste.garantia(teste.dias, teste.exigeCartao), ...textosAssinatura.garantias] : textosAssinatura.garantias).map((g) => (
               <li key={g}>{g}</li>
             ))}
           </ul>
