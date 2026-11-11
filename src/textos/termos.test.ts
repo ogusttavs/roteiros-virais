@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { GUARDA_DO_BRUTO_MS, GUARDA_DO_EDITADO_MS } from "../config/edicao";
 import { IDADE_MAXIMA_MS, VALIDADE_DO_ENDERECO_MS } from "../lib/video-temporario";
 import {
   MAXIMO_FRACAO_DE_UMA_MARCA,
@@ -49,13 +50,14 @@ describe("termos de uso, privacidade e exclusão: a linha do site e das redes", 
     expect(textosTermos.termos.secoes.map((secao) => secao.titulo)).toEqual([
       "1. O que você contrata",
       "2. As suas respostas e os seus dados",
-      "3. O que aprendemos entre clientes",
-      "4. Cancelamento",
-      "5. Contato",
+      "3. Editar o seu vídeo com a IA",
+      "4. O que aprendemos entre clientes",
+      "5. Cancelamento",
+      "6. Contato",
     ]);
-    expect(textosTermos.privacidade.secoes).toHaveLength(7);
+    expect(textosTermos.privacidade.secoes).toHaveLength(8);
     expect(textosTermos.dados.secoes).toHaveLength(4);
-    const tudo = [...paragrafosDe(textosTermos.termos.secoes), ...paragrafosDe(textosTermos.privacidade.secoes), ...paragrafosDe(textosTermos.dados.secoes)].join("\n");
+    const tudo = [...paragrafosDe(textosTermos.termos.secoes), ...paragrafosDe(textosTermos.privacidade.secoes), ...paragrafosDe(textosTermos.dados.secoes), textosTermos.privacidade.resumoEmIngles, textosTermos.dados.resumoEmIngles].join("\n");
     expect(tudo).not.toMatch(/[‒-―\u{1F300}-\u{1FAFF}]/u);
   });
 });
@@ -66,10 +68,10 @@ describe("a versão dos termos", () => {
     expect(VERSAO_TERMOS_EM.getTime()).toBeLessThanOrEqual(Date.now());
   });
 
-  it("a data dita na página é a da versão (27/10, meia-noite de Brasília) e é mais nova que a de 23/10, para quem aceitou aquela ver o aceite de novo", () => {
-    expect(textosTermos.atualizadoEm).toBe("atualizado em 27 de outubro de 2026");
-    expect(VERSAO_TERMOS_EM.toISOString()).toBe("2026-10-27T03:00:00.000Z");
-    expect(VERSAO_TERMOS_EM.getTime()).toBeGreaterThan(new Date("2026-10-23T03:00:00Z").getTime());
+  it("a data dita na página é a da versão (03/11, meia-noite de Brasília) e é mais nova que a de 27/10, para quem aceitou aquela ver o aceite de novo", () => {
+    expect(textosTermos.atualizadoEm).toBe("atualizado em 3 de novembro de 2026");
+    expect(VERSAO_TERMOS_EM.toISOString()).toBe("2026-11-03T03:00:00.000Z");
+    expect(VERSAO_TERMOS_EM.getTime()).toBeGreaterThan(new Date("2026-10-27T03:00:00Z").getTime());
   });
 });
 
@@ -123,7 +125,7 @@ describe("a privacidade e quem pede para testar (E57a)", () => {
   it("as seções são numeradas em ordem e o contato continua por último", () => {
     const titulos = textosTermos.privacidade.secoes.map((s) => s.titulo);
     titulos.forEach((titulo, i) => expect(titulo.startsWith(`${i + 1}. `)).toBe(true));
-    expect(titulos.at(-1)).toBe("7. Contato");
+    expect(titulos.at(-1)).toBe("8. Contato");
   });
 });
 
@@ -174,5 +176,82 @@ describe("a cláusula do que circula entre marcas: circula padrão, nunca o que 
     expect(t).toContain("pelo menos 5 marcas");
     expect(t).toContain("pelo menos 3 donos diferentes");
     expect(t).toContain("nenhuma marca responda por mais da metade");
+  });
+});
+
+describe("a edição do vídeo pela IA (E47, 03/11/2026)", () => {
+  const termos = paragrafosDe(textosTermos.termos.secoes).join("\n");
+  const privacidade = paragrafosDe(textosTermos.privacidade.secoes).join("\n");
+  const dados = paragrafosDe(textosTermos.dados.secoes).join("\n");
+
+  it("os prazos do texto (48 horas o vídeo enviado, 7 dias o editado) são os do código que apaga os arquivos", () => {
+    expect(GUARDA_DO_BRUTO_MS).toBe(48 * 60 * 60 * 1000);
+    expect(GUARDA_DO_EDITADO_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(termos).toContain("fica guardado por até 48 horas, e o vídeo editado por até 7 dias");
+    expect(privacidade).toContain("por até 48 horas e o vídeo editado, com a legenda, por até 7 dias");
+    expect(dados).toContain("o vídeo enviado em até 48 horas e o editado em até 7 dias");
+  });
+
+  it("os termos dizem que é a IA que edita e pode errar, que a pessoa assiste antes de aprovar, que o vídeo tem o rosto e a voz e que sai sem música", () => {
+    expect(termos).toContain("O vídeo mostra o seu rosto e tem a sua voz");
+    expect(termos).toContain("A edição é feita por inteligência artificial e pode errar");
+    expect(termos).toContain("Você assiste a uma prévia antes de aprovar");
+    expect(termos).toContain("O vídeo sai sem música");
+  });
+
+  it("a privacidade diz quem recebe o quê: só o som vai para a transcrição (Groq), o texto da fala vai para a IA (Anthropic), a imagem não sai do servidor", () => {
+    expect(privacidade).toContain("só o som vai para um serviço de transcrição (a Groq), junto com o nome da sua marca, a sua cidade ou região, o que você vende e os concorrentes que você citou");
+    expect(privacidade).toContain("o texto da fala, o seu roteiro e o resumo da sua marca vão para a inteligência artificial (a Anthropic)");
+    expect(privacidade).toContain("A imagem do vídeo não sai do nosso servidor");
+  });
+
+  it("a privacidade diz que nenhuma outra marca vê o vídeo, que ele não treina modelo e como pedir para apagar antes do prazo", () => {
+    expect(privacidade).toContain("nenhuma outra marca tem acesso");
+    expect(privacidade).toContain("Não usamos o seu vídeo nem a sua fala para treinar modelo nenhum");
+    expect(privacidade).toContain("Se você quiser que apaguemos o vídeo antes do prazo, escreva para o contato abaixo");
+  });
+
+  it("a exclusão de dados apaga o vídeo enviado, o editado, a legenda, o texto da fala e o plano da edição", () => {
+    expect(dados).toContain("Se você usou Editar o meu vídeo: o vídeo que você enviou, o vídeo editado, a legenda, o texto do que você falou (a sua fala) e o plano da edição");
+  });
+
+  it("a revisão do Fable de 03/11: os termos não dizem mais que a pessoa edita, e a privacidade cobre o vídeo em o que guardamos, por quanto tempo e a IA", () => {
+    expect(termos).not.toContain("Você grava e edita");
+    expect(termos).toContain("Se quiser, pode mandar o vídeo para a gente cortar as pausas e os erros e pôr a legenda e o título (seção 3), e você aprova antes de usar");
+    const guardamos = textosTermos.privacidade.secoes.find((s) => s.titulo.includes("O que guardamos"))!.paragrafos.join(" ");
+    expect(guardamos).toContain("com o seu rosto e a sua voz, por até 48 horas, e o vídeo editado, por até 7 dias");
+    expect(guardamos).toContain("você pode baixar o editado nesse prazo");
+    const tempo = textosTermos.privacidade.secoes.find((s) => s.titulo.includes("Por quanto tempo"))!.paragrafos.join(" ");
+    expect(tempo).toContain("o vídeo que você manda sai em até 48 horas e o editado em até 7 dias");
+    const ia = textosTermos.privacidade.secoes.find((s) => s.titulo.includes("Uso de inteligência artificial"))!.paragrafos.join(" ");
+    expect(ia).toContain("decidir a edição do seu vídeo");
+  });
+});
+
+describe("o resumo em inglês do topo da privacidade e da exclusão (para o revisor da Meta)", () => {
+  const resumo = textosTermos.privacidade.resumoEmIngles;
+
+  it("é o mesmo texto nas duas páginas e começa dizendo que é o resumo em inglês", () => {
+    expect(textosTermos.dados.resumoEmIngles).toBe(resumo);
+    expect(resumo.startsWith("Summary in English.")).toBe(true);
+  });
+
+  it("diz o que guardamos do Instagram, que só publicamos quando a pessoa toca, as 6 horas do vídeo, como desligar, a exclusão em 30 dias e o endereço do aviso da Meta", () => {
+    expect(resumo).toContain("the account name, an encrypted access token and the numbers of their videos (views, likes and comments)");
+    expect(resumo).toContain('only when they tap "Publish now" for that video');
+    expect(resumo).toContain("kept on our server for up to 6 hours");
+    expect(IDADE_MAXIMA_MS).toBe(6 * 60 * 60 * 1000);
+    expect(resumo).toContain("Account > Disconnect");
+    expect(resumo).toContain("Settings > Apps and websites");
+    expect(resumo).toContain("we delete within 30 days");
+    expect(resumo).toContain("/api/meta/exclusao");
+    expect(resumo).toContain("We never show one customer's data to another");
+  });
+
+  it("diz também da edição do vídeo: 48 horas e 7 dias, só o som para a Groq, só o texto da fala, o roteiro e o resumo da marca para a Anthropic, a imagem fica no servidor", () => {
+    expect(resumo).toContain("the uploaded video is kept for up to 48 hours and the edited video for up to 7 days");
+    expect(resumo).toContain("only the audio (with the brand name, city and a few business names, to spell them right) is sent to a speech-to-text service (Groq)");
+    expect(resumo).toContain("only the text of the speech, the script and a short brand summary are sent to an AI service (Anthropic)");
+    expect(resumo).toContain("the video image never leaves our server");
   });
 });

@@ -257,6 +257,63 @@ test.describe("aceite dos termos no primeiro acesso", () => {
     expect(depois.aceitouTermosEm!.getTime()).toBeGreaterThan(new Date("2026-10-27T03:00:00Z").getTime());
   });
 
+  /**
+   * 03/11/2026: a versao com a edicao do video pela IA e o paragrafo em ingles para a Meta. Quem aceitou a de 27/10 (a anterior, por exemplo no dia 28) ve a folha de novo UMA vez e depois nao e
+   * perguntado mais; aceitar nao mexe no resto das preferencias.
+   */
+  test("a versao de 03/11 pede aceite de novo de quem aceitou a de 27/10, uma vez so, sem perder o resto das preferencias", async ({ page }) => {
+    const id = "e2e-aceite-termos-versao-2710";
+    const email = "e2e-aceite-termos-versao-2710@exemplo.teste";
+    const [existe] = await db().select({ id: user.id }).from(user).where(eq(user.id, id));
+    if (!existe) {
+      const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
+      await db().insert(user).values({ id, name: "[teste] Aceite Termos 27/10", email });
+      await db()
+        .insert(account)
+        .values({ id: `${id}-credential`, issuer: "local:credential", accountId: id, providerId: "credential", userId: id, password: await hashPassword(SENHA) });
+      const [cliente] = await db().insert(clientes).values({ usuarioId: id, nome: "[teste] Aceite Termos 27/10", nichoId: nicho.id }).returning();
+      await db().insert(membrosMarca).values({ usuarioId: id, clienteId: cliente.id, papel: "dono" });
+      await db().insert(briefings).values({ clienteId: cliente.id, completo: true });
+    }
+    const aceitouAntes = new Date("2026-10-28T15:00:00Z");
+    await db()
+      .insert(preferenciasUsuario)
+      .values({ usuarioId: id, aceitouTermosEm: aceitouAntes, horaLembrete: "08:15" })
+      .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { aceitouTermosEm: aceitouAntes, horaLembrete: "08:15" } });
+
+    await entrar(page, email);
+    await expect(page).toHaveURL(/\/hoje/);
+    await expect(page.getByRole("heading", { name: "Antes de entrar" })).toBeVisible();
+    await page.getByRole("button", { name: "li e aceito" }).click();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Antes de entrar" })).not.toBeVisible();
+
+    const [depois] = await db().select().from(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, id));
+    expect(depois.aceitouTermosEm!.getTime()).toBeGreaterThan(new Date("2026-11-03T03:00:00Z").getTime());
+    expect(depois.horaLembrete).toBe("08:15");
+  });
+
+  test("as paginas dizem que a edicao do video pela IA guarda o enviado ate 48 horas e o editado ate 7 dias, e a privacidade e a exclusao abrem com o resumo em ingles", async ({ page }) => {
+    await page.goto("/termos");
+    await expect(page.getByRole("heading", { name: "3. Editar o seu vídeo com a IA" })).toBeVisible();
+    await expect(page.getByText("fica guardado por até 48 horas, e o vídeo editado por até 7 dias")).toBeVisible();
+
+    await page.goto("/privacidade");
+    await expect(page.getByRole("heading", { name: "4. A edição do seu vídeo pela IA" })).toBeVisible();
+    await expect(page.getByText("só o som vai para um serviço de transcrição (a Groq)", { exact: false })).toBeVisible();
+    const resumo = page.locator('p[lang="en"]');
+    await expect(resumo).toBeVisible();
+    await expect(resumo).toContainText("Summary in English.");
+    await expect(resumo).toContainText("the uploaded video is kept for up to 48 hours and the edited video for up to 7 days");
+
+    await page.goto("/dados");
+    await expect(page.locator('p[lang="en"]')).toContainText("To request deletion of all data");
+    await expect(page.getByText("Se você usou Editar o meu vídeo", { exact: false })).toBeVisible();
+  });
+
   test("as paginas dizem que o app so publica quando a pessoa toca, que o video fica ate seis horas e como retirar o acesso pelo Instagram", async ({ page }) => {
     await page.goto("/termos");
     await expect(page.getByText("sem esse toque, nada é publicado em seu nome", { exact: false })).toBeVisible();
@@ -280,7 +337,7 @@ test.describe("aceite dos termos no primeiro acesso", () => {
     const guardamos = "o que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou";
 
     await page.goto("/termos");
-    await expect(page.getByText("atualizado em 27 de outubro de 2026")).toBeVisible();
+    await expect(page.getByText("atualizado em 3 de novembro de 2026")).toBeVisible();
     await expect(page.getByText(leitura)).toBeVisible();
 
     await page.goto("/privacidade");

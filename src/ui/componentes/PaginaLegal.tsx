@@ -12,10 +12,11 @@ type Secao = { titulo: string; paragrafos: string[] };
  * `/termos` e `/privacidade` (etapa 12, decisão 7 do `PROXIMO.md`,
  * `EntrarContaTela.dc.html`, quadro "texto"): página pública, sem sessão.
  * O aviso de revisão jurídica pendente só aparece fora de produção.
+ * `resumoEmIngles` (só `/privacidade` e `/dados`, 03/11/2026): um parágrafo em inglês no topo, para o revisor da Meta, que pode não ler português.
  * "voltar" leva a `/` (E57a; antes era `/hoje`, etapa 13, ajuste 2): com sessão a
  * própria raiz manda para o painel; sem sessão, mostra a página de entrada, de onde a pessoa veio.
  */
-export function PaginaLegal({ titulo, secoes }: { titulo: string; secoes: Secao[] }) {
+export function PaginaLegal({ titulo, secoes, resumoEmIngles }: { titulo: string; secoes: Secao[]; resumoEmIngles?: string }) {
   const emDesenvolvimento = process.env.NODE_ENV !== "production";
 
   return (
@@ -33,6 +34,11 @@ export function PaginaLegal({ titulo, secoes }: { titulo: string; secoes: Secao[
           {textosTermos.atualizadoEm}
           {emDesenvolvimento ? ` · ${textosTermos.avisoRevisaoPendente}` : ""}
         </p>
+        {resumoEmIngles ? (
+          <p lang="en" className={`${styles.paragrafo} ${styles.resumoEmIngles}`}>
+            {resumoEmIngles}
+          </p>
+        ) : null}
         {secoes.map((secao) => (
           <section key={secao.titulo}>
             <h2 className={styles.subtitulo}>{secao.titulo}</h2>
