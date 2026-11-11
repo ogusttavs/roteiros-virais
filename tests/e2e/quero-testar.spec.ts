@@ -106,7 +106,7 @@ test("a política de privacidade fala da coleta do Quero testar", async ({ page 
   await page.goto("/");
   await page.getByRole("link", { name: "política de privacidade" }).first().click();
   await expect(page).toHaveURL(/\/privacidade$/);
-  await expect(page.getByRole("heading", { name: "6. Quem pede para testar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "7. Quem pede para testar" })).toBeVisible();
   await expect(page.getByText("o nome, o e-mail, o WhatsApp e o ramo do negócio")).toBeVisible();
   await expect(page.getByText("até 12 meses depois do pedido")).toBeVisible();
   // O "voltar" da política leva de volta à página de entrada.
