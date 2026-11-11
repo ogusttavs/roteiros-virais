@@ -41,6 +41,9 @@ const envDeTeste = {
   ORCAMENTO_TRANSCREVER_SETOR_COM_MARCA_MIN: "90",
   // O ritmo entre chamadas da Meta (padrao 2 s) so atrapalha o teste.
   META_INTERVALO_MS: "0",
+  // O teste grátis (E22): os padrões de produto, sem depender do .env de quem roda.
+  COBRANCA_TESTE_DIAS: "7",
+  COBRANCA_TESTE_EXIGE_CARTAO: "0",
 };
 
 export default defineConfig({

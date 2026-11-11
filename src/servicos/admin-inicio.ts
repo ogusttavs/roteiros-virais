@@ -4,14 +4,15 @@ import { usdParaBrl } from "@/config/dinheiro";
 import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
-import { briefings, clientes, execucoesJob, geracoesIA, nichos, roteiros, temasDia, videos } from "@/db/schema";
+import { briefings, clientes, edicoes, execucoesJob, geracoesIA, nichos, roteiros, temasDia, videos } from "@/db/schema";
 import { faltaDeCreditoDaIA } from "@/ia/falha-da-ia";
 import { FILAS } from "@/jobs/fila";
-import { hojeISO } from "@/lib/config";
+import { config, hojeISO } from "@/lib/config";
 import { estadoPorDia, NOMES_JOB_COLETA, type EstadoAgregado } from "@/servicos/admin-acompanhamento";
 import { listarContasAdmin } from "@/servicos/admin-contas";
 import { fixoMensalEmReais, tetoDiarioEmReais } from "@/servicos/admin-custos";
 import { lerEstadoDoAlarme } from "@/servicos/disco";
+import { inicioDoMesDeBrasilia } from "@/servicos/edicao";
 import { estadoAtualDaLeitura, type LeituraParada, outrasParadas, type ProxyParado, proxyDoEstado } from "@/servicos/leitura-parada";
 import { contarPedidosAbertos } from "@/servicos/pedidos-de-ramo";
 
@@ -45,7 +46,7 @@ export type InicioAdmin = {
   dinheiro: { saiuHojeUsd: number; saiu30dUsd: number; saiu30dComFixosBrl: number; fixosBrl: number; fixosCadastrados: number; tetoBrl: number; passouDoTeto: boolean };
   contas: { ativas: number; usaramOntem: number; pararam: number; briefingIncompleto: number; novasNaSemana: number };
   produto: { escritos: number; gravados: number; postados: number; reprovados: number; motivoMaisComum: { rotulo: string; vezes: number } | null };
-  atencao: { pedidosDeRamo: number; /** A API da IA recusou por falta de crédito e nenhuma geração boa veio depois (E-pequena de 05/10/2026), ou nulo. */ creditoDaIA: { desde: Date; tarefa: string } | null; /** O proxy do YouTube parado na última noite que tentou baixar (hotfix do proxy), ou nulo. */ proxy: ProxyParado | null; /** As outras redes cuja leitura parou (bloqueio ou nenhuma leitura boa na rodada), cada uma com a causa e desde quando; vazio quando tudo lê. */ leituraParada: LeituraParada[]; /** O disco do servidor acima do limite de atenção (29/10/2026), com o que o job `vigiar-disco` mediu por último, ou nulo quando está normal. */ disco: { nivel: "atencao" | "critico"; usadoPercentual: number; livreBytes: number; desde: Date } | null };
+  atencao: { /** Achado 6 da revisão de 03/11/2026: edições que a IA não conseguiu fechar sozinha e esperam alguém olhar (estado `para_revisao`); nulo quando não há nenhuma. */ edicoesParaRevisao: { quantas: number; desde: Date; marcas: string[] } | null; /** Achado 5 da revisão de 03/11/2026: as contas que bateram o teto de gasto de IA da edição de vídeo neste mês (nomes), vazio quando nenhuma. */ contasNoTetoDaEdicao: string[]; pedidosDeRamo: number; /** A API da IA recusou por falta de crédito e nenhuma geração boa veio depois (E-pequena de 05/10/2026), ou nulo. */ creditoDaIA: { desde: Date; tarefa: string } | null; /** O proxy do YouTube parado na última noite que tentou baixar (hotfix do proxy), ou nulo. */ proxy: ProxyParado | null; /** As outras redes cuja leitura parou (bloqueio ou nenhuma leitura boa na rodada), cada uma com a causa e desde quando; vazio quando tudo lê. */ leituraParada: LeituraParada[]; /** O disco do servidor acima do limite de atenção (29/10/2026), com o que o job `vigiar-disco` mediu por último, ou nulo quando está normal. */ disco: { nivel: "atencao" | "critico"; usadoPercentual: number; livreBytes: number; desde: Date } | null };
 };
 
 /** Depois desta hora (Brasil) um ramo sem tema do dia já é problema; antes, a madrugada ainda pode estar rodando. */
@@ -194,9 +195,34 @@ async function contas(agora: Date): Promise<InicioAdmin["contas"]> {
   };
 }
 
+/** As edições de vídeo paradas à espera de alguém (`para_revisao`), com a mais antiga e até 3 nomes de marca. */
+async function edicoesParaRevisao(): Promise<InicioAdmin["atencao"]["edicoesParaRevisao"]> {
+  const linhas = await db()
+    .select({ marca: clientes.nome, desde: edicoes.atualizadaEm })
+    .from(edicoes)
+    .innerJoin(clientes, eq(clientes.id, edicoes.clienteId))
+    .where(eq(edicoes.estado, "para_revisao"))
+    .orderBy(edicoes.atualizadaEm);
+  if (linhas.length === 0) return null;
+  return { quantas: linhas.length, desde: linhas[0].desde, marcas: [...new Set(linhas.map((l) => l.marca))].slice(0, 3) };
+}
+
+/** Os nomes das contas cujo gasto de IA com a edição de vídeo, neste mês de Brasília, chegou ao teto (`TETO_CUSTO_EDICAO_MES_USD`). */
+async function contasNoTetoDaEdicao(agora: Date): Promise<string[]> {
+  const gasto = sql<string>`sum(${edicoes.custoIaUsd} + ${edicoes.custoTranscricaoUsd})`;
+  const linhas = await db()
+    .select({ marca: clientes.nome })
+    .from(edicoes)
+    .innerJoin(clientes, eq(clientes.id, edicoes.clienteId))
+    .where(gte(edicoes.criadaEm, inicioDoMesDeBrasilia(agora)))
+    .groupBy(clientes.id, clientes.nome)
+    .having(sql`${gasto} >= ${config.regras.tetoCustoEdicaoMesUsd}`);
+  return linhas.map((l) => l.marca);
+}
+
 /** Tudo o que o Início do admin mostra (E46 PR 1), de uma vez. */
 export async function inicioDoAdmin(agora: Date = new Date()): Promise<InicioAdmin> {
-  const [m, e, d, c, p, pedidos, leitura, semCredito] = await Promise.all([madrugada(agora), erros(agora), dinheiro(agora), contas(agora), produto(agora), contarPedidosAbertos(), estadoAtualDaLeitura(), faltaDeCreditoDaIA()]);
+  const [m, e, d, c, p, pedidos, leitura, semCredito, paraRevisao, noTeto] = await Promise.all([madrugada(agora), erros(agora), dinheiro(agora), contas(agora), produto(agora), contarPedidosAbertos(), estadoAtualDaLeitura(), faltaDeCreditoDaIA(), edicoesParaRevisao(), contasNoTetoDaEdicao(agora)]);
   const alarme = await lerEstadoDoAlarme();
-  return { agora, madrugada: m, erros: e, dinheiro: d, contas: c, produto: p, atencao: { pedidosDeRamo: pedidos, creditoDaIA: semCredito ? { desde: semCredito.em, tarefa: semCredito.tarefa } : null, proxy: proxyDoEstado(leitura), leituraParada: outrasParadas(leitura), disco: alarme && alarme.nivel !== "normal" ? { nivel: alarme.nivel, usadoPercentual: alarme.usadoPercentual, livreBytes: alarme.livreBytes, desde: new Date(alarme.desde) } : null } };
+  return { agora, madrugada: m, erros: e, dinheiro: d, contas: c, produto: p, atencao: { edicoesParaRevisao: paraRevisao, contasNoTetoDaEdicao: noTeto, pedidosDeRamo: pedidos, creditoDaIA: semCredito ? { desde: semCredito.em, tarefa: semCredito.tarefa } : null, proxy: proxyDoEstado(leitura), leituraParada: outrasParadas(leitura), disco: alarme && alarme.nivel !== "normal" ? { nivel: alarme.nivel, usadoPercentual: alarme.usadoPercentual, livreBytes: alarme.livreBytes, desde: new Date(alarme.desde) } : null } };
 }

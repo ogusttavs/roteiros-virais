@@ -36,6 +36,7 @@ import { FILAS } from "./fila";
 import { rodarFiltroDeNoticias } from "./filtrar-noticias";
 import { rodarGuardarCapas } from "./guardar-capas";
 import { rodarLembrete } from "./lembrete";
+import { rodarLembreteFimDoTeste } from "./lembrete-fim-do-teste";
 import { rodarLerLongos } from "./ler-longos";
 import { rodarLimparEdicoes } from "./limpar-edicoes";
 import { rodarMetaContas } from "./meta-contas";
@@ -145,6 +146,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
     return rodarPesquisaDeSetor(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
   },
   [FILAS.lembrete]: () => rodarLembrete(),
+  [FILAS.lembreteFimDoTeste]: () => rodarLembreteFimDoTeste(),
   [FILAS.curvaCliente]: () => rodarCurvaCliente(),
   [FILAS.emailAcompanhamento]: () => rodarEmailAcompanhamento(),
   [FILAS.faxinaVersoes]: () => rodarFaxinaDasVersoes(),

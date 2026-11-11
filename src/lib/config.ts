@@ -14,6 +14,17 @@ function envNumero(nome: string, padrao: number): number {
   return Number.isFinite(n) ? n : padrao;
 }
 
+/**
+ * E22, o teste grátis: quantos dias de teste a primeira assinatura de uma marca ganha (`COBRANCA_TESTE_DIAS`, padrão 7; 0 desliga o teste). Valor que não é número volta ao padrão; negativo vale 0; o Stripe aceita
+ * de 1 a 730 dias, então acima disso vale 730. Exportada para o teste de unidade provar cada caso.
+ */
+export function diasDoTesteGratis(valor: string | undefined): number {
+  if (valor === undefined || valor.trim() === "") return 7;
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return 7;
+  return Math.min(730, Math.max(0, Math.trunc(n)));
+}
+
 export type ProvedorIA = "anthropic" | "mock";
 
 function provedorIA(): ProvedorIA {
@@ -213,6 +224,14 @@ export const config = {
     webhookSecret: env("STRIPE_WEBHOOK_SECRET"),
     /** A chave de busca do preço do plano trimestral no Stripe (criado por `scripts/stripe-preparar.ts`). */
     precoLookupKey: "roteiros_trimestral",
+    /** E22, o teste grátis (decisão do Gustavo em 28/10/2026): dias de teste da primeira assinatura de uma marca; 0 desliga. */
+    testeDias: diasDoTesteGratis(process.env.COBRANCA_TESTE_DIAS),
+    /**
+     * Pede o cartão no começo do teste (`COBRANCA_TESTE_EXIGE_CARTAO=1`). Padrão desligado (decisão do Gustavo em 03/11/2026): o teste começa sem cartão (Checkout `payment_method_collection=if_required`),
+     * a pessoa cadastra o cartão pelo portal antes do fim, e a assinatura é cancelada pelo Stripe no fim do teste se o cartão não vier (`missing_payment_method: cancel`). Com `1`, o cartão é
+     * pedido no começo e cobrado no fim do teste se a pessoa não cancelar.
+     */
+    testeExigeCartao: env("COBRANCA_TESTE_EXIGE_CARTAO") === "1",
   },
   /**
    * O alarme do disco do servidor (29/10/2026, antes de abrir a edicao de video para clientes): a VPS tem 100 GB e e dividida com outro produto. Com `atencaoPercentual` do disco usado o admin e avisado;
@@ -385,6 +404,13 @@ export const config = {
      * aviso até o mês virar. Uma leitura custa centavos; o teto só protege de erro de laço.
      */
     tetoCustoLeituraMarcaMesUsd: envNumero("TETO_CUSTO_LEITURA_MARCA_MES_USD", 5),
+    /**
+     * Achado 5 da revisão de 03/11/2026: teto de custo da edição de vídeo (IA da decisão e do verificador mais a transcrição) POR CONTA e por mês de Brasília, somado de `edicoes.custo_ia_usd` e
+     * `custo_transcricao_usd` (nunca em memória). Passou disto, a edição nova e o "Pedir ajuste" dessa conta são recusados com uma frase até o mês virar, e o admin recebe um e-mail (uma vez por conta
+     * por mês) e uma linha no Início. O pior caso de uma edição é cerca de US$ 1,70 (4 rodadas da decisão); 15 dólares cobre o uso normal de 30 edições com folga e para o erro de laço ou o abuso.
+     * Ainda não há custo medido de uso real: ajuste este número depois das dez primeiras edições com chave de verdade.
+     */
+    tetoCustoEdicaoMesUsd: envNumero("TETO_CUSTO_EDICAO_MES_USD", 15),
     /** Leitura disparada por evento (a pessoa salvou o site ou um perfil) não repete o site em menos de N minutos. */
     minutosEntreLeiturasMarcaPorEvento: envNumero("MINUTOS_ENTRE_LEITURAS_MARCA_EVENTO", 10),
     /**
@@ -474,6 +500,8 @@ export function verificarSegredosDeProducao(
     APP_URL?: string;
     BETTER_AUTH_URL?: string;
     COBRANCA_ATIVA?: string;
+    COBRANCA_TESTE_DIAS?: string;
+    COBRANCA_TESTE_EXIGE_CARTAO?: string;
     STRIPE_SECRET_KEY?: string;
     STRIPE_WEBHOOK_SECRET?: string;
     META_APP_ID?: string;

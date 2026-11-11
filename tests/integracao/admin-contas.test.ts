@@ -6,8 +6,8 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { alteracoesDoAdmin, briefings, clientes, execucoesJob, geracoesIA, membrosMarca, nichos, roteiros, session, user } from "@/db/schema";
-import { hojeISO } from "@/lib/config";
+import { alteracoesDoAdmin, briefings, clientes, edicoes, execucoesJob, geracoesIA, membrosMarca, nichos, roteiros, session, user } from "@/db/schema";
+import { config, hojeISO } from "@/lib/config";
 import { alteracoesDaConta, listarContasAdmin, usoDosUltimosDias } from "@/servicos/admin-contas";
 import { inicioDoAdmin } from "@/servicos/admin-inicio";
 import { trocarPlanoDaConta, trocarPublicoDaConta, trocarRamoDaConta, trocarRedeDaConta, trocarTipoDaConta } from "@/servicos/admin-trocas";
@@ -254,5 +254,24 @@ describe("inicioDoAdmin", () => {
     // De madrugada (04:00), ainda não é problema.
     const cedo = await inicioDoAdmin(new Date(`${hojeISO()}T07:00:00Z`));
     expect(cedo.madrugada.linhas.find((l) => l.nichoId === ramo.id)!.temas.atrasado).toBe(false);
+  });
+
+  it("a edição de vídeo parada para revisão e a conta no teto de gasto da edição aparecem na atenção do Início (achados 5 e 6 da revisão de 03/11/2026)", async () => {
+    const vazio = await inicioDoAdmin();
+    expect(vazio.atencao.edicoesParaRevisao).toBeNull();
+    expect(vazio.atencao.contasNoTetoDaEdicao).toEqual([]);
+
+    const [roteiro] = await db().insert(roteiros).values(roteiroBase(contaA, hojeISO(), "gerado")).returning({ id: roteiros.id });
+    const base = { clienteId: contaA, roteiroId: roteiro.id, tamanhoBytes: 10, tipoDoArquivo: "video/mp4" };
+    await db().insert(edicoes).values([
+      { ...base, estado: "para_revisao" as const },
+      { ...base, estado: "pronta" as const },
+      { ...base, estado: "pronta" as const, custoIaUsd: (config.regras.tetoCustoEdicaoMesUsd - 1).toFixed(6), custoTranscricaoUsd: "1.500000" },
+    ]);
+    const inicio = await inicioDoAdmin();
+    expect(inicio.atencao.edicoesParaRevisao).toMatchObject({ quantas: 1, marcas: ["[teste] Conta A"] });
+    expect(inicio.atencao.contasNoTetoDaEdicao).toEqual(["[teste] Conta A"]);
+    // A conta B não gastou: não entra.
+    expect(inicio.atencao.contasNoTetoDaEdicao).not.toContain("[teste] Conta B");
   });
 });

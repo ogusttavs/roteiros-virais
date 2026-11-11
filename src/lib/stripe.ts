@@ -35,12 +35,28 @@ export type PedidoDeCheckout = {
   email: string;
   urlDeSucesso: string;
   urlDeCancelar: string;
+  /** Dias de teste grátis (E22); 0 ou ausente, sem teste e a cobrança é na hora. */
+  diasDeTeste?: number;
+  /** Com teste: pedir o cartão já no começo, ou só se for preciso (padrão, sem cartão). Sem teste não faz diferença. */
+  exigeCartao?: boolean;
+};
+
+/** O que a porta olha para dizer se a marca já usou a assinatura (e, com ela, o teste grátis). */
+export type PedidoDeHistorico = {
+  clienteId: number;
+  /** O Checkout que a marca abriu antes (guardado em `checkouts_stripe`), se houver: se foi concluído, a assinatura existe mesmo que o aviso não tenha chegado. */
+  sessaoAnteriorId: string | null;
 };
 
 export interface PortaStripe {
   /** O preço do plano pela chave de busca; nulo quando não existe ou quando não é deste produto (sem `metadata.produto = roteiros`). */
   precoDoPlano(lookupKey: string): Promise<{ id: string } | null>;
   criarCheckout(pedido: PedidoDeCheckout): Promise<{ url: string; sessaoId: string }>;
+  /**
+   * A marca já teve uma assinatura deste produto no Stripe, em qualquer estado (E22, o teste grátis só vale uma vez)? Olha no Stripe, não no nosso banco: o aviso de uma assinatura
+   * pode ter se perdido. Lança erro se o Stripe falhar (quem chama não pode prometer o teste sem ter conferido).
+   */
+  jaTeveAssinatura(pedido: PedidoDeHistorico): Promise<boolean>;
   /**
    * O Checkout que a marca abriu antes, se ainda está aberto (E22 PR 2, item 0b): devolve o endereço dele para o segundo clique reaproveitar. Nulo quando a sessão não existe mais, já foi
    * paga, expirou, não é deste produto (sem `metadata.produto = roteiros`) ou é de outra marca (`client_reference_id` diferente).
@@ -58,7 +74,7 @@ export interface PortaStripe {
 // A porta simulada
 // ---------------------------------------------------------------------------
 
-export type ChamadaSimulada = { metodo: "precoDoPlano" | "criarCheckout" | "sessaoAberta" | "expirarSessao" | "criarPortal" | "cancelarAssinatura"; pedido: unknown };
+export type ChamadaSimulada = { metodo: "precoDoPlano" | "criarCheckout" | "jaTeveAssinatura" | "sessaoAberta" | "expirarSessao" | "criarPortal" | "cancelarAssinatura"; pedido: unknown };
 export const chamadasSimuladas: ChamadaSimulada[] = [];
 
 /** As sessões de Checkout que a porta simulada abriu (id para marca e se ainda está aberta); os testes fecham uma com `fecharSessaoSimulada` para imitar o pagamento ou a expiração. */
@@ -75,6 +91,13 @@ export function fecharSessaoSimulada(sessaoId: string): void {
 export function limparSessoesSimuladas(): void {
   estadoDasSessoes.sessoes.clear();
   estadoDasSessoes.contador = 0;
+  marcasComHistoricoSimulado.clear();
+}
+
+/** As marcas que a porta simulada diz que já tiveram assinatura no Stripe (os testes do "teste grátis só uma vez" marcam aqui, sem precisar de rede). */
+const marcasComHistoricoSimulado = ((globalDasSessoes as typeof globalDasSessoes & { __historicoSimuladoRoteiros?: Set<number> }).__historicoSimuladoRoteiros ??= new Set<number>());
+export function marcarHistoricoSimulado(clienteId: number): void {
+  marcasComHistoricoSimulado.add(clienteId);
 }
 
 export function criarPortaSimulada(): PortaStripe {
@@ -89,6 +112,10 @@ export function criarPortaSimulada(): PortaStripe {
       const sessaoId = `cs_simulada_${estadoDasSessoes.contador}`;
       estadoDasSessoes.sessoes.set(sessaoId, { clienteId: pedido.clienteId, aberta: true });
       return { url: `${config.appUrl}/assinar?simulado=checkout&sessao=${sessaoId}`, sessaoId };
+    },
+    async jaTeveAssinatura(pedido) {
+      chamadasSimuladas.push({ metodo: "jaTeveAssinatura", pedido });
+      return marcasComHistoricoSimulado.has(pedido.clienteId);
     },
     async sessaoAberta(sessaoId, clienteId) {
       chamadasSimuladas.push({ metodo: "sessaoAberta", pedido: { sessaoId, clienteId } });
@@ -152,12 +179,20 @@ export function criarPortaComSdk(stripe: Stripe): PortaStripe {
     },
     async criarCheckout(pedido) {
       const metadata = { ...METADATA_PRODUTO, cliente_id: String(pedido.clienteId) };
+      const dias = pedido.diasDeTeste && pedido.diasDeTeste > 0 ? Math.trunc(pedido.diasDeTeste) : 0;
+      const exigeCartao = pedido.exigeCartao === true;
       const sessao = await stripe.checkout.sessions.create({
         mode: "subscription",
         line_items: [{ price: pedido.precoId, quantity: 1 }],
         client_reference_id: String(pedido.clienteId),
         metadata,
-        subscription_data: { metadata },
+        subscription_data: {
+          metadata,
+          // O teste grátis: sem `trial_period_days` o Checkout cobra na hora (achado da prova de 03/11/2026). Sem o cartão no começo, o teste que acaba sem cartão CANCELA a assinatura (e não `pause` nem `create_invoice`): o código trata `paused` como sem acesso e como assinatura viva no Stripe, o que impediria assinar de novo pelo Checkout; `canceled` leva a marca a "Assinar de novo".
+          ...(dias > 0 ? { trial_period_days: dias } : {}),
+          ...(dias > 0 && !exigeCartao ? { trial_settings: { end_behavior: { missing_payment_method: "cancel" as const } } } : {}),
+        },
+        ...(dias > 0 && !exigeCartao ? { payment_method_collection: "if_required" as const } : {}),
         // Só cartão por enquanto (Pix e boleto estão desligados na conta; decisão do Gustavo, 22/10/2026).
         allowed_payment_method_types: ["card"],
         locale: "pt-BR",
@@ -167,6 +202,20 @@ export function criarPortaComSdk(stripe: Stripe): PortaStripe {
       });
       if (!sessao.url) throw new ErroStripe("O Stripe nao devolveu o endereco do Checkout.");
       return { url: sessao.url, sessaoId: sessao.id };
+    },
+    async jaTeveAssinatura(pedido) {
+      // 1) O Checkout anterior da marca foi concluído? Então a assinatura existe, mesmo que o aviso dela não tenha chegado ao nosso banco.
+      if (pedido.sessaoAnteriorId) {
+        try {
+          const anterior = await stripe.checkout.sessions.retrieve(pedido.sessaoAnteriorId);
+          if (anterior.metadata?.produto === METADATA_PRODUTO.produto && anterior.client_reference_id === String(pedido.clienteId) && anterior.status === "complete") return true;
+        } catch (erro) {
+          if ((erro as { code?: string } | null)?.code !== "resource_missing") throw erro;
+        }
+      }
+      // 2) Alguma assinatura deste produto com o `cliente_id` desta marca, em qualquer estado (a busca do Stripe pode levar cerca de um minuto para ver uma assinatura recém-criada; o passo 1 cobre essa janela).
+      const achadas = await stripe.subscriptions.search({ query: `metadata['produto']:'${METADATA_PRODUTO.produto}' AND metadata['cliente_id']:'${pedido.clienteId}'`, limit: 1 });
+      return achadas.data.length > 0;
     },
     async sessaoAberta(sessaoId, clienteId) {
       let sessao: Stripe.Checkout.Session;

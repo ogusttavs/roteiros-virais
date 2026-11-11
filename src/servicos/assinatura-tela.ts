@@ -12,6 +12,8 @@ export type TipoDeSituacao =
   | "cortesia"
   /** Assinatura que vale e está em dia. */
   | "ativa"
+  /** No teste grátis (o Stripe diz `trialing`): vale, e a primeira cobrança é no fim do teste, se a pessoa não cancelar. */
+  | "teste"
   /** Vale ainda, mas o último pagamento falhou: o Stripe está tentando de novo, e a pessoa pode trocar o cartão. */
   | "atrasada"
   /** Não vale mais por causa do cartão: pagamento que não passou (ou aviso de renovação que não veio). Pede para atualizar o cartão. */
@@ -29,7 +31,7 @@ export type SituacaoDaAssinatura = {
   temAcesso: boolean;
   /** O status que o Stripe guarda, para a pessoa ler em português (`null` sem assinatura nenhuma). */
   status: StatusAssinatura | null;
-  /** Fim do período já pago (a próxima cobrança, ou o último dia se vai terminar). */
+  /** Fim do período já pago (a próxima cobrança, ou o último dia se vai terminar); no teste grátis, o último dia do teste e dia da primeira cobrança. */
   periodoFim: Date | null;
   /** A pessoa cancelou e a assinatura vale até `periodoFim`, sem renovar. */
   cancelaNoFim: boolean;
@@ -49,7 +51,7 @@ export function situacaoDaAssinatura(cortesia: boolean, lista: Assinatura[], ago
   if (!principal) return { ...base, tipo: "nunca", temAcesso: false };
 
   if (assinaturaVale(principal, agora)) {
-    return { ...base, tipo: principal.status === "past_due" ? "atrasada" : "ativa", temAcesso: true };
+    return { ...base, tipo: principal.status === "past_due" ? "atrasada" : principal.status === "trialing" ? "teste" : "ativa", temAcesso: true };
   }
   switch (principal.status) {
     case "incomplete":

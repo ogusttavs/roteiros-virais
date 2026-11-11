@@ -193,7 +193,7 @@ worker_fala_com_provedor_pot() {
   printf '%s\n' "$saida" | grep "PO Token Providers:"
 }
 
-# E47 PR 2: o volume da edicao de video (`roteiros_edicao`, em /var/edicao) e o mesmo nos dois containers: o app (usuario sem privilegio) grava, o worker (root) le e apaga, e o app
+# E47 PR 2: o volume da edicao de video (`roteiros_edicao`, em /var/edicao) e o mesmo nos dois containers: o app e o worker (os dois sem privilegio, uid 999) gravam, leem e apagam, e o app
 # tem o ffprobe que confere o video que a pessoa envia. EDICAO_PASTA aponta para o volume nos dois.
 volume_da_edicao_funciona() {
   local versao lido
@@ -220,6 +220,45 @@ volume_da_edicao_funciona() {
     return 1
   }
   echo "$versao; app grava e worker le e apaga em /var/edicao"
+}
+
+# Achado 4 da revisao de 03/11/2026: o worker e o render abrem video que a pessoa mandou, entao nao rodam como root e nao ganham privilegio; o render tambem nao ve nenhuma chave do produto
+# (so o banco, a pasta do volume e o Sentry) e tem o sistema de arquivos so de leitura. O app e o worker precisam gravar um no arquivo do outro (mesmo uid), o que `volume_da_edicao_funciona` prova.
+worker_e_render_sem_privilegio() {
+  local servico uid
+  for servico in roteiros-worker roteiros-render; do
+    uid=$("${COMPOSE[@]}" exec -T "$servico" id -u | tr -d '')
+    [ "$uid" = "999" ] || {
+      echo "$servico roda como uid '$uid' em vez de 999 (sem privilegio)" >&2
+      return 1
+    }
+    "${COMPOSE[@]}" exec -T "$servico" sh -c 'grep -q "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status' || {
+      echo "$servico ainda tem capacidades do Linux (cap_drop: ALL nao valeu)" >&2
+      return 1
+    }
+  done
+  for chave in ANTHROPIC_API_KEY GROQ_API_KEY STRIPE_SECRET_KEY RESEND_API_KEY META_TOKEN_CHAVE POSTGRES_PASSWORD; do
+    "${COMPOSE[@]}" exec -T roteiros-render sh -c "[ -z \"\$(printenv $chave)\" ]" || {
+      echo "o render enxerga $chave (devia ter so DATABASE_URL, EDICAO_PASTA e o Sentry)" >&2
+      return 1
+    }
+  done
+  # As duas que a configuracao do aplicativo exige em producao chegam ao render com valor fixo sem uso, nunca o segredo de verdade.
+  for chave in JOBS_API_KEY BETTER_AUTH_SECRET; do
+    "${COMPOSE[@]}" exec -T roteiros-render sh -c "case \"\$(printenv $chave)\" in render-sem-uso*) exit 0 ;; *) exit 1 ;; esac" || {
+      echo "o render tem um $chave que nao e o valor fixo sem uso" >&2
+      return 1
+    }
+  done
+  "${COMPOSE[@]}" exec -T roteiros-render sh -c '! touch /app/teste-escrita 2>/dev/null' || {
+    echo "o render consegue escrever em /app (devia ser so de leitura)" >&2
+    return 1
+  }
+  "${COMPOSE[@]}" exec -T roteiros-render sh -c 'touch /var/edicao/teste-render && rm -f /var/edicao/teste-render' || {
+    echo "o render nao consegue escrever no volume de edicao" >&2
+    return 1
+  }
+  echo "worker e render: uid 999, sem capacidades; render sem chaves e com disco de leitura"
 }
 
 # E47 PR 4: o contêiner de render. A mesma imagem do worker, outro papel: tem de estar no ar com 1 vCPU (a trava que protege o painel e o OdontoTech), o ffmpeg dele tem os filtros que o render usa
@@ -446,6 +485,7 @@ passo "confere /api/saude em $BASE_URL" conferir_saude
 passo "worker fala com o provedor de PO Token" worker_fala_com_provedor_pot
 passo "o volume de edicao e o ffprobe funcionam no app e no worker" volume_da_edicao_funciona
 passo "o contêiner de render tem 1 vCPU, o ffmpeg e a fonte, e monta um vídeo de verdade" render_funciona
+passo "worker e render rodam sem privilegio e o render nao ve as chaves" worker_e_render_sem_privilegio
 passo "semeia o banco pelo container do worker" semear
 passo "login do admin de seed e GET /admin/clientes com o cookie" conferir_login_admin
 passo "dispara coleta-noticias e espera terminar ok (1a vez)" disparar_e_esperar_job

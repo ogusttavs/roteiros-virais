@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { config, ErroConfiguracao, hojeISO, verificarSegredosDeProducao } from "./config";
+import { config, diasDoTesteGratis, ErroConfiguracao, hojeISO, verificarSegredosDeProducao } from "./config";
 
 describe("hojeISO", () => {
   it("formata no fuso de Sao Paulo, sem hora", () => {
@@ -217,5 +217,23 @@ describe("config.cobranca (o portao desligado por padrao e a porta de teste)", (
   });
   it("a chave de busca do preco e a do plano trimestral", () => {
     expect(config.cobranca.precoLookupKey).toBe("roteiros_trimestral");
+  });
+});
+
+describe("o teste grátis (E22): COBRANCA_TESTE_DIAS e COBRANCA_TESTE_EXIGE_CARTAO", () => {
+  it("nos testes valem o padrão do produto: 7 dias, sem pedir o cartão no começo", () => {
+    expect(config.cobranca.testeDias).toBe(7);
+    expect(config.cobranca.testeExigeCartao).toBe(false);
+  });
+
+  it("os dias: vazio ou lixo volta a 7, zero e negativo desligam, o teto do Stripe é 730, fração se corta", () => {
+    expect(diasDoTesteGratis(undefined)).toBe(7);
+    expect(diasDoTesteGratis("")).toBe(7);
+    expect(diasDoTesteGratis("sete")).toBe(7);
+    expect(diasDoTesteGratis("14")).toBe(14);
+    expect(diasDoTesteGratis("0")).toBe(0);
+    expect(diasDoTesteGratis("-3")).toBe(0);
+    expect(diasDoTesteGratis("5.9")).toBe(5);
+    expect(diasDoTesteGratis("9999")).toBe(730);
   });
 });

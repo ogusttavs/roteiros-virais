@@ -10,7 +10,7 @@ import { rotuloDaCobranca } from "@/textos/admin-contas";
 
 import { eventoDeAssinatura, eventoDeCheckout, eventoDeFatura, MARCA_DO_ODONTOTECH, SEGUNDOS } from "../../tests/fixtures/stripe-eventos";
 
-import { assinaturaPrincipal, assinaturaVale, clienteIdDoAviso, ehNosso, lerEvento, precisaAssinarCom, resumirCobranca } from "./assinatura";
+import { assinaturaPrincipal, assinaturaVale, clienteIdDoAviso, ehNosso, lerEvento, marcaPodeGanharTeste, precisaAssinarCom, resumirCobranca } from "./assinatura";
 
 const DIA = 24 * 60 * 60 * 1000;
 const AGORA = new Date("2026-10-22T12:00:00Z");
@@ -27,6 +27,7 @@ function assinatura(extra: Partial<Assinatura> = {}): Assinatura {
     periodoFim: new Date(AGORA.getTime() + 60 * DIA),
     cancelaNoFimDoPeriodo: false,
     ultimoEventoEm: AGORA,
+    lembreteFimDoTesteEm: null,
     criadoEm: AGORA,
     atualizadoEm: AGORA,
     ...extra,
@@ -242,4 +243,49 @@ describe("rotuloDaCobranca (a coluna Assinatura do admin)", () => {
   it("incompleta", () => expect(r(false, { status: "incomplete" })).toBe("Não concluída"));
   it("unpaid", () => expect(r(false, { status: "unpaid" })).toBe("Pagamento atrasado"));
   it("o formato de SEGUNDOS exportado pela fixture e coerente", () => expect(SEGUNDOS.DIA).toBe(86400));
+});
+
+describe("o teste grátis (E22): trialing vale e a fatura de R$ 0 não vira ativa", () => {
+  it("trialing dá acesso como active, com o fim do teste mais a folga, e deixa de dar depois", () => {
+    expect(assinaturaVale(assinatura({ status: "trialing", periodoFim: new Date(AGORA.getTime() + 3 * DIA) }), AGORA)).toBe(true);
+    expect(assinaturaVale(assinatura({ status: "trialing", periodoFim: null }), AGORA)).toBe(true);
+    expect(assinaturaVale(assinatura({ status: "trialing", periodoFim: new Date(AGORA.getTime() - 10 * DIA) }), AGORA)).toBe(false);
+  });
+
+  it("o portão deixa passar a marca em teste e barra a marca sem nada", () => {
+    const emTeste = assinatura({ status: "trialing", periodoFim: new Date(AGORA.getTime() + 3 * DIA) });
+    expect(precisaAssinarCom({ cobrancaAtiva: true, cortesia: false, assinaturas: [emTeste], agora: AGORA })).toBe(false);
+    expect(precisaAssinarCom({ cobrancaAtiva: true, cortesia: false, assinaturas: [], agora: AGORA })).toBe(true);
+  });
+
+  it("o admin lê Teste grátis até a data, ou Teste grátis, cancela em, no lugar de Ativa", () => {
+    const r = (a: Partial<Assinatura>) => rotuloDaCobranca(resumirCobranca(false, [assinatura({ status: "trialing", ...a })], AGORA));
+    expect(r({})).toMatch(/^Teste grátis até \d\d\/\d\d\/\d\d$/);
+    expect(r({ periodoFim: null })).toBe("Teste grátis");
+    expect(r({ cancelaNoFimDoPeriodo: true })).toMatch(/^Teste grátis, cancela em /);
+  });
+
+  it("o Checkout sem pagamento a fazer (teste) cria a assinatura como trialing; pago, como active", () => {
+    expect(lerEvento(eventoDeCheckout({ clienteId: 9, pagamento: "no_payment_required" }))).toMatchObject({ tipo: "tratar", mudanca: { statusSeNova: "trialing" } });
+    expect(lerEvento(eventoDeCheckout({ clienteId: 9, pagamento: "paid" }))).toMatchObject({ mudanca: { statusSeNova: "active" } });
+  });
+
+  it("a fatura de R$ 0 do começo do teste não muda o status nem o período; a fatura com valor continua virando active", () => {
+    const zerada = eventoDeFatura("invoice.paid", { clienteId: 5, inicio: 10, fim: 20 });
+    (zerada.data.object as Record<string, unknown>).amount_paid = 0;
+    const l = lerEvento(zerada);
+    if (l.tipo !== "tratar") throw new Error("devia tratar");
+    expect(l.mudanca.status).toBeUndefined();
+    expect(l.mudanca.statusSeNova).toBe("trialing");
+    expect(l.mudanca.periodoFim).toBeUndefined();
+    const paga = eventoDeFatura("invoice.paid", { clienteId: 5, inicio: 10, fim: 20 });
+    (paga.data.object as Record<string, unknown>).amount_paid = 119100;
+    expect(lerEvento(paga)).toMatchObject({ mudanca: { status: "active", statusSeNova: "active" } });
+  });
+
+  it("marcaPodeGanharTeste: só quem nunca teve linha, e só com o teste ligado", () => {
+    expect(marcaPodeGanharTeste([], 7)).toBe(true);
+    expect(marcaPodeGanharTeste([], 0)).toBe(false);
+    expect(marcaPodeGanharTeste([{ id: 1 }], 7)).toBe(false);
+  });
 });

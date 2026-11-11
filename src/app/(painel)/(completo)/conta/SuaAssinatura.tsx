@@ -1,5 +1,6 @@
 import { BotoesDaAssinatura } from "@/app/(painel)/assinar/BotoesDaAssinatura";
 import { botaoEhDoDono, cartaoDaConta } from "@/app/(painel)/assinar/visao";
+import { config } from "@/lib/config";
 import type { SituacaoDaAssinatura } from "@/servicos/assinatura-tela";
 import { textosAssinatura } from "@/textos/assinatura";
 import { Cartao } from "@/ui/componentes/Cartao";
@@ -14,7 +15,7 @@ type Props = { situacao: SituacaoDaAssinatura; dono: boolean; verComo: boolean }
  * Quem chama decide se o cartão aparece (só com a cobrança ligada ou com assinatura no histórico: desligada e sem assinatura, nada muda em Conta).
  */
 export function SuaAssinatura({ situacao, dono, verComo }: Props) {
-  const { situacao: linha, data, botoes } = cartaoDaConta(situacao);
+  const { situacao: linha, data, botoes } = cartaoDaConta(situacao, config.cobranca.testeExigeCartao);
   const visiveis = botoes.filter((b) => !botaoEhDoDono(b) || (dono && !verComo));
   return (
     <Cartao className={styles.cartao} data-testid="sua-assinatura" data-situacao={situacao.tipo}>

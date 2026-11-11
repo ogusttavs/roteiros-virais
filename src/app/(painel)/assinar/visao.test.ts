@@ -111,3 +111,53 @@ describe("cartaoDaConta", () => {
     expect(cartaoDaConta(situacao({ tipo: "cortesia", temAcesso: true })).botoes).toEqual([]);
   });
 });
+
+describe("o teste grátis (E22)", () => {
+  const semCartao = { dias: 7, exigeCartao: false, oferecer: true };
+  const comCartao = { dias: 7, exigeCartao: true, oferecer: true };
+  const emTeste = situacao({ tipo: "teste", temAcesso: true, status: "trialing", periodoFim: FIM });
+
+  it("a marca em teste tem a sua tela, e voltando do pagamento a tela confirma o começo do teste", () => {
+    expect(visaoDaTela(emTeste, false)).toBe("teste");
+    expect(visaoDaTela(emTeste, true)).toBe("confirmada");
+  });
+
+  it("o convite só fala do teste para quem ainda pode ganhá-lo, com os dias escritos e sem prometer cartão que não pedimos", () => {
+    expect(botoesDaTela("pitch")[0].rotulo).toBe("Assinar por R$ 1.191 a cada 3 meses");
+    expect(botoesDaTela("pitch", semCartao)[0].rotulo).toBe("Começar 7 dias grátis");
+    expect(textosDaTela("pitch", situacao({}), semCartao).titulo).toBe("Teste 7 dias grátis");
+    expect(textosDaTela("pitch", situacao({}), { ...semCartao, oferecer: false }).titulo).toBe("Assine para continuar");
+    expect(textosDaTela("pitch", situacao({}), { ...semCartao, dias: 1 }).titulo).toBe("Teste 1 dia grátis");
+  });
+
+  it("sem cartão no começo: a frase manda cadastrar o cartão e não fala de primeira cobrança; o botão principal abre o portal para isso", () => {
+    const { titulo, frases } = textosDaTela("teste", emTeste, semCartao);
+    expect(titulo).toBe("Você está no teste grátis");
+    expect(frases).toEqual(["Seu teste grátis termina em 22 de janeiro de 2027. Para continuar, cadastre o cartão. Se você já cadastrou, está tudo certo."]);
+    expect(frases.join(" ")).not.toContain("cobrança");
+    expect(botoesDaTela("teste", semCartao).map((b) => [b.acao, b.rotulo, b.variante])).toEqual([
+      ["portal", "Cadastrar o cartão", "primario"],
+      ["hoje", "Ir para o Hoje", "secundario"],
+    ]);
+  });
+
+  it("com cartão no começo: Você está no teste grátis até a data, e a primeira cobrança é na mesma data", () => {
+    expect(textosDaTela("teste", emTeste, comCartao).frases).toEqual(["Você está no teste grátis até 22 de janeiro de 2027. Se não cancelar, a primeira cobrança é em 22 de janeiro de 2027."]);
+    expect(botoesDaTela("teste", comCartao).map((b) => b.acao)).toEqual(["hoje", "portal"]);
+  });
+
+  it("quem cancelou durante o teste lê que nada será cobrado, e o teste sem data diz o que dá para dizer", () => {
+    expect(textosDaTela("teste", { ...emTeste, cancelaNoFim: true }, comCartao).frases).toEqual(["Você cancelou. O teste grátis vai até 22 de janeiro de 2027 e nada será cobrado."]);
+    expect(textosDaTela("teste", { ...emTeste, periodoFim: null }, comCartao).frases[0]).toContain("no fim do teste");
+  });
+
+  it("o cartão de Conta mostra Teste grátis, a frase e o botão certo para cada modo", () => {
+    const sem = cartaoDaConta(emTeste, false);
+    expect(sem.situacao).toBe("Teste grátis");
+    expect(sem.data).toContain("cadastre o cartão");
+    expect(sem.botoes.map((b) => b.rotulo)).toEqual(["Cadastrar o cartão"]);
+    const com = cartaoDaConta(emTeste, true);
+    expect(com.data).toContain("a primeira cobrança é em");
+    expect(com.botoes.map((b) => b.rotulo)).toEqual(["Gerenciar a assinatura"]);
+  });
+});
