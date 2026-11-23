@@ -83,6 +83,17 @@ describe("verificarSegredosDeProducao", () => {
       expect(() => verificarSegredosDeProducao({ ...base, AI_PROVIDER: "mock" })).not.toThrow();
     });
 
+    it("o ambiente do contêiner de render (deploy/compose.prod.yml: sem chave, so a lista dele) passa", () => {
+      expect(() =>
+        verificarSegredosDeProducao({
+          NODE_ENV: "production",
+          BETTER_AUTH_SECRET: "render-sem-uso-nao-e-segredo",
+          JOBS_API_KEY: "render-sem-uso-nao-e-segredo",
+          AI_PROVIDER: "anthropic",
+        }),
+      ).not.toThrow();
+    });
+
     it("nao pesa fora de producao nem no build", () => {
       expect(() => verificarSegredosDeProducao({ ...base, NODE_ENV: "development" })).not.toThrow();
       expect(() => verificarSegredosDeProducao({ ...base, NEXT_PHASE: "phase-production-build" })).not.toThrow();

@@ -214,7 +214,8 @@ volume_da_edicao_funciona() {
     echo "o app nao conseguiu gravar em /var/edicao" >&2
     return 1
   }
-  lido=$("${COMPOSE[@]}" exec -T roteiros-worker sh -c 'cat /var/edicao/bruto/teste-ensaio.txt && rm -f /var/edicao/bruto/teste-ensaio.txt' | tr -d '') || {
+  lido=$("${COMPOSE[@]}" exec -T roteiros-worker sh -c 'cat /var/edicao/bruto/teste-ensaio.txt && rm -f /var/edicao/bruto/teste-ensaio.txt' | tr -d '
+') || {
     echo "o worker nao leu o que o app gravou em /var/edicao" >&2
     return 1
   }
@@ -230,7 +231,8 @@ volume_da_edicao_funciona() {
 worker_e_render_sem_privilegio() {
   local servico uid
   for servico in roteiros-worker roteiros-render; do
-    uid=$("${COMPOSE[@]}" exec -T "$servico" id -u | tr -d '')
+    uid=$("${COMPOSE[@]}" exec -T "$servico" id -u | tr -d '
+')
     [ "$uid" = "999" ] || {
       echo "$servico roda como uid '$uid' em vez de 999 (sem privilegio)" >&2
       return 1
@@ -242,7 +244,7 @@ worker_e_render_sem_privilegio() {
   done
   for chave in ANTHROPIC_API_KEY GROQ_API_KEY STRIPE_SECRET_KEY RESEND_API_KEY META_TOKEN_CHAVE POSTGRES_PASSWORD; do
     "${COMPOSE[@]}" exec -T roteiros-render sh -c "[ -z \"\$(printenv $chave)\" ]" || {
-      echo "o render enxerga $chave (devia ter so DATABASE_URL, EDICAO_PASTA e o Sentry)" >&2
+      echo "o render enxerga $chave (devia ter so DATABASE_URL, EDICAO_PASTA, o Sentry e AI_PROVIDER=anthropic sem chave)" >&2
       return 1
     }
   done
@@ -296,7 +298,8 @@ render_funciona() {
     echo "$saida" >&2
     return 1
   }
-  echo "$saida" | tr -d '' | tr '
+  echo "$saida" | tr -d '
+' | tr '
 ' ';'
   echo
 }
