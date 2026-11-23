@@ -174,7 +174,7 @@ export function FluxoCriarConta({ textos }: { textos: TextosDoFluxo }) {
           {quantos > 0 ? (
             <p className={styles.erroGeral} role="alert">
               <CircleAlert aria-hidden="true" strokeWidth={1.5} />
-              {t.confira(quantos)}
+              {quantos === 1 ? t.confiraUm : t.confiraVarios.replace("{n}", String(quantos))}
             </p>
           ) : null}
           {erroGeral ? (

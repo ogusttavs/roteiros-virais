@@ -37,9 +37,9 @@
   display: flex;
   flex-direction: column;
   max-height: 92dvh;
-  background: var(--vidro-fundo);
-  backdrop-filter: var(--vidro-desfoque);
-  -webkit-backdrop-filter: var(--vidro-desfoque);
+  background: var(--cor-material-menu);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
   border: var(--largura-borda) solid var(--vidro-borda);
   border-radius: var(--raio-lg) var(--raio-lg) 0 0;
   box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);

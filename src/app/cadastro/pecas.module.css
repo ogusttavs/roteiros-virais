@@ -15,20 +15,20 @@
   isolation: isolate;
 }
 
-/* A luz da marca atrás do cartão: o único lugar em que ela é uma mancha grande, desfocada e por trás de vidro. */
+/* A luz da marca atrás do cartão (o mesmo halo da tela de Entrar do código): desfocada e por trás de vidro, nunca fundo de texto. */
 .tela::before {
   content: "";
   position: absolute;
   z-index: -1;
-  width: 22rem;
-  height: 22rem;
+  top: 50%;
   left: 50%;
-  top: 18%;
-  transform: translateX(-60%);
-  border-radius: 50%;
+  width: 32rem;
+  height: 32rem;
+  transform: translate(-50%, -50%);
   background: var(--luz-degrade);
-  filter: blur(70px);
-  opacity: calc(var(--luz-halo) * 0.9);
+  filter: blur(6rem);
+  opacity: calc(var(--luz-halo) * 0.4);
+  pointer-events: none;
 }
 
 .arranjo {
@@ -45,9 +45,9 @@
   display: grid;
   gap: var(--espaco-5);
   padding: var(--espaco-8) var(--espaco-6);
-  background: var(--vidro-fundo);
-  backdrop-filter: var(--vidro-desfoque);
-  -webkit-backdrop-filter: var(--vidro-desfoque);
+  background: var(--cor-material-menu);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
   border: var(--largura-borda) solid var(--vidro-borda);
   border-radius: var(--raio-lg);
   box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
@@ -241,6 +241,8 @@
 }
 
 .campoSenha input {
+  width: 100%;
+  box-sizing: border-box;
   padding-right: calc(var(--altura-toque) + var(--espaco-2));
 }
 

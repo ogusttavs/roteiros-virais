@@ -119,7 +119,9 @@ export const textosCadastro = {
     lerPrivacidade: "Ler a privacidade",
     botao: "Começar o teste grátis",
     enviando: "Criando a sua conta",
-    confira: (n: number) => (n === 1 ? "Confira o ponto marcado acima." : `Confira os ${n} pontos marcados acima.`),
+    /** Texto puro (a tela de cliente recebe os textos por props, e função não atravessa): `{n}` vira o número de pontos. */
+    confiraUm: "Confira o ponto marcado acima.",
+    confiraVarios: "Confira os {n} pontos marcados acima.",
     linhaTeste: {
       destaque: "7 dias grátis, sem cartão.",
       limites: `No teste, até ${TETO_DO_TESTE.roteiros} roteiros e ${TETO_DO_TESTE.edicoes} vídeos editados.`,
