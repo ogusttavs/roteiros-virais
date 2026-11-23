@@ -1,0 +1,33 @@
+/* E63 PR 1: página provisória (as telas desenhadas vêm no PR 2); reaproveita o cartão de Entrar. */
+.pagina {
+  composes: pagina from "../entrar/page.module.css";
+}
+
+.envoltorio {
+  composes: envoltorio from "../entrar/page.module.css";
+}
+
+.titulo {
+  composes: titulo from "../entrar/page.module.css";
+}
+
+.texto {
+  margin: var(--espaco-3) 0 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}
+
+.aviso {
+  margin: var(--espaco-3) 0 0;
+  font-size: var(--tamanho-secundario);
+}
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--espaco-4);
+  min-height: 44px;
+  padding: 0 var(--espaco-4);
+  font: inherit;
+}

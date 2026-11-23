@@ -93,7 +93,7 @@ export async function aceitarPlanoAction(
 ): Promise<ResultadoAcao<{ id: number }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
-  await exigirAssinaturaValida();
+  await exigirAssinaturaValida({ gasto: "roteiro" });
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");

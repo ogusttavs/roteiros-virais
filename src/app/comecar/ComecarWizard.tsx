@@ -179,7 +179,7 @@ export function ComecarWizard({
     if (!resultado.ok) return resultado;
     if (resultado.dado.limiteDeRamosNovos && !limiteAvisado.current) {
       limiteAvisado.current = true;
-      return { ok: false, erro: textosRamo.limiteSemTemas };
+      return { ok: false, erro: resultado.dado.ramoEmPreparo ? textosRamo.emPreparo : textosRamo.limiteSemTemas };
     }
     setEtapa("blocos");
     return { ok: true, dado: null };

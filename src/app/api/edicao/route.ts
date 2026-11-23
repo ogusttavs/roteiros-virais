@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (!sessao) return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
-  const recusaCobranca = await recusaDaCobranca();
+  const recusaCobranca = await recusaDaCobranca({ gasto: "edicao" });
   if (recusaCobranca) return recusaCobranca;
 
   let corpo: { roteiroId?: unknown; tamanhoBytes?: unknown; tipoDoArquivo?: unknown; nomeDoArquivo?: unknown };

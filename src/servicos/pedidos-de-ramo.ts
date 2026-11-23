@@ -80,7 +80,7 @@ export async function registrarPedidoDeRamo(clienteId: number, textoBruto: strin
     const palpite = ramoMaisProximo(texto);
     if (palpite) {
       try {
-        const { nichoId } = await setorParaAMarca(marca.nichoId, palpite.slug);
+        const { nichoId } = await setorParaAMarca(marca.nichoId, palpite.slug, clienteId);
         setorProvisorioId = nichoId;
         nichoIdDaMarca = nichoId;
       } catch (erro) {

@@ -41,6 +41,8 @@ export const textosRamo = {
    */
   limiteSemTemas: "Muitos ramos novos hoje; a gente confere o seu ramo e, até lá, você fica sem temas.",
   limiteNoRamoDeHoje: (ramo: string) => `Muitos ramos novos hoje; a gente confere o seu ramo e, até lá, você continua em ${ramo}.`,
+  /** E63: o ramo novo de quem criou a conta sozinha espera a conferência (o teto de ramos novos do dia segurou a pesquisa automática). */
+  emPreparo: "O seu ramo está sendo preparado. Até lá, os temas e as referências dele ainda não aparecem.",
   /** Pedido aberto e nenhum ramo parecido: a marca ainda não tem temas. */
   aguardandoSemRamo: "A gente vai conferir o seu ramo. Até lá, os temas e as referências do seu ramo ainda não aparecem.",
   /** Pedido aberto, nenhum ramo parecido, mas a marca já estava num ramo: continua nele. */

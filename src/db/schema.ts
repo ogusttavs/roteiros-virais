@@ -3111,6 +3111,53 @@ export const checkoutsStripe = pgTable(
 );
 export type CheckoutStripe = typeof checkoutsStripe.$inferSelect;
 
+/**
+ * E63 PR 1: a marca nasceu do cadastro sozinho (a pessoa criou a conta pela página, sem o admin). Uma linha por marca de cadastro próprio, e é ela que diz quem está sujeito à
+ * confirmação do e-mail e aos tetos do teste: contas que o admin criou nunca têm linha aqui e nada muda para elas. `termosVersao` é a versão dos termos aceita na tela (a data
+ * de `VERSAO_TERMOS_EM` vigente no dia), gravada junto de `preferencias_usuario.aceitou_termos_em`.
+ */
+export const cadastrosProprios = pgTable(
+  "cadastros_proprios",
+  {
+    usuarioId: text("usuario_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    termosVersao: text("termos_versao").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("cadastros_proprios_cliente").on(t.clienteId), index("cadastros_proprios_criado_em").on(t.criadoEm)],
+);
+
+/**
+ * E63 PR 1: o link de confirmar o e-mail. Só o hash do código fica aqui (o código vai no e-mail); vale até `expiraEm` e só uma vez (`usadoEm`). Cada envio é uma linha, e é a contagem
+ * delas por pessoa que limita o reenvio.
+ */
+export const confirmacoesDeEmail = pgTable(
+  "confirmacoes_de_email",
+  {
+    id: id(),
+    usuarioId: text("usuario_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    codigoHash: text("codigo_hash").notNull().unique(),
+    expiraEm: timestamp("expira_em", { withTimezone: true }).notNull(),
+    usadoEm: timestamp("usado_em", { withTimezone: true }),
+    criadoEm: criadoEm(),
+  },
+  (t) => [index("confirmacoes_de_email_usuario").on(t.usuarioId, t.criadoEm)],
+);
+
+/** E63 PR 1: o setor que nasceu porque uma marca de cadastro próprio escolheu um ramo novo (e a pesquisa de setor, que gasta Apify e YouTube, começou sozinha). O teto de ramos novos por dia conta estas linhas. */
+export const setoresDeCadastro = pgTable("setores_de_cadastro", {
+  nichoId: integer("nicho_id")
+    .primaryKey()
+    .references(() => nichos.id, { onDelete: "cascade" }),
+  criadoEm: criadoEm(),
+});
+
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;
 export type ExecucaoJob = typeof execucoesJob.$inferSelect;
@@ -3120,3 +3167,4 @@ export type ContextoMarca = typeof contextoMarca.$inferSelect;
 export type ContextoMarcaItem = typeof contextoMarcaItens.$inferSelect;
 export type PedidoDeRamo = typeof pedidosDeRamo.$inferSelect;
 export type Interessado = typeof interessados.$inferSelect;
+export type CadastroProprio = typeof cadastrosProprios.$inferSelect;

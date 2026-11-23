@@ -6,10 +6,12 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
+import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import {
   account,
   briefings,
+  cadastrosProprios,
   clientes,
   contextoMarca,
   contextoMarcaItens,
@@ -39,16 +41,18 @@ import { semBarrasNoFim, TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL } from "@/lib/perfil-
 import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { normalizarSite, siteValido, TAMANHO_MAXIMO_DO_SITE } from "@/lib/site-valido";
 import { lerEstadoVerComo, sessaoDoPainel } from "@/lib/ver-como";
+import { marcaEhDeCadastroProprio } from "@/servicos/cadastro-travas";
 import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
 import { mandarEmailDeConvite } from "@/servicos/convite";
 import { pedirFiltroDeNoticias } from "@/servicos/filtro-de-noticias";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { cancelarPedidoAberto, registrarPedidoDeRamo } from "@/servicos/pedidos-de-ramo";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
-import { desligarSetorSeSemMarca, setorParaAMarca } from "@/servicos/ramos";
+import { desligarSetorSeSemMarca, ErroLimiteDeSetores, setorParaAMarca } from "@/servicos/ramos";
 import { tirarAlternativoQueViraPrincipal } from "@/servicos/ramos-da-conta";
 import { marcarSenhaProvisoria } from "@/servicos/senha";
 import { textosAdmin } from "@/textos/admin";
+import { textosCadastro } from "@/textos/cadastro";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
 export class ErroAcessoNegado extends Error {}
@@ -502,6 +506,14 @@ export async function darAcesso(clienteId: number, nome: string, email: string):
   const [usuarioExistente] = await db().select().from(user).where(eq(user.email, email));
 
   if (usuarioExistente) {
+    // E63: quem criou conta sozinho e ainda não confirmou o e-mail pode não ser o dono dele (qualquer um cadastra qualquer e-mail, com a senha que quiser). Dar a marca a essa
+    // conta entregaria a marca a quem fez o cadastro. Só depois de confirmar.
+    const [proprio] = await db()
+      .select({ confirmado: user.emailVerified })
+      .from(cadastrosProprios)
+      .innerJoin(user, eq(user.id, cadastrosProprios.usuarioId))
+      .where(eq(cadastrosProprios.usuarioId, usuarioExistente.id));
+    if (proprio && !proprio.confirmado) throw new ErroCliente(textosCadastro.adminEmailNaoConfirmado);
     const [jaMembro] = await db()
       .select({ id: membrosMarca.id })
       .from(membrosMarca)
@@ -682,7 +694,7 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
  * `salvarDadosFixos` com o que o pedido de ramo decidiu: `limiteDeRamosNovos` é verdadeiro quando o teto de setores novos do dia segurou o
  * palpite (o pedido vai aberto, e a marca fica onde estava: sem setor, se não tinha). A tela diz isso em vez de prometer o ramo provisório.
  */
-export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: unknown): Promise<{ cliente: Cliente; limiteDeRamosNovos: boolean }> {
+export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: unknown): Promise<{ cliente: Cliente; limiteDeRamosNovos: boolean; ramoEmPreparo: boolean }> {
   const dados = dadosFixosSchema.parse(dadosBrutos);
 
   const perfis: PerfisCliente = {
@@ -700,12 +712,21 @@ export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: 
   // `nichoId` de antes (um setor que o admin criou à mão, e que a tela mostra como o ramo atual) continua valendo quando a pessoa não
   // escolheu outro. E45, PR 2: no "Não achei o meu" (só o texto livre) a marca fica onde está por ora, e o pedido de ramo, registrado depois
   // da gravação, a põe provisoriamente no ramo mais próximo do que ela escreveu.
-  const escolheuDaLista = Boolean(dados.ramo) || Boolean(dados.nichoId);
-  const nichoId = dados.ramo
-    ? (await setorParaAMarca(antes?.nichoId ?? null, dados.ramo)).nichoId
-    : dados.nichoId
-      ? dados.nichoId
-      : (antes?.nichoId ?? null);
+  // E63: o ramo novo escolhido da lista por uma marca de cadastro próprio, depois do teto de ramos novos do dia, vira pedido de ramo (o admin aprova); a pessoa lê que o ramo dela está sendo preparado.
+  let ramoEmEspera: string | null = null;
+  let nichoId: number | null;
+  if (dados.ramo) {
+    try {
+      nichoId = (await setorParaAMarca(antes?.nichoId ?? null, dados.ramo, clienteId)).nichoId;
+    } catch (erro) {
+      if (!(erro instanceof ErroLimiteDeSetores) || !(await marcaEhDeCadastroProprio(clienteId))) throw erro;
+      ramoEmEspera = ramoPorSlug(dados.ramo)?.nome ?? dados.ramo;
+      nichoId = antes?.nichoId ?? null;
+    }
+  } else {
+    nichoId = dados.nichoId ? dados.nichoId : (antes?.nichoId ?? null);
+  }
+  const escolheuDaLista = (Boolean(dados.ramo) && ramoEmEspera === null) || Boolean(dados.nichoId);
 
   const [cliente] = await db()
     .update(clientes)
@@ -717,7 +738,7 @@ export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: 
       paises: dados.alcance === "mais_de_um_pais" ? (dados.paises?.trim() ?? null) : null,
       site: dados.site?.trim() || null,
       nichoId,
-      ramoOutro: escolheuDaLista ? null : (dados.ramoOutro?.trim() ?? null),
+      ramoOutro: escolheuDaLista ? null : (ramoEmEspera ?? dados.ramoOutro?.trim() ?? null),
       persona: dados.persona,
       perfis,
       quemGrava: dados.quemGrava ?? null,
@@ -740,7 +761,7 @@ export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: 
   if (escolheuDaLista) {
     await cancelarPedidoAberto(clienteId);
   } else {
-    limiteDeRamosNovos = (await registrarPedidoDeRamo(clienteId, dados.ramoOutro ?? "")).limite;
+    limiteDeRamosNovos = (await registrarPedidoDeRamo(clienteId, ramoEmEspera ?? dados.ramoOutro ?? "")).limite;
     const [fresco] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
     clienteFinal = fresco ?? cliente;
   }
@@ -759,7 +780,7 @@ export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: 
   if (perfisMudaram(antes?.perfis ?? null, perfis)) {
     void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
   }
-  return { cliente: clienteFinal, limiteDeRamosNovos };
+  return { cliente: clienteFinal, limiteDeRamosNovos, ramoEmPreparo: limiteDeRamosNovos && (await marcaEhDeCadastroProprio(clienteId)) };
 }
 
 /** O Instagram ou o YouTube mudou (são os dois que se analisam; o TikTok não). Comparação sem "@" e sem diferença de maiúscula. */
@@ -1015,7 +1036,7 @@ export async function salvarRamoConta(clienteId: number, ramoSlug: string): Prom
   const [antes] = await db().select({ nichoId: clientes.nichoId }).from(clientes).where(eq(clientes.id, clienteId));
   if (!antes) throw new ErroCliente("nao foi possivel trocar o ramo; cliente nao encontrado.");
 
-  const { nichoId } = await setorParaAMarca(antes.nichoId, ramoSlug);
+  const { nichoId } = await setorParaAMarca(antes.nichoId, ramoSlug, clienteId);
   const [cliente] = await db().update(clientes).set({ nichoId, ramoOutro: null }).where(eq(clientes.id, clienteId)).returning();
   if (!cliente) throw new ErroCliente("nao foi possivel trocar o ramo; cliente nao encontrado.");
   if (antes.nichoId !== nichoId) {

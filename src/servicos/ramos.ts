@@ -15,6 +15,7 @@ import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 
+import { anotarSetorDeCadastro, cabeRamoNovoDeCadastro, marcaEhDeCadastroProprio } from "./cadastro-travas";
 import { ErroNicho, normalizarTermos } from "./nichos";
 
 /** Menos que o teto de 20 do admin: cada termo é uma busca na coleta (cota do YouTube e da Meta), e o catálogo já traz o essencial. */
@@ -61,7 +62,7 @@ export type NichoDoRamo = {
  * escolhe; é o que a regra "o setor só é pesquisado quando tem marca" pede. Não enfileira a pesquisa de setor de novo: a base dele já
  * existe, e a rodada mensal a refaz.
  */
-export async function garantirNichoDoRamo(slugDoRamo: string): Promise<NichoDoRamo> {
+export async function garantirNichoDoRamo(slugDoRamo: string, clienteId?: number): Promise<NichoDoRamo> {
   const ramo = ramoPorSlug(slugDoRamo);
   if (!ramo) throw new ErroNicho("esse ramo nao existe no catalogo.");
 
@@ -70,6 +71,13 @@ export async function garantirNichoDoRamo(slugDoRamo: string): Promise<NichoDoRa
     if (existente.ativo) return { nicho: existente, criado: false, reativado: false };
     const [reativado] = await db().update(nichos).set({ ativo: true }).where(eq(nichos.id, existente.id)).returning();
     return { nicho: reativado ?? { ...existente, ativo: true }, criado: false, reativado: true };
+  }
+
+  // E63: o ramo novo escolhido por uma marca de cadastro próprio só nasce (e só começa a pesquisa de setor, que gasta Apify e YouTube) até o teto do dia; o resto espera o admin.
+  const deCadastro = clienteId !== undefined && (await marcaEhDeCadastroProprio(clienteId));
+  if (deCadastro && !(await cabeRamoNovoDeCadastro())) {
+    logger.warn({ ramo: ramo.slug, clienteId }, "teto de ramos novos de cadastro proprio por dia atingido; o ramo espera o admin");
+    throw new ErroLimiteDeSetores("muitos ramos novos hoje; tente de novo amanha.");
   }
 
   // O teto de setores novos por dia (custo): conta os que nasceram do catálogo nas últimas 24 horas, no sistema todo.
@@ -101,6 +109,7 @@ export async function garantirNichoDoRamo(slugDoRamo: string): Promise<NichoDoRa
       .returning();
 
     if (novo) {
+      if (deCadastro) await anotarSetorDeCadastro(novo.id);
       // M2: "o próprio agente tem que fazer uma pesquisa antes de começar o setor". A fila nunca derruba a escolha da pessoa.
       try {
         await garantirBossPronto();
@@ -143,12 +152,12 @@ export async function ramoAtualDoCliente(nichoId: number | null | undefined): Pr
  * O setor da marca ao escolher um ramo: o que ela já tem, se já é o ramo escolhido (nada muda, e um setor que o admin desligou não volta
  * só porque a pessoa salvou o formulário de novo), senão o do ramo, criando ou reativando. `trocou` diz se a marca mudou de setor.
  */
-export async function setorParaAMarca(nichoIdAtual: number | null, slugDoRamo: string): Promise<{ nichoId: number; trocou: boolean }> {
+export async function setorParaAMarca(nichoIdAtual: number | null, slugDoRamo: string, clienteId?: number): Promise<{ nichoId: number; trocou: boolean }> {
   if (nichoIdAtual) {
     const [atual] = await db().select({ ramoCatalogo: nichos.ramoCatalogo }).from(nichos).where(eq(nichos.id, nichoIdAtual));
     if (atual?.ramoCatalogo === slugDoRamo) return { nichoId: nichoIdAtual, trocou: false };
   }
-  const { nicho } = await garantirNichoDoRamo(slugDoRamo);
+  const { nicho } = await garantirNichoDoRamo(slugDoRamo, clienteId);
   return { nichoId: nicho.id, trocou: nicho.id !== nichoIdAtual };
 }
 
