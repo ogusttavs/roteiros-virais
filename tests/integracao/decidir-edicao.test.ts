@@ -398,7 +398,8 @@ describe("a limpeza cuida da decisão", () => {
     const id = await criarEdicao(await criarRoteiro(marcaA));
     await rodarDecidirEdicao(id);
     expect((await linha(id)).resultado).not.toBeNull();
-    await db().update(edicoes).set({ brutoExpiraEm: horasAtras(1) }).where(eq(edicoes.id, id));
+    // Depois da decisão a edição espera a prévia (`verificado`): o bruto ganha 6 horas além do prazo (achado 8 de 03/11/2026), então o prazo aqui venceu há mais que isso.
+    await db().update(edicoes).set({ brutoExpiraEm: horasAtras(7) }).where(eq(edicoes.id, id));
     await rodarLimparEdicoes({ agora: () => agora, enfileirar: async () => undefined, enfileirarDecisao: async () => undefined });
     const e = await linha(id);
     expect(e.estado).toBe("expirada");

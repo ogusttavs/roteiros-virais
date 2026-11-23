@@ -21,6 +21,13 @@ export const LIMITES_DA_EDICAO = {
 
 /** O bruto some sozinho 48 horas depois que chegou inteiro. */
 export const GUARDA_DO_BRUTO_MS = 48 * 60 * 60 * 1000;
+/**
+ * Achado 8 da revisão de 03/11/2026: o bruto de uma edição que espera o render (`verificado`, `montando_previa`, `aprovada`, `montando_final`) não é apagado no prazo de 48 horas; ganha até esta
+ * espera a mais (a partir do vencimento) para o render terminar. Passado este limite o bruto sai de qualquer jeito, então nunca fica para sempre.
+ */
+export const ESPERA_MAXIMA_DO_RENDER_APOS_O_PRAZO_MS = 6 * 60 * 60 * 1000;
+/** Quanto o render espera para tentar de novo quando o disco do servidor está crítico (achado 10 da revisão de 03/11/2026). Não conta como tentativa. */
+export const ESPERA_DO_RENDER_COM_DISCO_CRITICO_S = 10 * 60;
 /** O editado some sozinho 7 dias depois de pronto. */
 export const GUARDA_DO_EDITADO_MS = 7 * 24 * 60 * 60 * 1000;
 /** Uma edição que ficou em `subindo` ou `enviando` por mais que isto (o celular dormiu, a aba fechou) falha e o arquivo parcial sai. */

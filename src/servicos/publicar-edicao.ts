@@ -14,6 +14,7 @@ import { LIMITES_DA_PUBLICACAO } from "@/config/publicacao";
 import { db } from "@/db";
 import { edicoes } from "@/db/schema";
 import { caminhoNoVolume, tamanhoDoArquivoDaEdicao } from "@/edicao/arquivos";
+import { recusaPorDiscoCritico, type DepsDaRecusaPorDisco } from "@/servicos/disco";
 import { iniciarPublicacao, receberVideo, type DepsDaPublicacao } from "@/servicos/publicar-instagram";
 import { fraseDaEdicao } from "@/textos/edicao";
 import { textosPublicar } from "@/textos/publicar";
@@ -22,7 +23,7 @@ export type ResultadoDePublicarEdicao = { ok: true; publicacaoId: number } | { o
 
 export async function publicarEdicao(
   entrada: { usuarioId: string; clienteId: number; edicaoId: number; tipo: string; legenda: string },
-  deps: DepsDaPublicacao = {},
+  deps: DepsDaPublicacao & { disco?: DepsDaRecusaPorDisco } = {},
 ): Promise<ResultadoDePublicarEdicao> {
   const { usuarioId, clienteId, edicaoId } = entrada;
   const [edicao] = await db()
@@ -33,6 +34,8 @@ export async function publicarEdicao(
   if (edicao.estado !== "pronta" || !edicao.caminhoEditado) return { ok: false, frase: fraseDaEdicao("nao-e-a-hora") };
   const tamanho = await tamanhoDoArquivoDaEdicao(edicao.caminhoEditado);
   if (tamanho === null) return { ok: false, frase: fraseDaEdicao("arquivo-saiu") };
+  // Achado 10 da revisão de 03/11/2026: publicar copia o vídeo inteiro para a pasta da Meta. Com o disco do servidor em nível crítico, nada é copiado; o vídeo editado continua guardado.
+  if (await recusaPorDiscoCritico(deps.disco)) return { ok: false, frase: fraseDaEdicao("disco-cheio-publicar") };
 
   // O Story do Instagram só tem 60 segundos: o vídeo editado pode ter mais. A Meta recusaria depois do envio; aqui a frase vem antes.
   const duracao = edicao.resultado ? edicao.resultado.edl.duracao + edicao.resultado.edl.respiroFinal : null;

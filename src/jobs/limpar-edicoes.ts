@@ -4,7 +4,7 @@
  *
  *  1. Falha o envio que parou (a edição ficou `subindo` ou `enviando` por mais de 45 minutos: o celular dormiu, a aba fechou).
  *  2. Devolve a `guardado` (ou falha, se já foram 3 tentativas) a transcrição que parou no meio (o worker caiu).
- *  3. Apaga o bruto que passou de `bruto_expira_em` e o editado que passou de `editado_expira_em`. Junto com o bruto saem as palavras e a curva de energia (são a fala da pessoa). Quando não sobra
+ *  3. Apaga o bruto que passou de `bruto_expira_em` (menos o de quem espera o render: esse ganha até 6 horas a mais, achado 8 da revisão de 03/11/2026) e o editado que passou de `editado_expira_em`. Junto com o bruto saem as palavras e a curva de energia (são a fala da pessoa). Quando não sobra
  *     nenhum arquivo, a edição passa a `expirada`; a linha fica, para a cota do mês e o histórico.
  *  4. Enfileira de novo a transcrição que a fila perdeu (edição `guardado` há mais de 10 minutos) e a decisão da edição (E47 PR 3: `transcrito` ou `decidido` há mais de 10 minutos, até 3 rodadas);
  *     a decisão que parou no meio (`decidindo` há mais de 20 minutos) volta ao passo anterior ou, na terceira rodada, falha. O plano e a decisão saem junto com o último arquivo (têm a fala da pessoa).
@@ -18,11 +18,12 @@
  *
  * O resumo (que a tela de rotinas do admin mostra) tem só números.
  */
-import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 
 import {
   DECISAO_ESQUECIDA_APOS_MS,
   DECISAO_PARADA_APOS_MS,
+  ESPERA_MAXIMA_DO_RENDER_APOS_O_PRAZO_MS,
   ENVIO_DA_EDICAO_PARADO_APOS_MS,
   PARTE_VELHA_APOS_MS,
   RENDER_ESQUECIDO_APOS_MS,
@@ -45,6 +46,9 @@ import { fraseDaEdicao } from "@/textos/edicao";
 
 /** Um arquivo sem dono só é apagado depois de tanto tempo: o que acabou de ser renomeado ainda não teve o caminho gravado na linha. */
 export const IDADE_MINIMA_DO_ORFAO_MS = 10 * 60 * 1000;
+
+/** Os estados em que o render ainda precisa do bruto (a prévia e o final são montados a partir dele). */
+export const ESTADOS_QUE_PRECISAM_DO_BRUTO = ["verificado", "montando_previa", "aprovada", "montando_final"] as const;
 
 export type DepsDaLimpeza = {
   agora?: () => Date;
@@ -125,7 +129,15 @@ export async function rodarLimparEdicoes(deps: DepsDaLimpeza = {}): Promise<Reco
   const brutosVencidos = await db()
     .select({ id: edicoes.id, caminhoBruto: edicoes.caminhoBruto, caminhoPrevia: edicoes.caminhoPrevia })
     .from(edicoes)
-    .where(and(isNull(edicoes.brutoApagadoEm), isNotNull(edicoes.brutoExpiraEm), lte(edicoes.brutoExpiraEm, agora)));
+    .where(
+      and(
+        isNull(edicoes.brutoApagadoEm),
+        isNotNull(edicoes.brutoExpiraEm),
+        lte(edicoes.brutoExpiraEm, agora),
+        // Achado 8 da revisão de 03/11/2026: o bruto de quem espera o render (ou está sendo montado) ganha até 6 horas depois do prazo, para a fila andar. Passado o limite, sai de qualquer jeito.
+        or(notInArray(edicoes.estado, [...ESTADOS_QUE_PRECISAM_DO_BRUTO]), lte(edicoes.brutoExpiraEm, antes(ESPERA_MAXIMA_DO_RENDER_APOS_O_PRAZO_MS))),
+      ),
+    );
   for (const vencido of brutosVencidos) {
     await apagarArquivoDaEdicao(vencido.caminhoBruto);
     // A prévia só serve enquanto o bruto existe (aprovar e refazer precisam dele): sai junto.

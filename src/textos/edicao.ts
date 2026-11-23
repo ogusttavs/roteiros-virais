@@ -31,6 +31,8 @@ export type CodigoDaEdicao =
   | "sumiu"
   | "demorou"
   | "disco-cheio"
+  | "disco-cheio-montar"
+  | "disco-cheio-publicar"
   | "nao-montou"
   | "em-revisao"
   | "motivo-vazio"
@@ -48,7 +50,7 @@ export const textosEdicao = {
     "arquivo-grande": `O vídeo passa de ${LIMITES_DA_EDICAO.megasMax} MB. Grave um vídeo mais curto ou em qualidade HD (1080p) e tente de novo.`,
     "limite-do-mes": `Você já usou as ${LIMITES_DA_EDICAO.edicoesPorMes} edições deste mês. Elas voltam no primeiro dia do mês que vem.`,
     "teto-do-mes": "As edições deste mês acabaram para a sua conta. Elas voltam no primeiro dia do mês que vem.",
-    "em-andamento": "Já tem um vídeo seu sendo enviado ou editado para este roteiro. Espere terminar.",
+    "em-andamento": "Já tem um vídeo seu sendo enviado ou editado para este roteiro. Espere ele ficar pronto.",
     "envio-em-curso": "Este vídeo já está sendo enviado. Espere ele terminar.",
     "nao-achou": "Não achamos essa edição. Volte para o roteiro e comece de novo.",
     "nao-comecou": "Não foi possível começar agora. Tente de novo em instantes.",
@@ -65,6 +67,8 @@ export const textosEdicao = {
     sumiu: "O vídeo saiu do nosso servidor antes de a edição começar. Envie de novo.",
     demorou: "A edição demorou mais do que devia e foi parada. Envie o vídeo de novo.",
     "disco-cheio": "O envio de vídeos está pausado por alguns minutos. Tente de novo mais tarde.",
+    "disco-cheio-montar": "Estamos sem espaço por alguns minutos e não dá para montar o seu vídeo agora. O vídeo continua guardado: toque de novo daqui a pouco.",
+    "disco-cheio-publicar": "A publicação está pausada por alguns minutos. O seu vídeo editado continua guardado: tente de novo mais tarde.",
     "nao-montou": "Não conseguimos montar a edição do seu vídeo agora. Envie o vídeo de novo em alguns minutos.",
     "em-revisao": "Não conseguimos fechar a edição desse vídeo sozinhos. Grave de novo, falando com calma e dizendo o nome da marca com clareza, e envie outra vez.",
     "motivo-vazio": "Conte o que você quer mudar no vídeo, em poucas palavras, para a gente refazer do jeito certo.",

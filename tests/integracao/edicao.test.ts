@@ -694,10 +694,11 @@ describe("o teto de gasto de IA da edição por conta e por mês (achado 5 da re
 // ---------------------------------------------------------------------------
 
 describe("cota de 30 edições por mês", () => {
+  // `pronta` pesa na cota e não segura o roteiro (achado 7 de 03/11/2026: `transcrito` em diante conta como edição em andamento).
   async function encher(clienteId: number, roteiroId: number, quantas: number, extra: Partial<typeof edicoes.$inferInsert> = {}): Promise<void> {
     await db()
       .insert(edicoes)
-      .values(Array.from({ length: quantas }, () => ({ clienteId, roteiroId, tamanhoBytes: 10, tipoDoArquivo: "video/mp4", estado: "transcrito" as const, ...extra })));
+      .values(Array.from({ length: quantas }, () => ({ clienteId, roteiroId, tamanhoBytes: 10, tipoDoArquivo: "video/mp4", estado: "pronta" as const, ...extra })));
   }
 
   it("na 31ª o pedido volta 429 com a frase; só quem falhou antes de gastar não conta", async () => {
@@ -708,7 +709,7 @@ describe("cota de 30 edições por mês", () => {
     expect(trinta.status).toBe(200);
     expect(await trinta.json()).toMatchObject({ usadas: 30, limite: 30 });
     // Fecha a edição aberta para o roteiro ficar livre de novo e tenta a 31ª.
-    await db().update(edicoes).set({ estado: "transcrito" }).where(and(eq(edicoes.estado, "subindo")));
+    await db().update(edicoes).set({ estado: "pronta" }).where(and(eq(edicoes.estado, "subindo")));
     const trintaEUma = await abrirRota(pedidoAbrir({ roteiroId: roteiroA, tamanhoBytes: 10, tipoDoArquivo: "video/mp4" }));
     expect(trintaEUma.status).toBe(429);
     const corpo = (await trintaEUma.json()) as { erro: string; codigo: string };
