@@ -145,6 +145,11 @@ export default defineConfig({
       STRIPE_SECRET_KEY: "",
       STRIPE_WEBHOOK_SECRET: "whsec_e2e_nao_e_um_segredo_de_verdade",
       COBRANCA_ATIVA: "",
+      /**
+       * E63 PR 2: o cadastro sozinho fica DESLIGADO na suíte (como em produção hoje), e a página de vendas e o "Quero testar" são os de sempre. `tests/e2e/cadastro-proprio.spec.ts` prova o
+       * caminho inteiro com a chave ligada: `E2E_CADASTRO_ABERTO=1 npx playwright test cadastro-proprio` (sobe um servidor novo com a chave; sem a variável, o mesmo arquivo prova o cadastro fechado).
+       */
+      CADASTRO_ABERTO: process.env.E2E_CADASTRO_ABERTO === "1" ? "1" : "",
       COBRANCA_TESTE_DIAS: "7",
       COBRANCA_TESTE_EXIGE_CARTAO: "0",
       /**
