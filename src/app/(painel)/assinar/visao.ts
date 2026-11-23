@@ -31,8 +31,10 @@ export function testeTemCartao(s: Pick<SituacaoDaAssinatura, "temCartao">, exige
 }
 
 /** Qual das telas mostrar: a situação da marca, mais o fato de a pessoa ter acabado de voltar do pagamento (`?assinou=1`). */
-export function visaoDaTela(situacao: SituacaoDaAssinatura, voltouDoPagamento: boolean): Visao {
+export function visaoDaTela(situacao: SituacaoDaAssinatura, voltouDoPagamento: boolean, assinouAgora: boolean = false): Visao {
   if (situacao.tipo === "cortesia") return "cortesia";
+  // Assinou no meio do teste: enquanto o aviso do pagamento não chega, a marca ainda aparece como teste, e a tela não pode dizer que o teste "começou".
+  if (voltouDoPagamento && assinouAgora && situacao.tipo === "teste") return "aguardando";
   if (voltouDoPagamento) return situacao.tipo === "ativa" || situacao.tipo === "teste" ? "confirmada" : "aguardando";
   if (situacao.tipo === "ativa") return "ativa";
   if (situacao.tipo === "teste") return "teste";
@@ -66,13 +68,16 @@ export function botoesDaTela(visao: Visao, teste: TesteDaTela = TESTE_PADRAO, te
       return [{ acao: "hoje", rotulo: b.irParaHoje, variante: "primario" }];
     case "teste":
       // Sem cartão, o que a pessoa precisa fazer antes do fim é cadastrá-lo: o botão principal abre o portal para isso. Com cartão (pedido no começo ou já cadastrado), está tudo certo.
+      // O botão de assinar agora vem primeiro: encerra o teste e cobra hoje (sem cartão, leva a cadastrá-lo antes).
       return testeTemCartao({ temCartao }, teste.exigeCartao)
         ? [
-            { acao: "hoje", rotulo: b.irParaHoje, variante: "primario" },
+            { acao: "assinarAgora", rotulo: b.assinarAgora, variante: "primario" },
+            { acao: "hoje", rotulo: b.irParaHoje, variante: "secundario" },
             { acao: "portal", rotulo: b.gerenciar, variante: "secundario" },
           ]
         : [
-            { acao: "portal", rotulo: b.cadastrarCartao, variante: "primario" },
+            { acao: "assinarAgora", rotulo: b.assinarAgora, variante: "primario" },
+            { acao: "portal", rotulo: b.cadastrarCartao, variante: "secundario" },
             { acao: "hoje", rotulo: b.irParaHoje, variante: "secundario" },
           ];
     case "ativa":
@@ -89,7 +94,7 @@ export function botoesDaTela(visao: Visao, teste: TesteDaTela = TESTE_PADRAO, te
 
 /** O botão mexe em dinheiro ou em dado do Stripe? Só o dono da marca (e nunca o "ver como") os vê. */
 export function botaoEhDoDono(b: BotaoDaAssinatura): boolean {
-  return b.acao === "assinar" || b.acao === "portal";
+  return b.acao === "assinar" || b.acao === "portal" || b.acao === "assinarAgora";
 }
 
 /** O título e as frases embaixo dele. */

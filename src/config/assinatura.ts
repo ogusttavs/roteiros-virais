@@ -9,7 +9,6 @@ export const METADATA_PRODUTO = { produto: "roteiros" } as const;
 
 export const PLANO = {
   lookupKey: "roteiros_trimestral",
-  nomeDoProduto: "Roteiros, plano trimestral",
   /** R$ 1.191,00 em centavos. */
   valorEmCentavos: 119_100,
   moeda: "brl",
@@ -17,6 +16,14 @@ export const PLANO = {
   intervalo: "month",
   intervaloQuantidade: 3,
 } as const;
+
+/**
+ * O nome do produto na página do Stripe e na fatura da pessoa: o nome do aplicativo (`APP_NAME`), mais o plano. Antes era "Roteiros, plano trimestral", um nome de trabalho que a pessoa
+ * nunca viu no app (revisão de 23/11/2026, M3).
+ */
+export function nomeDoProdutoNoStripe(nomeDoApp: string): string {
+  return `${nomeDoApp.trim()}, plano trimestral`;
+}
 
 /** Depois do fim do período pago, quantos dias o acesso continua enquanto o aviso de renovação do Stripe não chega (o Stripe reenvia por até 3 dias). */
 export const DIAS_DE_FOLGA_DA_RENOVACAO = 3;

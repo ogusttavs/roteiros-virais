@@ -38,6 +38,7 @@ function stripeDeMentira(inicial: { produtos?: Produto[]; precos?: Preco[]; port
         if (!p) throw Object.assign(new Error("No such product"), { code: "resource_missing", statusCode: 404 });
         // Como o Stripe: so troca o que veio; o resto fica.
         if ("statement_descriptor" in params) p.statement_descriptor = params.statement_descriptor as string;
+        if ("name" in params) p.name = params.name as string;
         return p;
       },
     },
@@ -85,6 +86,8 @@ describe("prepararStripe", () => {
     const r = await prepararStripe(f.stripe, "Klaki");
     expect(r).toMatchObject({ produtoId: PRODUTO_ID, criouProduto: true, criouPreco: true });
     expect(f.produtos.get(PRODUTO_ID)?.metadata).toEqual({ produto: "roteiros" });
+    // M3 (23/11/2026): o nome na página do Stripe é o do app, não "Roteiros".
+    expect(f.produtos.get(PRODUTO_ID)?.name).toBe("Klaki, plano trimestral");
     expect(f.precos).toHaveLength(1);
     expect(f.precos[0]).toMatchObject({ unit_amount: 119_100, currency: "brl", lookup_key: "roteiros_trimestral", recurring: { interval: "month", interval_count: 3 }, metadata: { produto: "roteiros" } });
   });
@@ -197,10 +200,29 @@ describe("prepararStripe", () => {
     });
     const r = await prepararStripe(f.stripe, "Klaki");
     expect(r).toMatchObject({ criouProduto: false, criouPreco: false, atualizouDescritor: true, descritor: "KLAKI", precoId: "price_nosso" });
-    expect(f.produtos.get(PRODUTO_ID)).toMatchObject({ statement_descriptor: "KLAKI", name: "Roteiros, plano trimestral", metadata: { produto: "roteiros" } });
+    expect(f.produtos.get(PRODUTO_ID)).toMatchObject({ statement_descriptor: "KLAKI", name: "Klaki, plano trimestral", metadata: { produto: "roteiros" } });
     expect(f.produtos.get("prod_odonto")?.statement_descriptor).toBe("ODONTOTECH");
     expect(f.chamadas.filter((c) => c.startsWith("products.update"))).toEqual([`products.update ${PRODUTO_ID}`]);
     expect(f.precos).toHaveLength(1);
+  });
+
+  it("M3: produto nosso com o nome antigo (Roteiros) ganha o nome do app, numa chamada so, e nao mexe no produto de outro", async () => {
+    const f = stripeDeMentira({
+      produtos: [
+        { id: PRODUTO_ID, metadata: { produto: "roteiros" }, name: "Roteiros, plano trimestral", statement_descriptor: "KLAKI" },
+        { id: "prod_odonto", metadata: { produto: "odontotech" }, name: "OdontoTech" },
+      ],
+      precos: [{ id: "price_nosso", product: PRODUTO_ID, unit_amount: 119_100, currency: "brl", lookup_key: PLANO.lookupKey, metadata: { produto: "roteiros" }, recurring: { interval: "month", interval_count: 3 } }],
+    });
+    const r = await prepararStripe(f.stripe, "Klaki");
+    expect(r).toMatchObject({ atualizouNome: true, atualizouDescritor: false, nomeDoProduto: "Klaki, plano trimestral" });
+    expect(f.produtos.get(PRODUTO_ID)?.name).toBe("Klaki, plano trimestral");
+    expect(f.produtos.get("prod_odonto")?.name).toBe("OdontoTech");
+    expect(f.chamadas.filter((c) => c.startsWith("products.update"))).toHaveLength(1);
+    // Rodar de novo: nada a escrever.
+    f.chamadas.length = 0;
+    expect((await prepararStripe(f.stripe, "Klaki")).atualizouNome).toBe(false);
+    expect(f.chamadas.some((c) => c.startsWith("products.update"))).toBe(false);
   });
 
   it("produto nosso sem preco ainda e com outro descritor: atualiza o descritor e cria o preco", async () => {

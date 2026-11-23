@@ -25,7 +25,7 @@ async function main() {
   const nomeDoApp = process.env.APP_NAME || "Klaki";
   const relatorio = await prepararStripe(stripe as unknown as StripeLike, nomeDoApp);
   console.log(`stripe-preparar (${ehProducao ? "PRODUCAO" : "modo teste"}):`);
-  console.log(`  produto ${relatorio.produtoId}: ${relatorio.criouProduto ? "criado" : "ja existia"}`);
+  console.log(`  produto ${relatorio.produtoId} ("${relatorio.nomeDoProduto}"): ${relatorio.criouProduto ? "criado" : relatorio.atualizouNome ? "ja existia, nome atualizado agora" : "ja existia"}`);
   console.log(`  preco ${relatorio.precoId}: ${relatorio.criouPreco ? "criado" : "ja existia"}`);
   console.log(`  fatura do cartao mostra "${relatorio.descritor}": ${relatorio.criouProduto || relatorio.atualizouDescritor ? "definido agora" : "ja estava assim"}`);
   console.log(`  portal do cliente ${relatorio.portalId}: ${relatorio.criouPortal ? "criado" : "ja existia"}`);

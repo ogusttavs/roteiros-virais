@@ -19,8 +19,8 @@ import { botaoEhDoDono, botoesDaTela, textosDaTela, visaoDaTela, type TesteDaTel
  * atualizar). Fora do grupo `(completo)` de propósito: o portão redireciona para cá, e o layout dele não pode barrar a própria tela de pagar. Só as peças e os tokens que o painel
  * já tem (Cartao, Botao); nenhum desenho novo. O que decide cada tela está em `visao.ts` (puro, com teste).
  */
-export default async function Assinar({ searchParams }: { searchParams: Promise<{ assinou?: string }> }) {
-  const { assinou } = await searchParams;
+export default async function Assinar({ searchParams }: { searchParams: Promise<{ assinou?: string; agora?: string }> }) {
+  const { assinou, agora } = await searchParams;
   const sessao = await sessaoDoPainel();
   if (!sessao) redirect("/entrar");
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
@@ -28,7 +28,7 @@ export default async function Assinar({ searchParams }: { searchParams: Promise<
 
   const lista = await assinaturasDaMarca(cliente.id);
   const situacao = situacaoDaAssinatura(cliente.cortesia, lista);
-  const visao = visaoDaTela(situacao, assinou === "1");
+  const visao = visaoDaTela(situacao, assinou === "1", agora === "1");
   const verComo = sessao.verComo !== null;
   const dono = verComo ? false : await ehDonoDaMarca(sessao.user.id, cliente.id);
 
@@ -89,6 +89,7 @@ export default async function Assinar({ searchParams }: { searchParams: Promise<
           ) : null}
           {visao === "aguardando" ? <ConfirmandoPagamento /> : null}
           {aviso && visao !== "aguardando" ? <p className={styles.aviso}>{aviso}</p> : null}
+          {visao === "teste" && dono ? <p className={styles.frase}>{situacao.temCartao || teste.exigeCartao ? textosAssinatura.teste.assinarAgora.comCartao : textosAssinatura.teste.assinarAgora.semCartao}</p> : null}
           {botoes.length > 0 ? <BotoesDaAssinatura botoes={botoes} tamanho="lg" /> : null}
         </Cartao>
       )}
