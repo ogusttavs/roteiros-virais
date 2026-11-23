@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (!sessao) return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
-  const recusaCobranca = await recusaDaCobranca();
+  const recusaCobranca = await recusaDaCobranca({ gasto: "edicao" });
   if (recusaCobranca) return recusaCobranca;
 
   let corpo: { roteiroId?: unknown; tamanhoBytes?: unknown; tipoDoArquivo?: unknown; nomeDoArquivo?: unknown };
@@ -48,7 +48,8 @@ export async function POST(request: Request) {
       tipoDoArquivo: typeof corpo.tipoDoArquivo === "string" ? corpo.tipoDoArquivo : "",
       nomeDoArquivo: typeof corpo.nomeDoArquivo === "string" ? corpo.nomeDoArquivo : undefined,
     });
-    if (!resultado.ok) return NextResponse.json({ erro: resultado.frase, codigo: resultado.codigo }, { status: STATUS_DA_RECUSA[resultado.codigo] ?? 400, headers: SEM_CACHE });
+    // Em andamento: leva também o id da edição que já existe para o roteiro (a tela segue com ela em vez de abrir outra).
+    if (!resultado.ok) return NextResponse.json({ erro: resultado.frase, codigo: resultado.codigo, ...(resultado.edicaoId !== undefined ? { id: resultado.edicaoId } : {}) }, { status: STATUS_DA_RECUSA[resultado.codigo] ?? 400, headers: SEM_CACHE });
     return NextResponse.json({ id: resultado.edicaoId, usadas: resultado.usadas, limite: resultado.limite }, { headers: SEM_CACHE });
   } catch (erro) {
     logger.error({ err: erro, clienteId: cliente.id, roteiroId }, "edicao: nao foi possivel abrir a edicao");

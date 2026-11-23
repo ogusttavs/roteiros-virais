@@ -78,6 +78,30 @@ export const textosInteressados = {
     generico: "Não deu para enviar agora. Tente de novo em instantes.",
     semConexao: "Sem conexão com a internet. Confira o sinal e tente de novo.",
   },
+  /**
+   * E63 PR 2: o que muda na página quando o cadastro está aberto (a chave `CADASTRO_ABERTO`): "Quero testar" vira "Começar o teste grátis" e leva à criação da conta, entram o passo
+   * 4 (a edição do vídeo) e o item da edição no plano, e o formulário de interessado fica embaixo, discreto. Desligada, nada disto aparece e a página é a de sempre.
+   */
+  cadastro: {
+    botao: "Começar o teste grátis",
+    rotuloAria: "Começar o teste grátis, criar a conta",
+    linhaDoBotao: { destaque: "7 dias grátis, sem cartão.", resto: `Depois, ${PRECO_TRIMESTRAL_MES} por mês no plano trimestral, sem taxa de adesão.` },
+    passoDaEdicao: {
+      numero: "4",
+      etiqueta: "novo",
+      titulo: "Gravou? A gente edita.",
+      texto: "Mande o vídeo que você gravou e a gente corta as pausas e os erros, põe a legenda e o título na tela. Você assiste antes de aprovar. A música você escolhe na hora de postar.",
+    },
+    itemDaEdicao: "A edição do vídeo que você gravou: cortes, legenda e título",
+    plano: {
+      linhaDoTeste: "Teste 7 dias grátis, sem cartão.",
+      miudo: "Você não paga nada agora. Se não cadastrar o cartão até o fim do teste, ele termina sozinho e nada é cobrado.",
+    },
+    chamadaFinal: {
+      titulo: "Teste 7 dias grátis",
+      texto: "Crie a sua conta em um minuto, sem cartão. Depois do briefing, você já pode escrever o primeiro roteiro.",
+    },
+  },
   rodape: { termos: "Termos de uso", privacidade: "Política de privacidade", entrar: "Entrar" },
   /** O que o admin lê em `/admin/interessados`. */
   admin: {

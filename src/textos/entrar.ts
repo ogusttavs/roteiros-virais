@@ -1,4 +1,6 @@
 export const textosEntrar = {
+  /** E63 PR 2: o rodapé de Entrar quando o cadastro está aberto (a chave `CADASTRO_ABERTO`). */
+  cadastro: { pergunta: "Ainda não tem conta?", botao: "Começar o teste grátis" },
   titulo: "Bom te ver",
   campoEmail: "e-mail",
   campoSenha: "senha",

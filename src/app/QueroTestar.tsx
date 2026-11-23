@@ -37,7 +37,8 @@ type Erros = Partial<Record<"nome" | "email" | "whatsapp" | "ramo" | "aceite", s
  * página ainda não carregou o JavaScript e a pessoa tocar no botão, o envio nativo nunca põe nome, e-mail e telefone na barra de endereço. O campo "site" é a armadilha de robô:
  * escondido de quem vê e de quem usa leitor de tela, fora da ordem do Tab.
  */
-export function QueroTestar({ textos }: { textos: TextosDoFormulario }) {
+/** `aoEnviar` (E63 PR 2): quem usa o formulário dentro da tela de cadastro fechado troca o cartão pelo "Pedido enviado" do desenho; sem ele, o formulário mostra o sucesso sozinho, como sempre. `discreto`: o botão é de contorno (na página de vendas com o cadastro aberto o botão cheio é o do cadastro, um por tela). */
+export function QueroTestar({ textos, aoEnviar, discreto = false }: { textos: TextosDoFormulario; aoEnviar?: () => void; discreto?: boolean }) {
   const tratarFalha = useTratarFalha();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -61,6 +62,7 @@ export function QueroTestar({ textos }: { textos: TextosDoFormulario }) {
       const resultado = await queroTestarAction({ nome, email, whatsapp, ramo, aceite, site });
       if (resultado.ok) {
         setEnviado(true);
+        aoEnviar?.();
         return;
       }
       if (resultado.erros) {
@@ -152,7 +154,7 @@ export function QueroTestar({ textos }: { textos: TextosDoFormulario }) {
           {erroGeral}
         </p>
       ) : null}
-      <Botao type="submit" tamanho="lg" carregando={enviando} precisaDeRede>
+      <Botao type="submit" variante={discreto ? "secundario" : "primario"} tamanho="lg" carregando={enviando} precisaDeRede>
         {enviando ? textos.enviando : textos.botao}
       </Botao>
     </form>

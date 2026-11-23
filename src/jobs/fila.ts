@@ -71,6 +71,8 @@ export const FILAS = {
   emailAcompanhamento: "email-acompanhamento",
   /** E26 4c: a faxina diaria das versoes do roteiro que ninguem escolheu, em grupos parados ha mais de 30 dias. */
   faxinaVersoes: "faxina-versoes",
+  /** E63 PR 1: todo dia, apaga a conta de cadastro próprio que nunca confirmou o e-mail em 7 dias, com a marca vazia dela. Job curto. */
+  faxinaCadastros: "faxina-cadastros",
   /** E19 PR 1: a renovacao diaria do acesso das contas de Instagram que as pessoas ligaram (e o aviso quando nao da mais). */
   renovarContasLigadas: "renovar-contas-ligadas",
   /** Por evento, nao por horario (E27, parte 2, item 2): reprovarERescrever enfileira depois de gravar a reprovacao. */
@@ -183,6 +185,7 @@ const FILAS_CURTAS = new Set<string>([
   FILAS.curvaCliente,
   FILAS.emailAcompanhamento,
   FILAS.faxinaVersoes,
+  FILAS.faxinaCadastros,
   FILAS.renovarContasLigadas,
   FILAS.aprenderCliente,
   FILAS.analisarPerfil,

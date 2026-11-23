@@ -329,6 +329,9 @@ describe("(b) um Checkout aberto por marca", () => {
       expirarSessao: async () => undefined,
       criarPortal: async () => ({ url: "x" }),
       cancelarAssinatura: async () => undefined,
+      encerrarTeste: async () => ({ cobrado: true }),
+      lerAssinatura: async () => null,
+      assinaturasDaMarca: async () => [],
     };
     usarPortaStripe(porta);
     await expect(iniciarAssinatura(donoA, { id: marcaA })).rejects.toBeInstanceOf(ErroAssinatura);
@@ -382,6 +385,9 @@ describe("(d) apagar uma marca com assinatura cancela no Stripe antes", () => {
       cancelarAssinatura: async () => {
         throw new Error("Stripe fora do ar");
       },
+      encerrarTeste: async () => ({ cobrado: true }),
+      lerAssinatura: async () => null,
+      assinaturasDaMarca: async () => [],
     };
     usarPortaStripe(porta);
 

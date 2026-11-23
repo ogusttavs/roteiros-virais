@@ -71,7 +71,7 @@ export async function gerarVersoesAction(
 ): Promise<ResultadoAcao<{ grupo: string }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
-  await exigirAssinaturaValida();
+  await exigirAssinaturaValida({ gasto: "roteiro" });
   const cliente = await clienteDaSessaoAtual();
   // Um id que veio e não vale não vira "sem pesquisa" em silêncio: a pessoa pediu a pesquisa, e o roteiro sairia sem ela.
   const pesquisaValida = pesquisaId === undefined || pesquisaId === null ? undefined : idDoBancoOuNulo(pesquisaId);

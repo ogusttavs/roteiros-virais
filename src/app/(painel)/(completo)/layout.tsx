@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
+import { barreiraDoCadastroNaSessao } from "@/lib/portao-cadastro";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { marcaPrecisaAssinar } from "@/servicos/assinatura";
 import {
@@ -50,6 +51,10 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect(destinoSemMarca(sessao.user.role));
+  }
+  // E63: quem criou a conta sozinho e ainda não confirmou o e-mail só vê a página de confirmar.
+  if ((await barreiraDoCadastroNaSessao())?.tipo === "email") {
+    redirect("/confirmar-email");
   }
   if (!(await briefingCompleto(cliente.id))) {
     redirect("/comecar");

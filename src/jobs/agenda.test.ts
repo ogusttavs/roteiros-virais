@@ -48,6 +48,10 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.vigiarDisco)).toBe("*/15 * * * *");
   });
 
+  it("faxinaCadastros roda todo dia as 07:35 (E63)", () => {
+    expect(cronDe(FILAS.faxinaCadastros)).toBe("35 7 * * *");
+  });
+
   it("faxinaVersoes roda todo dia as 07:15", () => {
     expect(cronDe(FILAS.faxinaVersoes)).toBe("15 7 * * *");
   });

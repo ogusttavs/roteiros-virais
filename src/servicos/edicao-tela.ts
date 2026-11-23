@@ -16,6 +16,7 @@ import { edicoes, type Edicao, type EstadoDaEdicao } from "@/db/schema";
 import { apagarArquivoDaEdicao, arquivoExiste } from "@/edicao/arquivos";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { logger } from "@/lib/log";
+import { recusaPorDiscoCritico, type DepsDaRecusaPorDisco } from "@/servicos/disco";
 import { recusaPeloTetoDeGasto, usoDoMes } from "@/servicos/edicao";
 import { enfileirarRender } from "@/servicos/render-edicao";
 import type { RoteiroLinha } from "@/servicos/roteiro";
@@ -25,6 +26,8 @@ export type DepsDaTelaDeEdicao = {
   agora?: () => Date;
   enfileirarRender?: (edicaoId: number, perfil: "previa" | "final", emSegundos: number) => Promise<void>;
   enfileirarDecisao?: (edicaoId: number, rodada: number) => Promise<void>;
+  /** Achado 10 da revisão de 03/11/2026: como medir o disco antes de aprovar (os testes dão o disco que quiserem). */
+  disco?: DepsDaRecusaPorDisco;
 };
 
 /** O que a tela mostra de uma edição que já passou do envio. Nada da fala, dos caminhos, dos custos nem dos pedidos de ajuste. */
@@ -139,6 +142,8 @@ export async function aprovarEdicao(clienteId: number, edicaoId: number, deps: D
   if (!linha) return recusa("nao-achou");
   if (linha.estado !== "previa_pronta") return recusa("nao-e-a-hora");
   if (!(await arquivoExiste(linha.caminhoBruto))) return recusa("arquivo-saiu");
+  // Achado 10 da revisão de 03/11/2026: com o disco do servidor em nível crítico o vídeo final (centenas de MB) não é montado. A edição fica na prévia pronta e a pessoa toca de novo depois.
+  if (await recusaPorDiscoCritico(deps.disco)) return recusa("disco-cheio-montar");
 
   const [aprovada] = await db()
     .update(edicoes)

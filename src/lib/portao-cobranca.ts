@@ -16,11 +16,13 @@ import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 
 import { config } from "@/lib/config";
+import { barreiraDoCadastroNaSessao, destinoDaBarreira, fraseDaBarreira, type GastoQueConta } from "@/lib/portao-cadastro";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { marcaPrecisaAssinar } from "@/servicos/assinatura";
 import { briefingCompleto, clienteAtivoDoUsuario } from "@/servicos/clientes";
 
-export type OpcoesDoPortao = { soDepoisDoBriefing?: boolean };
+/** `gasto` (E63): a ação cria um roteiro ou manda um vídeo para editar; o teto do teste de quem criou a conta sozinho confere o tanto de cada um. */
+export type OpcoesDoPortao = { soDepoisDoBriefing?: boolean; gasto?: GastoQueConta };
 
 export const FRASE_ASSINATURA_NECESSARIA = "Para continuar, a conta precisa de uma assinatura ativa.";
 
@@ -38,11 +40,18 @@ export async function marcaBarradaPelaCobranca(opcoes: OpcoesDoPortao = {}, cobr
 
 /** Para Server Actions: se a marca precisa assinar, leva a pessoa para `/assinar` (o redirecionamento interrompe a ação). Chamar antes de qualquer gasto. */
 export async function exigirAssinaturaValida(opcoes: OpcoesDoPortao = {}): Promise<void> {
+  // E63: e-mail por confirmar e teto do teste (só marca de cadastro próprio), com a cobrança ligada ou não.
+  const barreira = await barreiraDoCadastroNaSessao(opcoes);
+  if (barreira) redirect(destinoDaBarreira(barreira));
   if (await marcaBarradaPelaCobranca(opcoes)) redirect("/assinar");
 }
 
 /** Para rotas `/api`: a resposta 402 quando a marca precisa assinar, ou `null` para seguir. */
 export async function recusaDaCobranca(opcoes: OpcoesDoPortao = {}): Promise<NextResponse | null> {
+  const barreira = await barreiraDoCadastroNaSessao(opcoes);
+  if (barreira) {
+    return NextResponse.json({ erro: fraseDaBarreira(barreira) }, { status: barreira.tipo === "email" ? 403 : 402, headers: { "Cache-Control": "private, no-store" } });
+  }
   if (!(await marcaBarradaPelaCobranca(opcoes))) return null;
   return NextResponse.json({ erro: FRASE_ASSINATURA_NECESSARIA }, { status: 402, headers: { "Cache-Control": "private, no-store" } });
 }

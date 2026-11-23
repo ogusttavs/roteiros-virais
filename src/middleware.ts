@@ -22,7 +22,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * /redefinir-senha (E58) e o destino do link do e-mail de "esqueci a senha":
  * quem esqueceu a senha nao tem sessao.
  */
-const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/api/versao", "/termos", "/privacidade", "/dados", "/redefinir-senha"];
+const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/api/versao", "/termos", "/privacidade", "/dados", "/redefinir-senha", "/api/cadastro/confirmar", "/criar-conta", "/email-confirmado"];
 
 /**
  * Rotas com autenticacao propria, sem cookie de sessao (etapa 6): o cabecalho

@@ -81,7 +81,7 @@ describe("stripe:preparar com o SDK oficial contra um Stripe de mentira em HTTP"
   });
 
   it("produto nosso que ja existia sem descritor: um unico POST no produto de id fixo, so com statement_descriptor=KLAKI", async () => {
-    const f = await subirStripeDeMentira({ produto: { id: PRODUTO_ID, object: "product", metadata: { produto: "roteiros" }, statement_descriptor: null }, preco: precoNosso });
+    const f = await subirStripeDeMentira({ produto: { id: PRODUTO_ID, object: "product", metadata: { produto: "roteiros" }, name: "Klaki, plano trimestral", statement_descriptor: null }, preco: precoNosso });
     fechar = f.fechar;
     const r = await prepararStripe(f.stripe, "Klaki");
     expect(r).toMatchObject({ criouProduto: false, criouPreco: false, atualizouDescritor: true, descritor: "KLAKI" });
@@ -93,7 +93,7 @@ describe("stripe:preparar com o SDK oficial contra um Stripe de mentira em HTTP"
   });
 
   it("rodar de novo com o descritor ja certo: nenhuma escrita no produto", async () => {
-    const f = await subirStripeDeMentira({ produto: { id: PRODUTO_ID, object: "product", metadata: { produto: "roteiros" }, statement_descriptor: "KLAKI" }, preco: precoNosso });
+    const f = await subirStripeDeMentira({ produto: { id: PRODUTO_ID, object: "product", metadata: { produto: "roteiros" }, name: "Klaki, plano trimestral", statement_descriptor: "KLAKI" }, preco: precoNosso });
     fechar = f.fechar;
     const r = await prepararStripe(f.stripe, "Klaki");
     expect(r).toMatchObject({ atualizouDescritor: false });

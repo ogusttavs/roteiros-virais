@@ -221,7 +221,14 @@ export function EditarMeuVideo({ roteiroId, visao, aoEnviando, semConexao, aoPub
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roteiroId, tamanhoBytes: arquivo.size, tipoDoArquivo: arquivo.type, nomeDoArquivo: arquivo.name }),
       });
-      const corpo = (await abriu.json().catch(() => ({}))) as { id?: number; usadas?: number; erro?: string };
+      const corpo = (await abriu.json().catch(() => ({}))) as { id?: number; usadas?: number; erro?: string; codigo?: string };
+      // Já existe uma edição deste roteiro (outra aba, ou o envio anterior ainda andando): a tela segue com ela, em vez de abrir outra.
+      if (abriu.status === 409 && corpo.codigo === "em-andamento" && typeof corpo.id === "number") {
+        setNovoEnvio(false);
+        setArquivo(null);
+        setEdicao(vistaNova(corpo.id, roteiroId));
+        return;
+      }
       if (!abriu.ok || typeof corpo.id !== "number") {
         setErro(corpo.erro ?? t.erroGenerico);
         return;

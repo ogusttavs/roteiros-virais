@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   briefingOk: true,
   chamadas: { sessao: vi.fn(), cliente: vi.fn(), briefing: vi.fn(), portao: vi.fn() },
   ativa: true,
+  barreira: null as null | { tipo: "email" } | { tipo: "teto"; qual: "roteiros" },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -26,6 +27,11 @@ vi.mock("@/lib/config", () => ({
       },
     },
   },
+}));
+vi.mock("@/lib/portao-cadastro", () => ({
+  barreiraDoCadastroNaSessao: async () => m.barreira,
+  destinoDaBarreira: (b: { tipo: string }) => (b.tipo === "email" ? "/confirmar-email" : "/limite-do-teste"),
+  fraseDaBarreira: () => "frase da barreira",
 }));
 vi.mock("@/lib/ver-como", () => ({
   sessaoDoPainel: async () => {
@@ -54,6 +60,7 @@ const { exigirAssinaturaValida, marcaBarradaPelaCobranca, recusaDaCobranca, FRAS
 
 beforeEach(() => {
   m.ativa = true;
+  m.barreira = null;
   m.sessao = { user: { id: "u1" }, verComo: null };
   m.cliente = { id: 7, cortesia: false };
   m.precisa = true;
@@ -127,5 +134,28 @@ describe("cobrança ligada", () => {
     m.briefingOk = false;
     await expect(exigirAssinaturaValida()).rejects.toThrow("REDIRECT:/assinar");
     expect(m.chamadas.briefing).not.toHaveBeenCalled();
+  });
+});
+
+describe("E63: e-mail por confirmar e teto do teste (marca de cadastro próprio)", () => {
+  it("vale com a cobrança desligada: a ação vai para a confirmação e a rota devolve 403", async () => {
+    m.ativa = false;
+    m.barreira = { tipo: "email" };
+    await expect(exigirAssinaturaValida()).rejects.toThrow("REDIRECT:/confirmar-email");
+    const resposta = await recusaDaCobranca();
+    expect(resposta?.status).toBe(403);
+    expect(await resposta?.json()).toEqual({ erro: "frase da barreira" });
+  });
+
+  it("o teto leva à página do limite, e a rota devolve 402", async () => {
+    m.barreira = { tipo: "teto", qual: "roteiros" };
+    await expect(exigirAssinaturaValida()).rejects.toThrow("REDIRECT:/limite-do-teste");
+    expect((await recusaDaCobranca())?.status).toBe(402);
+  });
+
+  it("sem barreira, nada muda", async () => {
+    m.ativa = false;
+    await expect(exigirAssinaturaValida()).resolves.toBeUndefined();
+    expect(await recusaDaCobranca()).toBeNull();
   });
 });

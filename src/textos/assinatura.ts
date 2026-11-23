@@ -99,6 +99,11 @@ export const textosAssinatura = {
     confirmada: {
       titulo: "Seu teste grátis começou",
     },
+    /** A linha embaixo do botão "Assinar agora", no teste em andamento. */
+    assinarAgora: {
+      comCartao: `Ao assinar agora, o teste termina hoje e a cobrança de ${valorDoPlanoPorExtenso()} ${periodoDoPlanoPorExtenso()} é feita hoje, no cartão que você cadastrou.`,
+      semCartao: "Para assinar agora, primeiro você cadastra o cartão. Depois de cadastrar, volte aqui e toque de novo em Assinar agora: o teste termina e a cobrança é feita hoje.",
+    },
   },
 
   /** O corpo de cada situação em `/assinar`. */
@@ -152,6 +157,8 @@ export const textosAssinatura = {
   botoes: {
     /** O preço e o período saem da configuração do plano (`config/assinatura.ts`), nunca escritos aqui. */
     assinar: `Assinar por ${valorDoPlanoPorExtenso()} ${periodoDoPlanoPorExtenso()}`,
+    /** Para quem está no teste grátis: encerra o teste e cobra hoje (preço e período da configuração do plano). */
+    assinarAgora: `Assinar agora por ${valorDoPlanoPorExtenso()} ${periodoDoPlanoPorExtenso()}`,
     assinarCurto: "Assinar",
     assinarDeNovo: "Assinar de novo",
     atualizarCartao: "Atualizar o cartão",

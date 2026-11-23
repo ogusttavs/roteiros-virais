@@ -70,6 +70,12 @@ jobs:
         env:
           PLAYWRIGHT_SEM_BUILD: "1"
 
+      # E63 PR 2: o caminho do cadastro com a chave LIGADA. `CADASTRO_ABERTO` e lida a cada pedido (nao no build), entao o mesmo build serve; so este spec roda, num servidor novo com a chave.
+      - run: npx playwright test cadastro-proprio
+        env:
+          PLAYWRIGHT_SEM_BUILD: "1"
+          E2E_CADASTRO_ABERTO: "1"
+
       # Sempre, nao so quando o job falha (item 0c, 29/09/2026): com retries em
       # CI, um teste que reprova na primeira tentativa e passa na segunda deixa
       # o job verde e o rastro da falha (error-context.md, trace) morria aqui.
