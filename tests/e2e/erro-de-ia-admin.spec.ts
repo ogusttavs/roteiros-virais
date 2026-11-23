@@ -1,6 +1,6 @@
 /**
  * O erro da API da IA dito pelo nome, só ao admin (achado de 05/10/2026): o simulador recusa a geração do roteiro pela causa que o texto do momento pede (`[mock:erro-credito]`,
- * `[mock:erro-sobrecarga]`, `[mock:erro-chave]`); o admin lê a causa na folha, o cliente comum lê a frase genérica de sempre; e o Início do admin avisa da falta de crédito até uma geração dar
+ * `[mock:erro-sobrecarga]`, `[mock:erro-chave]`); o admin lê a causa na folha, o cliente comum lê a frase do problema nosso quando só o dono resolve (crédito ou chave) e a genérica na sobrecarga; e o Início do admin avisa da falta de crédito e da chave recusada até uma geração dar
  * certo depois. Grava as duas marcas direto no banco. Seguro para a repetição automática do Playwright.
  */
 import { expect, test, type Page } from "@playwright/test";
@@ -9,6 +9,7 @@ import { eq, inArray } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import { account, briefings, clientes, configuracaoAdmin, geracoesIA, membrosMarca, nichos, preferenciasUsuario, user } from "../../src/db/schema";
+import { FRASE_DO_PROBLEMA_NOSSO } from "../../src/ia/erro";
 import { CHAVES_DAS_FALHAS_DA_IA, chaveDaFalhaDaIA } from "../../src/ia/falha-da-ia";
 
 const SENHA = "ExemploSenha123";
@@ -99,12 +100,15 @@ test.describe("o erro da IA dito pelo nome", () => {
     }
   });
 
-  test("o cliente comum lê a frase genérica de sempre, mesmo com a IA sem crédito", async ({ page }) => {
-    await entrar(page, COMUM, /\/hoje/);
-    const folha = await pedirRoteiroComMarcador(page, "[mock:erro-credito]");
-    await expect(folha.getByText(GENERICA)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/sem crédito|Plans & Billing/)).toHaveCount(0);
-  });
+  for (const marcador of ["[mock:erro-credito]", "[mock:erro-chave]"]) {
+    test(`o cliente comum lê a frase do problema nosso com ${marcador}, e nunca a causa`, async ({ page }) => {
+      await entrar(page, COMUM, /\/hoje/);
+      const folha = await pedirRoteiroComMarcador(page, marcador);
+      await expect(folha.getByText(FRASE_DO_PROBLEMA_NOSSO)).toBeVisible({ timeout: 30_000 });
+      await expect(folha.getByText(GENERICA)).toHaveCount(0);
+      await expect(page.getByText(/sem crédito|Plans & Billing|chave da IA/)).toHaveCount(0);
+    });
+  }
 
   test("o Início do admin avisa da falta de crédito e o aviso some quando uma geração dá certo depois", async ({ browser }) => {
     // o cliente comum esbarra na falta de crédito: nada na tela dele diz isso, mas fica anotado
@@ -119,12 +123,30 @@ test.describe("o erro da IA dito pelo nome", () => {
     const admin = await contextoAdmin.newPage();
     await entrar(admin, ADMIN, /\/admin\/?$/);
     await expect(admin.getByText("A API da IA está sem crédito")).toBeVisible();
-    await expect(admin.getByText(/nenhuma geração sai enquanto isso/)).toBeVisible();
+    await expect(admin.getByText(/nenhum roteiro, tema nem avaliação do briefing sai enquanto isso/)).toBeVisible();
 
     // uma geração que deu certo depois apaga o aviso
     await db().insert(geracoesIA).values({ tarefa: TAREFA_DO_TESTE, versaoPrompt: "1", modelo: "mock", entradas: {}, criadoEm: new Date(Date.now() + 5_000) });
     await admin.reload();
     await expect(admin.getByText("A API da IA está sem crédito")).toHaveCount(0);
+    await contextoAdmin.close();
+  });
+
+  test("a chave recusada também aparece no Início do admin, e some quando uma geração dá certo depois", async ({ browser }) => {
+    const contextoComum = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const paginaComum = await contextoComum.newPage();
+    await entrar(paginaComum, COMUM, /\/hoje/);
+    await pedirRoteiroComMarcador(paginaComum, "[mock:erro-chave]");
+    await expect.poll(async () => (await db().select().from(configuracaoAdmin).where(eq(configuracaoAdmin.chave, chaveDaFalhaDaIA("chave")))).length, { timeout: 30_000 }).toBe(1);
+    await contextoComum.close();
+
+    const contextoAdmin = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const admin = await contextoAdmin.newPage();
+    await entrar(admin, ADMIN, /\/admin\/?$/);
+    await expect(admin.getByText("A chave da IA foi recusada.")).toBeVisible();
+    await db().insert(geracoesIA).values({ tarefa: TAREFA_DO_TESTE, versaoPrompt: "1", modelo: "mock", entradas: {}, criadoEm: new Date(Date.now() + 5_000) });
+    await admin.reload();
+    await expect(admin.getByText("A chave da IA foi recusada.")).toHaveCount(0);
     await contextoAdmin.close();
   });
 
