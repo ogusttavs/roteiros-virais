@@ -21,7 +21,6 @@ export const textosCadastro = {
     senhaCurta: "A senha precisa ter pelo menos 8 caracteres.",
     senhaLonga: "A senha pode ter no máximo 128 caracteres.",
     aceite: "Para criar a conta, aceite os termos de uso e a política de privacidade.",
-    jaExiste: "Esse e-mail já tem uma conta. Entre com ele, ou peça uma senha nova em \"esqueci a senha\".",
     limite: "Muitas tentativas agora. Espere alguns minutos e tente de novo.",
     cheio: "Muita gente criando conta neste momento. Tente de novo daqui a pouco.",
     fechado: "O cadastro ainda não está aberto. Deixe o seu contato na página inicial e a gente conversa.",
@@ -36,6 +35,16 @@ export const textosCadastro = {
         `<p>${linkEmail(opcoes.url, "Confirmar o meu e-mail")}</p>` +
         `<p>O link vale por 24 horas e só funciona uma vez. Se ele vencer, entre no aplicativo e peça outro.</p>` +
         `<p>Se não foi você que criou a conta, pode ignorar este e-mail.</p>`,
+    ),
+
+  /** Para quem tentou criar conta com um e-mail que já tem uma: a tela responde igual a um cadastro novo, e é só este e-mail que conta a verdade. */
+  assuntoJaTemConta: `Você já tem conta em ${config.appName}`,
+  corpoJaTemConta: (opcoes: { entrarUrl: string; esqueciUrl: string }) =>
+    envolverEmail(
+      `<p>Alguém tentou criar uma conta com este e-mail, mas ele já tem uma.</p>` +
+        `<p>${linkEmail(opcoes.entrarUrl, "Entrar na minha conta")}</p>` +
+        `<p>Se você não lembra da senha, ${linkEmail(opcoes.esqueciUrl, "peça uma senha nova")}.</p>` +
+        `<p>Se não foi você que tentou, pode ignorar este e-mail: nada mudou na sua conta.</p>`,
     ),
 
   /** O aviso ao admin a cada conta nova: só o nome do negócio e o e-mail, nada além. */

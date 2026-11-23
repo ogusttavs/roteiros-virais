@@ -33,6 +33,8 @@ export const LIMITES_DO_CADASTRO = {
   /** Reenvios: no máximo cinco e-mails de confirmação por pessoa em 24 horas (o primeiro conta), e um minuto entre um e outro. */
   enviosPorDia: 5,
   esperaEntreEnviosMs: 60 * 1000,
+  /** A conta de cadastro próprio que nunca confirmou o e-mail é apagada depois de 7 dias (job diário), para não prender o e-mail. */
+  diasParaApagarSemConfirmar: 7,
   /** A pesquisa de setor novo (Apify e YouTube) roda sozinha só para este tanto de ramos novos por dia (24 horas) vindos de cadastro próprio; o resto espera o admin aprovar. */
   ramosNovosPorDia: 2,
 } as const;

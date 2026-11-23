@@ -10,7 +10,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { hashPassword } from "better-auth/crypto";
-import { and, count, desc, eq, gt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, lt, sql } from "drizzle-orm";
 
 import { LIMITES_DO_CADASTRO, TAMANHO_DO_CADASTRO, cadastroAberto } from "@/config/cadastro";
 import { emailEhDescartavel } from "@/config/emails-descartaveis";
@@ -32,9 +32,11 @@ export type ErrosDoCadastro = Partial<Record<CampoDoCadastro, string>>;
 export type DadosDoCadastro = { nome: string; negocio: string; email: string; senha: string };
 
 export type ResultadoDoCadastro =
-  | { ok: true; usuarioId: string; clienteId: number; email: string }
+  /** `novo` falso: o e-mail já tinha conta, nada foi criado e foi mandado um aviso a esse endereço. Quem chama responde IGUAL nos dois casos (a tela não revela quem já tem conta). */
+  | { ok: true; novo: true; usuarioId: string; clienteId: number; email: string }
+  | { ok: true; novo: false; email: string }
   | { ok: false; motivo: "campos"; erros: ErrosDoCadastro }
-  | { ok: false; motivo: "fechado" | "limite" | "cheio" | "jaExiste" };
+  | { ok: false; motivo: "fechado" | "limite" | "cheio" };
 
 const limitadorPorIp = criarLimitador(LIMITES_DO_CADASTRO.porIp);
 
@@ -95,11 +97,27 @@ function linkDeConfirmacao(codigo: string): string {
   return url.toString();
 }
 
+/**
+ * Dispara sem esperar (o tempo de resposta do cadastro não pode depender do envio, nem diferir entre e-mail novo e e-mail que já tem conta). Uma falha vai para o log, nunca para a pessoa.
+ */
+function semEsperar(tarefa: Promise<unknown>, contexto: string): void {
+  tarefa.catch((erro) => logger.error({ err: erro }, `cadastro: ${contexto} falhou`));
+}
+
 async function mandarConfirmacao(email: string, nome: string, codigo: string): Promise<void> {
   await enviarEmail({
     para: email,
     assunto: textosCadastro.assuntoConfirmacao,
     html: textosCadastro.corpoConfirmacao({ url: linkDeConfirmacao(codigo), nome }),
+  });
+}
+
+/** O e-mail curto para quem tentou criar conta com um endereço que já tem uma: o caminho de entrar ou de pedir uma senha nova. */
+async function avisarQueJaTemConta(email: string): Promise<void> {
+  await enviarEmail({
+    para: email,
+    assunto: textosCadastro.assuntoJaTemConta,
+    html: textosCadastro.corpoJaTemConta({ entrarUrl: `${config.appUrl}/entrar`, esqueciUrl: `${config.appUrl}/entrar?esqueci=1` }),
   });
 }
 
@@ -126,7 +144,7 @@ export type OpcoesDoCadastro = {
 
 /**
  * Cria a conta, a marca, a dona, o aceite dos termos e o primeiro link de confirmar, tudo numa transação: ou nasce tudo, ou nada. Dois pedidos ao mesmo tempo com o mesmo e-mail
- * criam uma conta só (o índice único de `user.email` decide, e quem perdeu recebe `jaExiste`).
+ * criam uma conta só (o índice único de `user.email` decide, e quem perdeu é tratado como e-mail que já tem conta). E-mail que já tem conta NÃO é revelado: responde igual a um cadastro novo, não cria nada e manda ao endereço um aviso.
  */
 export async function cadastrarConta(bruto: unknown, opcoes: OpcoesDoCadastro): Promise<ResultadoDoCadastro> {
   // Desligado, nada muda: o cadastro responde fechado, antes de ler qualquer outra coisa.
@@ -179,19 +197,18 @@ export async function cadastrarConta(bruto: unknown, opcoes: OpcoesDoCadastro): 
       return marca.id;
     });
   } catch (erro) {
-    if (erro instanceof ErroEmailJaTemConta || erroDeEmailRepetido(erro)) return { ok: false, motivo: "jaExiste" };
+    if (erro instanceof ErroEmailJaTemConta || erroDeEmailRepetido(erro)) {
+      semEsperar(avisarQueJaTemConta(email), "o aviso de que o e-mail ja tem conta");
+      return { ok: true, novo: false, email };
+    }
     throw erro;
   }
 
-  // Depois de gravar: uma falha de e-mail nunca desfaz a conta (a pessoa pede outro link na própria tela de confirmar).
-  try {
-    await mandarConfirmacao(email, nome, codigo);
-  } catch (erro) {
-    logger.error({ err: erro, usuarioId }, "cadastro: o e-mail de confirmacao falhou");
-  }
-  await (opcoes.avisar ?? avisarAdminDoCadastro)(negocio, email);
+  // Depois de gravar: uma falha de e-mail nunca desfaz a conta (a pessoa pede outro link na própria tela de confirmar), e nenhum envio é esperado.
+  semEsperar(mandarConfirmacao(email, nome, codigo), "o e-mail de confirmacao");
+  semEsperar((opcoes.avisar ?? avisarAdminDoCadastro)(negocio, email), "o aviso ao admin");
 
-  return { ok: true, usuarioId, clienteId, email };
+  return { ok: true, novo: true, usuarioId, clienteId, email };
 }
 
 // ---------------------------------------------------------------------------
@@ -251,3 +268,42 @@ export async function reenviarConfirmacao(usuarioId: string, agora: Date = new D
   await mandarConfirmacao(pessoa.email, pessoa.nome, codigo);
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// Faxina: conta que nunca confirmou o e-mail
+// ---------------------------------------------------------------------------
+
+/**
+ * Apaga a conta de cadastro próprio que nunca confirmou o e-mail em `LIMITES_DO_CADASTRO.diasParaApagarSemConfirmar` dias (para o e-mail não ficar preso por quem digitou errado ou
+ * por quem só quis tomar o endereço de outro), junto com a marca vazia que nasceu com ela. Só apaga se a marca tem a pessoa como única membro e nada ligado (roteiro, geração, edição,
+ * assinatura): se o banco recusar por qualquer vínculo, essa conta fica e é contada em `puladas`. Cada conta numa transação própria.
+ */
+export async function faxinarCadastrosSemConfirmar(agora: Date = new Date()): Promise<{ apagadas: number; puladas: number }> {
+  const limite = new Date(agora.getTime() - LIMITES_DO_CADASTRO.diasParaApagarSemConfirmar * 24 * 60 * 60 * 1000);
+  const velhas = await db()
+    .select({ usuarioId: cadastrosProprios.usuarioId, clienteId: cadastrosProprios.clienteId })
+    .from(cadastrosProprios)
+    .innerJoin(user, eq(user.id, cadastrosProprios.usuarioId))
+    .where(and(eq(user.emailVerified, false), lt(cadastrosProprios.criadoEm, limite)));
+
+  let apagadas = 0;
+  let puladas = 0;
+  for (const { usuarioId, clienteId } of velhas) {
+    try {
+      await db().transaction(async (tx) => {
+        const [{ membros }] = await tx.select({ membros: count() }).from(membrosMarca).where(eq(membrosMarca.clienteId, clienteId));
+        if (membros !== 1) throw new ErroContaComVinculo();
+        // Apaga a pessoa (leva junto o acesso, os termos, os links e a linha do cadastro) e a marca; qualquer coisa ligada à marca faz o banco recusar e tudo volta.
+        await tx.delete(user).where(eq(user.id, usuarioId));
+        await tx.delete(clientes).where(eq(clientes.id, clienteId));
+      });
+      apagadas += 1;
+    } catch (erro) {
+      puladas += 1;
+      logger.warn({ err: erro, usuarioId, clienteId }, "cadastro: a conta sem confirmar tem vinculo e ficou");
+    }
+  }
+  return { apagadas, puladas };
+}
+
+class ErroContaComVinculo extends Error {}

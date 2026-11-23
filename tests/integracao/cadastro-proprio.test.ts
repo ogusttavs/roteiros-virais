@@ -2,7 +2,7 @@
  * E63 PR 1: o cadastro sozinho, no servidor. Contra o Postgres local, sem rede e sem e-mail de verdade (fora de produção o e-mail cai no log). A chave `CADASTRO_ABERTO` liga e desliga
  * dentro de cada teste.
  */
-import { count, eq } from "drizzle-orm";
+import { count, eq, gt, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ set: () => undefined, get: () => undefined, delete: () => undefined }), headers: async () => new Headers() }));
@@ -13,7 +13,7 @@ import { db, getPool } from "@/db";
 import { assinaturas, cadastrosProprios, clientes, confirmacoesDeEmail, edicoes, geracoesIA, membrosMarca, nichos, preferenciasUsuario, roteiros, setoresDeCadastro, user } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { criarLimitador } from "@/lib/limite-de-taxa";
-import { cadastrarConta, confirmarEmail, reenviarConfirmacao } from "@/servicos/cadastro";
+import { cadastrarConta, confirmarEmail, faxinarCadastrosSemConfirmar, reenviarConfirmacao } from "@/servicos/cadastro";
 import { barreiraDoCadastro } from "@/servicos/cadastro-travas";
 import { criarMarca, darAcesso, ErroCliente, salvarDadosFixosComPedido } from "@/servicos/clientes";
 import { ErroLimiteDeSetores, setorParaAMarca } from "@/servicos/ramos";
@@ -29,8 +29,10 @@ afterAll(async () => {
   await getPool().end();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   process.env.CADASTRO_ABERTO = "1";
+  // O teto de contas por hora conta o sistema todo: as contas dos testes de antes saem da hora de agora (o teste do teto cria as dele).
+  await db().update(cadastrosProprios).set({ criadoEm: sql`${cadastrosProprios.criadoEm} - interval '2 hours'` }).where(gt(cadastrosProprios.criadoEm, new Date(Date.now() - 60 * 60 * 1000)));
 });
 
 afterEach(() => {
@@ -50,7 +52,7 @@ const opcoes = () => ({ ip: "1.1.1.1", limitador: criarLimitador({ janelaMs: 100
 async function criar(sobre: Record<string, unknown> = {}) {
   const dados = dadosBons(sobre);
   const r = await cadastrarConta(dados, opcoes());
-  if (!r.ok) throw new Error(`cadastro recusado: ${JSON.stringify(r)}`);
+  if (!r.ok || !r.novo) throw new Error(`cadastro recusado: ${JSON.stringify(r)}`);
   return { ...r, dados };
 }
 
@@ -97,7 +99,7 @@ describe("criar a conta", () => {
     const dados = dadosBons({ email: "Maria@Cadastro.Teste", negocio: "Doces da Maria" });
     const r = await cadastrarConta(dados, { ...opcoes(), avisar });
     expect(r.ok).toBe(true);
-    if (!r.ok) return;
+    if (!r.ok || !r.novo) throw new Error("devia ser conta nova");
 
     const [u] = await db().select().from(user).where(eq(user.id, r.usuarioId));
     expect(u).toMatchObject({ email: "maria@cadastro.teste", name: "Ana Souza", emailVerified: false, role: "cliente" });
@@ -131,10 +133,12 @@ describe("criar a conta", () => {
     expect(await db().select().from(user).where(eq(user.email, "alguem@mailinator.com"))).toHaveLength(0);
   });
 
-  it("o mesmo e-mail não cria duas contas, nem com outra caixa", async () => {
+  it("o mesmo e-mail não cria duas contas, nem com outra caixa, e a resposta é igual à de um cadastro novo", async () => {
     const { dados } = await criar({ email: "unico@cadastro.teste" });
-    expect(await cadastrarConta(dadosBons({ email: dados.email }), opcoes())).toEqual({ ok: false, motivo: "jaExiste" });
-    expect(await cadastrarConta(dadosBons({ email: "UNICO@cadastro.teste" }), opcoes())).toEqual({ ok: false, motivo: "jaExiste" });
+    const repetido = await cadastrarConta(dadosBons({ email: dados.email }), opcoes());
+    // Igual por fora: ok, com o e-mail; só `novo` (que a tela não lê) diz a verdade a quem chama.
+    expect(repetido).toEqual({ ok: true, novo: false, email: "unico@cadastro.teste" });
+    expect(await cadastrarConta(dadosBons({ email: "UNICO@cadastro.teste" }), opcoes())).toEqual({ ok: true, novo: false, email: "unico@cadastro.teste" });
     const [{ total }] = await db().select({ total: count() }).from(user).where(eq(user.email, "unico@cadastro.teste"));
     expect(total).toBe(1);
   });
@@ -142,8 +146,8 @@ describe("criar a conta", () => {
   it("dois pedidos ao mesmo tempo com o mesmo e-mail criam uma conta só", async () => {
     const email = "corrida@cadastro.teste";
     const resultados = await Promise.all([cadastrarConta(dadosBons({ email }), opcoes()), cadastrarConta(dadosBons({ email }), opcoes())]);
-    expect(resultados.filter((r) => r.ok)).toHaveLength(1);
-    expect(resultados.filter((r) => !r.ok)).toEqual([{ ok: false, motivo: "jaExiste" }]);
+    expect(resultados.filter((r) => r.ok && r.novo)).toHaveLength(1);
+    expect(resultados.filter((r) => r.ok && !r.novo)).toHaveLength(1);
     const [{ total }] = await db().select({ total: count() }).from(user).where(eq(user.email, email));
     expect(total).toBe(1);
     // E a conta perdedora não deixou marca solta: o que a transação desfez não existe.
@@ -173,6 +177,85 @@ describe("criar a conta", () => {
       await db().insert(cadastrosProprios).values({ usuarioId: u.id, clienteId: marca.id, termosVersao: "x", criadoEm: agora });
     }
     expect(await cadastrarConta(dadosBons(), { ...opcoes(), agora })).toEqual({ ok: false, motivo: "cheio" });
+  });
+});
+
+describe("e-mail que já tem conta não é revelado", () => {
+  it("não cria nada, manda o aviso ao endereço e não manda link de confirmar", async () => {
+    await criar({ email: "ja-tem@cadastro.teste" });
+    const [{ antes }] = await db().select({ antes: count() }).from(cadastrosProprios);
+    const textos: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((m: unknown) => void textos.push(String(m)));
+    const r = await cadastrarConta(dadosBons({ email: "ja-tem@cadastro.teste" }), opcoes());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(r.ok).toBe(true);
+    const [{ depois }] = await db().select({ depois: count() }).from(cadastrosProprios);
+    expect(depois).toBe(antes);
+    const tudo = textos.join("\n");
+    expect(tudo).toContain("ja-tem@cadastro.teste");
+    expect(tudo).toContain("Você já tem conta");
+    expect(tudo).toContain("/entrar?esqueci=1");
+    expect(tudo).not.toContain("codigo=");
+  });
+
+  it("a conta antiga com e-mail de outra caixa (criada pelo admin) também vale como existente", async () => {
+    const marca = await criarMarca({ nome: "Antiga", nichoId: null });
+    await darAcesso(marca.id, "Antigo", "MisTa@Cadastro.Teste");
+    const r = await cadastrarConta(dadosBons({ email: "mista@cadastro.teste" }), opcoes());
+    expect(r).toMatchObject({ ok: true, novo: false });
+    expect(await db().select().from(user).where(eq(user.email, "mista@cadastro.teste"))).toHaveLength(0);
+  });
+
+  it("a ação responde igual nos dois casos e só a conta nova ganha sessão", async () => {
+    const { criarContaAction } = await import("@/app/cadastro/acoes");
+    const novo = await criarContaAction(dadosBons({ email: "igual-novo@cadastro.teste" }));
+    const repetido = await criarContaAction(dadosBons({ email: "igual-novo@cadastro.teste" }));
+    expect(novo).toEqual({ ok: true, email: "igual-novo@cadastro.teste" });
+    expect(repetido).toEqual(novo);
+  });
+});
+
+describe("os termos aceitos no cadastro", () => {
+  it("ficam gravados com a versão vigente, e o painel não pede o aceite de novo", async () => {
+    const { VERSAO_TERMOS_EM } = await import("@/textos/termos");
+    const { usuarioId } = await criar();
+    const [pref] = await db().select().from(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, usuarioId));
+    // É a regra do layout: quem tem aceitouTermosEm igual ou depois da versão vigente não vê a folha.
+    expect(pref.aceitouTermosEm!.getTime()).toBeGreaterThanOrEqual(VERSAO_TERMOS_EM.getTime());
+    const [cad] = await db().select().from(cadastrosProprios).where(eq(cadastrosProprios.usuarioId, usuarioId));
+    expect(cad.termosVersao).toBe(VERSAO_TERMOS_EM.toISOString());
+  });
+});
+
+describe("a faxina das contas que não confirmaram", () => {
+  const DIA = 24 * 60 * 60 * 1000;
+  it("apaga a de 8 dias sem confirmar e a marca vazia dela, libera o e-mail, e deixa a confirmada e a de 6 dias", async () => {
+    const velha = await criar({ email: "velha@cadastro.teste" });
+    const nova = await criar({ email: "nova6@cadastro.teste" });
+    const confirmada = await criar({ email: "confirmada8@cadastro.teste" });
+    await db().update(user).set({ emailVerified: true }).where(eq(user.id, confirmada.usuarioId));
+    const voltar = async (usuarioId: string, dias: number) =>
+      db().update(cadastrosProprios).set({ criadoEm: new Date(Date.now() - dias * DIA) }).where(eq(cadastrosProprios.usuarioId, usuarioId));
+    await voltar(velha.usuarioId, 8);
+    await voltar(nova.usuarioId, 6);
+    await voltar(confirmada.usuarioId, 8);
+
+    const resumo = await faxinarCadastrosSemConfirmar();
+    expect(resumo).toEqual({ apagadas: 1, puladas: 0 });
+    expect(await db().select().from(user).where(eq(user.id, velha.usuarioId))).toHaveLength(0);
+    expect(await db().select().from(clientes).where(eq(clientes.id, velha.clienteId))).toHaveLength(0);
+    expect(await db().select().from(user).where(eq(user.id, nova.usuarioId))).toHaveLength(1);
+    expect(await db().select().from(user).where(eq(user.id, confirmada.usuarioId))).toHaveLength(1);
+    // O e-mail ficou livre: dá para criar a conta de novo.
+    expect(await cadastrarConta(dadosBons({ email: "velha@cadastro.teste" }), opcoes())).toMatchObject({ ok: true, novo: true });
+  });
+
+  it("não apaga a conta que já tem alguma coisa ligada à marca", async () => {
+    const velha = await criar({ email: "comvinculo@cadastro.teste" });
+    await db().insert(geracoesIA).values({ tarefa: "t", versaoPrompt: "1", modelo: "mock", clienteId: velha.clienteId, entradas: {} });
+    await db().update(cadastrosProprios).set({ criadoEm: new Date(Date.now() - 9 * DIA) }).where(eq(cadastrosProprios.usuarioId, velha.usuarioId));
+    expect(await faxinarCadastrosSemConfirmar()).toEqual({ apagadas: 0, puladas: 1 });
+    expect(await db().select().from(user).where(eq(user.id, velha.usuarioId))).toHaveLength(1);
   });
 });
 
@@ -406,10 +489,10 @@ describe("ramo novo de cadastro próprio", () => {
 });
 
 describe("a Server Action de criar conta", () => {
-  it("cria, entra na conta e manda ao briefing; fechada, devolve a frase", async () => {
+  it("cria e entra na conta; fechada, devolve a frase", async () => {
     const { criarContaAction } = await import("@/app/cadastro/acoes");
     const dados = dadosBons({ email: "acao@cadastro.teste" });
-    expect(await criarContaAction(dados)).toEqual({ ok: true, destino: "/comecar" });
+    expect(await criarContaAction(dados)).toEqual({ ok: true, email: "acao@cadastro.teste" });
     expect(await db().select().from(user).where(eq(user.email, "acao@cadastro.teste"))).toHaveLength(1);
     delete process.env.CADASTRO_ABERTO;
     expect(await criarContaAction(dadosBons())).toMatchObject({ ok: false, erro: expect.stringContaining("ainda não está aberto") });
