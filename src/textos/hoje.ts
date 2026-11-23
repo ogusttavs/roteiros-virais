@@ -83,6 +83,8 @@ export const textosHoje = {
   /** Quem abre o Criar num ramo sem tema de hoje: o tema nasce na hora (o de madrugada só sai para ramo em uso). */
   gerandoTitulo: "Estamos escolhendo os temas de hoje para você",
   gerando: "Leva menos de um minuto. A tela se atualiza sozinha.",
+  /** Achado B1 de 23/11/2026: com a chave da IA recusada ou sem crédito, os temas não saem e a tela diz a verdade (o texto é `FRASE_DO_PROBLEMA_NOSSO`, em `src/ia/erro.ts`). */
+  iaTrancadaTitulo: "Os temas de hoje ainda não saíram",
   semTemaDepoisTitulo: "Hoje não saiu tema para o seu setor",
   semTemaDepois: "Dá para gravar do mesmo jeito: conte o que está acontecendo ou escreva o seu assunto.",
   /** M1, item 5: mesmo espírito do aviso de Referências, aqui na porta Reels, no lugar dos três temas. */

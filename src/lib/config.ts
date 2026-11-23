@@ -496,6 +496,8 @@ export function verificarSegredosDeProducao(
     NEXT_PHASE?: string;
     BETTER_AUTH_SECRET?: string;
     JOBS_API_KEY?: string;
+    AI_PROVIDER?: string;
+    ANTHROPIC_API_KEY?: string;
     MODO_E2E?: string;
     APP_URL?: string;
     BETTER_AUTH_URL?: string;
@@ -523,6 +525,18 @@ export function verificarSegredosDeProducao(
   if (!env.JOBS_API_KEY || env.JOBS_API_KEY === SEGREDO_PADRAO) {
     throw new ErroConfiguracao(
       "JOBS_API_KEY ainda e o valor de exemplo do .env.example; gere uma chave de verdade antes de subir em producao.",
+    );
+  }
+
+  /**
+   * Achado A1 da revisão de 23/11/2026: sem `AI_PROVIDER` e sem `ANTHROPIC_API_KEY`, `provedorIA` cai em `mock` em silêncio, e produção entregaria briefing aprovado e roteiro simulado como se fossem de
+   * verdade (a saúde responde, ninguém vê erro). Quem quer o simulador de propósito (o ensaio do deploy, a CI e a suíte e2e) diz `AI_PROVIDER=mock` por extenso e continua passando; o que não passa
+   * é chegar ao simulador por esquecimento (variável apagada, nome errado, valor com erro de digitação). Melhor não subir do que subir assim.
+   */
+  const provedorDito = env.AI_PROVIDER === "anthropic" || env.AI_PROVIDER === "mock";
+  if (!provedorDito && !env.ANTHROPIC_API_KEY) {
+    throw new ErroConfiguracao(
+      "Sem ANTHROPIC_API_KEY e sem AI_PROVIDER valido (anthropic ou mock), a IA cairia no simulador e produção entregaria roteiro de mentira; defina ANTHROPIC_API_KEY (ou AI_PROVIDER=mock por extenso, so para ensaio).",
     );
   }
 

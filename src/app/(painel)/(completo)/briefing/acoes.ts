@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
+import { comoResultadoDaIA } from "@/lib/resultado-da-ia";
 import { exigirForaDoVerComo } from "@/lib/ver-como";
 import { desativarRegra, reativarRegra } from "@/servicos/aprendizado";
 import { avaliarResposta, salvarRascunho } from "@/servicos/briefing";
@@ -39,7 +40,7 @@ export async function avaliarRespostaAction(perguntaId: string, resposta: string
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
   const cliente = await clienteDaSessaoAtual();
-  return avaliarResposta(cliente.id, perguntaId, resposta, cliente.tipo);
+  return comoResultadoDaIA(() => avaliarResposta(cliente.id, perguntaId, resposta, cliente.tipo));
 }
 
 /** "O que a gente aprendeu com você" (E27 parte 2, item 4): "Não é bem assim" e "Desfazer". */

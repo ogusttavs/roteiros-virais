@@ -118,6 +118,9 @@ services:
       # nunca abre sessao nem chama a API de jobs, entao o segredo de verdade nao precisa chegar aqui.
       BETTER_AUTH_SECRET: render-sem-uso-nao-e-segredo
       JOBS_API_KEY: render-sem-uso-nao-e-segredo
+      # Achado A1 de 23/11/2026: a configuracao tambem recusa subir em producao sem `AI_PROVIDER` valido e sem `ANTHROPIC_API_KEY`. O render nao chama a IA e nao recebe a chave; com `anthropic` e sem chave,
+      # qualquer chamada feita por engano falha alto (o SDK recusa) em vez de cair no simulador em silencio. O cliente da Anthropic so e criado na primeira chamada, nao ao carregar.
+      AI_PROVIDER: anthropic
       # O ffmpeg (legenda com fontconfig) e o tsx guardam cache; o contêiner e so de leitura, entao tudo vai para o /tmp.
       HOME: /tmp
       XDG_CACHE_HOME: /tmp/.cache

@@ -5,7 +5,7 @@ import { APIError, AuthenticationError, RateLimitError } from "@anthropic-ai/sdk
 import { describe, expect, it, vi } from "vitest";
 
 import { traduzirErro } from "./cliente";
-import { causaDoErroDaApi, ErroIA, FRASE_DA_CAUSA_PARA_ADMIN, FRASE_GENERICA_DO_CLIENTE, fraseDoErroDaIA } from "./erro";
+import { causaDoErroDaApi, ErroIA, FRASE_DA_CAUSA_PARA_ADMIN, FRASE_DO_PROBLEMA_NOSSO, FRASE_GENERICA_DO_CLIENTE, fraseDoErroDaIA } from "./erro";
 
 function erroDaApi(status: number, mensagem: string): APIError {
   return APIError.generate(status, { type: "error", error: { type: "x", message: mensagem } }, mensagem, new Headers());
@@ -47,7 +47,8 @@ describe("traduzirErro leva a causa", () => {
     expect(erro).toBeInstanceOf(ErroIA);
     expect(erro.causa).toBe("credito");
     expect(erro.message).toContain("credit balance");
-    expect(erro.mensagemCliente).toBe(FRASE_GENERICA_DO_CLIENTE);
+    // com a conta sem crédito a frase do cliente diz a verdade (achado B1 de 23/11/2026), nunca o texto técnico
+    expect(erro.mensagemCliente).toBe(FRASE_DO_PROBLEMA_NOSSO);
   });
 
   it("o limite de taxa vira sobrecarga, mesmo sem a palavra na mensagem", () => {
@@ -71,11 +72,25 @@ describe("traduzirErro leva a causa", () => {
   });
 });
 
+describe("a frase do cliente quando só o dono resolve", () => {
+  it("chave e crédito trocam a frase genérica; uma frase própria de quem chamou continua valendo; sem causa e sobrecarga ficam como estavam", () => {
+    expect(new ErroIA("x", undefined, "chave").mensagemCliente).toBe(FRASE_DO_PROBLEMA_NOSSO);
+    expect(new ErroIA("x", undefined, "credito").mensagemCliente).toBe(FRASE_DO_PROBLEMA_NOSSO);
+    expect(new ErroIA("x", "Frase própria.", "chave").mensagemCliente).toBe("Frase própria.");
+    expect(new ErroIA("x", undefined, "sobrecarga").mensagemCliente).toBe(FRASE_GENERICA_DO_CLIENTE);
+    expect(new ErroIA("x").mensagemCliente).toBe(FRASE_GENERICA_DO_CLIENTE);
+    expect(FRASE_DO_PROBLEMA_NOSSO).toBe("Estamos com um problema do nosso lado e já fomos avisados. Volte mais tarde.");
+  });
+});
+
 describe("fraseDoErroDaIA", () => {
   it("o admin lê a causa pelo nome; o cliente comum, a frase genérica", () => {
     const credito = new ErroIA("credit balance", undefined, "credito");
     expect(fraseDoErroDaIA(credito, true)).toBe("A API da IA está sem crédito. Recarregue em Plans & Billing da Anthropic.");
-    expect(fraseDoErroDaIA(credito, false)).toBe(FRASE_GENERICA_DO_CLIENTE);
+    expect(fraseDoErroDaIA(credito, false)).toBe(FRASE_DO_PROBLEMA_NOSSO);
+    expect(fraseDoErroDaIA(new ErroIA("401", undefined, "chave"), false)).toBe(FRASE_DO_PROBLEMA_NOSSO);
+    // a sobrecarga passa sozinha: "tente de novo" continua certo
+    expect(fraseDoErroDaIA(new ErroIA("529", undefined, "sobrecarga"), false)).toBe(FRASE_GENERICA_DO_CLIENTE);
     expect(fraseDoErroDaIA(new ErroIA("529", undefined, "sobrecarga"), true)).toBe("A IA está sobrecarregada, tente em um minuto.");
     expect(fraseDoErroDaIA(new ErroIA("401", undefined, "chave"), true)).toContain("A chave da IA foi recusada");
   });

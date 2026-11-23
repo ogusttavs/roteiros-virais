@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { PerguntaBriefing } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
 import { ehFalhaDeRede } from "@/lib/offline";
+import { dadoOuErro, type ResultadoAcao } from "@/lib/resultado-acao";
 import { montarTextoParaIA, textosBriefing } from "@/textos/briefing";
 import { textosComuns } from "@/textos/comuns";
 import { AnaliseQuatroPartes } from "@/ui/componentes/AnaliseQuatroPartes";
@@ -40,7 +41,8 @@ type Props = {
    * dela. `transcricaoBruta` (P2, item 3): só quando a resposta veio pelo microfone.
    */
   onSalvarRascunho: (perguntaId: string, resposta: string, transcricaoBruta?: string) => Promise<void>;
-  onAvaliar: (perguntaId: string, resposta: string) => Promise<ResultadoAcaoBriefing>;
+  /** `ok: false` só quando a IA está trancada pela chave ou pelo crédito (`comoResultadoDaIA`): a frase vem pronta do servidor. */
+  onAvaliar: (perguntaId: string, resposta: string) => Promise<ResultadoAcao<ResultadoAcaoBriefing>>;
   onAtualizado: (perguntaId: string, resposta: string, resultado: ResultadoAcaoBriefing) => void;
   /**
    * Avisa o pai quando o campo passa a ter algo que ainda nao esta resolvido no servidor: a avaliacao
@@ -408,7 +410,7 @@ export function PerguntaCampo({
      */
     await salvarPendente();
     try {
-      const resultado = await onAvaliar(pergunta.id, textoDoToque);
+      const resultado = dadoOuErro(await onAvaliar(pergunta.id, textoDoToque));
       // A avaliacao grava a resposta junto: o texto esta no servidor.
       salvoRef.current = textoDoToque;
       setRascunhoSalvo(true);

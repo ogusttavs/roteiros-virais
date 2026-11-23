@@ -1,3 +1,4 @@
+import { FRASE_DO_PROBLEMA_NOSSO } from "@/ia/erro";
 import { horaMinutoAtualISO } from "@/lib/config";
 import type { ResultadoTemasHoje } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
@@ -10,7 +11,13 @@ export type AvisoSemTema = { titulo: string; texto: string };
  * `emConferencia` (a marca ainda não tem ramo: espera o pedido dela), `semBase` (o ramo ainda não tem vídeo nenhum: está começando a ser
  * pesquisado), `aindaLendo` (tem vídeo, a análise ainda não rodou).
  */
-export type EstadoDoRamo = { aindaLendo?: boolean; semBase?: boolean; emConferencia?: boolean };
+export type EstadoDoRamo = {
+  aindaLendo?: boolean;
+  semBase?: boolean;
+  emConferencia?: boolean;
+  /** Achado B1 de 23/11/2026: a chave da IA foi recusada ou a conta está sem crédito (`falhaQueTrancaAIA`). Vale mais que todo o resto: nenhum tema sai até o dono agir, e a tela não promete o contrário. */
+  iaTrancada?: boolean;
+};
 
 /** "06:30", o horário em que os temas do dia deviam ter saído (job `temas-do-dia`, de madrugada). */
 const HORA_TEMAS_PRONTOS = "06:30";
@@ -39,6 +46,9 @@ export function avisoSemTema(
   if (resultado.status === "ok") return null;
   if (resultado.status === "erro") {
     return { titulo: textosHoje.erroTitulo, texto: textosHoje.erro };
+  }
+  if (estado.iaTrancada) {
+    return { titulo: textosHoje.iaTrancadaTitulo, texto: FRASE_DO_PROBLEMA_NOSSO };
   }
   if (estado.emConferencia) {
     return { titulo: textosHoje.ramoEmConferenciaTitulo, texto: textosHoje.ramoEmConferencia };

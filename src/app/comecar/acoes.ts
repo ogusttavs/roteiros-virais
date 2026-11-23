@@ -2,6 +2,7 @@
 
 import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import type { ResultadoAcao } from "@/lib/resultado-acao";
+import { comoResultadoDaIA } from "@/lib/resultado-da-ia";
 import { exigirForaDoVerComo, recusaDoVerComo } from "@/lib/ver-como";
 import { avaliarResposta, salvarRascunho } from "@/servicos/briefing";
 import { clienteDaSessaoAtual, salvarDadosFixosComPedido } from "@/servicos/clientes";
@@ -45,5 +46,5 @@ export async function avaliarRespostaAction(perguntaId: string, resposta: string
   await exigirForaDoVerComo();
   await exigirAssinaturaValida({ soDepoisDoBriefing: true });
   const cliente = await clienteDaSessaoAtual();
-  return avaliarResposta(cliente.id, perguntaId, resposta, cliente.tipo);
+  return comoResultadoDaIA(() => avaliarResposta(cliente.id, perguntaId, resposta, cliente.tipo));
 }

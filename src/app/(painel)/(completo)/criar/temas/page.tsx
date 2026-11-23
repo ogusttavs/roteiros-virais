@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { datasDeHojeEProximas } from "@/config/datas";
+import { falhaQueTrancaAIA } from "@/ia/falha-da-ia";
 import { hojeISO } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { classificarMultiplo, formatarMultiplo, formatarViewsCompacto, diasDesde, fraseDiasAtras, rotuloMultiploConta } from "@/lib/formatarNumero";
@@ -80,16 +81,20 @@ export default async function Temas({ searchParams }: Props) {
   );
   // O que se sabe do ramo quando não há tema (E45 PR 2): sem setor e com pedido de ramo aberto, o ramo está sendo conferido; com setor sem vídeo
   // nenhum, está começando a ser pesquisado; com vídeo e sem análise, está sendo lido.
+  const iaTrancada = resultado.status === "sem_tema" && (await falhaQueTrancaAIA().catch(() => null)) !== null;
   const estadoDoRamo =
     resultado.status !== "sem_tema"
       ? {}
-      : cliente.nichoId
+      : iaTrancada
+        ? { iaTrancada: true }
+        : cliente.nichoId
         ? { aindaLendo: await setorAindaLendo(cliente.nichoId), semBase: await setorSemBase(cliente.nichoId) }
         : { emConferencia: (await pedidoAbertoDaMarca(cliente.id)) !== null };
   // O tema de madrugada só sai para ramo em uso: sem tema de hoje e com o ramo já lido, o tema nasce agora (a tela espera e se atualiza sozinha).
   const podePedirTema =
     resultado.status === "sem_tema" && cliente.nichoId !== null && !("aindaLendo" in estadoDoRamo && (estadoDoRamo.aindaLendo || estadoDoRamo.semBase));
-  const gerando = podePedirTema ? (await pedirTemaDeHoje(cliente.nichoId!)) === "gerando" : false;
+  // Com a IA trancada a tela não promete tema: o pedido ainda pode sair (a sonda de uma por hora, `pedirTemaDeHoje`), mas o aviso diz a verdade.
+  const gerando = podePedirTema ? (await pedirTemaDeHoje(cliente.nichoId!)) === "gerando" && !iaTrancada : false;
   // A pessoa que volta depois de o ramo ficar parado (27/10/2026: 5 dias sem abrir o aplicativo) vê o tema que ainda vale e o de hoje é pedido em silêncio; a próxima abertura já o traz.
   if (cliente.nichoId !== null && deveRenovarTemaVelho(resultado, hojeISO(), new Date(), dataInicial)) {
     await pedirTemaDeHoje(cliente.nichoId);
