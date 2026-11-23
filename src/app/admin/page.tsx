@@ -42,7 +42,9 @@ function itensDeAtencao(inicio: InicioAdmin): ItemDeAtencao[] {
     itens.push({ chave: "teto", ...t.atencao.teto(reais(usdParaBrl(inicio.dinheiro.saiuHojeUsd)), reais(inicio.dinheiro.tetoBrl)), href: "/admin/custos", rotulo: t.atencao.verCustos });
   }
   if (inicio.contas.pararam > 0) itens.push({ chave: "pararam", ...t.atencao.contasPararam(inicio.contas.pararam), href: "/admin/clientes?filtro=parou", rotulo: t.atencao.verContas });
-  if (inicio.atencao.creditoDaIA) itens.push({ chave: "credito", ...t.atencao.creditoDaIA(`${diaDoMes(inicio.atencao.creditoDaIA.desde)}, ${horaDoDia(inicio.atencao.creditoDaIA.desde)}`), href: "/admin/custos", rotulo: t.atencao.verCustos });
+  for (const falha of inicio.atencao.falhasDaIA) {
+    itens.push({ chave: falha.causa === "chave" ? "chave-da-ia" : "credito", ...t.atencao.falhaDaIA(falha.causa, `${diaDoMes(falha.desde)}, ${horaDoDia(falha.desde)}`), href: "/admin/custos", rotulo: t.atencao.verCustos });
+  }
   if (inicio.atencao.proxy) itens.push({ chave: "proxy", ...t.atencao.proxyParado(inicio.atencao.proxy.motivo, diaDoMes(inicio.atencao.proxy.desde), proxyEhTunel()), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
   for (const parada of inicio.atencao.leituraParada) {
     if (parada.causa === "bloqueio" || parada.causa === "sem leitura") {

@@ -21,6 +21,7 @@ import {
   type Objetivo,
   type TemaDoDia,
 } from "@/db/schema";
+import { falhaQueTrancaAIA } from "@/ia/falha-da-ia";
 import * as avaliarTemaIA from "@/ia/prompts/avaliarTema";
 import { acharTerceiraPessoa, gerarComVerificacao } from "@/ia/verificador";
 import { boss, existeJobPendente, FILAS, garantirBossPronto } from "@/jobs/fila";
@@ -44,6 +45,11 @@ import { assuntoEmAltaDaLista, listaDeTendenciasDeAgora, temasQueAindaValem, ten
 import { listaDePlataformas, perguntaDoPublicoPelaChave } from "./vozes-do-publico";
 
 export class ErroTemas extends Error {}
+
+/** A chave da IA recusada ou a conta sem crédito (`falhaQueTrancaAIA`). Se a leitura falhar, não trava ninguém: segue como se a IA estivesse bem. */
+async function iaTrancada(): Promise<boolean> {
+  return (await falhaQueTrancaAIA().catch(() => null)) !== null;
+}
 
 const JANELA_LINHA_EDITORIAL = 15;
 const STATUS_GRAVADO_OU_POSTADO: ("gravado" | "postado")[] = ["gravado", "postado"];
@@ -225,6 +231,9 @@ export async function temasDoDiaOuRecente(
  * No máximo um pedido por setor a cada 10 minutos, para uma tela que se atualiza sozinha nunca encher a fila.
  */
 export async function pedirTemaDeHoje(nichoId: number, data: string = hojeISO()): Promise<"gerando" | "nao"> {
+  // Achado B1 de 23/11/2026: com a chave da IA recusada ou sem crédito, todo pedido falharia e, como a falha não grava a linha do dia, a tela pediria de novo a cada 10 minutos para sempre. Não pede.
+  // Quem traz a IA de volta é a rodada da madrugada (e qualquer geração que dê certo): a falha deixa de valer sozinha e o pedido volta a sair.
+  if (await iaTrancada()) return "nao";
   const [jaTentou] = await db().select({ id: temasDia.id }).from(temasDia).where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, data)));
   if (jaTentou) return "nao";
   try {
@@ -244,6 +253,7 @@ export async function pedirTemaDeHoje(nichoId: number, data: string = hojeISO())
  */
 export async function pedirTemasDaConta(clienteId: number, nichoId: number | null, foco: string): Promise<"gerando" | "nao"> {
   if (nichoId === null) return "nao";
+  if (await iaTrancada()) return "nao";
   try {
     await garantirBossPronto();
     const id = await boss().send(FILAS.temasDoDia, { nichoId, clienteId, aoAbrir: true }, { singletonKey: `tema-da-conta-${clienteId}-${hashDoFoco(foco)}`, singletonSeconds: 600 });

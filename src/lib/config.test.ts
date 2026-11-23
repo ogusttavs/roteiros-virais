@@ -19,6 +19,7 @@ describe("verificarSegredosDeProducao", () => {
   const segredosDeVerdade = {
     BETTER_AUTH_SECRET: "algo-gerado-de-verdade",
     JOBS_API_KEY: "outro-gerado-de-verdade",
+    ANTHROPIC_API_KEY: "sk-ant-so-no-teste",
   };
 
   it("nao faz nada fora de producao, mesmo com os valores padrao", () => {
@@ -59,6 +60,33 @@ describe("verificarSegredosDeProducao", () => {
 
   it("recusa em producao sem nenhum dos dois definido", () => {
     expect(() => verificarSegredosDeProducao({ NODE_ENV: "production" })).toThrow(ErroConfiguracao);
+  });
+
+  describe("a IA nao pode cair no simulador por esquecimento (achado A1 de 23/11/2026)", () => {
+    const base = { NODE_ENV: "production", BETTER_AUTH_SECRET: segredosDeVerdade.BETTER_AUTH_SECRET, JOBS_API_KEY: segredosDeVerdade.JOBS_API_KEY };
+
+    it("recusa sem AI_PROVIDER e sem ANTHROPIC_API_KEY, com a mensagem dizendo o que definir", () => {
+      expect(() => verificarSegredosDeProducao(base)).toThrow(/ANTHROPIC_API_KEY/);
+    });
+
+    it("recusa o valor com erro de digitacao quando nao ha chave (caia no simulador do mesmo jeito)", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, AI_PROVIDER: "antropic" })).toThrow(ErroConfiguracao);
+      expect(() => verificarSegredosDeProducao({ ...base, AI_PROVIDER: "" })).toThrow(ErroConfiguracao);
+    });
+
+    it("passa com a chave, com ou sem AI_PROVIDER", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, ANTHROPIC_API_KEY: "sk-ant-x" })).not.toThrow();
+      expect(() => verificarSegredosDeProducao({ ...base, ANTHROPIC_API_KEY: "sk-ant-x", AI_PROVIDER: "anthropic" })).not.toThrow();
+    });
+
+    it("AI_PROVIDER=mock por extenso continua valendo: e o que o ensaio do deploy, a CI e o e2e fazem de proposito", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, AI_PROVIDER: "mock" })).not.toThrow();
+    });
+
+    it("nao pesa fora de producao nem no build", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, NODE_ENV: "development" })).not.toThrow();
+      expect(() => verificarSegredosDeProducao({ ...base, NEXT_PHASE: "phase-production-build" })).not.toThrow();
+    });
   });
 
   it("nao faz nada durante `next build`, mesmo com os valores padrao", () => {

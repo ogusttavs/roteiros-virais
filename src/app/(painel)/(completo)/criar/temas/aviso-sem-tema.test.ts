@@ -86,6 +86,16 @@ describe("avisoSemTema (H3, item 1)", () => {
 describe("avisoSemTema: o estado do ramo", () => {
   const SEM_TEMA = { status: "sem_tema" as const, constancia: { tipo: "primeiro_dia" as const } };
 
+  it("IA trancada (chave recusada ou sem crédito): diz a verdade, não promete 'menos de um minuto', e vale mais que qualquer outro estado e a hora", () => {
+    for (const quando of [ANTES_DAS_0630, DEPOIS_DAS_0630]) {
+      const aviso = avisoSemTema(SEM_TEMA, quando, { iaTrancada: true, semBase: true, aindaLendo: true });
+      expect(aviso).toEqual({ titulo: textosHoje.iaTrancadaTitulo, texto: "Estamos com um problema do nosso lado e já fomos avisados. Volte mais tarde." });
+      expect(aviso?.texto).not.toMatch(/minuto/);
+    }
+    // sem a falha, volta ao normal
+    expect(avisoSemTema(SEM_TEMA, DEPOIS_DAS_0630, { iaTrancada: false })?.titulo).toBe(textosHoje.semTemaDepoisTitulo);
+  });
+
   it("ramo sem base (nenhum vídeo): 'o seu ramo ainda está sendo pesquisado', a qualquer hora, e nunca 'hoje não saiu tema'", () => {
     for (const quando of [ANTES_DAS_0630, DEPOIS_DAS_0630]) {
       expect(avisoSemTema(SEM_TEMA, quando, { semBase: true })).toEqual({ titulo: textosHoje.ramoNovoTitulo, texto: textosHoje.ramoNovo });

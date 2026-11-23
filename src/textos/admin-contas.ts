@@ -1,3 +1,4 @@
+import { FRASE_DA_CAUSA_PARA_ADMIN, FRASE_DO_PROBLEMA_NOSSO } from "@/ia/erro";
 import type { EstadoDoDia } from "@/servicos/admin-contas";
 import type { ResumoDaCobranca } from "@/servicos/assinatura";
 
@@ -83,7 +84,11 @@ export const textosInicioAdmin = {
       detalhe: `desde ${desde}; a fila lê só as redes que funcionam e tenta uma leitura de prova por noite no ${NOME_DA_REDE[rede]}${causa === "bloqueio" ? "; confira se o yt-dlp está atualizado e se o proxy responde" : "; veja o erro da última rodada em Rotinas"}`,
     }),
     // Achado de 05/10/2026: a API da IA recusou por falta de crédito (a geração do cliente só diz "tente de novo"); some sozinho quando uma geração dá certo depois.
-    creditoDaIA: (desde: string) => ({ titulo: "A API da IA está sem crédito", detalhe: `desde ${desde}; nenhuma geração sai enquanto isso; recarregue em Plans & Billing da Anthropic` }),
+    // Achado B1 de 23/11/2026: a chave recusada (401) também tranca tudo e o dono não sabia. A frase de cada causa vem de `FRASE_DA_CAUSA_PARA_ADMIN`; o item some quando uma geração dá certo depois.
+    falhaDaIA: (causa: "credito" | "chave", desde: string) => ({
+      titulo: FRASE_DA_CAUSA_PARA_ADMIN[causa],
+      detalhe: `desde ${desde}; nenhum roteiro, tema nem avaliação do briefing sai enquanto isso; quem usa o aplicativo vê "${FRASE_DO_PROBLEMA_NOSSO}"`,
+    }),
     // 29/10/2026: o disco do servidor (100 GB, dividido com o outro produto) passou do limite. No crítico o envio de vídeo para editar fica pausado até o uso baixar.
     disco: (nivel: "atencao" | "critico", usado: string, livre: string, desde: string) => ({
       titulo: nivel === "critico" ? `O disco do servidor está com ${usado} de uso e o envio de vídeos está pausado` : `O disco do servidor está com ${usado} de uso`,

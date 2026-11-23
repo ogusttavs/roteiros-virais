@@ -10,6 +10,18 @@ export type CausaDoErroIA = "credito" | "sobrecarga" | "chave";
 
 export const FRASE_GENERICA_DO_CLIENTE = "Não conseguimos fazer isso agora. Tente de novo em um minuto.";
 
+/**
+ * Achado B1 da revisão de 23/11/2026: com a chave recusada ou sem crédito, "tente de novo em um minuto" é mentira (nenhuma tentativa vai dar certo até o dono agir) e a pessoa fica
+ * apertando o botão. Nessas duas causas a frase do cliente diz a verdade, sem jargão: o problema é nosso e o dono já foi avisado (o aviso sai do mesmo ponto que anota a falha).
+ * A sobrecarga fica de fora: ela passa sozinha e "tente de novo" é o conselho certo.
+ */
+export const FRASE_DO_PROBLEMA_NOSSO = "Estamos com um problema do nosso lado e já fomos avisados. Volte mais tarde.";
+
+/** As causas em que nenhuma tentativa do cliente adianta, só o dono (a chave recusada e a falta de crédito). */
+export function causaTrancaAIA(causa: CausaDoErroIA | null | undefined): causa is "credito" | "chave" {
+  return causa === "credito" || causa === "chave";
+}
+
 /** O que o admin le no lugar da frase generica, em lingua de gente e com o que fazer. Nunca o texto cru da API. */
 export const FRASE_DA_CAUSA_PARA_ADMIN: Record<CausaDoErroIA, string> = {
   credito: "A API da IA está sem crédito. Recarregue em Plans & Billing da Anthropic.",
@@ -35,7 +47,8 @@ export class ErroIA extends Error {
   constructor(mensagemTecnica: string, mensagemCliente = FRASE_GENERICA_DO_CLIENTE, causa: CausaDoErroIA | null = null) {
     super(mensagemTecnica);
     this.name = "ErroIA";
-    this.mensagemCliente = mensagemCliente;
+    // A frase genérica vira a do problema nosso nas causas que trancam; uma frase própria de quem chamou continua valendo.
+    this.mensagemCliente = causaTrancaAIA(causa) && mensagemCliente === FRASE_GENERICA_DO_CLIENTE ? FRASE_DO_PROBLEMA_NOSSO : mensagemCliente;
     this.causa = causa;
   }
 }
