@@ -14,7 +14,7 @@ import { rename, rm } from "node:fs/promises";
 
 import { and, eq, sql } from "drizzle-orm";
 
-import { GUARDA_DO_EDITADO_MS, TENTATIVAS_DO_RENDER } from "@/config/edicao";
+import { ESPERA_DO_RENDER_COM_DISCO_CRITICO_S, GUARDA_DO_EDITADO_MS, TENTATIVAS_DO_RENDER } from "@/config/edicao";
 import { db } from "@/db";
 import { edicoes, type Edicao } from "@/db/schema";
 import {
@@ -32,6 +32,7 @@ import { ErroDoRender, lerHdrDoBruto, renderizar, type EntradaDoRender } from "@
 import type { PerfilDeRender } from "@/edicao/render-grafo";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { logger } from "@/lib/log";
+import { recusaPorDiscoCritico, type DepsDaRecusaPorDisco } from "@/servicos/disco";
 import { fraseDaEdicao, type CodigoDaEdicao } from "@/textos/edicao";
 
 export type PayloadRenderizarEdicao = { edicaoId: number; perfil: PerfilDeRender };
@@ -43,6 +44,8 @@ export type DepsDoRender = {
   /** O ffmpeg de verdade; os testes de falha trocam por uma função que erra. */
   renderizar?: (entrada: EntradaDoRender) => Promise<{ duracaoEsperadaS: number }>;
   lerHdr?: (caminho: string) => ReturnType<typeof lerHdrDoBruto>;
+  /** Achado 10 da revisão de 03/11/2026: como medir o disco antes de montar (os testes dão o disco que quiserem). */
+  disco?: DepsDaRecusaPorDisco;
 };
 
 /** O estado em que a edição espera a vez e o estado em que está sendo montada, para cada perfil. */
@@ -52,7 +55,7 @@ export const ESTADOS_DO_RENDER = {
 } as const;
 
 /** Põe o render na fila. Cada tentativa tem a própria chave, para um pedido repetido não ser descartado nem duplicado. */
-export async function enfileirarRender(edicaoId: number, perfil: PerfilDeRender, emSegundos = 0, tentativa = 0): Promise<void> {
+export async function enfileirarRender(edicaoId: number, perfil: PerfilDeRender, emSegundos = 0, tentativa: number | string = 0): Promise<void> {
   await garantirBossPronto();
   await boss().send(FILAS.renderizarEdicao, { edicaoId, perfil } satisfies PayloadRenderizarEdicao, {
     singletonKey: `render-${perfil}-${edicaoId}-${tentativa}`,
@@ -87,6 +90,25 @@ export async function rodarRenderizarEdicao(edicaoId: number, perfil: PerfilDeRe
   if (!Number.isInteger(edicaoId) || edicaoId <= 0 || (perfil !== "previa" && perfil !== "final")) throw new Error("uso: npm run job -- renderizar-edicao <edicaoId> <previa|final>");
   const agora = deps.agora ? deps.agora() : new Date();
   const { espera, montando } = ESTADOS_DO_RENDER[perfil];
+
+  // Achado 10 da revisão de 03/11/2026: com o disco do servidor em nível crítico nada novo é escrito. A edição fica onde está (esperando a vez), sem gastar tentativa, e o job volta daqui a 10
+  // minutos; a limpeza do bruto vencido já foi pedida por `recusaPorDiscoCritico`. A pessoa continua vendo "esperando a vez" e nada falha.
+  if (await recusaPorDiscoCritico(deps.disco)) {
+    const [esperando] = await db()
+      .update(edicoes)
+      .set({ atualizadaEm: agora })
+      .where(and(eq(edicoes.id, edicaoId), eq(edicoes.estado, espera)))
+      .returning({ id: edicoes.id });
+    // Quem não está esperando a vez (já terminou, falhou ou não existe) não volta para a fila.
+    if (!esperando) return { edicaoId, perfil, pulou: "outro-estado" };
+    try {
+      await (deps.enfileirar ?? ((id, p, s) => enfileirarRender(id, p, s, `disco-${Math.floor(agora.getTime() / 1000 / ESPERA_DO_RENDER_COM_DISCO_CRITICO_S)}`)))(edicaoId, perfil, ESPERA_DO_RENDER_COM_DISCO_CRITICO_S);
+    } catch (erro) {
+      // A limpeza de hora em hora enfileira de novo o que ficou esperando sem ninguém pegar.
+      logger.warn({ err: erro, edicaoId }, "edicao: nao foi possivel enfileirar o render de novo com o disco cheio");
+    }
+    return { edicaoId, perfil, pulou: "disco-cheio" };
+  }
 
   // Só passa quem consegue reservar: duas execuções nunca montam a mesma edição ao mesmo tempo.
   const [edicao] = await db()

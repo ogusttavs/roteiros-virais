@@ -43,7 +43,8 @@ function relogio(deps: DepsDaEdicao): Date {
   return deps.agora ? deps.agora() : new Date();
 }
 
-export type RecusaDaEdicao = { ok: false; codigo: CodigoDaEdicao; frase: string };
+/** `edicaoId` vem só na recusa `em-andamento`: a edição que já existe para o roteiro, para a tela levar a pessoa até ela em vez de abrir outra. */
+export type RecusaDaEdicao = { ok: false; codigo: CodigoDaEdicao; frase: string; edicaoId?: number };
 
 function recusa(codigo: CodigoDaEdicao): RecusaDaEdicao {
   return { ok: false, codigo, frase: fraseDaEdicao(codigo) };
@@ -126,7 +127,25 @@ export type EntradaDeIniciarEdicao = {
 };
 export type ResultadoDeIniciarEdicao = { ok: true; edicaoId: number; usadas: number; limite: number } | RecusaDaEdicao;
 
-const ESTADOS_EM_ANDAMENTO: EstadoDaEdicao[] = ["subindo", "enviando", "guardado", "transcrevendo"];
+/**
+ * Tudo o que ainda não terminou e já gastou (ou vai gastar) IA e render: do envio até o vídeo final sendo montado (achado 7 da revisão de 03/11/2026: antes a lista parava em `transcrevendo` e
+ * a mesma pessoa abria várias edições do mesmo roteiro, cada uma na fila do render). `pronta` e `para_revisao` ficam de fora de propósito: lá a pessoa já recebeu o que tinha de receber e pode
+ * enviar outro vídeo.
+ */
+export const ESTADOS_EM_ANDAMENTO: EstadoDaEdicao[] = [
+  "subindo",
+  "enviando",
+  "guardado",
+  "transcrevendo",
+  "transcrito",
+  "decidindo",
+  "decidido",
+  "verificado",
+  "montando_previa",
+  "previa_pronta",
+  "aprovada",
+  "montando_final",
+];
 
 /**
  * Abre uma edição para um roteiro da marca. Confere o roteiro, o tipo e o tamanho do arquivo (que o navegador já sabe) e a cota do mês, e só então grava a linha. O vídeo vem depois, por
@@ -147,14 +166,14 @@ export async function iniciarEdicao(entrada: EntradaDeIniciarEdicao, deps: DepsD
     // A trava vale até o fim da transação: dois pedidos da mesma marca ao mesmo tempo se enfileiram aqui e o segundo já enxerga a linha do primeiro.
     await tx.execute(sql`select pg_advisory_xact_lock(${TRAVA_DA_COTA_DA_EDICAO}, ${clienteId})`);
 
-    // Uma edição por roteiro em andamento. Um envio que parou há muito tempo (o celular dormiu, a aba fechou) libera o roteiro e a cota.
+    // Uma edição por roteiro e por marca em andamento (a trava acima, no banco, faz dois pedidos ao mesmo tempo se enfileirarem). Um envio que parou há muito tempo (o celular dormiu, a aba fechou) libera o roteiro e a cota.
     const vivas = await tx
       .select()
       .from(edicoes)
       .where(and(eq(edicoes.clienteId, clienteId), eq(edicoes.roteiroId, roteiroId), inArray(edicoes.estado, ESTADOS_EM_ANDAMENTO)));
     for (const viva of vivas) {
       const parado = agora.getTime() - viva.atualizadaEm.getTime();
-      if ((viva.estado !== "subindo" && viva.estado !== "enviando") || parado <= ENVIO_DA_EDICAO_PARADO_APOS_MS) return recusa("em-andamento");
+      if ((viva.estado !== "subindo" && viva.estado !== "enviando") || parado <= ENVIO_DA_EDICAO_PARADO_APOS_MS) return { ...recusa("em-andamento"), edicaoId: viva.id };
       await tx
         .update(edicoes)
         .set({ estado: "falhou", motivo: fraseDaEdicao("envio-parado"), atualizadaEm: agora })
