@@ -6,11 +6,11 @@ import { useState } from "react";
 import { textosAssinatura } from "@/textos/assinatura";
 import { Botao } from "@/ui/componentes/Botao";
 
-import { abrirPortalAction, assinarAction } from "./acoes";
+import { abrirPortalAction, assinarAction, assinarAgoraAction } from "./acoes";
 import styles from "./page.module.css";
 
 export type BotaoDaAssinatura = {
-  acao: "assinar" | "portal" | "hoje" | "plano";
+  acao: "assinar" | "assinarAgora" | "portal" | "hoje" | "plano";
   rotulo: string;
   variante: "primario" | "secundario";
 };
@@ -26,16 +26,18 @@ export function BotoesDaAssinatura({ botoes, tamanho = "md" }: Props) {
   const [ocupado, setOcupado] = useState<BotaoDaAssinatura["acao"] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
-  async function ir(acao: "assinar" | "portal") {
+  async function ir(acao: "assinar" | "assinarAgora" | "portal") {
     setOcupado(acao);
     setErro(null);
     try {
-      const r = await (acao === "assinar" ? assinarAction() : abrirPortalAction());
+      const r = await (acao === "assinar" ? assinarAction() : acao === "assinarAgora" ? assinarAgoraAction() : abrirPortalAction());
       if (r.ok) {
         window.location.assign(r.dado.url);
         return;
       }
       setErro(r.erro);
+      // Cartão recusado ao assinar agora: a assinatura já mudou de estado, e a tela se atualiza para dizer isso.
+      if (acao === "assinarAgora") router.refresh();
     } catch {
       setErro(textosAssinatura.erroGenerico);
     }
@@ -52,7 +54,7 @@ export function BotoesDaAssinatura({ botoes, tamanho = "md" }: Props) {
             tamanho={tamanho}
             carregando={ocupado === b.acao}
             disabled={ocupado !== null}
-            precisaDeRede={b.acao === "assinar" || b.acao === "portal"}
+            precisaDeRede={b.acao === "assinar" || b.acao === "assinarAgora" || b.acao === "portal"}
             data-acao={b.acao}
             onClick={() => (b.acao === "hoje" ? router.push("/hoje") : b.acao === "plano" ? router.push("/assinar") : ir(b.acao))}
           >

@@ -15,11 +15,11 @@
  *    (ou cria) uma configuração à parte, com `metadata.produto = roteiros`, só com o que este produto oferece (cartão, faturas, e-mail, cancelar no fim do período; sem trocar de plano,
  *    porque o plano é um só). A configuração do OdontoTech nunca é lida como nossa, alterada nem reaproveitada.
  */
-import { METADATA_PRODUTO, PLANO } from "../src/config/assinatura";
+import { METADATA_PRODUTO, nomeDoProdutoNoStripe, PLANO } from "../src/config/assinatura";
 
 export const PRODUTO_ID = "roteiros_plano_trimestral";
 
-type ProdutoLike = { id: string; metadata?: Record<string, string> | null; livemode?: boolean; statement_descriptor?: string | null };
+type ProdutoLike = { id: string; name?: string | null; metadata?: Record<string, string> | null; livemode?: boolean; statement_descriptor?: string | null };
 type PrecoLike = {
   id: string;
   product: string | { id: string };
@@ -64,8 +64,12 @@ export type Relatorio = {
   descritor: string;
   /** O produto já existia com outro descritor (ou sem) e foi atualizado. */
   atualizouDescritor: boolean;
+  /** O nome do produto no Stripe (o nome do app mais "plano trimestral"). */
+  nomeDoProduto: string;
+  /** O produto já existia com outro nome e foi atualizado (M3, 23/11/2026: antes se chamava "Roteiros, plano trimestral"). */
+  atualizouNome: boolean;
 };
-type RelatorioDoPreco = Pick<Relatorio, "produtoId" | "precoId" | "criouProduto" | "criouPreco" | "descritor" | "atualizouDescritor">;
+type RelatorioDoPreco = Pick<Relatorio, "produtoId" | "precoId" | "criouProduto" | "criouPreco" | "descritor" | "atualizouDescritor" | "nomeDoProduto" | "atualizouNome">;
 
 /**
  * O que a documentação do Stripe exige de um descritor (descritor-na-fatura.md, baixado em 23/10/2026): só caracteres latinos, de 5 a 22 caracteres, ao menos uma letra, nenhum
@@ -123,7 +127,7 @@ export const CONFIGURACAO_DO_PORTAL = {
 /** `nomeDoApp` é o `APP_NAME`; o descritor é validado antes de qualquer chamada ao Stripe. */
 export async function prepararStripe(stripe: StripeLike, nomeDoApp: string): Promise<Relatorio> {
   const descritor = descritorDaFatura(nomeDoApp);
-  const preco = await prepararProdutoEPreco(stripe, descritor);
+  const preco = await prepararProdutoEPreco(stripe, descritor, nomeDoProdutoNoStripe(nomeDoApp));
   const portal = await prepararPortal(stripe);
   return { ...preco, ...portal };
 }
@@ -140,14 +144,20 @@ async function prepararPortal(stripe: StripeLike): Promise<{ portalId: string; c
   return { portalId: criada.id, criouPortal: true };
 }
 
-/** Garante o descritor num produto que JÁ é nosso (quem chama já conferiu a marca). Só escreve se for diferente. */
-async function garantirDescritor(stripe: StripeLike, produto: ProdutoLike, descritor: string): Promise<boolean> {
-  if (produto.statement_descriptor === descritor) return false;
-  await stripe.products.update(produto.id, { statement_descriptor: descritor }, { idempotencyKey: `roteiros-descritor-${produto.id}-${descritor}` });
-  return true;
+/** Garante o descritor e o nome num produto que JÁ é nosso (quem chama já conferiu a marca). Só escreve se algum for diferente, numa chamada só. */
+async function garantirDescritorENome(stripe: StripeLike, produto: ProdutoLike, descritor: string, nome: string): Promise<{ atualizouDescritor: boolean; atualizouNome: boolean }> {
+  const atualizouDescritor = produto.statement_descriptor !== descritor;
+  const atualizouNome = produto.name !== nome;
+  if (!atualizouDescritor && !atualizouNome) return { atualizouDescritor, atualizouNome };
+  await stripe.products.update(
+    produto.id,
+    { ...(atualizouDescritor ? { statement_descriptor: descritor } : {}), ...(atualizouNome ? { name: nome } : {}) },
+    { idempotencyKey: `roteiros-produto-${produto.id}-${descritor}-${nome}` },
+  );
+  return { atualizouDescritor, atualizouNome };
 }
 
-async function prepararProdutoEPreco(stripe: StripeLike, descritor: string): Promise<RelatorioDoPreco> {
+async function prepararProdutoEPreco(stripe: StripeLike, descritor: string, nomeDoProduto: string): Promise<RelatorioDoPreco> {
   // 1. O preço primeiro, só lendo: se a chave de busca já é de outro produto (ou de um preço nosso diferente do plano), para antes de criar qualquer coisa.
   const achados = await stripe.prices.list({ lookup_keys: [PLANO.lookupKey], limit: 1 });
   const existente = achados.data[0];
@@ -172,13 +182,14 @@ async function prepararProdutoEPreco(stripe: StripeLike, descritor: string): Pro
     if (!ehNosso(nosso.metadata)) {
       throw new ErroDePreparo(`O produto ${PRODUTO_ID} ja existe na conta, mas sem metadata.produto = roteiros. Nao e nosso: nada foi alterado.`);
     }
-    const atualizouDescritor = await garantirDescritor(stripe, nosso, descritor);
-    return { produtoId: PRODUTO_ID, precoId: existente.id, criouProduto: false, criouPreco: false, descritor, atualizouDescritor };
+    const { atualizouDescritor, atualizouNome } = await garantirDescritorENome(stripe, nosso, descritor, nomeDoProduto);
+    return { produtoId: PRODUTO_ID, precoId: existente.id, criouProduto: false, criouPreco: false, descritor, atualizouDescritor, nomeDoProduto, atualizouNome };
   }
 
   // 2. O produto, pelo id fixo (retrieve, nunca busca: a busca do Stripe demora a refletir o que acabou de ser criado).
   let criouProduto = false;
   let atualizouDescritor = false;
+  let atualizouNome = false;
   let produto: ProdutoLike | null = null;
   try {
     produto = await stripe.products.retrieve(PRODUTO_ID);
@@ -189,10 +200,10 @@ async function prepararProdutoEPreco(stripe: StripeLike, descritor: string): Pro
     if (!ehNosso(produto.metadata)) {
       throw new ErroDePreparo(`O produto ${PRODUTO_ID} ja existe na conta, mas sem metadata.produto = roteiros. Nao e nosso: nada foi alterado.`);
     }
-    atualizouDescritor = await garantirDescritor(stripe, produto, descritor);
+    ({ atualizouDescritor, atualizouNome } = await garantirDescritorENome(stripe, produto, descritor, nomeDoProduto));
   } else {
     produto = await stripe.products.create(
-      { id: PRODUTO_ID, name: PLANO.nomeDoProduto, statement_descriptor: descritor, metadata: { ...METADATA_PRODUTO } },
+      { id: PRODUTO_ID, name: nomeDoProduto, statement_descriptor: descritor, metadata: { ...METADATA_PRODUTO } },
       { idempotencyKey: `roteiros-produto-${PRODUTO_ID}` },
     );
     criouProduto = true;
@@ -210,5 +221,5 @@ async function prepararProdutoEPreco(stripe: StripeLike, descritor: string): Pro
     },
     { idempotencyKey: `roteiros-preco-${PLANO.lookupKey}` },
   );
-  return { produtoId: produto.id, precoId: preco.id, criouProduto, criouPreco: true, descritor, atualizouDescritor };
+  return { produtoId: produto.id, precoId: preco.id, criouProduto, criouPreco: true, descritor, atualizouDescritor, nomeDoProduto, atualizouNome };
 }

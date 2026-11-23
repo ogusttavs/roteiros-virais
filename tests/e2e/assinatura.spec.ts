@@ -205,8 +205,9 @@ test.describe("assinatura pelo Stripe", () => {
     await expect(page.getByText(/Seu teste grátis termina em .*\. Para continuar depois do teste, cadastre o cartão\./)).toBeVisible();
     await expect(page.getByText("primeira cobrança")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Cadastrar o cartão" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Assinar agora por R$ 1.191 a cada 3 meses" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Ir para o Hoje" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Assinar|grátis$/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^(Assinar por|Assinar de novo|Começar .* grátis)/ })).toHaveCount(0);
 
     // Voltando do pagamento já em teste: a confirmação diz que o teste começou.
     await page.goto("/assinar?assinou=1");

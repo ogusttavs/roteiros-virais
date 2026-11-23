@@ -10,14 +10,20 @@
  *
  * Sessão e posse ficam na Server Action (como em todo serviço deste projeto): as funções daqui recebem a marca já resolvida, nunca leem a sessão.
  */
+import { randomUUID } from "node:crypto";
+
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { DIAS_DE_FOLGA_DA_RENOVACAO, DIAS_DE_TOLERANCIA_SEM_NENHUM_PAGAMENTO, METADATA_PRODUTO } from "@/config/assinatura";
 import { db } from "@/db";
 import { assinaturas, checkoutsStripe, clientes, eventosStripe, membrosMarca, type Assinatura, type Cliente, type StatusAssinatura } from "@/db/schema";
 import { config } from "@/lib/config";
+import { enviarEmail } from "@/lib/email";
 import { logger } from "@/lib/log";
 import { portaStripe, type EventoDoStripe } from "@/lib/stripe";
+import { type EventoDeCobranca, textosAvisoDeCobranca } from "@/textos/aviso-cobranca";
+
+import { destinatariosDoAviso } from "./aviso-de-leitura";
 
 /** Erro de regra da assinatura, com a frase que a pessoa pode ler. */
 export class ErroAssinatura extends Error {}
@@ -108,6 +114,9 @@ export const frasesDaAssinatura = {
   semPlano: "Não deu para abrir o pagamento agora. Tente de novo daqui a pouco.",
   semAssinatura: "Esta conta ainda não tem uma assinatura para gerenciar.",
   falhou: "Não deu para abrir o pagamento agora. Tente de novo daqui a pouco.",
+  semTeste: "Esta conta não está no teste grátis.",
+  emAbertura: "Já estamos abrindo o pagamento desta conta. Espere um instante e toque de novo.",
+  cartaoRecusado: `O seu cartão foi recusado. Atualize o cartão em até ${DIAS_DE_TOLERANCIA_SEM_NENHUM_PAGAMENTO} dias para continuar usando.`,
   naoCancelou: "Não deu para cancelar a assinatura desta conta no Stripe, então a conta não foi apagada. Nada mudou: tente de novo, ou cancele a assinatura no painel do Stripe antes.",
 } as const;
 
@@ -130,21 +139,19 @@ export async function iniciarAssinatura(usuario: { id: string; email: string }, 
 
   try {
     const porta = portaStripe();
-    return await db().transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`checkout-da-marca-${cliente.id}`}))`);
-      const [aberto] = await tx.select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, cliente.id));
-      if (aberto) {
-        const viva = await porta.sessaoAberta(aberto.stripeSessaoId, cliente.id);
-        if (viva) return { url: viva.url };
-      }
+    // O Stripe é chamado FORA de qualquer transação (revisão de 23/11/2026, M1): cada tentativa leva até 20 s, e a transação com trava segurava uma das 8 conexões do banco o tempo todo.
+    const reservado = await reservarCheckout(porta, cliente.id);
+    if (reservado.tipo === "url") return { url: reservado.url };
+    const { reserva } = reservado;
+    try {
       const preco = await porta.precoDoPlano(config.cobranca.precoLookupKey);
       if (!preco) {
         logger.error({ clienteId: cliente.id, lookupKey: config.cobranca.precoLookupKey }, "assinatura: o preco do plano nao existe no Stripe (rode scripts/stripe-preparar.ts)");
         throw new ErroAssinatura(frasesDaAssinatura.semPlano);
       }
       // O teste grátis é uma vez só por marca: quem já teve assinatura (teste, ativa ou cancelada) no nosso banco ou no Stripe abre o Checkout sem teste, cobrando na hora.
-      // `aberto` é o Checkout anterior da marca (aberto, expirado ou pago); se foi pago e o aviso se perdeu, o Stripe ainda diz que a assinatura existe.
-      const diasDeTeste = marcaPodeGanharTeste(lista) && !(await porta.jaTeveAssinatura({ clienteId: cliente.id, sessaoAnteriorId: aberto?.stripeSessaoId ?? null })) ? config.cobranca.testeDias : 0;
+      // `reserva.anterior` é o Checkout anterior da marca (aberto, expirado ou pago); se foi pago e o aviso se perdeu, o Stripe ainda diz que a assinatura existe.
+      const diasDeTeste = marcaPodeGanharTeste(lista) && !(await porta.jaTeveAssinatura({ clienteId: cliente.id, sessaoAnteriorId: reserva.anterior })) ? config.cobranca.testeDias : 0;
       const nova = await porta.criarCheckout({
         precoId: preco.id,
         clienteId: cliente.id,
@@ -156,17 +163,143 @@ export async function iniciarAssinatura(usuario: { id: string; email: string }, 
         diasDeTeste,
         exigeCartao: config.cobranca.testeExigeCartao,
       });
-      await tx
-        .insert(checkoutsStripe)
-        .values({ clienteId: cliente.id, stripeSessaoId: nova.sessaoId })
-        .onConflictDoUpdate({ target: checkoutsStripe.clienteId, set: { stripeSessaoId: nova.sessaoId, criadoEm: new Date() } });
+      const gravou = await db()
+        .update(checkoutsStripe)
+        .set({ stripeSessaoId: nova.sessaoId, criadoEm: new Date() })
+        .where(and(eq(checkoutsStripe.clienteId, cliente.id), eq(checkoutsStripe.stripeSessaoId, reserva.minha)))
+        .returning({ id: checkoutsStripe.id });
+      if (gravou.length === 0) logger.warn({ clienteId: cliente.id, sessaoId: nova.sessaoId }, "assinatura: a reserva do Checkout foi tomada por outra tentativa antes de gravar a sessao; ela fica sem registro");
       return { url: nova.url };
-    });
+    } catch (erro) {
+      await soltarReserva(cliente.id, reserva);
+      throw erro;
+    }
   } catch (erro) {
     if (erro instanceof ErroAssinatura) throw erro;
     logger.error({ err: erro, clienteId: cliente.id }, "assinatura: o Stripe falhou ao criar o Checkout");
     throw new ErroAssinatura(frasesDaAssinatura.falhou);
   }
+}
+
+// ---------------------------------------------------------------------------
+// A reserva do Checkout (o cadeado curto, só no banco)
+// ---------------------------------------------------------------------------
+
+/** Em `checkouts_stripe.stripe_sessao_id`, o que marca "alguém está abrindo o Checkout desta marca agora" (a chamada ao Stripe acontece com a reserva feita, fora de transação). */
+const PREFIXO_DA_RESERVA = "pendente:";
+/** Reserva mais velha que isto é de uma tentativa que morreu no meio: a próxima a toma (o Stripe leva até 20 s por tentativa, com 2 repetições). */
+const IDADE_MAXIMA_DA_RESERVA_MS = 90_000;
+const ESPERA_ENTRE_CONFERENCIAS_MS = 300;
+const CONFERENCIAS_ATE_DESISTIR = 40;
+
+type Reserva = { minha: string; anterior: string | null };
+
+export function ehReservaDeCheckout(stripeSessaoId: string): boolean {
+  return stripeSessaoId.startsWith(PREFIXO_DA_RESERVA);
+}
+
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Ou devolve o endereço de um Checkout que já está aberto para a marca, ou faz a reserva que dá a esta chamada o direito de abrir um novo. A reserva é uma troca atômica numa linha só
+ * (`INSERT ... ON CONFLICT DO NOTHING` ou `UPDATE ... WHERE stripe_sessao_id = <o que li>`): de dois cliques ao mesmo tempo, um reserva e o outro espera, e depois reaproveita a sessão do
+ * primeiro. Nenhuma transação fica aberta enquanto o Stripe responde.
+ */
+async function reservarCheckout(porta: ReturnType<typeof portaStripe>, clienteId: number): Promise<{ tipo: "url"; url: string } | { tipo: "reservada"; reserva: Reserva }> {
+  for (let i = 0; i < CONFERENCIAS_ATE_DESISTIR; i++) {
+    const minha = `${PREFIXO_DA_RESERVA}${randomUUID()}`;
+    const [linha] = await db().select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, clienteId));
+    if (!linha) {
+      const [inserida] = await db().insert(checkoutsStripe).values({ clienteId, stripeSessaoId: minha }).onConflictDoNothing({ target: checkoutsStripe.clienteId }).returning({ id: checkoutsStripe.id });
+      if (inserida) return { tipo: "reservada", reserva: { minha, anterior: null } };
+      continue;
+    }
+    if (ehReservaDeCheckout(linha.stripeSessaoId)) {
+      if (Date.now() - linha.criadoEm.getTime() <= IDADE_MAXIMA_DA_RESERVA_MS) {
+        await dormir(ESPERA_ENTRE_CONFERENCIAS_MS);
+        continue;
+      }
+      // A reserva ficou velha: a tentativa que a fez morreu. Quem tomar primeiro (a troca confere o valor que leu) segue; o Checkout dela, se existiu, fica sem registro.
+      if (await tomar(clienteId, linha.stripeSessaoId, minha)) return { tipo: "reservada", reserva: { minha, anterior: null } };
+      continue;
+    }
+    const viva = await porta.sessaoAberta(linha.stripeSessaoId, clienteId);
+    if (viva) return { tipo: "url", url: viva.url };
+    if (await tomar(clienteId, linha.stripeSessaoId, minha)) return { tipo: "reservada", reserva: { minha, anterior: linha.stripeSessaoId } };
+  }
+  throw new ErroAssinatura(frasesDaAssinatura.emAbertura);
+}
+
+/** Troca o valor da linha da marca só se ela ainda guarda `de`. Verdade se esta chamada ganhou. */
+async function tomar(clienteId: number, de: string, para: string): Promise<boolean> {
+  const trocou = await db()
+    .update(checkoutsStripe)
+    .set({ stripeSessaoId: para, criadoEm: new Date() })
+    .where(and(eq(checkoutsStripe.clienteId, clienteId), eq(checkoutsStripe.stripeSessaoId, de)))
+    .returning({ id: checkoutsStripe.id });
+  return trocou.length > 0;
+}
+
+/** A tentativa falhou: devolve a linha ao que era antes da reserva (a sessão anterior, ou nenhuma), para o próximo clique não esperar por uma reserva que não vai se cumprir. */
+async function soltarReserva(clienteId: number, reserva: Reserva): Promise<void> {
+  try {
+    if (reserva.anterior) await tomar(clienteId, reserva.minha, reserva.anterior);
+    else await db().delete(checkoutsStripe).where(and(eq(checkoutsStripe.clienteId, clienteId), eq(checkoutsStripe.stripeSessaoId, reserva.minha)));
+  } catch (erro) {
+    logger.error({ err: erro, clienteId }, "assinatura: nao foi possivel soltar a reserva do Checkout; ela expira sozinha");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Assinar no meio do teste
+// ---------------------------------------------------------------------------
+
+/** A assinatura em teste que vale agora (`trialing`), se a marca tem uma. */
+export function assinaturaEmTeste(lista: Assinatura[], agora: Date = new Date()): Assinatura | null {
+  return lista.find((a) => a.status === "trialing" && assinaturaVale(a, agora)) ?? null;
+}
+
+export type ResultadoDeAssinarAgora =
+  /** O teste acabou e o cartão foi cobrado hoje; a assinatura vira `active` quando o Stripe confirmar o pagamento. */
+  | { tipo: "cobrado" }
+  /** A pessoa ainda não cadastrou o cartão: abre o portal (`url`) para cadastrar; depois ela volta e assina agora. Nada foi cobrado, o teste segue. */
+  | { tipo: "cadastrar-cartao"; url: string };
+
+/**
+ * Assinar no meio do teste (decisão do Gustavo em 23/11/2026, "Sim, cobra na hora"). Quem está em teste e assina encerra o teste: a cobrança é feita agora e os limites do teste caem sozinhos
+ * quando a assinatura vira `active` (eles só valem para quem não tem assinatura `active`). Contraponto registrado: a pessoa perde os dias que sobravam.
+ *
+ *  - **Com cartão cadastrado** (`temFormaDePagamento`): encerra o teste no Stripe (`trial_end: "now"`), que emite a fatura e cobra na hora. Não grava nada aqui: o estado volta pelos avisos do
+ *    Stripe (`customer.subscription.updated`, `invoice.paid`), como em qualquer cobrança. Cartão recusado: o Stripe deixa a assinatura `past_due` sem nenhum pagamento, e a regra de quem nunca
+ *    pagou (`DIAS_DE_TOLERANCIA_SEM_NENHUM_PAGAMENTO`) vale; a pessoa recebe `frasesDaAssinatura.cartaoRecusado` (lança `ErroAssinatura`).
+ *  - **Sem cartão**: devolve o endereço do portal para cadastrar o cartão (o fluxo que já existe; nada novo no Stripe). Depois de cadastrar, a pessoa volta e toca em assinar agora de novo, e
+ *    cai no caso acima.
+ *
+ * Só o dono. A Server Action `assinarAgoraAction` (em `app/(painel)/assinar/acoes.ts`) é quem chama; a tela do limite do teste usa a mesma ação.
+ */
+export async function assinarAgora(usuario: { id: string }, cliente: Pick<Cliente, "id">, agora: Date = new Date()): Promise<ResultadoDeAssinarAgora> {
+  if (!(await ehDonoDaMarca(usuario.id, cliente.id))) throw new ErroAssinatura(frasesDaAssinatura.soODono);
+  const lista = await assinaturasDaMarca(cliente.id);
+  const emTeste = assinaturaEmTeste(lista, agora);
+  if (!emTeste) throw new ErroAssinatura(lista.some((a) => assinaturaVale(a, agora)) ? frasesDaAssinatura.jaAssinada : frasesDaAssinatura.semTeste);
+
+  if (!emTeste.temFormaDePagamento) {
+    const portal = await abrirPortalDaAssinatura(usuario, cliente);
+    return { tipo: "cadastrar-cartao", url: portal.url };
+  }
+
+  let cobrado: boolean;
+  try {
+    ({ cobrado } = await portaStripe().encerrarTeste({ stripeAssinaturaId: emTeste.stripeAssinaturaId, clienteId: cliente.id }));
+  } catch (erro) {
+    logger.error({ err: erro, clienteId: cliente.id }, "assinatura: o Stripe falhou ao encerrar o teste");
+    throw new ErroAssinatura(frasesDaAssinatura.falhou);
+  }
+  if (!cobrado) {
+    logger.warn({ clienteId: cliente.id }, "assinatura: o cartao foi recusado ao encerrar o teste; vale a tolerancia de quem nunca pagou");
+    throw new ErroAssinatura(frasesDaAssinatura.cartaoRecusado);
+  }
+  return { tipo: "cobrado" };
 }
 
 /** O portal do cliente no Stripe (trocar o cartão, cancelar). Só o dono; só quem já tem cliente no Stripe. */
@@ -200,7 +333,7 @@ export type AlvosDoCancelamento = { assinaturaIds: string[]; sessaoId: string | 
 export async function alvosDoCancelamento(clienteId: number, executor: Pick<ReturnType<typeof db>, "select"> = db()): Promise<AlvosDoCancelamento> {
   const lista = await executor.select().from(assinaturas).where(eq(assinaturas.clienteId, clienteId)).orderBy(desc(assinaturas.criadoEm), desc(assinaturas.id));
   const [aberto] = await executor.select().from(checkoutsStripe).where(eq(checkoutsStripe.clienteId, clienteId));
-  return { assinaturaIds: lista.filter((a) => !STATUS_ACABADOS.includes(a.status)).map((a) => a.stripeAssinaturaId), sessaoId: aberto?.stripeSessaoId ?? null };
+  return { assinaturaIds: lista.filter((a) => !STATUS_ACABADOS.includes(a.status)).map((a) => a.stripeAssinaturaId), sessaoId: aberto && !ehReservaDeCheckout(aberto.stripeSessaoId) ? aberto.stripeSessaoId : null };
 }
 
 /**
@@ -427,21 +560,24 @@ export type ResultadoDoEvento = "tratado" | "repetido" | "ignorado";
 
 type Executor = Pick<ReturnType<typeof db>, "select" | "insert" | "update" | "execute">;
 
-async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Date, eventoId: string): Promise<void> {
+/** O que mudou de verdade na assinatura por causa do evento: é daqui que saem os e-mails ao admin (M5), uma vez por mudança, não por evento. */
+type Mudou = EventoDeCobranca["tipo"][];
+
+async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Date, eventoId: string): Promise<{ clienteId: number | null; mudou: Mudou }> {
   const [atual] = await tx.select().from(assinaturas).where(eq(assinaturas.stripeAssinaturaId, m.stripeAssinaturaId));
 
   if (!atual) {
     const stripeClienteId = m.stripeClienteId;
     if (m.clienteId === null || !stripeClienteId) {
       logger.warn({ eventoId, stripeAssinaturaId: m.stripeAssinaturaId }, "stripe: evento nosso, mas sem a marca ou sem o cliente do Stripe; nada gravado");
-      return;
+      return { clienteId: null, mudou: [] };
     }
     const [marca] = await tx.select({ id: clientes.id }).from(clientes).where(eq(clientes.id, m.clienteId));
     if (!marca) {
       logger.warn({ eventoId, clienteId: m.clienteId }, "stripe: evento nosso aponta para uma marca que nao existe; nada gravado");
-      return;
+      return { clienteId: null, mudou: [] };
     }
-    await tx
+    const criada = await tx
       .insert(assinaturas)
       .values({
         clienteId: m.clienteId,
@@ -458,12 +594,19 @@ async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Da
         temFormaDePagamento: m.temFormaDePagamento === true,
         ultimoEventoEm: eventoEm,
       })
-      .onConflictDoNothing({ target: assinaturas.stripeAssinaturaId });
-    return;
+      .onConflictDoNothing({ target: assinaturas.stripeAssinaturaId })
+      .returning({ id: assinaturas.id });
+    if (criada.length === 0) return { clienteId: m.clienteId, mudou: [] };
+    const mudou: Mudou = [];
+    if (m.statusSeNova === "trialing") mudou.push("teste-comecou");
+    if (m.pagou) mudou.push("assinatura-paga");
+    if (m.statusSeNova === "past_due") mudou.push("cartao-recusado");
+    if (m.statusSeNova === "canceled") mudou.push("cancelamento");
+    return { clienteId: m.clienteId, mudou };
   }
 
   // `canceled` e `incomplete_expired` são finais: reassinar cria OUTRA assinatura no Stripe, nunca reabre a antiga. Um evento atrasado, ou do mesmo segundo, não a ressuscita.
-  if (atual.status === "canceled" || atual.status === "incomplete_expired") return;
+  if (atual.status === "canceled" || atual.status === "incomplete_expired") return { clienteId: atual.clienteId, mudou: [] };
   // Evento mais velho que o último que escreveu aqui: o mais novo já valeu para o status, mas não pode ser jogado fora inteiro (o Stripe entrega em paralelo: o checkout, mais novo,
   // pode chegar antes da assinatura e deixar a linha sem período e sem preço). Só preenche o que está vazio; nunca mexe no status nem em `ultimoEventoEm`.
   if (eventoEm.getTime() < atual.ultimoEventoEm.getTime()) {
@@ -477,7 +620,8 @@ async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Da
       ...(!atual.primeiroPagamentoEm && m.pagou ? { primeiroPagamentoEm: eventoEm } : {}),
     };
     if (Object.keys(vazios).length > 0) await tx.update(assinaturas).set({ ...vazios, atualizadoEm: new Date() }).where(eq(assinaturas.id, atual.id));
-    return;
+    // O primeiro pagamento que só chegou agora, num aviso atrasado, também é uma assinatura nova paga (o aviso mais novo pode ter vindo antes sem trazê-lo).
+    return { clienteId: atual.clienteId, mudou: !atual.primeiroPagamentoEm && m.pagou ? ["assinatura-paga"] : [] };
   }
 
   // O `created` do Stripe tem resolução de um segundo, então dois eventos do mesmo segundo (o cadastro: assinatura criada `incomplete`, fatura paga `active`) podem chegar em qualquer ordem.
@@ -505,30 +649,61 @@ async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Da
       atualizadoEm: new Date(),
     })
     .where(eq(assinaturas.id, atual.id));
+
+  const mudou: Mudou = [];
+  if (status === "trialing" && atual.status !== "trialing") mudou.push("teste-comecou");
+  if (m.pagou && !atual.primeiroPagamentoEm) mudou.push("assinatura-paga");
+  if (status === "past_due" && atual.status !== "past_due") mudou.push("cartao-recusado");
+  if (status === "canceled") mudou.push("cancelamento");
+  else if (m.cancelaNoFimDoPeriodo === true && !atual.cancelaNoFimDoPeriodo) mudou.push("cancelamento-agendado");
+  return { clienteId: atual.clienteId, mudou };
 }
 
 /**
  * Trata um evento já conferido (assinatura do aviso verificada por quem chama). `ignorado`: não é nosso ou não é de um tipo que tratamos (nada é gravado, nem o id do
  * evento). `repetido`: o id já estava em `eventos_stripe`. `tratado`: aplicado. Erro de banco sobe (a rota responde 500 e o Stripe reenvia; a transação desfez o id).
  */
-export async function tratarEventoDoStripe(evento: EventoDoStripe): Promise<ResultadoDoEvento> {
+export async function tratarEventoDoStripe(evento: EventoDoStripe, enviar: typeof enviarEmail | null = enviarEmail): Promise<ResultadoDoEvento> {
   const leitura = lerEvento(evento);
   if (leitura.tipo === "ignorar") return "ignorado";
   const eventoEm = new Date(evento.created * 1000);
 
-  return db().transaction(async (tx) => {
+  const feito = await db().transaction(async (tx) => {
     // Os avisos de um cadastro (checkout, assinatura criada, fatura paga) chegam quase juntos e em pedidos diferentes: sem isto, dois deles veem "não existe" ao mesmo tempo, um grava e o
     // outro, que perdeu a corrida, registra o id e some sem aplicar nada. O cadeado é por assinatura e dura até o fim da transação; os avisos da mesma assinatura passam um de cada vez.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${leitura.mudanca.stripeAssinaturaId}))`);
     if (leitura.verificar) {
       const [conhecida] = await tx.select({ id: assinaturas.id }).from(assinaturas).where(eq(assinaturas.stripeAssinaturaId, leitura.mudanca.stripeAssinaturaId));
-      if (!conhecida) return "ignorado" as const;
+      if (!conhecida) return { resultado: "ignorado" as const };
     }
     const [novo] = await tx.insert(eventosStripe).values({ eventoId: evento.id, tipo: evento.type }).onConflictDoNothing({ target: eventosStripe.eventoId }).returning({ id: eventosStripe.id });
-    if (!novo) return "repetido" as const;
-    await aplicarMudanca(tx, leitura.mudanca, eventoEm, evento.id);
-    return "tratado" as const;
+    if (!novo) return { resultado: "repetido" as const };
+    const { clienteId, mudou } = await aplicarMudanca(tx, leitura.mudanca, eventoEm, evento.id);
+    return { resultado: "tratado" as const, clienteId, mudou };
   });
+
+  // Os e-mails ao admin saem DEPOIS de a transação fechar e só para evento novo (`repetido` nunca chega aqui): o reenvio do Stripe não duplica o aviso. Falha de e-mail nunca derruba o webhook.
+  if (feito.resultado === "tratado" && enviar && feito.clienteId !== null && feito.mudou.length > 0) {
+    await avisarOAdmin(feito.clienteId, feito.mudou, enviar);
+  }
+  return feito.resultado;
+}
+
+/** M5 (revisão de 23/11/2026): um e-mail curto por mudança (teste começou, assinatura nova paga, cancelamento, cartão recusado). Só o nome do negócio e o que aconteceu, nenhum dado de cartão. */
+async function avisarOAdmin(clienteId: number, mudou: Mudou, enviar: typeof enviarEmail): Promise<void> {
+  try {
+    const [marca] = await db().select({ nome: clientes.nome }).from(clientes).where(eq(clientes.id, clienteId));
+    const para = await destinatariosDoAviso();
+    if (!marca || para.length === 0) return;
+    for (const tipo of mudou) {
+      const assunto = textosAvisoDeCobranca.assunto({ tipo, nomeDaMarca: marca.nome });
+      const html = textosAvisoDeCobranca.corpo({ tipo, nomeDaMarca: marca.nome }, `${config.appUrl}/admin`);
+      const resultados = await Promise.allSettled(para.map((email) => enviar({ para: email, assunto, html })));
+      for (const r of resultados) if (r.status === "rejected") logger.error({ err: r.reason, tipo }, "nao foi possivel enviar o aviso de cobranca ao admin");
+    }
+  } catch (erro) {
+    logger.error({ err: erro, clienteId }, "nao foi possivel montar o aviso de cobranca ao admin");
+  }
 }
 
 // ---------------------------------------------------------------------------

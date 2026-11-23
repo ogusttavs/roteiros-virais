@@ -15,6 +15,9 @@ function sdkDeMentira(estado: {
   erroAoCancelar?: { code?: string };
   /** O que a busca de assinaturas do Stripe devolve. */
   assinaturasAchadas?: unknown[];
+  /** A assinatura que o Stripe devolve ao ler e o status em que ela fica depois de `trial_end: "now"`. */
+  assinatura?: { status: string; metadata?: Record<string, string> };
+  statusDepoisDeEncerrar?: string;
 }) {
   const chamadas: Chamada[] = [];
   const registrar = (metodo: string, ...args: unknown[]) => chamadas.push({ metodo, args });
@@ -55,6 +58,14 @@ function sdkDeMentira(estado: {
       async search(...args: unknown[]) {
         registrar("subscriptions.search", ...args);
         return { data: estado.assinaturasAchadas ?? [] };
+      },
+      async retrieve(id: string) {
+        registrar("subscriptions.retrieve", id);
+        return { id, ...estado.assinatura };
+      },
+      async update(id: string, ...args: unknown[]) {
+        registrar("subscriptions.update", id, ...args);
+        return { id, status: estado.statusDepoisDeEncerrar ?? "active" };
       },
       async cancel(id: string) {
         registrar("subscriptions.cancel", id);
@@ -223,5 +234,42 @@ describe("a porta de verdade: o teste grátis (E22)", () => {
       throw new Error("Stripe fora do ar");
     };
     await expect(criarPortaComSdk(sdk).jaTeveAssinatura({ clienteId: 7, sessaoAnteriorId: null })).rejects.toThrow("Stripe fora do ar");
+  });
+});
+
+describe("a porta de verdade: encerrar o teste e cobrar (23/11/2026)", () => {
+  const nossa = { produto: "roteiros", cliente_id: "7" };
+
+  it("assinatura em teste: trial_end now, com chave de idempotência fixa por assinatura; pagou, cobrado", async () => {
+    const { sdk, chamadas } = sdkDeMentira({ assinatura: { status: "trialing", metadata: nossa }, statusDepoisDeEncerrar: "active" });
+    await expect(criarPortaComSdk(sdk).encerrarTeste({ stripeAssinaturaId: "sub_1", clienteId: 7 })).resolves.toEqual({ cobrado: true });
+    const atualizar = chamadas.find((c) => c.metodo === "subscriptions.update")!;
+    expect(atualizar.args[1]).toMatchObject({ trial_end: "now" });
+    expect(atualizar.args[2]).toEqual({ idempotencyKey: "roteiros-encerrar-teste-sub_1" });
+  });
+
+  it("cartão recusado: o Stripe deixa past_due e a porta diz que não cobrou", async () => {
+    const { sdk } = sdkDeMentira({ assinatura: { status: "trialing", metadata: nossa }, statusDepoisDeEncerrar: "past_due" });
+    await expect(criarPortaComSdk(sdk).encerrarTeste({ stripeAssinaturaId: "sub_1", clienteId: 7 })).resolves.toEqual({ cobrado: false });
+  });
+
+  it("assinatura de outro produto ou de outra marca: erro e nenhuma alteração (conta dividida)", async () => {
+    const alheias: Record<string, string>[] = [{ produto: "odontotech", cliente_id: "7" }, { produto: "roteiros", cliente_id: "8" }, {}];
+    for (const metadata of alheias) {
+      const { sdk, chamadas } = sdkDeMentira({ assinatura: { status: "trialing", metadata } });
+      await expect(criarPortaComSdk(sdk).encerrarTeste({ stripeAssinaturaId: "sub_1", clienteId: 7 })).rejects.toThrow();
+      expect(chamadas.some((c) => c.metodo === "subscriptions.update")).toBe(false);
+    }
+  });
+
+  it("assinatura que já não está em teste (outro clique chegou primeiro): não mexe e não cobra de novo", async () => {
+    const { sdk, chamadas } = sdkDeMentira({ assinatura: { status: "active", metadata: nossa } });
+    await expect(criarPortaComSdk(sdk).encerrarTeste({ stripeAssinaturaId: "sub_1", clienteId: 7 })).resolves.toEqual({ cobrado: true });
+    expect(chamadas.some((c) => c.metodo === "subscriptions.update")).toBe(false);
+  });
+
+  it("lerAssinatura só devolve assinatura deste produto", async () => {
+    expect(await criarPortaComSdk(sdkDeMentira({ assinatura: { status: "active", metadata: nossa } }).sdk).lerAssinatura("sub_1")).toMatchObject({ id: "sub_1" });
+    expect(await criarPortaComSdk(sdkDeMentira({ assinatura: { status: "active", metadata: { produto: "odontotech" } } }).sdk).lerAssinatura("sub_1")).toBeNull();
   });
 });

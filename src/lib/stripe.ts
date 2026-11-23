@@ -68,13 +68,24 @@ export interface PortaStripe {
   criarPortal(pedido: { stripeClienteId: string; urlDeVolta: string }): Promise<{ url: string }>;
   /** Cancela a assinatura agora (item 0d: a marca vai ser apagada). Assinatura que já não existe no Stripe conta como cancelada. */
   cancelarAssinatura(stripeAssinaturaId: string): Promise<void>;
+  /**
+   * Assinar no meio do teste (23/11/2026, "cobra na hora"): encerra o teste da assinatura agora (`trial_end: "now"`), e o Stripe emite a fatura e tenta cobrar o cartão da assinatura na
+   * mesma chamada. `cobrado` é verdade quando a assinatura saiu da chamada `active` (pagou); falso quando o cartão foi recusado (a assinatura fica `past_due`). Só mexe em assinatura deste
+   * produto e desta marca (`metadata.produto` e `cliente_id`); a chave de idempotência é fixa por assinatura, então dois cliques viram uma cobrança só. Quem já não está em teste
+   * (o aviso de outro clique chegou primeiro) devolve o estado em que está, sem cobrar de novo.
+   */
+  encerrarTeste(pedido: { stripeAssinaturaId: string; clienteId: number }): Promise<{ cobrado: boolean }>;
+  /** A assinatura como o Stripe a tem agora, para a conferência (`npm run stripe:conferir`). Nula se não existe ou não é deste produto. */
+  lerAssinatura(stripeAssinaturaId: string): Promise<Record<string, unknown> | null>;
+  /** As assinaturas deste produto que o Stripe tem para a marca (`metadata.cliente_id`), em qualquer estado, para achar as que o nosso banco nunca recebeu. */
+  assinaturasDaMarca(clienteId: number): Promise<Record<string, unknown>[]>;
 }
 
 // ---------------------------------------------------------------------------
 // A porta simulada
 // ---------------------------------------------------------------------------
 
-export type ChamadaSimulada = { metodo: "precoDoPlano" | "criarCheckout" | "jaTeveAssinatura" | "sessaoAberta" | "expirarSessao" | "criarPortal" | "cancelarAssinatura"; pedido: unknown };
+export type ChamadaSimulada = { metodo: "precoDoPlano" | "criarCheckout" | "jaTeveAssinatura" | "sessaoAberta" | "expirarSessao" | "criarPortal" | "cancelarAssinatura" | "encerrarTeste" | "lerAssinatura" | "assinaturasDaMarca"; pedido: unknown };
 export const chamadasSimuladas: ChamadaSimulada[] = [];
 
 /** As sessões de Checkout que a porta simulada abriu (id para marca e se ainda está aberta); os testes fecham uma com `fecharSessaoSimulada` para imitar o pagamento ou a expiração. */
@@ -133,6 +144,18 @@ export function criarPortaSimulada(): PortaStripe {
     },
     async cancelarAssinatura(stripeAssinaturaId) {
       chamadasSimuladas.push({ metodo: "cancelarAssinatura", pedido: stripeAssinaturaId });
+    },
+    async encerrarTeste(pedido) {
+      chamadasSimuladas.push({ metodo: "encerrarTeste", pedido });
+      return { cobrado: true };
+    },
+    async lerAssinatura(stripeAssinaturaId) {
+      chamadasSimuladas.push({ metodo: "lerAssinatura", pedido: stripeAssinaturaId });
+      return null;
+    },
+    async assinaturasDaMarca(clienteId) {
+      chamadasSimuladas.push({ metodo: "assinaturasDaMarca", pedido: clienteId });
+      return [];
     },
   };
 }
@@ -252,6 +275,30 @@ export function criarPortaComSdk(stripe: Stripe): PortaStripe {
       return { url: sessao.url };
     },
     cancelarAssinatura: cancelar,
+    async encerrarTeste(pedido) {
+      const atual = await stripe.subscriptions.retrieve(pedido.stripeAssinaturaId);
+      // Conta dividida: só se encerra o teste de assinatura deste produto e desta marca.
+      if (atual.metadata?.produto !== METADATA_PRODUTO.produto || atual.metadata?.cliente_id !== String(pedido.clienteId)) {
+        throw new ErroStripe("A assinatura nao e deste produto ou desta marca.");
+      }
+      if (atual.status !== "trialing") return { cobrado: atual.status === "active" };
+      const nova = await stripe.subscriptions.update(pedido.stripeAssinaturaId, { trial_end: "now", proration_behavior: "none" }, { idempotencyKey: `roteiros-encerrar-teste-${pedido.stripeAssinaturaId}` });
+      return { cobrado: nova.status === "active" };
+    },
+    async lerAssinatura(stripeAssinaturaId) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(stripeAssinaturaId);
+        if (sub.metadata?.produto !== METADATA_PRODUTO.produto) return null;
+        return sub as unknown as Record<string, unknown>;
+      } catch (erro) {
+        if ((erro as { code?: string } | null)?.code === "resource_missing") return null;
+        throw erro;
+      }
+    },
+    async assinaturasDaMarca(clienteId) {
+      const achadas = await stripe.subscriptions.search({ query: `metadata['produto']:'${METADATA_PRODUTO.produto}' AND metadata['cliente_id']:'${clienteId}'`, limit: 20 });
+      return achadas.data as unknown as Record<string, unknown>[];
+    },
   };
 }
 

@@ -138,14 +138,15 @@ describe("o teste grátis (E22)", () => {
     expect(frases).toEqual(["Seu teste grátis termina em 22 de janeiro de 2027. Para continuar depois do teste, cadastre o cartão."]);
     expect(frases.join(" ")).not.toContain("cobrança");
     expect(botoesDaTela("teste", semCartao).map((b) => [b.acao, b.rotulo, b.variante])).toEqual([
-      ["portal", "Cadastrar o cartão", "primario"],
+      ["assinarAgora", "Assinar agora por R$ 1.191 a cada 3 meses", "primario"],
+      ["portal", "Cadastrar o cartão", "secundario"],
       ["hoje", "Ir para o Hoje", "secundario"],
     ]);
   });
 
   it("com cartão no começo: Você está no teste grátis até a data, e a primeira cobrança é na mesma data", () => {
     expect(textosDaTela("teste", emTeste, comCartao).frases).toEqual(["Você está no teste grátis até 22 de janeiro de 2027. Se não cancelar, a primeira cobrança é em 22 de janeiro de 2027."]);
-    expect(botoesDaTela("teste", comCartao).map((b) => b.acao)).toEqual(["hoje", "portal"]);
+    expect(botoesDaTela("teste", comCartao).map((b) => b.acao)).toEqual(["assinarAgora", "hoje", "portal"]);
   });
 
   it("quem cancelou durante o teste lê que nada será cobrado, e o teste sem data diz o que dá para dizer", () => {
@@ -195,7 +196,7 @@ describe("o fim do teste e o cartão já cadastrado (A3, M4, 23/11/2026)", () =>
   it("teste sem cartão e a pessoa já cadastrou: Tudo certo, a assinatura começa sozinha, e o botão principal volta a ser o Hoje", () => {
     const comCartao = { ...emTeste, temCartao: true };
     expect(textosDaTela("teste", comCartao, semCartao).frases).toEqual(["Seu teste grátis termina em 22 de janeiro de 2027. Tudo certo: no fim do teste a assinatura começa sozinha, com o cartão que você cadastrou."]);
-    expect(botoesDaTela("teste", semCartao, true).map((b) => b.acao)).toEqual(["hoje", "portal"]);
+    expect(botoesDaTela("teste", semCartao, true).map((b) => b.acao)).toEqual(["assinarAgora", "hoje", "portal"]);
     const conta = cartaoDaConta(comCartao, false);
     expect(conta.data).toContain("Tudo certo");
     expect(conta.botoes.map((b) => b.rotulo)).toEqual(["Gerenciar a assinatura"]);
@@ -204,6 +205,21 @@ describe("o fim do teste e o cartão já cadastrado (A3, M4, 23/11/2026)", () =>
   it("teste sem cartão e sem cartão cadastrado: Para continuar depois do teste, cadastre o cartão", () => {
     expect(textosDaTela("teste", emTeste, semCartao).frases[0]).toContain("Para continuar depois do teste, cadastre o cartão.");
     expect(textosDaTela("teste", emTeste, semCartao).frases[0]).not.toContain("já cadastrou");
-    expect(botoesDaTela("teste", semCartao, false)[0].rotulo).toBe("Cadastrar o cartão");
+    expect(botoesDaTela("teste", semCartao, false).map((b) => b.rotulo)).toContain("Cadastrar o cartão");
+  });
+});
+
+describe("assinar no meio do teste (23/11/2026)", () => {
+  const semCartao = { dias: 7, exigeCartao: false, oferecer: false };
+  it("quem está no teste vê o botão de assinar agora primeiro, com o preço e o período vindos do plano, e só o dono o enxerga", () => {
+    const botao = botoesDaTela("teste", semCartao, true)[0];
+    expect(botao).toMatchObject({ acao: "assinarAgora", rotulo: "Assinar agora por R$ 1.191 a cada 3 meses", variante: "primario" });
+    expect(botaoEhDoDono(botao)).toBe(true);
+  });
+
+  it("voltando de assinar agora, enquanto o aviso do pagamento não chega a tela espera, e não diz que o teste começou", () => {
+    expect(visaoDaTela(situacao({ tipo: "teste" }), true, true)).toBe("aguardando");
+    expect(visaoDaTela(situacao({ tipo: "teste" }), true, false)).toBe("confirmada");
+    expect(visaoDaTela(situacao({ tipo: "ativa" }), true, true)).toBe("confirmada");
   });
 });

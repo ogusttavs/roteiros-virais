@@ -95,6 +95,9 @@ function portaSemNada(): PortaStripe {
     expirarSessao: vi.fn(),
     criarPortal: vi.fn(),
     cancelarAssinatura: vi.fn(),
+    encerrarTeste: vi.fn(),
+    lerAssinatura: vi.fn(),
+    assinaturasDaMarca: vi.fn(),
   };
 }
 
