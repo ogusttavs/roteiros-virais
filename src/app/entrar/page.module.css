@@ -101,3 +101,31 @@
 .linkAcao + .linkAcao {
   margin-top: 0;
 }
+
+/* E63 PR 2: o cartão e, embaixo dele, o rodapé do cadastro (só com a chave ligada). */
+.coluna {
+  position: relative;
+  width: 100%;
+  max-width: 24rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espaco-6);
+}
+
+.rodape {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+  text-align: center;
+}
+
+.linkRodape {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  color: var(--cor-titulo);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}

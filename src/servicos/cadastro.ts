@@ -244,6 +244,18 @@ export async function confirmarEmail(codigo: string, agora: Date = new Date()): 
 
 export type ResultadoDoReenvio = { ok: true } | { ok: false; motivo: "jaConfirmado" | "esperar" | "limite" };
 
+/** Os dois tetos do reenvio, os mesmos para "mandar de novo" e para "trocar o e-mail": no máximo `enviosPorDia` links por pessoa em 24 horas e um minuto entre um e outro. `null` é "pode mandar". */
+async function tetoDeEnvios(usuarioId: string, agora: Date): Promise<"esperar" | "limite" | null> {
+  const recentes = await db()
+    .select({ criadoEm: confirmacoesDeEmail.criadoEm })
+    .from(confirmacoesDeEmail)
+    .where(and(eq(confirmacoesDeEmail.usuarioId, usuarioId), gt(confirmacoesDeEmail.criadoEm, new Date(agora.getTime() - 24 * 60 * 60 * 1000))))
+    .orderBy(desc(confirmacoesDeEmail.criadoEm));
+  if (recentes.length >= LIMITES_DO_CADASTRO.enviosPorDia) return "limite";
+  if (recentes[0] && agora.getTime() - recentes[0].criadoEm.getTime() < LIMITES_DO_CADASTRO.esperaEntreEnviosMs) return "esperar";
+  return null;
+}
+
 /** Manda outro link de confirmar: no máximo `enviosPorDia` por pessoa em 24 horas e um minuto entre um e outro. Quem já confirmou (ou nunca precisou) não recebe nada. */
 export async function reenviarConfirmacao(usuarioId: string, agora: Date = new Date()): Promise<ResultadoDoReenvio> {
   const [pessoa] = await db()
@@ -253,13 +265,8 @@ export async function reenviarConfirmacao(usuarioId: string, agora: Date = new D
     .where(eq(user.id, usuarioId));
   if (!pessoa || pessoa.confirmado || !pessoa.cadastro) return { ok: false, motivo: "jaConfirmado" };
 
-  const recentes = await db()
-    .select({ criadoEm: confirmacoesDeEmail.criadoEm })
-    .from(confirmacoesDeEmail)
-    .where(and(eq(confirmacoesDeEmail.usuarioId, usuarioId), gt(confirmacoesDeEmail.criadoEm, new Date(agora.getTime() - 24 * 60 * 60 * 1000))))
-    .orderBy(desc(confirmacoesDeEmail.criadoEm));
-  if (recentes.length >= LIMITES_DO_CADASTRO.enviosPorDia) return { ok: false, motivo: "limite" };
-  if (recentes[0] && agora.getTime() - recentes[0].criadoEm.getTime() < LIMITES_DO_CADASTRO.esperaEntreEnviosMs) return { ok: false, motivo: "esperar" };
+  const teto = await tetoDeEnvios(usuarioId, agora);
+  if (teto) return { ok: false, motivo: teto };
 
   const codigo = randomBytes(32).toString("base64url");
   await db()
@@ -272,6 +279,52 @@ export async function reenviarConfirmacao(usuarioId: string, agora: Date = new D
 // ---------------------------------------------------------------------------
 // Faxina: conta que nunca confirmou o e-mail
 // ---------------------------------------------------------------------------
+
+export type ResultadoDaTroca = { ok: true } | { ok: false; motivo: "email" | "descartavel" | "jaConfirmado" | "esperar" | "limite" };
+
+/**
+ * "Trocar o e-mail" (E63 PR 2): a pessoa errou o endereço no cadastro. Vale só para a conta de cadastro próprio que ainda não confirmou. O endereço novo passa pelas mesmas regras do
+ * cadastro (formato e lista de descartáveis), o link que foi para o endereço errado deixa de valer, e conta nos mesmos tetos de reenvio. Endereço que já tem conta não é revelado:
+ * responde `ok` igual, não troca nada e manda ao dono daquele endereço o aviso de "você já tem conta". Endereço igual ao de agora é só um reenvio.
+ */
+export async function trocarEmailDoCadastro(usuarioId: string, bruto: unknown, agora: Date = new Date()): Promise<ResultadoDaTroca> {
+  const email = limparTexto(bruto).toLowerCase();
+  if (email.length > TAMANHO_DO_CADASTRO.emailMax || !FORMATO_EMAIL.test(email)) return { ok: false, motivo: "email" };
+  if (emailEhDescartavel(email)) return { ok: false, motivo: "descartavel" };
+
+  const [pessoa] = await db()
+    .select({ nome: user.name, email: user.email, confirmado: user.emailVerified, cadastro: cadastrosProprios.usuarioId })
+    .from(user)
+    .leftJoin(cadastrosProprios, eq(cadastrosProprios.usuarioId, user.id))
+    .where(eq(user.id, usuarioId));
+  if (!pessoa || pessoa.confirmado || !pessoa.cadastro) return { ok: false, motivo: "jaConfirmado" };
+  if (pessoa.email.toLowerCase() === email) return reenviarConfirmacao(usuarioId, agora);
+
+  const teto = await tetoDeEnvios(usuarioId, agora);
+  if (teto) return { ok: false, motivo: teto };
+
+  const codigo = randomBytes(32).toString("base64url");
+  try {
+    await db().transaction(async (tx) => {
+      const [existente] = await tx.select({ id: user.id }).from(user).where(sql`lower(${user.email}) = ${email}`);
+      if (existente) throw new ErroEmailJaTemConta();
+      await tx.update(user).set({ email, updatedAt: agora }).where(eq(user.id, usuarioId));
+      // O link que foi para o endereço errado deixa de valer.
+      await tx.update(confirmacoesDeEmail).set({ usadoEm: agora }).where(and(eq(confirmacoesDeEmail.usuarioId, usuarioId), sql`${confirmacoesDeEmail.usadoEm} is null`));
+      await tx
+        .insert(confirmacoesDeEmail)
+        .values({ usuarioId, codigoHash: hashDoCodigo(codigo), expiraEm: new Date(agora.getTime() + LIMITES_DO_CADASTRO.validadeDoLinkMs), criadoEm: agora });
+    });
+  } catch (erro) {
+    if (erro instanceof ErroEmailJaTemConta || erroDeEmailRepetido(erro)) {
+      semEsperar(avisarQueJaTemConta(email), "o aviso de que o e-mail ja tem conta");
+      return { ok: true };
+    }
+    throw erro;
+  }
+  semEsperar(mandarConfirmacao(email, pessoa.nome, codigo), "o e-mail de confirmacao");
+  return { ok: true };
+}
 
 /**
  * Apaga a conta de cadastro próprio que nunca confirmou o e-mail em `LIMITES_DO_CADASTRO.diasParaApagarSemConfirmar` dias (para o e-mail não ficar preso por quem digitou errado ou

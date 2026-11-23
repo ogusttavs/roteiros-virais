@@ -35,6 +35,7 @@ export const ACOES_LIVRES: Record<string, string> = {
   "src/app/acoes.ts:queroTestarAction": "formulário público da página de entrada (E57a): não há conta nem assinatura, só grava quem pediu para testar, sem IA e sem gasto",
   "src/app/cadastro/acoes.ts:criarContaAction": "E63: é o cadastro sozinho, antes de existir conta, marca ou assinatura; não gasta IA (as travas e a chave CADASTRO_ABERTO estão no serviço)",
   "src/app/confirmar-email/acoes.ts:reenviarConfirmacaoAction": "E63: manda só o e-mail de confirmar da própria pessoa, com teto de reenvios; é o que destrava quem não confirmou, então nunca pode ficar atrás do portão",
+  "src/app/confirmar-email/acoes.ts:trocarEmailAction": "E63: troca o e-mail de quem não confirmou e manda o link novo; é o que destrava quem errou o endereço, então nunca pode ficar atrás do portão",
   "src/app/(painel)/(completo)/conta/instagram-acoes.ts:desligarInstagramAction": "E19: desligar apaga o acesso guardado da pessoa e não gasta nada; é privacidade, e nunca pode ficar trancado atrás do pagamento",
 };
 

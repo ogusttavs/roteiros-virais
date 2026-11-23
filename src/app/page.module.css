@@ -354,3 +354,97 @@
     justify-content: space-between;
   }
 }
+
+/* ---------- E63 PR 2: a página com o cadastro aberto (desenho em `PaginaDeVendas-cadastro.dc.html`) ---------- */
+.acoesDoTopo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+
+.botaoTopo {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+}
+
+.botaoTopo:hover {
+  background: var(--cor-acao-hover);
+}
+
+.botaoTopo:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+/* No celular, antes de rolar só "Entrar"; depois de rolar só o botão do teste. Do tablet para cima, os dois sempre. */
+@media (max-width: 47.999rem) {
+  .topo[data-rolado="sim"] .soAntesDeRolar,
+  .topo[data-rolado="nao"] .soDepoisDeRolar {
+    display: none;
+  }
+}
+
+.botaoComLinha {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+}
+
+.linhaDoBotao,
+.linhaDoTeste {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+  text-wrap: pretty;
+}
+
+.linhaDoBotao strong,
+.linhaDoTeste {
+  color: var(--cor-titulo);
+}
+
+.preco .botaoHeroi {
+  align-self: flex-start;
+  margin-top: var(--espaco-2);
+}
+
+.etiquetaNova {
+  margin-left: var(--espaco-2);
+  padding: 0.125rem var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  border: 1px solid var(--cor-selecao-borda);
+  color: var(--cor-titulo);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+}
+
+/* O formulário de interessado como segunda opção: cartão recuado e título menor. */
+.cartaoRecuado {
+  background: var(--cor-superficie-recuada);
+  box-shadow: none;
+}
+
+.tituloMenor {
+  font-size: var(--tamanho-cabecalho);
+}
+
+@media (min-width: 48rem) {
+  .passosEmQuatro {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 64rem) {
+  .passosEmQuatro {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

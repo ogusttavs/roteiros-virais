@@ -13,7 +13,7 @@ import { db, getPool } from "@/db";
 import { assinaturas, cadastrosProprios, clientes, confirmacoesDeEmail, edicoes, geracoesIA, membrosMarca, nichos, preferenciasUsuario, roteiros, setoresDeCadastro, user } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { criarLimitador } from "@/lib/limite-de-taxa";
-import { cadastrarConta, confirmarEmail, faxinarCadastrosSemConfirmar, reenviarConfirmacao } from "@/servicos/cadastro";
+import { cadastrarConta, confirmarEmail, faxinarCadastrosSemConfirmar, reenviarConfirmacao, trocarEmailDoCadastro } from "@/servicos/cadastro";
 import { barreiraDoCadastro } from "@/servicos/cadastro-travas";
 import { criarMarca, darAcesso, ErroCliente, salvarDadosFixosComPedido } from "@/servicos/clientes";
 import { ErroLimiteDeSetores, setorParaAMarca } from "@/servicos/ramos";
@@ -499,5 +499,55 @@ describe("a Server Action de criar conta", () => {
     expect(await db().select().from(user).where(eq(user.email, "acao@cadastro.teste"))).toHaveLength(1);
     delete process.env.CADASTRO_ABERTO;
     expect(await criarContaAction(dadosBons())).toMatchObject({ ok: false, erro: expect.stringContaining("ainda não está aberto") });
+  });
+});
+
+describe("trocar o e-mail (E63 PR 2)", () => {
+  it("o endereço novo recebe o link, o do endereço errado deixa de valer e a conta continua a mesma", async () => {
+    const { usuarioId, dados } = await criar();
+    const [antes] = await db().select().from(confirmacoesDeEmail).where(eq(confirmacoesDeEmail.usuarioId, usuarioId));
+    expect(antes.usadoEm).toBeNull();
+    const novo = `certo-${dados.email}`;
+    const agora = new Date(Date.now() + 120_000);
+    const codigo = await codigoDoEmail(async () => {
+      expect(await trocarEmailDoCadastro(usuarioId, `  ${novo.toUpperCase()} `, agora)).toEqual({ ok: true });
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    const [pessoa] = await db().select().from(user).where(eq(user.id, usuarioId));
+    expect(pessoa.email).toBe(novo);
+    expect(pessoa.emailVerified).toBe(false);
+    const [velha] = await db().select().from(confirmacoesDeEmail).where(eq(confirmacoesDeEmail.id, antes.id));
+    expect(velha.usadoEm).not.toBeNull();
+    // O código novo confirma; o velho já não vale.
+    expect(await confirmarEmail(codigo)).toEqual({ ok: true, usuarioId });
+  });
+
+  it("e-mail que não parece e-mail ou que é descartável é recusado sem mexer na conta", async () => {
+    const { usuarioId, dados } = await criar();
+    expect(await trocarEmailDoCadastro(usuarioId, "isso-nao-e-email")).toEqual({ ok: false, motivo: "email" });
+    expect(await trocarEmailDoCadastro(usuarioId, "x@mailinator.com")).toEqual({ ok: false, motivo: "descartavel" });
+    const [pessoa] = await db().select().from(user).where(eq(user.id, usuarioId));
+    expect(pessoa.email).toBe(dados.email);
+  });
+
+  it("endereço que já tem conta responde igual e não troca nada (não revela quem tem conta)", async () => {
+    const a = await criar();
+    const b = await criar();
+    const agora = new Date(Date.now() + 120_000);
+    expect(await trocarEmailDoCadastro(a.usuarioId, b.dados.email, agora)).toEqual({ ok: true });
+    const [pessoa] = await db().select().from(user).where(eq(user.id, a.usuarioId));
+    expect(pessoa.email).toBe(a.dados.email);
+  });
+
+  it("o mesmo endereço é só um reenvio, e os tetos de reenvio valem para a troca", async () => {
+    const { usuarioId, dados } = await criar();
+    expect(await trocarEmailDoCadastro(usuarioId, dados.email, new Date(Date.now() + 5_000))).toEqual({ ok: false, motivo: "esperar" });
+    expect(await trocarEmailDoCadastro(usuarioId, `outro-${dados.email}`, new Date(Date.now() + 5_000))).toEqual({ ok: false, motivo: "esperar" });
+  });
+
+  it("quem já confirmou não troca por aqui", async () => {
+    const { usuarioId } = await criar();
+    await db().update(user).set({ emailVerified: true }).where(eq(user.id, usuarioId));
+    expect(await trocarEmailDoCadastro(usuarioId, "qualquer@cadastro.teste", new Date(Date.now() + 120_000))).toEqual({ ok: false, motivo: "jaConfirmado" });
   });
 });
