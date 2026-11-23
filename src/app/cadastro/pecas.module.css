@@ -1,0 +1,572 @@
+/*
+ * E63 PR 2: as peças das telas do cadastro (desenho em `entregaveis/design-v2/entrega/telas/CriarConta.dc.html`). Irmãs da tela de Entrar: a mesma luz atrás, o mesmo cartão de
+ * vidro, o logotipo no alto do cartão. Sem casca: a pessoa ainda não tem conta.
+ */
+.tela {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--espaco-6);
+  padding: var(--espaco-8) var(--margem-celular);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* A luz da marca atrás do cartão (o mesmo halo da tela de Entrar do código): desfocada e por trás de vidro, nunca fundo de texto. */
+.tela::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: 32rem;
+  height: 32rem;
+  transform: translate(-50%, -50%);
+  background: var(--luz-degrade);
+  filter: blur(6rem);
+  opacity: calc(var(--luz-halo) * 0.4);
+  pointer-events: none;
+}
+
+.arranjo {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: var(--espaco-6);
+}
+
+.cartao {
+  width: 100%;
+  max-width: 26rem;
+  display: grid;
+  gap: var(--espaco-5);
+  padding: var(--espaco-8) var(--espaco-6);
+  background: var(--cor-material-menu);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border: var(--largura-borda) solid var(--vidro-borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
+}
+
+.cartao input {
+  font-stretch: 100%;
+}
+
+.cabeca {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.cabeca h1 {
+  margin: 0;
+  font-size: var(--tamanho-titulo-1);
+}
+
+.cabeca p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  text-wrap: pretty;
+}
+
+.confirmado {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-width: 0;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.4 var(--fonte-mono);
+  color: var(--cor-texto-suave);
+}
+
+.confirmado svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--cor-positivo);
+  flex: 0 0 auto;
+}
+
+.confirmado span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.formulario {
+  display: grid;
+  gap: var(--espaco-5);
+}
+
+.campos {
+  display: grid;
+  gap: var(--espaco-4);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.rodape {
+  max-width: 26rem;
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+  text-align: center;
+}
+
+/* Botão de texto no meio de uma frase: sublinhado, com alvo de 44 px. */
+.linkTexto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  background: none;
+  border: none;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.linkAcao {
+  composes: linkTexto;
+  width: 100%;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-acao);
+}
+
+.erroGeral {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}
+
+.erroGeral svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 auto;
+}
+
+/* ---------- O aceite ---------- */
+.aceite {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.marcarAceite {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-3);
+  align-items: start;
+  min-height: var(--altura-toque);
+  padding: var(--espaco-2) 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--cor-texto);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+}
+
+.caixa {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  margin-top: 0.1rem;
+  border: 2px solid var(--cor-borda-forte);
+  border-radius: 0.375rem;
+  background: var(--cor-superficie);
+  color: var(--cor-acao-texto);
+}
+
+.marcarAceite[aria-checked="true"] .caixa {
+  border-color: var(--cor-acao);
+  background: var(--cor-acao);
+}
+
+.caixa svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.aceiteComErro .caixa {
+  border-color: var(--cor-erro);
+}
+
+.marcarAceite:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+  border-radius: var(--raio-sm);
+}
+
+.linksAceite {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--espaco-1);
+  margin-left: calc(1.375rem + var(--espaco-3) - var(--espaco-2));
+  font-size: var(--tamanho-secundario);
+}
+
+.erroCampo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  color: var(--cor-erro);
+  font-size: var(--tamanho-rodape);
+  margin-left: calc(1.375rem + var(--espaco-3));
+}
+
+.erroCampo svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+/* ---------- A senha com o botão de mostrar dentro do campo ---------- */
+.campoSenha {
+  position: relative;
+}
+
+.campoSenha input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: calc(var(--altura-toque) + var(--espaco-2));
+}
+
+.mostrar {
+  position: absolute;
+  right: var(--espaco-1);
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+
+.mostrar:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.mostrar svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* ---------- A linha do teste, embaixo do botão (promessa e preço: cor de texto, não de dica) ---------- */
+.botaoELinha {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.linhaTeste {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.linhaTeste strong {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+/* ---------- Mensagens ---------- */
+.avisoLink {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-selecao-suave);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+}
+
+.avisoLink strong {
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-corpo);
+  overflow-wrap: anywhere;
+}
+
+.avisoLink p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.prazo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.dica {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  text-wrap: pretty;
+}
+
+.avisoCurto {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.avisoCurto svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--cor-positivo);
+  flex: 0 0 auto;
+}
+
+.acoesPilha {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.itensProximo {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.itemProximo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-3);
+  align-items: start;
+}
+
+.itemProximo svg {
+  color: var(--cor-titulo);
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.15rem;
+}
+
+.itemProximo p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+  text-wrap: pretty;
+}
+
+/* Um link com cara de botão (Link do Next no lugar de `<button>`). */
+.botaoLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--altura-toque-lg);
+  padding: 0 var(--espaco-6);
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  text-align: center;
+  text-decoration: none;
+}
+
+.botaoLink:hover {
+  background: var(--cor-acao-hover);
+}
+
+.botaoLinkVazio {
+  composes: botaoLink;
+  background: transparent;
+  color: var(--cor-titulo);
+  border: 1px solid var(--cor-borda-forte);
+}
+
+.botaoLinkVazio:hover {
+  background: var(--cor-superficie-hover);
+}
+
+/* ---------- O caminho do teste ---------- */
+.caminho {
+  width: 100%;
+  max-width: 26rem;
+  display: grid;
+  gap: var(--espaco-4);
+  align-content: start;
+}
+
+.rotuloCaminho {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.passosCaminho {
+  display: grid;
+  gap: var(--espaco-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.passoCaminho {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: var(--espaco-3);
+  align-items: start;
+}
+
+.numero {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1 var(--fonte-mono);
+  color: var(--cor-texto-suave);
+}
+
+.numero svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.feito .numero {
+  border-color: var(--cor-positivo);
+  color: var(--cor-positivo);
+}
+
+.agora .numero {
+  border-color: transparent;
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+}
+
+.textoDoPasso {
+  display: grid;
+  gap: var(--espaco-1);
+  padding-top: 0.2rem;
+}
+
+.textoDoPasso strong {
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  line-height: var(--altura-compacta);
+}
+
+.agora .textoDoPasso strong {
+  font-weight: var(--peso-forte);
+}
+
+.feito .textoDoPasso strong {
+  color: var(--cor-texto-suave);
+}
+
+.textoDoPasso p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  text-wrap: pretty;
+}
+
+.marcaAgora {
+  margin-left: var(--espaco-2);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-destaque);
+}
+
+.precoCaminho {
+  margin: 0;
+  padding-top: var(--espaco-4);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+  text-wrap: pretty;
+}
+
+.precoCaminho b {
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.soLeitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .largo {
+    max-width: 36rem;
+  }
+
+  .largo .campos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--espaco-4);
+  }
+}
+
+/* A partir de 1180 px, o caminho à esquerda do cartão. Sem o caminho (cadastro fechado) volta a uma coluna, no meio. */
+@media (min-width: 1180px) {
+  .arranjoComCaminho {
+    width: auto;
+    grid-template-columns: 20rem auto;
+    column-gap: var(--espaco-12);
+    row-gap: var(--espaco-5);
+    justify-content: center;
+    align-items: center;
+  }
+
+  .arranjoComCaminho > .caminho {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    max-width: none;
+  }
+
+  .arranjoComCaminho > .cartao {
+    grid-column: 2;
+    grid-row: 1;
+    width: 26rem;
+  }
+
+  .arranjoComCaminho > .cartao.largo {
+    width: 36rem;
+  }
+
+  .arranjoComCaminho > .rodape {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .tela:has(.caminho)::before {
+    left: calc(50% + 11.5rem);
+  }
+}

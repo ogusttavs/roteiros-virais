@@ -1,0 +1,224 @@
+/* E63 PR 2: a folha do limite do teste (desenho em `entregaveis/design-v2/entrega/telas/LimiteDoTeste.dc.html`). No celular sobe de baixo; do tablet para cima fica no meio. */
+.pagina {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--cor-fundo);
+}
+
+/* O véu: no desenho a folha cobre o Hoje ou o Roteiro; aqui a ação levou a pessoa até esta página, então o fundo é a luz da marca desfocada. */
+.veu {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.veu::before {
+  content: "";
+  position: absolute;
+  width: 22rem;
+  height: 22rem;
+  left: 50%;
+  top: 12%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--luz-degrade);
+  filter: blur(70px);
+  opacity: calc(var(--luz-halo) * 0.9);
+}
+
+.folha {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 92dvh;
+  background: var(--cor-material-menu);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border: var(--largura-borda) solid var(--vidro-borda);
+  border-radius: var(--raio-lg) var(--raio-lg) 0 0;
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
+}
+
+.topo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  padding: var(--espaco-6) var(--espaco-4) var(--espaco-2) var(--margem-celular);
+}
+
+.alca {
+  position: absolute;
+  top: var(--espaco-2);
+  left: 50%;
+  width: 2.5rem;
+  height: 0.25rem;
+  transform: translateX(-50%);
+  border-radius: var(--raio-pill);
+  background: var(--cor-borda-forte);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  text-wrap: balance;
+}
+
+.fechar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  border-radius: var(--raio-pill);
+  color: var(--cor-texto-suave);
+}
+
+.fechar:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.fechar svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.corpo {
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-5) var(--margem-celular);
+  overflow-y: auto;
+}
+
+.contador {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.contador b {
+  margin-right: var(--espaco-2);
+  font: 800 var(--tamanho-titulo-2) / 1 var(--fonte-mono);
+  letter-spacing: -0.03em;
+  color: var(--cor-titulo);
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-texto);
+  text-wrap: pretty;
+}
+
+.suave {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  text-wrap: pretty;
+}
+
+.plano {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-5);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+}
+
+.plano p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.plano .preco {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.preco b {
+  font: 800 var(--tamanho-titulo-1) / 1 var(--fonte-mono);
+  letter-spacing: -0.03em;
+  color: var(--cor-titulo);
+  background: linear-gradient(transparent 72%, var(--cor-marcador) 72%, var(--cor-marcador) 92%, transparent 92%);
+}
+
+.pe {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-5) + env(safe-area-inset-bottom, 0px));
+}
+
+/* O botão quebra em duas linhas no celular: o preço não pode sair dele. */
+.botao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--altura-toque-lg);
+  padding: var(--espaco-2) var(--espaco-6);
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.botao:hover {
+  background: var(--cor-acao-hover);
+}
+
+.agoraNao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--altura-toque);
+  color: var(--cor-acao);
+  font-size: var(--tamanho-secundario);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.miudo {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+@media (min-width: 768px) {
+  .folha {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(var(--largura-folha), calc(100vw - var(--espaco-12)));
+    max-height: 88vh;
+    border-radius: var(--raio-lg);
+  }
+
+  .alca {
+    display: none;
+  }
+}

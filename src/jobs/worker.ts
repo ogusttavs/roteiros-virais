@@ -36,6 +36,7 @@ import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
+import { rodarFaxinaDosCadastros } from "./faxina-cadastros";
 import { rodarFaxinaDeContas } from "./faxina-de-contas";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { boss, FILAS, garantirFilas } from "./fila";
@@ -221,6 +222,9 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.faxinaVersoes, async () => {
     await executarComRegistro(FILAS.faxinaVersoes, () => rodarFaxinaDasVersoes());
+  });
+  await boss().work(FILAS.faxinaCadastros, async () => {
+    await executarComRegistro(FILAS.faxinaCadastros, () => rodarFaxinaDosCadastros());
   });
   await boss().work(FILAS.renovarContasLigadas, async () => {
     await executarComRegistro(FILAS.renovarContasLigadas, () => rodarRenovarContasLigadas());

@@ -21,14 +21,14 @@ import { textosRamo } from "@/textos/ramo";
  * mensagem de uma exceção, e a pessoa veria o "confira os campos" genérico com o formulário certo. Qualquer outro erro continua sendo lançado.
  * Nada do `Cliente` volta ao navegador; volta só se o teto segurou o palpite do ramo provisório (o pedido vai aberto e a tela não promete o ramo).
  */
-export async function salvarDadosFixosAction(dadosBrutos: unknown): Promise<ResultadoAcao<{ limiteDeRamosNovos: boolean }>> {
+export async function salvarDadosFixosAction(dadosBrutos: unknown): Promise<ResultadoAcao<{ limiteDeRamosNovos: boolean; ramoEmPreparo: boolean }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   await exigirAssinaturaValida({ soDepoisDoBriefing: true });
   const cliente = await clienteDaSessaoAtual();
   try {
-    const { limiteDeRamosNovos } = await salvarDadosFixosComPedido(cliente.id, dadosBrutos);
-    return { ok: true, dado: { limiteDeRamosNovos } };
+    const { limiteDeRamosNovos, ramoEmPreparo } = await salvarDadosFixosComPedido(cliente.id, dadosBrutos);
+    return { ok: true, dado: { limiteDeRamosNovos, ramoEmPreparo } };
   } catch (erro) {
     if (erro instanceof ErroLimiteDeSetores) return { ok: false, erro: textosRamo.limiteDeRamosNovos };
     throw erro;

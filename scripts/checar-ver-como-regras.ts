@@ -19,6 +19,9 @@ export const LEITURA_LIVRE: Record<string, string> = {
   "src/app/(painel)/_briefing/acoes.ts:listarPerfisCitadosAction": "só lê os perfis citados",
   "src/app/(painel)/_casca/push-acoes.ts:inscricaoRegistradaAction": "só lê se a pessoa tem aquela inscrição de push",
   "src/app/(painel)/_casca/ver-como-acoes.ts:sairDoVerComoAction": "é a própria saída do modo",
+  "src/app/cadastro/acoes.ts:criarContaAction": "E63: é o cadastro público, sem sessão: não há pessoa nem conta para ver como",
+  "src/app/confirmar-email/acoes.ts:reenviarConfirmacaoAction": "E63: só manda o e-mail de confirmar da pessoa da sessão real; o admin no modo não chega a esta página",
+  "src/app/confirmar-email/acoes.ts:trocarEmailAction": "E63: só mexe na conta da pessoa da sessão real que ainda não confirmou o e-mail; o admin no modo não chega a esta página",
   "src/app/acoes.ts:queroTestarAction": "é o formulário público da página de entrada (E57a): não há sessão, logo nem conta para ver como; só grava a pessoa que pediu para testar",
 };
 

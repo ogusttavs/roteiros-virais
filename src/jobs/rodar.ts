@@ -30,6 +30,7 @@ import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
+import { rodarFaxinaDosCadastros } from "./faxina-cadastros";
 import { rodarFaxinaDeContas } from "./faxina-de-contas";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { FILAS } from "./fila";
@@ -150,6 +151,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.curvaCliente]: () => rodarCurvaCliente(),
   [FILAS.emailAcompanhamento]: () => rodarEmailAcompanhamento(),
   [FILAS.faxinaVersoes]: () => rodarFaxinaDasVersoes(),
+  [FILAS.faxinaCadastros]: () => rodarFaxinaDosCadastros(),
   [FILAS.renovarContasLigadas]: () => rodarRenovarContasLigadas(),
   /** Por evento (E54): `npm run job -- pesquisa-na-hora <pesquisaId>` roda uma pesquisa já criada, na hora (busca paga com a chave real). */
   [FILAS.pesquisaNaHora]: () => rodarPesquisaNaHora(Number(process.argv[3])),

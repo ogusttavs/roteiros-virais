@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   termosEm: new Date("2999-01-01") as Date | null,
   precisaChamada: vi.fn(),
   semMarca: false,
+  barreira: null as null | { tipo: "email" },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -18,6 +19,8 @@ vi.mock("next/navigation", () => ({
     throw new Error(`REDIRECT:${destino}`);
   },
 }));
+// E63: a trava do e-mail por confirmar (so conta de cadastro proprio); por padrao, sem barreira, e sem banco.
+vi.mock("@/lib/portao-cadastro", () => ({ barreiraDoCadastroNaSessao: async () => m.barreira }));
 vi.mock("@/lib/ver-como", () => ({ sessaoDoPainel: async () => m.sessao }));
 vi.mock("@/servicos/clientes", () => ({
   clienteAtivoDoUsuario: async () => (m.semMarca ? null : { id: 7, cortesia: false, ultimoAcessoEm: new Date() }),
@@ -44,12 +47,20 @@ beforeEach(() => {
   m.sessao = { user: { id: "u1", role: "cliente" }, verComo: null };
   m.precisa = false;
   m.semMarca = false;
+  m.barreira = null;
   m.briefingOk = true;
   m.termosEm = new Date("2999-01-01");
   m.precisaChamada.mockClear();
 });
 
 describe("o portao no layout do painel", () => {
+  it("conta de cadastro proprio sem e-mail confirmado vai para a tela de confirmar, antes do briefing", async () => {
+    m.barreira = { tipo: "email" };
+    m.briefingOk = false;
+    await expect(LayoutCompleto({ children: null })).rejects.toThrow("REDIRECT:/confirmar-email");
+    expect(m.precisaChamada).not.toHaveBeenCalled();
+  });
+
   it("marca que precisa assinar vai para /assinar", async () => {
     m.precisa = true;
     await expect(LayoutCompleto({ children: null })).rejects.toThrow("REDIRECT:/assinar");

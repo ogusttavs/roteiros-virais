@@ -33,12 +33,16 @@ export const ACOES_LIVRES: Record<string, string> = {
   "src/app/trocar-senha/acoes.ts:trocarSenhaDoPrimeiroAcessoAction": "segurança da conta, sem gasto nenhum, e o primeiro acesso vem antes de qualquer pagamento",
   "src/app/(painel)/(completo)/conta/acoes-senha.ts:trocarSenhaAction": "segurança da conta, sem gasto nenhum: a senha é da pessoa, pague ou não",
   "src/app/acoes.ts:queroTestarAction": "formulário público da página de entrada (E57a): não há conta nem assinatura, só grava quem pediu para testar, sem IA e sem gasto",
+  "src/app/cadastro/acoes.ts:criarContaAction": "E63: é o cadastro sozinho, antes de existir conta, marca ou assinatura; não gasta IA (as travas e a chave CADASTRO_ABERTO estão no serviço)",
+  "src/app/confirmar-email/acoes.ts:reenviarConfirmacaoAction": "E63: manda só o e-mail de confirmar da própria pessoa, com teto de reenvios; é o que destrava quem não confirmou, então nunca pode ficar atrás do portão",
+  "src/app/confirmar-email/acoes.ts:trocarEmailAction": "E63: troca o e-mail de quem não confirmou e manda o link novo; é o que destrava quem errou o endereço, então nunca pode ficar atrás do portão",
   "src/app/(painel)/(completo)/conta/instagram-acoes.ts:desligarInstagramAction": "E19: desligar apaga o acesso guardado da pessoa e não gasta nada; é privacidade, e nunca pode ficar trancado atrás do pagamento",
 };
 
 /** Rotas `/api` livres, por caminho do arquivo. */
 export const ROTAS_LIVRES: Record<string, string> = {
   "src/app/api/auth/[...all]/route.ts": "entrar e sair (better-auth): antes de existir marca ou assinatura",
+  "src/app/api/cadastro/confirmar/route.ts": "E63: é o link do e-mail de confirmar, aberto sem sessão (às vezes em outro aparelho); o código de uso único e com prazo é a prova, e confirmar não gasta nada",
   "src/app/api/capa/[videoId]/route.ts": "capa de vídeo é dado público da plataforma, igual para todas as marcas, sem gasto (só serve a quem está logado)",
   "src/app/api/imagem-noticia/[id]/route.ts": "foto de matéria guardada do nosso lado, dado público do setor, só serve a quem está logado e é do setor, sem gasto de IA nem de terceiros (mesmo critério da capa)",
   "src/app/api/meta/retorno/route.ts": "E19: a volta do diálogo da Meta termina uma ligação que o /api/meta/conectar (com o portão) começou; a conferência é o state assinado mais o cookie mais a sessão, e o retorno em si só grava o acesso, sem gasto",

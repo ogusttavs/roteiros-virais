@@ -30,7 +30,7 @@ export const ROTINAS: Rotina[] = [
   { chave: "edicao", titulo: "Editar os vídeos das pessoas", faz: "Escreve o que a pessoa falou no vídeo que enviou para editar (com a hora de cada palavra), decide o que fica no vídeo (cortes, título e legenda), confere o resultado, monta a prévia e o vídeo final (num contêiner só para isso, um vídeo por vez) e, de hora em hora, apaga os vídeos que passaram do prazo de guarda: o bruto em 48 horas e o editado em 7 dias.", filas: [FILAS.transcreverEdicao, FILAS.decidirEdicao, FILAS.renderizarEdicao, FILAS.limparEdicoes] },
   { chave: "disco", titulo: "Vigiar o espaço do servidor", faz: "A cada 15 minutos mede quanto do disco está usado e avisa por e-mail quando passa de 80% (atenção) e de 90% (crítico). No crítico, o envio de vídeos para editar fica pausado e a limpeza roda na hora.", filas: [FILAS.vigiarDisco] },
   { chave: "aprender", titulo: "Aprender com as reprovações", faz: "Transforma o que a pessoa reprovou em regras daquela conta.", filas: [FILAS.aprenderCliente] },
-  { chave: "faxina", titulo: "Limpar as versões que ninguém escolheu", faz: "Apaga as versões de roteiro que ficaram sem escolha em grupos parados há mais de 30 dias.", filas: [FILAS.faxinaVersoes] },
+  { chave: "faxina", titulo: "Limpar as versões que ninguém escolheu", faz: "Apaga as versões de roteiro que ficaram sem escolha em grupos parados há mais de 30 dias.", filas: [FILAS.faxinaVersoes, FILAS.faxinaCadastros] },
   { chave: "instagram-ligado", titulo: "Renovar o acesso dos Instagram ligados", faz: "Renova, antes de vencer, o acesso que as pessoas deram ao próprio Instagram, e avisa o dono da conta quando não dá mais para renovar.", filas: [FILAS.renovarContasLigadas] },
   { chave: "email", titulo: "Mandar o e-mail de acompanhamento", faz: "Resume o dia do sistema para quem acompanha.", filas: [FILAS.emailAcompanhamento] },
 ];
@@ -68,6 +68,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.curvaCliente]: "a medição dos vídeos postados",
   [FILAS.emailAcompanhamento]: "o e-mail de acompanhamento",
   [FILAS.faxinaVersoes]: "a limpeza das versões",
+  [FILAS.faxinaCadastros]: "a limpeza das contas que não confirmaram o e-mail",
   [FILAS.renovarContasLigadas]: "a renovação do acesso aos Instagram ligados",
   [FILAS.aprenderCliente]: "o aprendizado com as reprovações",
   [FILAS.entenderMarca]: "a leitura da marca",
