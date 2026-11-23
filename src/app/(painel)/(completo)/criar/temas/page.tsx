@@ -92,8 +92,9 @@ export default async function Temas({ searchParams }: Props) {
         : { emConferencia: (await pedidoAbertoDaMarca(cliente.id)) !== null };
   // O tema de madrugada só sai para ramo em uso: sem tema de hoje e com o ramo já lido, o tema nasce agora (a tela espera e se atualiza sozinha).
   const podePedirTema =
-    resultado.status === "sem_tema" && !iaTrancada && cliente.nichoId !== null && !("aindaLendo" in estadoDoRamo && (estadoDoRamo.aindaLendo || estadoDoRamo.semBase));
-  const gerando = podePedirTema ? (await pedirTemaDeHoje(cliente.nichoId!)) === "gerando" : false;
+    resultado.status === "sem_tema" && cliente.nichoId !== null && !("aindaLendo" in estadoDoRamo && (estadoDoRamo.aindaLendo || estadoDoRamo.semBase));
+  // Com a IA trancada a tela não promete tema: o pedido ainda pode sair (a sonda de uma por hora, `pedirTemaDeHoje`), mas o aviso diz a verdade.
+  const gerando = podePedirTema ? (await pedirTemaDeHoje(cliente.nichoId!)) === "gerando" && !iaTrancada : false;
   // A pessoa que volta depois de o ramo ficar parado (27/10/2026: 5 dias sem abrir o aplicativo) vê o tema que ainda vale e o de hoje é pedido em silêncio; a próxima abertura já o traz.
   if (cliente.nichoId !== null && deveRenovarTemaVelho(resultado, hojeISO(), new Date(), dataInicial)) {
     await pedirTemaDeHoje(cliente.nichoId);

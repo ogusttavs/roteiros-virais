@@ -1,7 +1,7 @@
 /**
  * O alarme da IA (achados B1 e A1 da revisão de 23/11/2026), contra o Postgres real e com o simulador: o dono recebe no máximo um e-mail por dia por causa (chave recusada ou falta de crédito, nunca a
  * sobrecarga), a trava aguenta falhas ao mesmo tempo, o e-mail sai do ponto que anota a falha, a avaliação do briefing devolve a frase certa, e o pedido dos temas para quando a IA está trancada e volta
- * quando uma geração dá certo.
+ * quando uma geração dá certo (com a falha valendo, só uma sonda por hora sai).
  */
 import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,7 +14,7 @@ import { CHAVES_DAS_FALHAS_DA_IA, registrarFalhaDaIA } from "@/ia/falha-da-ia";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { comoResultadoDaIA } from "@/lib/resultado-da-ia";
 import { avisarFalhaDaIA, chaveDoAvisoDaIA } from "@/servicos/aviso-da-ia";
-import { pedirTemaDeHoje, pedirTemasDaConta } from "@/servicos/temas";
+import { CHAVE_DA_SONDA_DOS_TEMAS, INTERVALO_DA_SONDA_MS, pedirTemaDeHoje, pedirTemasDaConta } from "@/servicos/temas";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -46,7 +46,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await db()
     .delete(configuracaoAdmin)
-    .where(inArray(configuracaoAdmin.chave, [...CHAVES_DAS_FALHAS_DA_IA, chaveDoAvisoDaIA("chave"), chaveDoAvisoDaIA("credito")]));
+    .where(inArray(configuracaoAdmin.chave, [...CHAVES_DAS_FALHAS_DA_IA, chaveDoAvisoDaIA("chave"), chaveDoAvisoDaIA("credito"), CHAVE_DA_SONDA_DOS_TEMAS]));
   await db().delete(geracoesIA);
   await db().delete(user);
   await db().delete(temasDia);
@@ -184,27 +184,56 @@ describe("a avaliação do briefing devolve a verdade", () => {
   });
 });
 
-describe("o ciclo dos temas para e volta", () => {
-  it("com a chave recusada o pedido não sai (nada na fila); quando uma geração dá certo depois, volta a pedir sozinho", async () => {
-    await chamar("[mock:erro-chave]");
-    expect(await pedirTemaDeHoje(nichoId)).toBe("nao");
-    expect(await pedirTemaDeHoje(nichoId)).toBe("nao");
-    expect(await pedirTemasDaConta(1, nichoId, "foco")).toBe("nao");
-    expect(await pendentesDosTemas()).toBe(0);
+describe("o ciclo dos temas vira uma sonda por hora", () => {
+  const T0 = new Date();
+  const maisUmaHora = new Date(T0.getTime() + INTERVALO_DA_SONDA_MS + 1000);
+  const limpar = async () => {
+    await boss().deleteAllJobs(FILAS.temasDoDia).catch(() => undefined);
+  };
 
-    await boaGeracaoDepois();
-    expect(await pedirTemaDeHoje(nichoId)).toBe("gerando");
+  it("com a chave recusada, o primeiro pedido da hora enfileira e o segundo não, nem em outro ramo; depois de uma hora enfileira de novo", async () => {
+    const outro = (await db().insert(nichos).values({ slug: "alarme-ia-2", nome: "alarme-ia-2", termos: [] }).returning())[0].id;
+    await chamar("[mock:erro-chave]");
+    expect(await pedirTemaDeHoje(nichoId, undefined, T0)).toBe("gerando");
+    expect(await pendentesDosTemas()).toBe(1);
+    // o sistema todo, não um por ramo
+    expect(await pedirTemaDeHoje(outro, undefined, new Date(T0.getTime() + 60_000))).toBe("nao");
+    expect(await pedirTemasDaConta(1, nichoId, "foco", new Date(T0.getTime() + 60_000))).toBe("nao");
+    await limpar();
+    expect(await pedirTemaDeHoje(nichoId, undefined, new Date(T0.getTime() + 30 * 60_000))).toBe("nao");
+    expect(await pendentesDosTemas()).toBe(0);
+    expect(await pedirTemaDeHoje(nichoId, undefined, maisUmaHora)).toBe("gerando");
     expect(await pendentesDosTemas()).toBe(1);
   });
 
-  it("a sobrecarga não para o pedido: ela passa sozinha", async () => {
-    await chamar("[mock:erro-sobrecarga]");
-    expect(await pedirTemaDeHoje(nichoId)).toBe("gerando");
+  it("quando uma geração dá certo depois, volta ao comportamento de sempre (sem a trava da hora)", async () => {
+    await chamar("[mock:erro-chave]");
+    expect(await pedirTemaDeHoje(nichoId, undefined, T0)).toBe("gerando");
+    await limpar();
+    expect(await pedirTemaDeHoje(nichoId, undefined, new Date(T0.getTime() + 60_000))).toBe("nao");
+    await boaGeracaoDepois();
+    expect(await pedirTemaDeHoje(nichoId, undefined, new Date(T0.getTime() + 120_000))).toBe("gerando");
   });
 
-  it("a falta de crédito também para o pedido", async () => {
+  it("sem falha nenhuma: pede sempre, e a sonda não é tocada", async () => {
+    expect(await pedirTemaDeHoje(nichoId, undefined, T0)).toBe("gerando");
+    await limpar();
+    expect(await pedirTemaDeHoje(nichoId, undefined, new Date(T0.getTime() + 1000))).toBe("gerando");
+    const [l] = await db().select().from(configuracaoAdmin).where(eq(configuracaoAdmin.chave, CHAVE_DA_SONDA_DOS_TEMAS));
+    expect(l).toBeUndefined();
+  });
+
+  it("a sobrecarga não aciona a sonda: pede como sempre", async () => {
+    await chamar("[mock:erro-sobrecarga]");
+    expect(await pedirTemaDeHoje(nichoId, undefined, T0)).toBe("gerando");
+    await limpar();
+    expect(await pedirTemaDeHoje(nichoId, undefined, new Date(T0.getTime() + 1000))).toBe("gerando");
+  });
+
+  it("a falta de crédito também só deixa passar a sonda", async () => {
     await chamar("[mock:erro-credito]");
-    expect(await pedirTemaDeHoje(nichoId)).toBe("nao");
-    expect(await pendentesDosTemas()).toBe(0);
+    expect(await pedirTemaDeHoje(nichoId, undefined, T0)).toBe("gerando");
+    await limpar();
+    expect(await pedirTemaDeHoje(nichoId, undefined, new Date(T0.getTime() + 1000))).toBe("nao");
   });
 });

@@ -13,6 +13,7 @@ import {
   avaliacoesTema,
   briefings,
   clientes,
+  configuracaoAdmin,
   nichos,
   rascunhosTemaLivre,
   roteiros,
@@ -46,9 +47,23 @@ import { listaDePlataformas, perguntaDoPublicoPelaChave } from "./vozes-do-publi
 
 export class ErroTemas extends Error {}
 
-/** A chave da IA recusada ou a conta sem crédito (`falhaQueTrancaAIA`). Se a leitura falhar, não trava ninguém: segue como se a IA estivesse bem. */
-async function iaTrancada(): Promise<boolean> {
-  return (await falhaQueTrancaAIA().catch(() => null)) !== null;
+export const CHAVE_DA_SONDA_DOS_TEMAS = "sonda_temas_ia_em";
+export const INTERVALO_DA_SONDA_MS = 60 * 60 * 1000;
+
+/**
+ * Pode enfileirar os temas? Sem falha da IA que tranca (chave recusada ou sem crédito, `falhaQueTrancaAIA`), sempre. Com a falha valendo, só uma tentativa por hora no sistema todo (uma sonda, não uma por ramo,
+ * para não disparar vários 401 juntos): se der certo, a geração boa apaga a falha e tudo volta sozinho depois que o dono conserta a chave; se der 401, nada muda. A vaga da hora é tomada de forma atômica
+ * em `configuracao_admin` (`INSERT ... ON CONFLICT ... WHERE`, a mesma ideia da trava do e-mail), sem tabela nova. Se a leitura da falha falhar, não trava ninguém.
+ */
+async function podePedirTemas(agora: Date = new Date()): Promise<boolean> {
+  if ((await falhaQueTrancaAIA().catch(() => null)) === null) return true;
+  const limite = new Date(agora.getTime() - INTERVALO_DA_SONDA_MS).toISOString();
+  const tomou = await db()
+    .insert(configuracaoAdmin)
+    .values({ chave: CHAVE_DA_SONDA_DOS_TEMAS, valor: agora.toISOString() })
+    .onConflictDoUpdate({ target: configuracaoAdmin.chave, set: { valor: agora.toISOString(), atualizadoEm: new Date() }, setWhere: sql`${configuracaoAdmin.valor}::timestamptz <= ${limite}::timestamptz` })
+    .returning({ chave: configuracaoAdmin.chave });
+  return tomou.length > 0;
 }
 
 const JANELA_LINHA_EDITORIAL = 15;
@@ -230,15 +245,14 @@ export async function temasDoDiaOuRecente(
  * se atualiza) e "nao" quando nada foi pedido: o setor já tentou hoje (existe a linha do dia, inclusive a vazia que marca "ficou sem prova"), ou a fila não respondeu.
  * No máximo um pedido por setor a cada 10 minutos, para uma tela que se atualiza sozinha nunca encher a fila.
  */
-export async function pedirTemaDeHoje(nichoId: number, data: string = hojeISO()): Promise<"gerando" | "nao"> {
-  // Achado B1 de 23/11/2026: com a chave da IA recusada ou sem crédito, todo pedido falharia e, como a falha não grava a linha do dia, a tela pediria de novo a cada 10 minutos para sempre. Não pede.
-  // Quem traz a IA de volta é a rodada da madrugada (e qualquer geração que dê certo): a falha deixa de valer sozinha e o pedido volta a sair.
-  if (await iaTrancada()) return "nao";
+export async function pedirTemaDeHoje(nichoId: number, data: string = hojeISO(), agora: Date = new Date()): Promise<"gerando" | "nao"> {
   const [jaTentou] = await db().select({ id: temasDia.id }).from(temasDia).where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, data)));
   if (jaTentou) return "nao";
   try {
     await garantirBossPronto();
     if (await existeJobPendente(FILAS.temasDoDia, nichoId, { semClienteId: true })) return "gerando";
+    // Achado B1 de 23/11/2026: com a chave da IA recusada ou sem crédito, pedir a cada 10 minutos por ramo era um ciclo sem fim; agora só a sonda de uma por hora sai (`podePedirTemas`).
+    if (!(await podePedirTemas(agora))) return "nao";
     const id = await boss().send(FILAS.temasDoDia, { nichoId, aoAbrir: true }, { singletonKey: `tema-ao-abrir-${nichoId}`, singletonSeconds: 600 });
     return id === null ? "nao" : "gerando";
   } catch (erro) {
@@ -251,9 +265,9 @@ export async function pedirTemaDeHoje(nichoId: number, data: string = hojeISO())
  * E61 PR 2: a pessoa confirmou ou mudou o foco no meio do dia, e os temas dela precisam nascer na hora (no máximo uma vez por foco a cada 10 minutos). Enfileira o mesmo job dos temas do dia só para
  * esta conta (`{ nichoId, clienteId }`): ele não mexe nos temas do setor. Nunca derruba quem chama: fila fora do ar é só "não pediu", e a conta segue lendo os temas do setor até o job rodar.
  */
-export async function pedirTemasDaConta(clienteId: number, nichoId: number | null, foco: string): Promise<"gerando" | "nao"> {
+export async function pedirTemasDaConta(clienteId: number, nichoId: number | null, foco: string, agora: Date = new Date()): Promise<"gerando" | "nao"> {
   if (nichoId === null) return "nao";
-  if (await iaTrancada()) return "nao";
+  if (!(await podePedirTemas(agora))) return "nao";
   try {
     await garantirBossPronto();
     const id = await boss().send(FILAS.temasDoDia, { nichoId, clienteId, aoAbrir: true }, { singletonKey: `tema-da-conta-${clienteId}-${hashDoFoco(foco)}`, singletonSeconds: 600 });
