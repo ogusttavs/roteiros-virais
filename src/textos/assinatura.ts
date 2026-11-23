@@ -3,6 +3,7 @@
  * "webhook". O preço é o do plano único (R$ 397 por mês, R$ 1.191 a cada 3 meses, só no cartão; decisão do Gustavo em 22/10/2026) e muda aqui e em `config/assinatura.ts`, nunca em JSX.
  */
 
+import { PLANO } from "@/config/assinatura";
 import { config } from "@/lib/config";
 
 import { envolverEmail, linkEmail } from "./casca-email";
@@ -17,6 +18,18 @@ const DATA = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", y
 /** "22 de janeiro de 2027". */
 export function dataPorExtensoDaAssinatura(data: Date): string {
   return DATA.format(data);
+}
+
+/** O valor do plano como a pessoa lê, sempre vindo da configuração do plano: "R$ 1.191" (sem centavos quando são zero). */
+export function valorDoPlanoPorExtenso(centavos: number = PLANO.valorEmCentavos): string {
+  const reais = Math.floor(centavos / 100);
+  const resto = centavos % 100;
+  return `R$ ${reais.toLocaleString("pt-BR")}${resto === 0 ? "" : `,${String(resto).padStart(2, "0")}`}`;
+}
+
+/** O período de cobrança do plano como a pessoa lê, vindo da configuração: "a cada 3 meses". */
+export function periodoDoPlanoPorExtenso(quantidade: number = PLANO.intervaloQuantidade): string {
+  return quantidade === 1 ? "todo mês" : `a cada ${quantidade} meses`;
 }
 
 /** "7 dias", "1 dia". */
@@ -77,7 +90,10 @@ export const textosAssinatura = {
     /** Em `/assinar` e em Conta, enquanto o teste corre. As duas datas são o mesmo dia: o teste acaba quando a primeira cobrança acontece. */
     titulo: "Você está no teste grátis",
     frase: (data: Date) => `Você está no teste grátis até ${dataPorExtensoDaAssinatura(data)}. Se não cancelar, a primeira cobrança é em ${dataPorExtensoDaAssinatura(data)}.`,
-    fraseSemCartao: (data: Date) => `Seu teste grátis termina em ${dataPorExtensoDaAssinatura(data)}. Para continuar, cadastre o cartão. Se você já cadastrou, está tudo certo.`,
+    /** Teste que começou sem cartão e a pessoa ainda não cadastrou. */
+    fraseSemCartao: (data: Date) => `Seu teste grátis termina em ${dataPorExtensoDaAssinatura(data)}. Para continuar depois do teste, cadastre o cartão.`,
+    /** Teste que começou sem cartão e a pessoa já cadastrou (o aplicativo sabe pelo aviso da assinatura). */
+    fraseComCartao: (data: Date) => `Seu teste grátis termina em ${dataPorExtensoDaAssinatura(data)}. Tudo certo: no fim do teste a assinatura começa sozinha, com o cartão que você cadastrou.`,
     fraseCancelada: (data: Date) => `Você cancelou. O teste grátis vai até ${dataPorExtensoDaAssinatura(data)} e nada será cobrado.`,
     fraseSemData: "Você está no teste grátis. Se não cancelar, a primeira cobrança é no fim do teste.",
     confirmada: {
@@ -95,6 +111,10 @@ export const textosAssinatura = {
       titulo: "Sua assinatura terminou",
       frase: "Assine de novo para voltar a receber os temas e os roteiros de cada dia. Tudo o que você já fez continua guardado.",
       fraseComData: (data: Date) => `Ela terminou em ${dataPorExtensoDaAssinatura(data)}. Assine de novo para voltar a receber os temas e os roteiros de cada dia. Tudo o que você já fez continua guardado.`,
+    },
+    testeTerminou: {
+      titulo: "Seu teste grátis terminou",
+      frase: "Para continuar, assine o plano.",
     },
     cartao: {
       titulo: "Falta acertar o pagamento",
@@ -130,7 +150,8 @@ export const textosAssinatura = {
   },
 
   botoes: {
-    assinar: "Assinar por R$ 1.191 a cada 3 meses",
+    /** O preço e o período saem da configuração do plano (`config/assinatura.ts`), nunca escritos aqui. */
+    assinar: `Assinar por ${valorDoPlanoPorExtenso()} ${periodoDoPlanoPorExtenso()}`,
     assinarCurto: "Assinar",
     assinarDeNovo: "Assinar de novo",
     atualizarCartao: "Atualizar o cartão",
@@ -148,13 +169,25 @@ export const textosAssinatura = {
   /** O e-mail de 2 dias antes do fim do teste grátis (job `lembrete-fim-do-teste`): uma vez por assinatura, para o dono da conta. */
   emailFimDoTeste: {
     assunto: "O seu teste grátis termina em 2 dias",
-    corpo: (nomeDaMarca: string, fim: Date, exigeCartao: boolean) =>
+    /** `temCartao`: o cartão foi pedido no começo do teste, ou a pessoa já o cadastrou (o aplicativo sabe pelo aviso da assinatura). */
+    corpo: (nomeDaMarca: string, fim: Date, temCartao: boolean) =>
       envolverEmail(
         `<p>O teste grátis da conta <strong>${escaparHtml(nomeDaMarca)}</strong> termina em ${dataPorExtensoDaAssinatura(fim)}.</p>` +
-          (exigeCartao
-            ? `<p>Se você não cancelar, a primeira cobrança, de R$ 1.191 (a cada 3 meses, no cartão que você cadastrou), é feita nesse dia. Se quiser cancelar, abra a tela de Conta e toque em Gerenciar a assinatura: cancelando antes, nada é cobrado.</p>`
-            : `<p>Para continuar, cadastre o cartão antes dessa data: abra a tela de Conta e toque em Cadastrar o cartão. Se você já cadastrou, está tudo certo. Sem o cartão, a assinatura termina sozinha e nada é cobrado.</p>`) +
+          (temCartao
+            ? `<p>Se você não cancelar, a primeira cobrança, de ${valorDoPlanoPorExtenso()} (${periodoDoPlanoPorExtenso()}, no cartão que você cadastrou), é feita nesse dia. Se quiser cancelar, abra a tela de Conta e toque em Gerenciar a assinatura: cancelando antes, nada é cobrado.</p>`
+            : `<p>Para continuar depois do teste, cadastre o cartão antes dessa data: abra a tela de Conta e toque em Cadastrar o cartão. Sem o cartão, a assinatura termina sozinha e nada é cobrado.</p>`) +
           `<p>${linkEmail(`${config.appUrl}/conta`, "abrir a tela de Conta")}</p>`,
+      ),
+  },
+
+  /** O e-mail do dia em que o teste grátis acaba sem virar pagamento (job `lembrete-fim-do-teste`): uma vez por assinatura, para o dono da conta. */
+  emailTesteTerminou: {
+    assunto: "O seu teste grátis terminou",
+    corpo: (nomeDaMarca: string, fim: Date) =>
+      envolverEmail(
+        `<p>O teste grátis da conta <strong>${escaparHtml(nomeDaMarca)}</strong> terminou em ${dataPorExtensoDaAssinatura(fim)}, e nada foi cobrado.</p>` +
+          `<p>Para continuar recebendo os temas e os roteiros de cada dia, assine o plano (${valorDoPlanoPorExtenso()} ${periodoDoPlanoPorExtenso()}, só no cartão). Tudo o que você já fez continua guardado.</p>` +
+          `<p>${linkEmail(`${config.appUrl}/assinar`, "assinar o plano")}</p>`,
       ),
   },
 
@@ -167,6 +200,7 @@ export const textosAssinatura = {
     titulo: "Sua assinatura",
     statusRotulo: "Situação",
     semAssinatura: "Esta conta ainda não tem assinatura.",
+    testeTerminou: "Teste grátis terminou",
     verPlano: "Ver o plano",
   },
 };

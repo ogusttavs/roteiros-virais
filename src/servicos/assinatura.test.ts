@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { DIAS_DE_FOLGA_DA_RENOVACAO } from "@/config/assinatura";
+import { DIAS_DE_FOLGA_DA_RENOVACAO, DIAS_DE_TOLERANCIA_SEM_NENHUM_PAGAMENTO } from "@/config/assinatura";
 import type { Assinatura } from "@/db/schema";
 import { rotuloDaCobranca } from "@/textos/admin-contas";
 
@@ -28,6 +28,11 @@ function assinatura(extra: Partial<Assinatura> = {}): Assinatura {
     cancelaNoFimDoPeriodo: false,
     ultimoEventoEm: AGORA,
     lembreteFimDoTesteEm: null,
+    comecouComoTeste: false,
+    primeiroPagamentoEm: new Date(AGORA.getTime() - 30 * DIA),
+    atrasadaDesde: null,
+    temFormaDePagamento: false,
+    fimDoTesteAvisadoEm: null,
     criadoEm: AGORA,
     atualizadoEm: AGORA,
     ...extra,
@@ -45,27 +50,27 @@ describe("assinaturaVale", () => {
     ["incomplete_expired", false],
     ["paused", false],
   ] as const)("o status %s vale: %s", (status, esperado) => {
-    expect(assinaturaVale({ status, periodoFim: null }, AGORA)).toBe(esperado);
+    expect(assinaturaVale(assinatura({ status, periodoFim: null }), AGORA)).toBe(esperado);
   });
 
   it("depois do fim do periodo mais a folga, o acesso acaba mesmo com status active (aviso perdido)", () => {
     const fim = new Date(AGORA.getTime() - DIAS_DE_FOLGA_DA_RENOVACAO * DIA - 1000);
-    expect(assinaturaVale({ status: "active", periodoFim: fim }, AGORA)).toBe(false);
+    expect(assinaturaVale(assinatura({ status: "active", periodoFim: fim }), AGORA)).toBe(false);
   });
 
   it("dentro da folga da renovacao o acesso continua", () => {
     const fim = new Date(AGORA.getTime() - (DIAS_DE_FOLGA_DA_RENOVACAO - 1) * DIA);
-    expect(assinaturaVale({ status: "active", periodoFim: fim }, AGORA)).toBe(true);
+    expect(assinaturaVale(assinatura({ status: "active", periodoFim: fim }), AGORA)).toBe(true);
   });
 
   it("no limite exato da folga ainda vale; um segundo depois, nao", () => {
     const limite = new Date(AGORA.getTime() - DIAS_DE_FOLGA_DA_RENOVACAO * DIA);
-    expect(assinaturaVale({ status: "active", periodoFim: limite }, AGORA)).toBe(true);
-    expect(assinaturaVale({ status: "active", periodoFim: new Date(limite.getTime() - 1) }, AGORA)).toBe(false);
+    expect(assinaturaVale(assinatura({ status: "active", periodoFim: limite }), AGORA)).toBe(true);
+    expect(assinaturaVale(assinatura({ status: "active", periodoFim: new Date(limite.getTime() - 1) }), AGORA)).toBe(false);
   });
 
   it("status que nao vale nao e salvo por um periodo futuro", () => {
-    expect(assinaturaVale({ status: "canceled", periodoFim: new Date(AGORA.getTime() + 30 * DIA) }, AGORA)).toBe(false);
+    expect(assinaturaVale(assinatura({ status: "canceled", periodoFim: new Date(AGORA.getTime() + 30 * DIA) }), AGORA)).toBe(false);
   });
 });
 
@@ -287,5 +292,68 @@ describe("o teste grátis (E22): trialing vale e a fatura de R$ 0 não vira ativ
     expect(marcaPodeGanharTeste([], 7)).toBe(true);
     expect(marcaPodeGanharTeste([], 0)).toBe(false);
     expect(marcaPodeGanharTeste([{ id: 1 }], 7)).toBe(false);
+  });
+});
+
+describe("cartão recusado de quem nunca pagou (A7, 23/11/2026)", () => {
+  const nuncaPagou = (extra: Partial<Assinatura> = {}) =>
+    assinatura({ status: "past_due", primeiroPagamentoEm: null, comecouComoTeste: true, periodoFim: new Date(AGORA.getTime() + 85 * DIA), ...extra });
+
+  it("past_due sem nenhum pagamento dá acesso por 3 dias contados de quando o cartão falhou, mesmo com o período novo de 3 meses pela frente", () => {
+    expect(DIAS_DE_TOLERANCIA_SEM_NENHUM_PAGAMENTO).toBe(3);
+    expect(assinaturaVale(nuncaPagou({ atrasadaDesde: new Date(AGORA.getTime() - 2 * DIA) }), AGORA)).toBe(true);
+    expect(assinaturaVale(nuncaPagou({ atrasadaDesde: new Date(AGORA.getTime() - 3 * DIA - 1000) }), AGORA)).toBe(false);
+  });
+
+  it("past_due de quem já pagou antes continua como sempre: vale até o fim do período mais a folga", () => {
+    const pagou = assinatura({ status: "past_due", primeiroPagamentoEm: new Date(AGORA.getTime() - 100 * DIA), atrasadaDesde: new Date(AGORA.getTime() - 10 * DIA), periodoFim: new Date(AGORA.getTime() + 50 * DIA) });
+    expect(assinaturaVale(pagou, AGORA)).toBe(true);
+  });
+
+  it("linha antiga sem 'atrasada desde': conta do último aviso", () => {
+    expect(assinaturaVale(nuncaPagou({ atrasadaDesde: null, ultimoEventoEm: new Date(AGORA.getTime() - 5 * DIA) }), AGORA)).toBe(false);
+    expect(assinaturaVale(nuncaPagou({ atrasadaDesde: null, ultimoEventoEm: new Date(AGORA.getTime() - 1 * DIA) }), AGORA)).toBe(true);
+  });
+
+  it("a tolerância é só do past_due: o teste de quem nunca pagou segue o fim do período", () => {
+    expect(assinaturaVale(assinatura({ status: "trialing", primeiroPagamentoEm: null, atrasadaDesde: new Date(AGORA.getTime() - 20 * DIA) }), AGORA)).toBe(true);
+  });
+});
+
+describe("o que o aviso do Stripe diz sobre teste, pagamento e cartão (A3, A7, M4)", () => {
+  it("assinatura em teste, com ou sem cartão: começou como teste; o cartão vem de default_payment_method", () => {
+    const sem = lerEvento(eventoDeAssinatura("customer.subscription.created", { clienteId: 4, status: "trialing", cartao: false }));
+    expect(sem).toMatchObject({ mudanca: { comecouComoTeste: true, temFormaDePagamento: false } });
+    const com = lerEvento(eventoDeAssinatura("customer.subscription.updated", { clienteId: 4, status: "trialing", cartao: true }));
+    expect(com).toMatchObject({ mudanca: { temFormaDePagamento: true } });
+  });
+
+  it("aviso sem o campo do cartão não diz nada sobre o cartão (o que está gravado fica)", () => {
+    const l = lerEvento(eventoDeAssinatura("customer.subscription.updated", { clienteId: 4, status: "trialing" }));
+    if (l.tipo !== "tratar") throw new Error("devia tratar");
+    expect(l.mudanca.temFormaDePagamento).toBeUndefined();
+  });
+
+  it("a assinatura cancelada que traz trial_start começou como teste; sem ele e sem trialing, não", () => {
+    expect(lerEvento(eventoDeAssinatura("customer.subscription.deleted", { clienteId: 4, status: "canceled", comTeste: true }))).toMatchObject({ mudanca: { comecouComoTeste: true } });
+    expect(lerEvento(eventoDeAssinatura("customer.subscription.deleted", { clienteId: 4, status: "canceled" }))).toMatchObject({ mudanca: { comecouComoTeste: false } });
+  });
+
+  it("só pagamento de verdade conta: fatura com valor e assinatura active sim; fatura de R$ 0, checkout de teste e trialing não", () => {
+    const paga = eventoDeFatura("invoice.paid", { clienteId: 5 });
+    (paga.data.object as Record<string, unknown>).amount_paid = 119100;
+    expect(lerEvento(paga)).toMatchObject({ mudanca: { pagou: true } });
+    const zerada = eventoDeFatura("invoice.paid", { clienteId: 5 });
+    (zerada.data.object as Record<string, unknown>).amount_paid = 0;
+    const lz = lerEvento(zerada);
+    if (lz.tipo !== "tratar") throw new Error("devia tratar");
+    expect(lz.mudanca.pagou).toBeUndefined();
+    expect(lerEvento(eventoDeAssinatura("customer.subscription.updated", { clienteId: 4, status: "active" }))).toMatchObject({ mudanca: { pagou: true } });
+    const t = lerEvento(eventoDeAssinatura("customer.subscription.updated", { clienteId: 4, status: "trialing" }));
+    if (t.tipo !== "tratar") throw new Error("devia tratar");
+    expect(t.mudanca.pagou).toBeUndefined();
+    const c = lerEvento(eventoDeCheckout({ clienteId: 4, pagamento: "no_payment_required" }));
+    if (c.tipo !== "tratar") throw new Error("devia tratar");
+    expect(c.mudanca.pagou).toBeUndefined();
   });
 });

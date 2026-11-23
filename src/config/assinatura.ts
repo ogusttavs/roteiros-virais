@@ -20,3 +20,9 @@ export const PLANO = {
 
 /** Depois do fim do período pago, quantos dias o acesso continua enquanto o aviso de renovação do Stripe não chega (o Stripe reenvia por até 3 dias). */
 export const DIAS_DE_FOLGA_DA_RENOVACAO = 3;
+
+/**
+ * Quantos dias o acesso continua depois que o cartão falha (`past_due`) para quem NUNCA pagou nada (o cartão cadastrado no teste que não passa na primeira cobrança). Quem já pagou
+ * antes segue a regra de sempre: vale até o fim do período mais `DIAS_DE_FOLGA_DA_RENOVACAO`, enquanto o Stripe tenta cobrar de novo. Hipótese da revisão de 23/11/2026, até o dono decidir.
+ */
+export const DIAS_DE_TOLERANCIA_SEM_NENHUM_PAGAMENTO = 3;

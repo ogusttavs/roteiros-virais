@@ -20,6 +20,8 @@ export type TipoDeSituacao =
   | "cartao"
   /** Acabou (cancelada pela pessoa ou pelo Stripe). Pede para assinar de novo. */
   | "encerrada"
+  /** O teste grátis terminou sem virar pagamento (a pessoa nunca pagou). Pede para assinar o plano, sem dizer que a assinatura "terminou" nem que algo foi "pago". */
+  | "testeTerminou"
   /** A pessoa começou o pagamento e o Stripe ainda não confirmou. */
   | "aguardando"
   /** Nunca assinou. */
@@ -35,6 +37,8 @@ export type SituacaoDaAssinatura = {
   periodoFim: Date | null;
   /** A pessoa cancelou e a assinatura vale até `periodoFim`, sem renovar. */
   cancelaNoFim: boolean;
+  /** A assinatura que conta tem forma de pagamento cadastrada (no teste sem cartão, diz se a pessoa já cadastrou o cartão). */
+  temCartao: boolean;
   /** Já existe cliente no Stripe (então o portal abre: trocar o cartão, ver as faturas, cancelar). */
   podeAbrirOPortal: boolean;
 };
@@ -45,6 +49,7 @@ export function situacaoDaAssinatura(cortesia: boolean, lista: Assinatura[], ago
     status: principal?.status ?? null,
     periodoFim: principal?.periodoFim ?? null,
     cancelaNoFim: principal?.cancelaNoFimDoPeriodo ?? false,
+    temCartao: principal?.temFormaDePagamento ?? false,
     podeAbrirOPortal: lista.length > 0,
   };
   if (cortesia) return { ...base, tipo: "cortesia", temAcesso: true };
@@ -63,6 +68,7 @@ export function situacaoDaAssinatura(cortesia: boolean, lista: Assinatura[], ago
       // Os dois últimos só caem aqui com o período vencido (o aviso de renovação não chegou): do ponto de vista da pessoa, é o cartão que precisa de atenção.
       return { ...base, tipo: "cartao", temAcesso: false };
     default:
-      return { ...base, tipo: "encerrada", temAcesso: false };
+      // Começou como teste e nunca teve um pagamento: o teste terminou, a pessoa nunca assinou.
+      return { ...base, tipo: principal.comecouComoTeste && !principal.primeiroPagamentoEm ? "testeTerminou" : "encerrada", temAcesso: false };
   }
 }
