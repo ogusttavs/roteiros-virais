@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { hashPassword } from "better-auth/crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
@@ -27,7 +27,6 @@ import {
   type TemaPreferido,
   type TipoMarca,
 } from "@/db/schema";
-import { auth } from "@/lib/auth";
 import { hojeISO } from "@/lib/config";
 import { adiamentoDoConvite } from "@/lib/convite-instalar";
 import {
@@ -41,6 +40,7 @@ import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { normalizarSite, siteValido, TAMANHO_MAXIMO_DO_SITE } from "@/lib/site-valido";
 import { lerEstadoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
+import { mandarEmailDeConvite } from "@/servicos/convite";
 import { pedirFiltroDeNoticias } from "@/servicos/filtro-de-noticias";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { cancelarPedidoAberto, registrarPedidoDeRamo } from "@/servicos/pedidos-de-ramo";
@@ -337,18 +337,12 @@ async function criarUsuarioComSenhaGerada(email: string, nome: string): Promise<
 }
 
 /**
- * Manda o convite por e-mail (link mágico, o "clique no link do e-mail" da
- * folha "Convite mandado"); bônus sobre a senha, que já resolve o acesso
- * sozinha, então uma falha aqui não derruba a ação inteira. `headers()` só
- * funciona dentro de uma requisição de verdade (mesmo motivo documentado em
- * `resolverMarcaAtiva`, acima); o try/catch cobre a função inteira, não só a
- * chamada à API, para um teste de integração que chama `darAcesso` direto
- * (fora de uma Server Action) também cair no "bônus", não travar a ação.
+ * Manda o e-mail de convite (boas-vindas e link de 48 horas, `servicos/convite.ts`); bônus sobre a senha, que já resolve o acesso sozinha, então uma falha aqui não
+ * derruba a ação inteira.
  */
-async function mandarConviteMagico(email: string): Promise<void> {
+async function mandarConviteMagico(email: string, nome: string): Promise<void> {
   try {
-    const cabecalhos = await headers();
-    await auth.api.signInMagicLink({ body: { email, callbackURL: "/comecar" }, headers: cabecalhos });
+    await mandarEmailDeConvite(email, nome === NOME_SEM_NOME_AINDA ? null : nome);
   } catch {
     // Best-effort; ver comentario acima.
   }
@@ -521,7 +515,7 @@ export async function darAcesso(clienteId: number, nome: string, email: string):
 
   const { usuarioId, senha } = await criarUsuarioComSenhaGerada(email, nome.trim() || NOME_SEM_NOME_AINDA);
   await db().insert(membrosMarca).values({ usuarioId, clienteId, papel });
-  await mandarConviteMagico(email);
+  await mandarConviteMagico(email, nome.trim() || NOME_SEM_NOME_AINDA);
 
   return { tipo: "convite", senha };
 }
