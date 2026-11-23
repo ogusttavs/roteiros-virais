@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { creditoAindaFalta, lerFalhaDaIA } from "./falha-da-ia";
+import { falhaQueTrancaAindaVale, lerFalhaDaIA } from "./falha-da-ia";
 
 const EM = new Date("2026-10-14T15:00:00.000Z");
 const falha = (causa: "credito" | "sobrecarga" | "chave", em: Date = EM) => ({ causa, tarefa: "roteiro", em });
@@ -27,19 +27,18 @@ describe("lerFalhaDaIA", () => {
   });
 });
 
-describe("creditoAindaFalta", () => {
-  it("vale a falta de crédito sem nenhuma geração boa depois dela", () => {
-    expect(creditoAindaFalta(falha("credito"), null)?.causa).toBe("credito");
-    expect(creditoAindaFalta(falha("credito"), new Date(EM.getTime() - 1000))?.causa).toBe("credito");
+describe("falhaQueTrancaAindaVale", () => {
+  it.each(["credito", "chave"] as const)("vale a falha por %s sem nenhuma geração boa depois dela", (causa) => {
+    expect(falhaQueTrancaAindaVale(falha(causa), null)?.causa).toBe(causa);
+    expect(falhaQueTrancaAindaVale(falha(causa), new Date(EM.getTime() - 1000))?.causa).toBe(causa);
   });
 
-  it("some quando uma geração deu certo depois (o crédito voltou)", () => {
-    expect(creditoAindaFalta(falha("credito"), new Date(EM.getTime() + 1000))).toBeNull();
+  it.each(["credito", "chave"] as const)("a falha por %s some quando uma geração deu certo depois (a IA voltou)", (causa) => {
+    expect(falhaQueTrancaAindaVale(falha(causa), new Date(EM.getTime() + 1000))).toBeNull();
   });
 
-  it("só a falta de crédito vira aviso: a sobrecarga passa sozinha e a chave não é desta rodada", () => {
-    expect(creditoAindaFalta(falha("sobrecarga"), null)).toBeNull();
-    expect(creditoAindaFalta(falha("chave"), null)).toBeNull();
-    expect(creditoAindaFalta(null, null)).toBeNull();
+  it("a sobrecarga passa sozinha e nunca vira aviso", () => {
+    expect(falhaQueTrancaAindaVale(falha("sobrecarga"), null)).toBeNull();
+    expect(falhaQueTrancaAindaVale(null, null)).toBeNull();
   });
 });

@@ -7,7 +7,7 @@
  * (na próxima hora, tenta de novo). Não depende do aviso `customer.subscription.trial_will_end` do Stripe: o horário dele (3 dias antes) não é o combinado, e um e-mail que dependesse de
  * um aviso configurado à mão no painel do Stripe poderia nunca sair.
  */
-import { and, eq, gt, isNull, lte } from "drizzle-orm";
+import { and, eq, gt, gte, isNull, lte } from "drizzle-orm";
 
 import { db } from "@/db";
 import { assinaturas, clientes, membrosMarca, user } from "@/db/schema";
@@ -33,7 +33,7 @@ export async function avisarFimDoTeste(agora: Date = new Date(), enviar: typeof 
   }
 
   const candidatas = await db()
-    .select({ id: assinaturas.id, clienteId: assinaturas.clienteId, periodoFim: assinaturas.periodoFim })
+    .select({ id: assinaturas.id, clienteId: assinaturas.clienteId, periodoFim: assinaturas.periodoFim, temFormaDePagamento: assinaturas.temFormaDePagamento })
     .from(assinaturas)
     .where(
       and(
@@ -72,7 +72,7 @@ export async function avisarFimDoTeste(agora: Date = new Date(), enviar: typeof 
         enviar({
           para: dono.email,
           assunto: textosAssinatura.emailFimDoTeste.assunto,
-          html: textosAssinatura.emailFimDoTeste.corpo(dono.nomeDaMarca, fim, config.cobranca.testeExigeCartao),
+          html: textosAssinatura.emailFimDoTeste.corpo(dono.nomeDaMarca, fim, config.cobranca.testeExigeCartao || candidata.temFormaDePagamento),
         }),
       ),
     );
@@ -81,6 +81,74 @@ export async function avisarFimDoTeste(agora: Date = new Date(), enviar: typeof 
       resumo.avisadas += 1;
     } else {
       await db().update(assinaturas).set({ lembreteFimDoTesteEm: null }).where(eq(assinaturas.id, candidata.id));
+      resumo.falhas += 1;
+    }
+  }
+  return resumo;
+}
+
+/** Até quanto tempo depois do fim o e-mail "o teste terminou" ainda sai (se o horário ou o envio falharam). Passou disso, o aviso perdeu o sentido. */
+export const JANELA_DO_AVISO_DE_TESTE_TERMINADO_MS = 2 * 24 * 60 * 60 * 1000;
+
+export type ResumoDoTesteTerminado = { candidatas: number; avisadas: number; semDono: number; falhas: number; foraDoHorario: boolean };
+
+/**
+ * O e-mail do dia em que o teste grátis acaba sem virar pagamento (23/11/2026, achado A3 da revisão): "o seu teste grátis terminou, nada foi cobrado, assine o plano". Só vai para assinatura
+ * que começou como teste, está `canceled` (o Stripe cancela no fim do teste sem cartão), nunca teve pagamento e cuja pessoa não cancelou por conta própria; depende do aviso de cancelamento
+ * do Stripe ter chegado, então sai na primeira rodada dentro da janela de horário (8h a 20h de Brasília) depois disso. Mesma ordem do aviso de 2 dias: marca antes de enviar, desfaz se falhar.
+ */
+export async function avisarTesteTerminado(agora: Date = new Date(), enviar: typeof enviarEmail = enviarEmail): Promise<ResumoDoTesteTerminado> {
+  const resumo: ResumoDoTesteTerminado = { candidatas: 0, avisadas: 0, semDono: 0, falhas: 0, foraDoHorario: false };
+  const hora = Number(horaAtualISO(agora).slice(0, 2));
+  if (hora < HORA_MINIMA || hora > HORA_MAXIMA) {
+    resumo.foraDoHorario = true;
+    return resumo;
+  }
+
+  const candidatas = await db()
+    .select({ id: assinaturas.id, clienteId: assinaturas.clienteId, periodoFim: assinaturas.periodoFim })
+    .from(assinaturas)
+    .where(
+      and(
+        eq(assinaturas.status, "canceled"),
+        eq(assinaturas.comecouComoTeste, true),
+        isNull(assinaturas.primeiroPagamentoEm),
+        eq(assinaturas.cancelaNoFimDoPeriodo, false),
+        isNull(assinaturas.fimDoTesteAvisadoEm),
+        lte(assinaturas.periodoFim, agora),
+        gte(assinaturas.periodoFim, new Date(agora.getTime() - JANELA_DO_AVISO_DE_TESTE_TERMINADO_MS)),
+      ),
+    );
+  resumo.candidatas = candidatas.length;
+
+  for (const candidata of candidatas) {
+    const fim = candidata.periodoFim;
+    if (!fim) continue;
+    const donos = await db()
+      .select({ email: user.email, nomeDaMarca: clientes.nome })
+      .from(membrosMarca)
+      .innerJoin(user, eq(user.id, membrosMarca.usuarioId))
+      .innerJoin(clientes, eq(clientes.id, membrosMarca.clienteId))
+      .where(and(eq(membrosMarca.clienteId, candidata.clienteId), eq(membrosMarca.papel, "dono")));
+    if (donos.length === 0) {
+      resumo.semDono += 1;
+      continue;
+    }
+    const [reservada] = await db()
+      .update(assinaturas)
+      .set({ fimDoTesteAvisadoEm: agora })
+      .where(and(eq(assinaturas.id, candidata.id), isNull(assinaturas.fimDoTesteAvisadoEm)))
+      .returning({ id: assinaturas.id });
+    if (!reservada) continue;
+
+    const resultados = await Promise.allSettled(
+      donos.map((dono) => enviar({ para: dono.email, assunto: textosAssinatura.emailTesteTerminou.assunto, html: textosAssinatura.emailTesteTerminou.corpo(dono.nomeDaMarca, fim) })),
+    );
+    for (const r of resultados) if (r.status === "rejected") logger.error({ err: r.reason, clienteId: candidata.clienteId }, "assinatura: o aviso de teste terminado nao saiu");
+    if (resultados.some((r) => r.status === "fulfilled")) {
+      resumo.avisadas += 1;
+    } else {
+      await db().update(assinaturas).set({ fimDoTesteAvisadoEm: null }).where(eq(assinaturas.id, candidata.id));
       resumo.falhas += 1;
     }
   }

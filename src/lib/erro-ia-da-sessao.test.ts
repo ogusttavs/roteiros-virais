@@ -1,12 +1,12 @@
 /**
- * A frase do erro da IA para a sessão (achado de 05/10/2026): admin na sessão real lê a causa; qualquer outro, e o erro sem causa, a frase genérica; sem sessão legível, a genérica.
+ * A frase do erro da IA para a sessão (achado de 05/10/2026): admin na sessão real lê a causa; qualquer outro lê a do cliente (a do problema nosso nas causas que trancam), e o erro sem causa, a genérica; sem sessão legível, a genérica.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { sessaoAtual } = vi.hoisted(() => ({ sessaoAtual: vi.fn() }));
 vi.mock("@/lib/sessao", () => ({ sessaoAtual }));
 
-import { ErroIA, FRASE_GENERICA_DO_CLIENTE } from "@/ia/erro";
+import { ErroIA, FRASE_DO_PROBLEMA_NOSSO, FRASE_GENERICA_DO_CLIENTE } from "@/ia/erro";
 
 import { fraseDoErroDaIAParaASessao } from "./erro-ia-da-sessao";
 
@@ -22,18 +22,18 @@ describe("fraseDoErroDaIAParaASessao", () => {
     expect(await fraseDoErroDaIAParaASessao(credito())).toBe("A API da IA está sem crédito. Recarregue em Plans & Billing da Anthropic.");
   });
 
-  it("o cliente comum lê a frase genérica", async () => {
+  it("o cliente comum lê a frase do problema nosso (a causa trava a IA para todos)", async () => {
     sessaoAtual.mockResolvedValue({ user: { role: "cliente" } });
-    expect(await fraseDoErroDaIAParaASessao(credito())).toBe(FRASE_GENERICA_DO_CLIENTE);
+    expect(await fraseDoErroDaIAParaASessao(credito())).toBe(FRASE_DO_PROBLEMA_NOSSO);
     sessaoAtual.mockResolvedValue({ user: { role: null } });
-    expect(await fraseDoErroDaIAParaASessao(credito())).toBe(FRASE_GENERICA_DO_CLIENTE);
+    expect(await fraseDoErroDaIAParaASessao(credito())).toBe(FRASE_DO_PROBLEMA_NOSSO);
   });
 
   it("sem sessão, ou com a leitura da sessão falhando, a frase é a genérica", async () => {
     sessaoAtual.mockResolvedValue(null);
-    expect(await fraseDoErroDaIAParaASessao(credito())).toBe(FRASE_GENERICA_DO_CLIENTE);
+    expect(await fraseDoErroDaIAParaASessao(credito())).toBe(FRASE_DO_PROBLEMA_NOSSO);
     sessaoAtual.mockRejectedValue(new Error("fora de um pedido"));
-    expect(await fraseDoErroDaIAParaASessao(credito())).toBe(FRASE_GENERICA_DO_CLIENTE);
+    expect(await fraseDoErroDaIAParaASessao(credito())).toBe(FRASE_DO_PROBLEMA_NOSSO);
   });
 
   it("o erro sem causa nem lê a sessão", async () => {

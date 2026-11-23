@@ -3,14 +3,16 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { PLANO } from "@/config/assinatura";
 import type { SituacaoDaAssinatura } from "@/servicos/assinatura-tela";
+import { periodoDoPlanoPorExtenso, valorDoPlanoPorExtenso } from "@/textos/assinatura";
 
 import { botaoEhDoDono, botoesDaTela, cartaoDaConta, textosDaTela, visaoDaTela } from "./visao";
 
 const FIM = new Date("2027-01-22T15:00:00Z");
 
 function situacao(parcial: Partial<SituacaoDaAssinatura>): SituacaoDaAssinatura {
-  return { tipo: "nunca", temAcesso: false, status: null, periodoFim: null, cancelaNoFim: false, podeAbrirOPortal: false, ...parcial };
+  return { tipo: "nunca", temAcesso: false, status: null, periodoFim: null, cancelaNoFim: false, temCartao: false, podeAbrirOPortal: false, ...parcial };
 }
 
 describe("visaoDaTela", () => {
@@ -133,7 +135,7 @@ describe("o teste grátis (E22)", () => {
   it("sem cartão no começo: a frase manda cadastrar o cartão e não fala de primeira cobrança; o botão principal abre o portal para isso", () => {
     const { titulo, frases } = textosDaTela("teste", emTeste, semCartao);
     expect(titulo).toBe("Você está no teste grátis");
-    expect(frases).toEqual(["Seu teste grátis termina em 22 de janeiro de 2027. Para continuar, cadastre o cartão. Se você já cadastrou, está tudo certo."]);
+    expect(frases).toEqual(["Seu teste grátis termina em 22 de janeiro de 2027. Para continuar depois do teste, cadastre o cartão."]);
     expect(frases.join(" ")).not.toContain("cobrança");
     expect(botoesDaTela("teste", semCartao).map((b) => [b.acao, b.rotulo, b.variante])).toEqual([
       ["portal", "Cadastrar o cartão", "primario"],
@@ -159,5 +161,49 @@ describe("o teste grátis (E22)", () => {
     const com = cartaoDaConta(emTeste, true);
     expect(com.data).toContain("a primeira cobrança é em");
     expect(com.botoes.map((b) => b.rotulo)).toEqual(["Gerenciar a assinatura"]);
+  });
+});
+
+describe("o fim do teste e o cartão já cadastrado (A3, M4, 23/11/2026)", () => {
+  const terminou = situacao({ tipo: "testeTerminou", status: "canceled", periodoFim: FIM });
+  const semCartao = { dias: 7, exigeCartao: false, oferecer: false };
+  const emTeste = situacao({ tipo: "teste", temAcesso: true, status: "trialing", periodoFim: FIM });
+
+  it("teste terminado: a tela diz que o teste terminou, e o botão mostra o preço e o período do plano", () => {
+    expect(visaoDaTela(terminou, false)).toBe("testeTerminou");
+    const { titulo, frases } = textosDaTela("testeTerminou", terminou);
+    expect(titulo).toBe("Seu teste grátis terminou");
+    expect(frases).toEqual(["Para continuar, assine o plano."]);
+    expect(botoesDaTela("testeTerminou").map((b) => [b.acao, b.rotulo])).toEqual([["assinar", "Assinar por R$ 1.191 a cada 3 meses"]]);
+  });
+
+  it("o botão vem da configuração do plano: o valor e o período não estão escritos à mão", () => {
+    expect(valorDoPlanoPorExtenso(PLANO.valorEmCentavos)).toBe("R$ 1.191");
+    expect(valorDoPlanoPorExtenso(39_750)).toBe("R$ 397,50");
+    expect(periodoDoPlanoPorExtenso(PLANO.intervaloQuantidade)).toBe("a cada 3 meses");
+    expect(periodoDoPlanoPorExtenso(1)).toBe("todo mês");
+  });
+
+  it("a Conta de quem nunca pagou: nada de Cancelada nem Pago até, e o botão leva ao plano", () => {
+    const c = cartaoDaConta(terminou);
+    expect(c.situacao).toBe("Teste grátis terminou");
+    expect(c.data).toBeNull();
+    expect(c.botoes.map((b) => b.acao)).toEqual(["plano"]);
+    expect(JSON.stringify(c)).not.toMatch(/Cancelada|Pago até/);
+  });
+
+  it("teste sem cartão e a pessoa já cadastrou: Tudo certo, a assinatura começa sozinha, e o botão principal volta a ser o Hoje", () => {
+    const comCartao = { ...emTeste, temCartao: true };
+    expect(textosDaTela("teste", comCartao, semCartao).frases).toEqual(["Seu teste grátis termina em 22 de janeiro de 2027. Tudo certo: no fim do teste a assinatura começa sozinha, com o cartão que você cadastrou."]);
+    expect(botoesDaTela("teste", semCartao, true).map((b) => b.acao)).toEqual(["hoje", "portal"]);
+    const conta = cartaoDaConta(comCartao, false);
+    expect(conta.data).toContain("Tudo certo");
+    expect(conta.botoes.map((b) => b.rotulo)).toEqual(["Gerenciar a assinatura"]);
+  });
+
+  it("teste sem cartão e sem cartão cadastrado: Para continuar depois do teste, cadastre o cartão", () => {
+    expect(textosDaTela("teste", emTeste, semCartao).frases[0]).toContain("Para continuar depois do teste, cadastre o cartão.");
+    expect(textosDaTela("teste", emTeste, semCartao).frases[0]).not.toContain("já cadastrou");
+    expect(botoesDaTela("teste", semCartao, false)[0].rotulo).toBe("Cadastrar o cartão");
   });
 });

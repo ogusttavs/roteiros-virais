@@ -10,7 +10,7 @@ import { db, getPool } from "@/db";
 import { configuracaoAdmin, geracoesIA } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
-import { CHAVES_DAS_FALHAS_DA_IA, chaveDaFalhaDaIA, faltaDeCreditoDaIA, lerFalhaDaIA, registrarFalhaDaIA } from "@/ia/falha-da-ia";
+import { CHAVES_DAS_FALHAS_DA_IA, chaveDaFalhaDaIA, falhaQueTrancaAIA, falhasQueTrancamAIA, lerFalhaDaIA, registrarFalhaDaIA } from "@/ia/falha-da-ia";
 import { inicioDoAdmin } from "@/servicos/admin-inicio";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -48,8 +48,10 @@ describe("a chamada que a IA recusa pela causa", () => {
     const erro = await chamar(marcador);
     expect(erro).toBeInstanceOf(ErroIA);
     expect((erro as ErroIA).causa).toBe(causa);
-    // a frase para o cliente continua a genérica
-    expect((erro as ErroIA).mensagemCliente).toBe("Não conseguimos fazer isso agora. Tente de novo em um minuto.");
+    // a frase para o cliente: a que diz a verdade quando só o dono resolve (chave, crédito); a genérica quando é passageiro (sobrecarga)
+    expect((erro as ErroIA).mensagemCliente).toBe(
+      causa === "sobrecarga" ? "Não conseguimos fazer isso agora. Tente de novo em um minuto." : "Estamos com um problema do nosso lado e já fomos avisados. Volte mais tarde.",
+    );
     const anotada = await falhaAnotada(causa);
     expect(anotada?.causa).toBe(causa);
     expect(anotada?.tarefa).toBe("roteiro");
@@ -66,49 +68,69 @@ describe("a chamada que a IA recusa pela causa", () => {
     await chamar("[mock:erro-sobrecarga]");
     await chamar("[mock:erro-chave]");
     expect((await falhaAnotada("credito"))?.causa).toBe("credito");
-    expect((await faltaDeCreditoDaIA())?.causa).toBe("credito");
+    expect((await falhasQueTrancamAIA()).map((f) => f.causa).sort()).toEqual(["chave", "credito"]);
   });
 });
 
-describe("a falta de crédito como aviso", () => {
+describe("a falha que tranca a IA como aviso", () => {
   it("vale depois da falha e some quando uma geração dá certo depois dela", async () => {
-    expect(await faltaDeCreditoDaIA()).toBeNull();
+    expect(await falhasQueTrancamAIA()).toEqual([]);
     await chamar("[mock:erro-credito]");
-    expect((await faltaDeCreditoDaIA())?.causa).toBe("credito");
+    expect((await falhaQueTrancaAIA())?.causa).toBe("credito");
 
     // uma geração boa ANTES da falha não apaga
     await db().insert(geracoesIA).values({ tarefa: "roteiro", versaoPrompt: "1", modelo: "mock", entradas: {}, criadoEm: new Date(Date.now() - 60_000) });
-    expect((await faltaDeCreditoDaIA())?.causa).toBe("credito");
+    expect((await falhaQueTrancaAIA())?.causa).toBe("credito");
 
     // uma DEPOIS apaga
     await db().insert(geracoesIA).values({ tarefa: "roteiro", versaoPrompt: "1", modelo: "mock", entradas: {}, criadoEm: new Date(Date.now() + 5_000) });
-    expect(await faltaDeCreditoDaIA()).toBeNull();
+    expect(await falhaQueTrancaAIA()).toBeNull();
   });
 
   it("a linha de uma geração que terminou em erro não prova que o crédito voltou (a pesquisa que cai depois de gastar registra uma)", async () => {
     await chamar("[mock:erro-credito]");
     await db().insert(geracoesIA).values({ tarefa: "pesquisaNaHora", versaoPrompt: "1", modelo: "mock", entradas: {}, saida: { erro: true }, criadoEm: new Date(Date.now() + 5_000) });
-    expect((await faltaDeCreditoDaIA())?.causa).toBe("credito");
+    expect((await falhaQueTrancaAIA())?.causa).toBe("credito");
     // uma de verdade, sem erro, depois, apaga
     await db().insert(geracoesIA).values({ tarefa: "roteiro", versaoPrompt: "1", modelo: "mock", entradas: {}, saida: { ok: true }, criadoEm: new Date(Date.now() + 6_000) });
-    expect(await faltaDeCreditoDaIA()).toBeNull();
+    expect(await falhaQueTrancaAIA()).toBeNull();
   });
 
-  it("sobrecarga e chave recusada ficam anotadas e não viram o aviso de crédito", async () => {
+  it("a sobrecarga fica anotada e não vira aviso; a chave recusada vira", async () => {
     await chamar("[mock:erro-sobrecarga]");
-    expect(await faltaDeCreditoDaIA()).toBeNull();
+    expect(await falhasQueTrancamAIA()).toEqual([]);
     await chamar("[mock:erro-chave]");
-    expect(await faltaDeCreditoDaIA()).toBeNull();
+    expect((await falhaQueTrancaAIA())?.causa).toBe("chave");
+  });
+
+  it("as duas causas podem valer juntas, a mais nova primeiro, e uma geração boa depois apaga as duas", async () => {
+    await registrarFalhaDaIA("credito", "roteiro", new Date(Date.now() - 20_000));
+    await registrarFalhaDaIA("chave", "briefing", new Date(Date.now() - 10_000));
+    expect((await falhasQueTrancamAIA()).map((f) => f.causa)).toEqual(["chave", "credito"]);
+    await db().insert(geracoesIA).values({ tarefa: "roteiro", versaoPrompt: "1", modelo: "mock", entradas: {}, criadoEm: new Date(Date.now() + 5_000) });
+    expect(await falhasQueTrancamAIA()).toEqual([]);
   });
 
   it("o Início do admin traz a falta de crédito quando vale, e nada quando não", async () => {
-    expect((await inicioDoAdmin()).atencao.creditoDaIA).toBeNull();
+    expect((await inicioDoAdmin()).atencao.falhasDaIA).toEqual([]);
     await chamar("[mock:erro-credito]");
     const inicio = await inicioDoAdmin();
-    expect(inicio.atencao.creditoDaIA?.tarefa).toBe("roteiro");
-    expect(inicio.atencao.creditoDaIA?.desde.getTime()).toBeGreaterThan(Date.now() - 60_000);
+    expect(inicio.atencao.falhasDaIA).toHaveLength(1);
+    expect(inicio.atencao.falhasDaIA[0].causa).toBe("credito");
+    expect(inicio.atencao.falhasDaIA[0].tarefa).toBe("roteiro");
+    expect(inicio.atencao.falhasDaIA[0].desde.getTime()).toBeGreaterThan(Date.now() - 60_000);
     await db().insert(geracoesIA).values({ tarefa: "roteiro", versaoPrompt: "1", modelo: "mock", entradas: {}, criadoEm: new Date(Date.now() + 5_000) });
-    expect((await inicioDoAdmin()).atencao.creditoDaIA).toBeNull();
+    expect((await inicioDoAdmin()).atencao.falhasDaIA).toEqual([]);
+  });
+
+  it("o Início do admin traz a chave recusada (achado B1), e a sobrecarga não aparece", async () => {
+    await chamar("[mock:erro-sobrecarga]");
+    expect((await inicioDoAdmin()).atencao.falhasDaIA).toEqual([]);
+    await chamar("[mock:erro-chave]");
+    const inicio = await inicioDoAdmin();
+    expect(inicio.atencao.falhasDaIA.map((f) => f.causa)).toEqual(["chave"]);
+    await db().insert(geracoesIA).values({ tarefa: "roteiro", versaoPrompt: "1", modelo: "mock", entradas: {}, criadoEm: new Date(Date.now() + 5_000) });
+    expect((await inicioDoAdmin()).atencao.falhasDaIA).toEqual([]);
   });
 });
 
