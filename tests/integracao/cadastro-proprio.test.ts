@@ -208,10 +208,13 @@ describe("e-mail que já tem conta não é revelado", () => {
 
   it("a ação responde igual nos dois casos e só a conta nova ganha sessão", async () => {
     const { criarContaAction } = await import("@/app/cadastro/acoes");
+    const entrar = vi.spyOn(auth.api, "signInEmail");
     const novo = await criarContaAction(dadosBons({ email: "igual-novo@cadastro.teste" }));
     const repetido = await criarContaAction(dadosBons({ email: "igual-novo@cadastro.teste" }));
     expect(novo).toEqual({ ok: true, email: "igual-novo@cadastro.teste" });
     expect(repetido).toEqual(novo);
+    // Só a conta nova entrou: o endereço que já existia não ganha sessão.
+    expect(entrar).toHaveBeenCalledTimes(1);
   });
 });
 
