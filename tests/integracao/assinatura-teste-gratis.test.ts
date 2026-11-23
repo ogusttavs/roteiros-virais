@@ -11,7 +11,7 @@ import { assinaturas, checkoutsStripe, clientes, eventosStripe, membrosMarca, ni
 import { config } from "@/lib/config";
 import { chamadasSimuladas, limparSessoesSimuladas, marcarHistoricoSimulado, usarPortaStripe } from "@/lib/stripe";
 import { iniciarAssinatura, marcaPrecisaAssinar, tratarEventoDoStripe } from "@/servicos/assinatura";
-import { avisarFimDoTeste } from "@/servicos/assinatura-teste";
+import { avisarFimDoTeste, avisarTesteTerminado } from "@/servicos/assinatura-teste";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { eventoDeAssinatura, eventoDeCheckout, eventoDeFatura, SEGUNDOS } from "../fixtures/stripe-eventos";
@@ -254,5 +254,131 @@ describe("o e-mail de 2 dias antes do fim do teste", () => {
     const manda = enviar();
     expect(await avisarFimDoTeste(AGORA, manda)).toMatchObject({ candidatas: 1, semDono: 1, avisadas: 0 });
     expect(manda).not.toHaveBeenCalled();
+  });
+});
+
+describe("o fim do teste sem pagamento (A3, A7, M4, 23/11/2026)", () => {
+  type Mensagem = { para: string; assunto: string; html: string };
+  const enviar = () => vi.fn<(m: Mensagem) => Promise<undefined>>(async () => undefined);
+  const linhaDaMarca = async () => (await db().select().from(assinaturas).where(eq(assinaturas.clienteId, marca)))[0];
+
+  /** O teste acabou há 1 hora e o Stripe cancelou (sem cartão). */
+  async function testeQueAcabou(opcoes: { cancelaNoFim?: boolean } = {}) {
+    const fim = agoraS() - 3600;
+    const id = `sub_acabou_${n}`;
+    const base = { clienteId: marca, assinaturaId: id, clienteStripeId: `cus_${id}` };
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.created", { ...base, criadoEm: fim - 7 * SEGUNDOS.DIA, status: "trialing", inicio: fim - 7 * SEGUNDOS.DIA, fim, cartao: false }));
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.deleted", { ...base, criadoEm: fim + 60, status: "canceled", inicio: fim - 7 * SEGUNDOS.DIA, fim, comTeste: true, cancelaNoFim: opcoes.cancelaNoFim }));
+    return fim;
+  }
+
+  it("a assinatura guarda que começou como teste e que nunca teve pagamento; o portão a barra", async () => {
+    await testeQueAcabou();
+    const linha = await linhaDaMarca();
+    expect(linha).toMatchObject({ status: "canceled", comecouComoTeste: true, primeiroPagamentoEm: null, temFormaDePagamento: false });
+    expect(await marcaPrecisaAssinar({ id: marca, cortesia: false }, AGORA, true)).toBe(true);
+  });
+
+  it("o e-mail do dia sai uma vez para o dono, com o preço do plano e o link para assinar; não repete", async () => {
+    await testeQueAcabou();
+    const manda = enviar();
+    expect(await avisarTesteTerminado(AGORA, manda)).toMatchObject({ candidatas: 1, avisadas: 1, falhas: 0 });
+    expect(manda).toHaveBeenCalledTimes(1);
+    const m = manda.mock.calls[0][0];
+    expect(m.para).toBe(dono.email);
+    expect(m.assunto).toBe("O seu teste grátis terminou");
+    expect(m.html).toContain("[teste] Marca do teste");
+    expect(m.html).toContain("R$ 1.191 a cada 3 meses");
+    expect(m.html).toContain("/assinar");
+    expect((await linhaDaMarca()).fimDoTesteAvisadoEm).not.toBeNull();
+    const outra = enviar();
+    expect(await avisarTesteTerminado(new Date(AGORA.getTime() + HORA), outra)).toMatchObject({ candidatas: 0, avisadas: 0 });
+    expect(outra).not.toHaveBeenCalled();
+  });
+
+  it("de madrugada não sai, e a marca fica para a próxima rodada; se o envio falhar, desfaz e tenta de novo", async () => {
+    await testeQueAcabou();
+    const manda = enviar();
+    expect(await avisarTesteTerminado(new Date("2026-11-10T07:00:00Z"), manda)).toMatchObject({ foraDoHorario: true, avisadas: 0 });
+    expect(manda).not.toHaveBeenCalled();
+    const quebra = vi.fn<(m: Mensagem) => Promise<undefined>>(async () => {
+      throw new Error("Resend fora do ar");
+    });
+    expect(await avisarTesteTerminado(AGORA, quebra)).toMatchObject({ avisadas: 0, falhas: 1 });
+    expect((await linhaDaMarca()).fimDoTesteAvisadoEm).toBeNull();
+    expect(await avisarTesteTerminado(new Date(AGORA.getTime() + HORA), manda)).toMatchObject({ avisadas: 1 });
+  });
+
+  it("não sai para quem cancelou por conta própria, para quem já pagou, nem para teste que acabou há mais de 2 dias", async () => {
+    await testeQueAcabou({ cancelaNoFim: true });
+    const manda = enviar();
+    expect(await avisarTesteTerminado(AGORA, manda)).toMatchObject({ candidatas: 0 });
+    await db().delete(assinaturas);
+    await testeQueAcabou();
+    await db().update(assinaturas).set({ primeiroPagamentoEm: new Date(AGORA.getTime() - 30 * 24 * HORA) });
+    expect(await avisarTesteTerminado(AGORA, manda)).toMatchObject({ candidatas: 0 });
+    await db().update(assinaturas).set({ primeiroPagamentoEm: null });
+    expect(await avisarTesteTerminado(new Date(AGORA.getTime() + 3 * 24 * HORA), manda)).toMatchObject({ candidatas: 0 });
+    expect(manda).not.toHaveBeenCalled();
+  });
+
+  it("marca sem dono: conta como sem dono e não marca nada", async () => {
+    const fim = agoraS() - 3600;
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.deleted", { clienteId: marcaSemDono, assinaturaId: `sub_sd_${n}`, criadoEm: fim + 60, status: "canceled", inicio: fim - 7 * SEGUNDOS.DIA, fim, comTeste: true }));
+    const manda = enviar();
+    expect(await avisarTesteTerminado(AGORA, manda)).toMatchObject({ candidatas: 1, semDono: 1, avisadas: 0 });
+    expect(manda).not.toHaveBeenCalled();
+  });
+
+  it("cartão recusado na primeira cobrança de quem nunca pagou: acesso por 3 dias, não pelas semanas do período novo", async () => {
+    const fim = agoraS() + 7 * SEGUNDOS.DIA;
+    await cadastrarComTeste(marca, `sub_recusa_${n}`, fim);
+    const base = { clienteId: marca, assinaturaId: `sub_recusa_${n}`, clienteStripeId: `cus_sub_recusa_${n}` };
+    const falhouEm = fim + 10;
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { ...base, criadoEm: falhouEm, status: "past_due", inicio: fim, fim: fim + 90 * SEGUNDOS.DIA }));
+    await tratarEventoDoStripe(eventoDeFatura("invoice.payment_failed", { ...base, criadoEm: falhouEm, inicio: fim, fim: fim + 90 * SEGUNDOS.DIA }));
+    const linha = await linhaDaMarca();
+    expect(linha).toMatchObject({ status: "past_due", primeiroPagamentoEm: null });
+    expect(linha.atrasadaDesde?.getTime()).toBe(falhouEm * 1000);
+    const em = (dias: number) => new Date((falhouEm + dias * SEGUNDOS.DIA) * 1000);
+    expect(await marcaPrecisaAssinar({ id: marca, cortesia: false }, em(2), true)).toBe(false);
+    expect(await marcaPrecisaAssinar({ id: marca, cortesia: false }, em(4), true)).toBe(true);
+    // O Stripe tenta de novo e falha de novo: a conta dos 3 dias não recomeça.
+    await tratarEventoDoStripe(eventoDeFatura("invoice.payment_failed", { ...base, criadoEm: falhouEm + 2 * SEGUNDOS.DIA, inicio: fim, fim: fim + 90 * SEGUNDOS.DIA }));
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { ...base, criadoEm: falhouEm + 2 * SEGUNDOS.DIA, status: "past_due", inicio: fim, fim: fim + 90 * SEGUNDOS.DIA }));
+    expect((await linhaDaMarca()).atrasadaDesde?.getTime()).toBe(falhouEm * 1000);
+    expect(await marcaPrecisaAssinar({ id: marca, cortesia: false }, em(4), true)).toBe(true);
+  });
+
+  it("cartão recusado de quem já pagou: segue a regra de sempre (vale até o fim do período mais a folga)", async () => {
+    const fim = agoraS() + 7 * SEGUNDOS.DIA;
+    await cadastrarComTeste(marca, `sub_pagou_${n}`, fim);
+    const base = { clienteId: marca, assinaturaId: `sub_pagou_${n}`, clienteStripeId: `cus_sub_pagou_${n}` };
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { ...base, criadoEm: fim + 5, status: "active", inicio: fim, fim: fim + 90 * SEGUNDOS.DIA }));
+    await tratarEventoDoStripe(eventoDeFatura("invoice.paid", { ...base, criadoEm: fim + 5, inicio: fim, fim: fim + 90 * SEGUNDOS.DIA, valorPago: 119100 }));
+    const renovaEm = fim + 90 * SEGUNDOS.DIA;
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { ...base, criadoEm: renovaEm, status: "past_due", inicio: renovaEm, fim: renovaEm + 90 * SEGUNDOS.DIA }));
+    const linha = await linhaDaMarca();
+    expect(linha.primeiroPagamentoEm).not.toBeNull();
+    expect(await marcaPrecisaAssinar({ id: marca, cortesia: false }, new Date((renovaEm + 20 * SEGUNDOS.DIA) * 1000), true)).toBe(false);
+  });
+
+  it("o cartão cadastrado no teste sem cartão aparece no aviso da assinatura e muda o e-mail de 2 dias", async () => {
+    const fim = agoraS() + 40 * 3600;
+    const base = { clienteId: marca, assinaturaId: `sub_cartao_${n}`, clienteStripeId: `cus_sub_cartao_${n}` };
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.created", { ...base, criadoEm: agoraS(), status: "trialing", inicio: agoraS(), fim, cartao: false, comTeste: true }));
+    expect((await linhaDaMarca()).temFormaDePagamento).toBe(false);
+    const sem = enviar();
+    await db().update(assinaturas).set({ lembreteFimDoTesteEm: null });
+    await avisarFimDoTeste(AGORA, sem);
+    expect(sem.mock.calls[0][0].html).toContain("cadastre o cartão");
+    expect(sem.mock.calls[0][0].html).not.toContain("já cadastrou");
+
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { ...base, criadoEm: agoraS() + 60, status: "trialing", inicio: agoraS(), fim, cartao: true, comTeste: true }));
+    expect((await linhaDaMarca()).temFormaDePagamento).toBe(true);
+    await db().update(assinaturas).set({ lembreteFimDoTesteEm: null });
+    const com = enviar();
+    await avisarFimDoTeste(AGORA, com);
+    expect(com.mock.calls[0][0].html).toContain("a primeira cobrança");
   });
 });

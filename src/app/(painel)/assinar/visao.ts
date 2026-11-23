@@ -7,7 +7,7 @@ import { textosAssinatura } from "@/textos/assinatura";
 
 import type { BotaoDaAssinatura } from "./BotoesDaAssinatura";
 
-export type Visao = "pitch" | "encerrada" | "cartao" | "atrasada" | "aguardando" | "confirmada" | "ativa" | "teste" | "cortesia";
+export type Visao = "pitch" | "encerrada" | "testeTerminou" | "cartao" | "atrasada" | "aguardando" | "confirmada" | "ativa" | "teste" | "cortesia";
 
 /**
  * O teste grátis como a tela precisa dele (E22): `dias` e `exigeCartao` vêm da configuração; `oferecer` é verdade só para a marca que ainda pode ganhar o teste (nunca teve assinatura),
@@ -17,11 +17,17 @@ export type TesteDaTela = { dias: number; exigeCartao: boolean; oferecer: boolea
 export const TESTE_PADRAO: TesteDaTela = { dias: 7, exigeCartao: false, oferecer: false };
 
 /** A frase do teste em andamento: a data do fim (e da primeira cobrança), ou a do cancelamento, ou a do cartão que falta. */
-export function fraseDoTeste(s: Pick<SituacaoDaAssinatura, "periodoFim" | "cancelaNoFim">, exigeCartao: boolean): string {
+export function fraseDoTeste(s: Pick<SituacaoDaAssinatura, "periodoFim" | "cancelaNoFim" | "temCartao">, exigeCartao: boolean): string {
   const t = textosAssinatura.teste;
   if (!s.periodoFim) return t.fraseSemData;
   if (s.cancelaNoFim) return t.fraseCancelada(s.periodoFim);
-  return exigeCartao ? t.frase(s.periodoFim) : t.fraseSemCartao(s.periodoFim);
+  if (exigeCartao) return t.frase(s.periodoFim);
+  return s.temCartao ? t.fraseComCartao(s.periodoFim) : t.fraseSemCartao(s.periodoFim);
+}
+
+/** No teste em andamento, já há cartão? Pedido no começo (`exigeCartao`), ou cadastrado depois, no teste sem cartão (o aviso da assinatura diz). */
+export function testeTemCartao(s: Pick<SituacaoDaAssinatura, "temCartao">, exigeCartao: boolean): boolean {
+  return exigeCartao || s.temCartao;
 }
 
 /** Qual das telas mostrar: a situação da marca, mais o fato de a pessoa ter acabado de voltar do pagamento (`?assinou=1`). */
@@ -33,18 +39,22 @@ export function visaoDaTela(situacao: SituacaoDaAssinatura, voltouDoPagamento: b
   if (situacao.tipo === "atrasada") return "atrasada";
   if (situacao.tipo === "cartao") return "cartao";
   if (situacao.tipo === "encerrada") return "encerrada";
+  if (situacao.tipo === "testeTerminou") return "testeTerminou";
   // `nunca`, e `incomplete` sem ter voltado do pagamento (abandonou no meio): volta ao convite, e a sessão aberta do Stripe é reaproveitada.
   return "pitch";
 }
 
 /** Os botões de cada tela, na ordem em que aparecem (antes de tirar os que a pessoa não pode usar). */
-export function botoesDaTela(visao: Visao, teste: TesteDaTela = TESTE_PADRAO): BotaoDaAssinatura[] {
+export function botoesDaTela(visao: Visao, teste: TesteDaTela = TESTE_PADRAO, temCartao: boolean = false): BotaoDaAssinatura[] {
   const b = textosAssinatura.botoes;
   switch (visao) {
     case "pitch":
       return [{ acao: "assinar", rotulo: teste.oferecer ? textosAssinatura.teste.botao(teste.dias) : b.assinar, variante: "primario" }];
     case "encerrada":
       return [{ acao: "assinar", rotulo: b.assinarDeNovo, variante: "primario" }];
+    case "testeTerminou":
+      // O preço e o período do botão vêm da configuração do plano.
+      return [{ acao: "assinar", rotulo: b.assinar, variante: "primario" }];
     case "cartao":
       return [{ acao: "portal", rotulo: b.atualizarCartao, variante: "primario" }];
     case "atrasada":
@@ -55,8 +65,8 @@ export function botoesDaTela(visao: Visao, teste: TesteDaTela = TESTE_PADRAO): B
     case "confirmada":
       return [{ acao: "hoje", rotulo: b.irParaHoje, variante: "primario" }];
     case "teste":
-      // Sem cartão no começo, o que a pessoa precisa fazer antes do fim é cadastrá-lo: o botão principal abre o portal para isso.
-      return teste.exigeCartao
+      // Sem cartão, o que a pessoa precisa fazer antes do fim é cadastrá-lo: o botão principal abre o portal para isso. Com cartão (pedido no começo ou já cadastrado), está tudo certo.
+      return testeTemCartao({ temCartao }, teste.exigeCartao)
         ? [
             { acao: "hoje", rotulo: b.irParaHoje, variante: "primario" },
             { acao: "portal", rotulo: b.gerenciar, variante: "secundario" },
@@ -94,6 +104,8 @@ export function textosDaTela(visao: Visao, s: SituacaoDaAssinatura, teste: Teste
         : { titulo: t.nunca.titulo, frases: [t.nunca.frase] };
     case "encerrada":
       return { titulo: t.encerrada.titulo, frases: [s.periodoFim ? t.encerrada.fraseComData(s.periodoFim) : t.encerrada.frase] };
+    case "testeTerminou":
+      return { titulo: t.testeTerminou.titulo, frases: [t.testeTerminou.frase] };
     case "cartao":
       return { titulo: t.cartao.titulo, frases: [t.cartao.frase] };
     case "atrasada":
@@ -129,7 +141,7 @@ export function cartaoDaConta(s: SituacaoDaAssinatura, exigeCartao: boolean = TE
     case "ativa":
       return { situacao: rotuloDoStatus ?? t.status.active, data: dataDoPeriodo, botoes: [gerenciar] };
     case "teste":
-      return { situacao: rotuloDoStatus ?? t.status.trialing, data: fraseDoTeste(s, exigeCartao), botoes: [exigeCartao ? gerenciar : cadastrar] };
+      return { situacao: rotuloDoStatus ?? t.status.trialing, data: fraseDoTeste(s, exigeCartao), botoes: [testeTemCartao(s, exigeCartao) ? gerenciar : cadastrar] };
     case "atrasada":
       return { situacao: rotuloDoStatus ?? t.status.past_due, data: dataDoPeriodo, botoes: [cartao] };
     case "cartao":
@@ -138,6 +150,9 @@ export function cartaoDaConta(s: SituacaoDaAssinatura, exigeCartao: boolean = TE
       return { situacao: t.situacoes.aguardando.titulo, data: null, botoes: [plano] };
     case "encerrada":
       return { situacao: rotuloDoStatus ?? t.status.canceled, data: s.periodoFim ? d.paga(s.periodoFim) : null, botoes: [plano] };
+    case "testeTerminou":
+      // Quem nunca pagou não lê "Cancelada" nem "Pago até".
+      return { situacao: t.conta.testeTerminou, data: null, botoes: [plano] };
     case "nunca":
       return { situacao: t.conta.semAssinatura, data: null, botoes: [plano] };
   }

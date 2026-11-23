@@ -24,7 +24,7 @@ const proximoId = (prefixo: string) => `${prefixo}_teste_${++contador}`;
 
 export function eventoDeAssinatura(
   tipo: "customer.subscription.created" | "customer.subscription.updated" | "customer.subscription.deleted",
-  opcoes: Opcoes & { clienteId?: number; status?: string; inicio?: number; fim?: number; cancelaNoFim?: boolean; cancelAt?: number | null; antigaApi?: boolean },
+  opcoes: Opcoes & { clienteId?: number; status?: string; inicio?: number; fim?: number; cancelaNoFim?: boolean; cancelAt?: number | null; antigaApi?: boolean; cartao?: boolean; comTeste?: boolean },
 ): EventoDoStripe {
   const metadata = opcoes.metadata === undefined ? { ...NOSSA_MARCA, cliente_id: String(opcoes.clienteId ?? 1) } : opcoes.metadata;
   const inicio = opcoes.inicio ?? T0;
@@ -42,6 +42,9 @@ export function eventoDeAssinatura(
         metadata: metadata ?? {},
         cancel_at_period_end: opcoes.cancelaNoFim ?? false,
         cancel_at: opcoes.cancelAt ?? null,
+        // Só os testes que falam de cartão ou de teste trazem estes campos (o Stripe real sempre os traz).
+        ...(opcoes.cartao === undefined ? {} : { default_payment_method: opcoes.cartao ? "pm_teste_1" : null }),
+        ...(opcoes.comTeste ? { trial_start: inicio, trial_end: fim } : {}),
         ...(opcoes.antigaApi ? { current_period_start: inicio, current_period_end: fim } : {}),
         items: { data: [{ price: { id: opcoes.precoId ?? "price_teste_1" }, ...(opcoes.antigaApi ? {} : { current_period_start: inicio, current_period_end: fim }) }] },
       },

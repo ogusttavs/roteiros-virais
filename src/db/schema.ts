@@ -3045,6 +3045,16 @@ export const assinaturas = pgTable(
     ultimoEventoEm: timestamp("ultimo_evento_em", { withTimezone: true }).notNull(),
     /** E22, o teste grátis: quando o e-mail "seu teste acaba em 2 dias" saiu (a trava para não mandar duas vezes). Nulo: ainda não mandou. */
     lembreteFimDoTesteEm: timestamp("lembrete_fim_do_teste_em", { withTimezone: true }),
+    /** A assinatura começou como teste grátis (o Stripe a criou `trialing`, ou o aviso traz `trial_start`). Nunca volta para falso. Com `primeiroPagamentoEm` nulo, é o que separa "o teste terminou" de "a assinatura terminou". */
+    comecouComoTeste: boolean("comecou_como_teste").notNull().default(false),
+    /** Quando chegou o primeiro pagamento de verdade (fatura paga com valor, ou assinatura `active`). Nulo: ninguém nunca pagou por esta assinatura. */
+    primeiroPagamentoEm: timestamp("primeiro_pagamento_em", { withTimezone: true }),
+    /** Desde quando o status é `past_due` (o cartão falhou); nulo fora desse status. A tolerância de quem nunca pagou conta daqui. */
+    atrasadaDesde: timestamp("atrasada_desde", { withTimezone: true }),
+    /** O Stripe diz que a assinatura tem forma de pagamento (`default_payment_method` no aviso). No teste sem cartão, é o que diz se a pessoa já cadastrou o cartão. */
+    temFormaDePagamento: boolean("tem_forma_de_pagamento").notNull().default(false),
+    /** Quando saiu o e-mail "o seu teste grátis terminou" (uma vez só). Nulo: ainda não mandou. */
+    fimDoTesteAvisadoEm: timestamp("fim_do_teste_avisado_em", { withTimezone: true }),
     criadoEm: criadoEm(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },

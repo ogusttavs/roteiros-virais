@@ -34,12 +34,12 @@ export default async function Assinar({ searchParams }: { searchParams: Promise<
 
   // O teste grátis só é anunciado a quem ainda pode ganhá-lo (nunca teve assinatura); quem já teve vê o convite de sempre (`assinar de novo`).
   const teste: TesteDaTela = { dias: config.cobranca.testeDias, exigeCartao: config.cobranca.testeExigeCartao, oferecer: visao === "pitch" && marcaPodeGanharTeste(lista) };
-  const todos = botoesDaTela(visao, teste);
+  const todos = botoesDaTela(visao, teste, situacao.temCartao);
   // Quem não é o dono (e o "ver como") não vê o que mexe em dinheiro; o "Ir para o Hoje" continua para quem tem acesso.
   const botoes = todos.filter((b) => !botaoEhDoDono(b) || dono);
   const faltaPermissao = todos.some(botaoEhDoDono) && !dono;
   const { titulo, frases } = textosDaTela(visao, situacao, teste);
-  const convite = visao === "pitch" || visao === "encerrada";
+  const convite = visao === "pitch" || visao === "encerrada" || visao === "testeTerminou";
   const aviso = verComo ? textosAssinatura.verComo : faltaPermissao ? textosAssinatura.semPermissao : null;
 
   return (

@@ -16,7 +16,7 @@ import { assinaturas, clientes } from "@/db/schema";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 
-import { precisaAssinarCom } from "./assinatura";
+import { precisaAssinarCom, type DadosDeAcesso } from "./assinatura";
 
 export type OpcoesDaTrava = {
   agora?: Date;
@@ -40,13 +40,20 @@ export async function separarMarcasPorAssinatura(ids: readonly number[], opcoes:
   const agora = opcoes.agora ?? new Date();
   const marcas = await db().select({ id: clientes.id, cortesia: clientes.cortesia }).from(clientes).where(inArray(clientes.id, unicos));
   const assinaturasDasMarcas = await db()
-    .select({ clienteId: assinaturas.clienteId, status: assinaturas.status, periodoFim: assinaturas.periodoFim })
+    .select({
+      clienteId: assinaturas.clienteId,
+      status: assinaturas.status,
+      periodoFim: assinaturas.periodoFim,
+      primeiroPagamentoEm: assinaturas.primeiroPagamentoEm,
+      atrasadaDesde: assinaturas.atrasadaDesde,
+      ultimoEventoEm: assinaturas.ultimoEventoEm,
+    })
     .from(assinaturas)
     .where(inArray(assinaturas.clienteId, unicos));
-  const porMarca = new Map<number, { status: (typeof assinaturasDasMarcas)[number]["status"]; periodoFim: Date | null }[]>();
+  const porMarca = new Map<number, DadosDeAcesso[]>();
   for (const a of assinaturasDasMarcas) {
     const lista = porMarca.get(a.clienteId) ?? [];
-    lista.push({ status: a.status, periodoFim: a.periodoFim });
+    lista.push({ status: a.status, periodoFim: a.periodoFim, primeiroPagamentoEm: a.primeiroPagamentoEm, atrasadaDesde: a.atrasadaDesde, ultimoEventoEm: a.ultimoEventoEm });
     porMarca.set(a.clienteId, lista);
   }
 

@@ -12,7 +12,7 @@
  */
 import { and, desc, eq, sql } from "drizzle-orm";
 
-import { DIAS_DE_FOLGA_DA_RENOVACAO, METADATA_PRODUTO } from "@/config/assinatura";
+import { DIAS_DE_FOLGA_DA_RENOVACAO, DIAS_DE_TOLERANCIA_SEM_NENHUM_PAGAMENTO, METADATA_PRODUTO } from "@/config/assinatura";
 import { db } from "@/db";
 import { assinaturas, checkoutsStripe, clientes, eventosStripe, membrosMarca, type Assinatura, type Cliente, type StatusAssinatura } from "@/db/schema";
 import { config } from "@/lib/config";
@@ -34,9 +34,20 @@ const STATUS_VIVOS_NO_STRIPE: StatusAssinatura[] = ["active", "trialing", "past_
  * cartão recusado, e o Stripe cancela sozinho se não conseguir cobrar. `unpaid`, `canceled`, `incomplete`, `incomplete_expired` e `paused` não. Além do status, o fim do período
  * pago manda: passou do fim mais a folga da renovação (o aviso de renovação pode atrasar), o acesso acaba mesmo que o status ainda diga `active` (aviso perdido).
  * Sem data de fim, vale só o status.
+ *
+ * **Quem nunca pagou (fim do teste, 23/11/2026).** O `past_due` de uma assinatura sem nenhum pagamento (`primeiroPagamentoEm` nulo: o cartão cadastrado no teste que não passou na primeira
+ * cobrança) dá acesso só por `DIAS_DE_TOLERANCIA_SEM_NENHUM_PAGAMENTO` dias, contados de quando o cartão falhou (`atrasadaDesde`), e não até o fim do período novo de 3 meses: senão a pessoa
+ * usaria por semanas enquanto o Stripe tenta de novo. Quem já pagou alguma vez segue a regra de sempre.
  */
-export function assinaturaVale(a: Pick<Assinatura, "status" | "periodoFim">, agora: Date = new Date()): boolean {
+export type DadosDeAcesso = Pick<Assinatura, "status" | "periodoFim" | "primeiroPagamentoEm" | "atrasadaDesde" | "ultimoEventoEm">;
+
+export function assinaturaVale(a: DadosDeAcesso, agora: Date = new Date()): boolean {
   if (a.status !== "active" && a.status !== "trialing" && a.status !== "past_due") return false;
+  if (a.status === "past_due" && !a.primeiroPagamentoEm) {
+    // `atrasadaDesde` nulo só acontece em linha anterior a esta regra; nesse caso conta do último aviso.
+    const desde = a.atrasadaDesde ?? a.ultimoEventoEm;
+    if (agora.getTime() > desde.getTime() + DIAS_DE_TOLERANCIA_SEM_NENHUM_PAGAMENTO * 24 * 60 * 60 * 1000) return false;
+  }
   if (!a.periodoFim) return true;
   const limite = a.periodoFim.getTime() + DIAS_DE_FOLGA_DA_RENOVACAO * 24 * 60 * 60 * 1000;
   return agora.getTime() <= limite;
@@ -45,7 +56,7 @@ export function assinaturaVale(a: Pick<Assinatura, "status" | "periodoFim">, ago
 /**
  * O portão em si, puro: a marca precisa assinar quando a cobrança está ligada, ela não é cortesia e nenhuma assinatura dela vale. Desligado, ninguém precisa de nada.
  */
-export function precisaAssinarCom(entrada: { cobrancaAtiva: boolean; cortesia: boolean; assinaturas: Pick<Assinatura, "status" | "periodoFim">[]; agora?: Date }): boolean {
+export function precisaAssinarCom(entrada: { cobrancaAtiva: boolean; cortesia: boolean; assinaturas: DadosDeAcesso[]; agora?: Date }): boolean {
   if (!entrada.cobrancaAtiva) return false;
   if (entrada.cortesia) return false;
   const agora = entrada.agora ?? new Date();
@@ -270,6 +281,12 @@ export type MudancaDeAssinatura = {
   periodoInicio?: Date | null;
   periodoFim?: Date | null;
   cancelaNoFimDoPeriodo?: boolean;
+  /** O aviso mostra que a assinatura nasceu como teste grátis (nunca desfaz). */
+  comecouComoTeste?: boolean;
+  /** O aviso prova um pagamento de verdade (fatura paga com valor, Checkout pago, assinatura `active`). */
+  pagou?: boolean;
+  /** Se o aviso diz se a assinatura tem forma de pagamento (`default_payment_method`); ausente: o aviso não diz, e o que está gravado fica. */
+  temFormaDePagamento?: boolean;
   /** Se vier, o `status` só muda quando o status atual da linha estiver nesta lista (a fatura que falhou só rebaixa quem já era assinante). */
   soSobreStatus?: StatusAssinatura[];
 };
@@ -324,7 +341,14 @@ export function lerEvento(evento: EventoDoStripe): LeituraDoEvento {
     return {
       tipo: "tratar",
       verificar: false,
-      mudanca: { stripeAssinaturaId, stripeClienteId, clienteId: clienteIdDoAviso(obj.metadata, obj.client_reference_id), statusSeNova },
+      mudanca: {
+        stripeAssinaturaId,
+        stripeClienteId,
+        clienteId: clienteIdDoAviso(obj.metadata, obj.client_reference_id),
+        statusSeNova,
+        comecouComoTeste: obj.payment_status === "no_payment_required",
+        ...(obj.payment_status === "paid" ? { pagou: true, temFormaDePagamento: true } : {}),
+      },
     };
   }
 
@@ -349,6 +373,12 @@ export function lerEvento(evento: EventoDoStripe): LeituraDoEvento {
         periodoInicio: inicio,
         periodoFim: fim,
         cancelaNoFimDoPeriodo: obj.cancel_at_period_end === true || (typeof obj.cancel_at === "number" && !apagada),
+        // `trial_start` fica na assinatura mesmo depois de o teste acabar: é o que prova, em qualquer aviso, que ela nasceu como teste.
+        comecouComoTeste: status === "trialing" || typeof obj.trial_start === "number",
+        // `active` só acontece depois de uma fatura paga.
+        ...(status === "active" ? { pagou: true } : {}),
+        // `default_payment_method` é o cartão da assinatura. Cartão que só está no cliente do Stripe (sem ser o da assinatura) o aviso da assinatura não mostra.
+        ...("default_payment_method" in obj ? { temFormaDePagamento: idDe(obj.default_payment_method) !== null || status === "active" } : {}),
       },
     };
   }
@@ -383,7 +413,8 @@ export function lerEvento(evento: EventoDoStripe): LeituraDoEvento {
       // (`soSobreStatus`: uma assinatura ainda `incomplete`, com o primeiro pagamento em curso, não vira `past_due` e ganha acesso).
       statusSeNova: zerada ? "trialing" : pago ? "active" : "incomplete",
       ...(pago ? {} : { soSobreStatus: ["active", "trialing", "past_due"] as StatusAssinatura[] }),
-      ...(pago && !zerada ? { periodoInicio: dataDeSegundos(periodo?.start), periodoFim: dataDeSegundos(periodo?.end) } : {}),
+      ...(pago && !zerada ? { periodoInicio: dataDeSegundos(periodo?.start), periodoFim: dataDeSegundos(periodo?.end), pagou: true, temFormaDePagamento: true } : {}),
+      ...(zerada ? { comecouComoTeste: true } : {}),
     },
   };
 }
@@ -421,6 +452,10 @@ async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Da
         periodoInicio: m.periodoInicio ?? null,
         periodoFim: m.periodoFim ?? null,
         cancelaNoFimDoPeriodo: m.cancelaNoFimDoPeriodo ?? false,
+        comecouComoTeste: m.comecouComoTeste === true || m.statusSeNova === "trialing",
+        primeiroPagamentoEm: m.pagou ? eventoEm : null,
+        atrasadaDesde: m.statusSeNova === "past_due" ? eventoEm : null,
+        temFormaDePagamento: m.temFormaDePagamento === true,
         ultimoEventoEm: eventoEm,
       })
       .onConflictDoNothing({ target: assinaturas.stripeAssinaturaId });
@@ -437,6 +472,9 @@ async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Da
       ...(!atual.stripePrecoId && m.stripePrecoId ? { stripePrecoId: m.stripePrecoId } : {}),
       ...(!atual.periodoInicio && m.periodoInicio ? { periodoInicio: m.periodoInicio } : {}),
       ...(!atual.periodoFim && m.periodoFim ? { periodoFim: m.periodoFim } : {}),
+      // Provas que só se acrescentam (nunca desfazem): o teste de onde veio e o primeiro pagamento, mesmo vindos de um aviso atrasado.
+      ...(!atual.comecouComoTeste && m.comecouComoTeste ? { comecouComoTeste: true } : {}),
+      ...(!atual.primeiroPagamentoEm && m.pagou ? { primeiroPagamentoEm: eventoEm } : {}),
     };
     if (Object.keys(vazios).length > 0) await tx.update(assinaturas).set({ ...vazios, atualizadoEm: new Date() }).where(eq(assinaturas.id, atual.id));
     return;
@@ -457,6 +495,12 @@ async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Da
       ...(m.periodoInicio ? { periodoInicio: m.periodoInicio } : {}),
       ...(m.periodoFim ? { periodoFim: m.periodoFim } : {}),
       ...(m.cancelaNoFimDoPeriodo !== undefined ? { cancelaNoFimDoPeriodo: m.cancelaNoFimDoPeriodo } : {}),
+      ...(m.comecouComoTeste || status === "trialing" ? { comecouComoTeste: true } : {}),
+      ...(m.pagou && !atual.primeiroPagamentoEm ? { primeiroPagamentoEm: eventoEm } : {}),
+      ...(m.temFormaDePagamento !== undefined ? { temFormaDePagamento: m.temFormaDePagamento } : {}),
+      // Desde quando o cartão está falhando: marca na entrada em `past_due` (nova tentativa do Stripe não reinicia a conta) e apaga na saída.
+      ...(status === "past_due" && atual.status !== "past_due" ? { atrasadaDesde: eventoEm } : {}),
+      ...(status !== undefined && status !== "past_due" ? { atrasadaDesde: null } : {}),
       ultimoEventoEm: eventoEm,
       atualizadoEm: new Date(),
     })
