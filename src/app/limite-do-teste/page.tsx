@@ -6,6 +6,7 @@ import { LIMITES_DA_EDICAO } from "@/config/edicao";
 import { sessaoAtual } from "@/lib/sessao";
 import { textosCadastro } from "@/textos/cadastro";
 
+import { BotaoAssinarAgora } from "./BotaoAssinarAgora";
 import styles from "./page.module.css";
 
 /**
@@ -59,10 +60,7 @@ export default async function LimiteDoTeste({ searchParams }: { searchParams: Pr
         </div>
 
         <div className={styles.pe}>
-          {/* Ponto de troca: quando existir a ação "assinar agora" (o PR da cobrança no teste), este link para `/assinar` passa a chamá-la. */}
-          <Link href="/assinar" className={styles.botao}>
-            {t.botao}
-          </Link>
+          <BotaoAssinarAgora rotulo={t.botao} />
           <Link href="/hoje" className={styles.agoraNao}>
             {t.agoraNao}
           </Link>
