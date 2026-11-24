@@ -158,7 +158,7 @@ describe("rodarMetaHashtags", () => {
     vi.mocked(buscarRecentMediaDaHashtag).mockResolvedValue([
       {
         id: "5",
-        caption: "Dica de limpeza sem media_url #brasil",
+        caption: "Dica de limpeza para a casa sem media_url #brasil",
         media_type: "VIDEO",
         media_product_type: "REELS",
         permalink: "https://www.instagram.com/p/ExemploSemUrl01/",
