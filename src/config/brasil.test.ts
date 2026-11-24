@@ -14,6 +14,8 @@ describe("temIndicioDeBrasil", () => {
   it("dez legendas, cinco sem indicio de Brasil", () => {
     // Ingles, sem nenhuma palavra em portugues.
     expect(temIndicioDeBrasil("Cleaning tips for your home, so satisfying to watch")).toBe(false);
+    // Frances: "de" sozinho nao prova portugues (a legenda que passou em 24/11/2026), mesmo com um termo do nicho presente.
+    expect(temIndicioDeBrasil("La confusion qui sabote l'image de la marque pix", ["image"])).toBe(false);
     // Espanhol.
     expect(temIndicioDeBrasil("Consejos de limpieza para tu casa, muy facil de hacer")).toBe(false);
     // Portugues, mas de Portugal (sem nenhum indicio de Brasil).

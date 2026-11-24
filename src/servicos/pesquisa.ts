@@ -1232,6 +1232,9 @@ function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regu
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
+    // Hotfix de 24/11/2026: o vídeo da Hashtag Search da Meta não traz a conta dona nem as views (`videos.semDono`); só serve de sinal de assunto, nunca de referência na tela
+    // (aparecia com "0 views" e "conta não identificada" no segmento "Todos", que não tem piso). Vale para a lista, a contagem e as pílulas, todas feitas por esta função.
+    eq(videos.semDono, false),
   ];
   if (!semRegua) {
     // V9d, item 0b: o piso vem antes do múltiplo (decisão do Gustavo em 25/09/2026); um vídeo de
@@ -1705,7 +1708,8 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(eq(videos.id, id));
+    // Vídeo sem conta dona (Hashtag Search da Meta) nunca é mostrado ao cliente como "de onde veio": quem chama já trata o `null` e some só com o cartão.
+    .where(and(eq(videos.id, id), eq(videos.semDono, false)));
 
   if (!linha) return null;
   return {

@@ -7,20 +7,21 @@
  * de Brasil (nao so "e portugues", que tambem pega Portugal).
  */
 
-/** Palavras funcionais comuns o bastante em portugues para servir de sinal fraco de idioma. */
-const PALAVRAS_PORTUGUES = [
-  "de",
-  "da",
-  "do",
+/**
+ * Palavras funcionais do portugues que tambem existem em outro idioma comum numa legenda de rede social ("de" e "que" no frances, no espanhol e no italiano; "do" no
+ * ingles; "da" no italiano e no alemao; "um" e "com" no ingles). Uma so delas nao prova que o texto e portugues (achado de 24/11/2026: uma legenda em frances com "de"
+ * passou no filtro), so valem juntas, duas diferentes.
+ */
+const PALAVRAS_AMBIGUAS = ["de", "que", "do", "da", "um", "com"];
+
+/** Palavras funcionais que, no mundo das legendas de rede social, so aparecem em portugues: uma basta como sinal fraco de idioma. */
+const PALAVRAS_SO_PORTUGUES = [
   "das",
   "dos",
   "para",
-  "com",
-  "que",
   "não",
   "nao",
   "uma",
-  "um",
   "hoje",
   "muito",
   "voce",
@@ -33,10 +34,15 @@ const PALAVRAS_PORTUGUES = [
 /** As tres letras acentuadas (ã, õ, ç) praticamente so existem em portugues, entre os idiomas mais comuns numa legenda de rede social. */
 const ACENTOS_PORTUGUES = /[ãõç]/i;
 
+/** Termos tao do Brasil que a legenda que os traz so pode ser em portugues (dinheiro e documento daqui). */
+const TERMOS_PORTUGUES_DO_BRASIL = /\b(reais|cnpj|cpf)\b/i;
+
 function pareceTextoEmPortugues(texto: string): boolean {
   if (ACENTOS_PORTUGUES.test(texto)) return true;
+  if (TERMOS_PORTUGUES_DO_BRASIL.test(texto)) return true;
   const palavras = texto.toLowerCase().match(/\p{L}+/gu) ?? [];
-  return palavras.some((p) => PALAVRAS_PORTUGUES.includes(p));
+  if (palavras.some((p) => PALAVRAS_SO_PORTUGUES.includes(p))) return true;
+  return new Set(palavras.filter((p) => PALAVRAS_AMBIGUAS.includes(p))).size >= 2;
 }
 
 /**
