@@ -813,6 +813,13 @@
       "when": 1795631311646,
       "tag": "0119_posts_prontos",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1795645186008,
+      "tag": "0122_ganchos-alternativos",
+      "breakpoints": true
     }
   ]
 }

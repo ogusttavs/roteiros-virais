@@ -1073,6 +1073,25 @@ export const TIPOS_ABERTURA = [
 export type TipoAbertura = (typeof TIPOS_ABERTURA)[number];
 
 /**
+ * A emoção que um gancho alternativo puxa (R-COPY-22: espanto e graça estão liberados; indignação só contra o problema, nunca contra pessoa, concorrente ou grupo; medo só com o limite de R-CONF-06,
+ * que aqui é o "alerta"). Rótulo de tela em `textos/ganchos.ts`.
+ */
+export const EMOCOES_DO_GANCHO = ["curiosidade", "espanto", "graca", "identificacao", "alerta", "desejo", "saudade", "indignacao"] as const;
+export type EmocaoDoGancho = (typeof EMOCOES_DO_GANCHO)[number];
+
+/** Um gancho alternativo: a frase, o tipo de abertura (a lista de `TIPOS_ABERTURA`, sem "outro") e a emoção. */
+export type GanchoAlternativo = { texto: string; tipoAbertura: TipoAbertura; emocao: EmocaoDoGancho };
+
+/** O que `roteiros.ganchosAlternativos` guarda. `original` é o gancho de quando a pessoa pediu pela primeira vez (ou o que valia antes da primeira troca). `escolhido` é o índice de `alternativas` que vale agora; nulo é o original. */
+export type GanchosDoRoteiro = {
+  original: { texto: string; tipoAbertura: TipoAbertura | null };
+  alternativas: GanchoAlternativo[];
+  escolhido: number | null;
+  geradoEm: string;
+  geracaoId: number | null;
+};
+
+/**
  * H4, item 2 (achado do Gustavo em produção em 01/10, o caso do roteiro 12): "original"
  * quando quem publica é quem aparece e fala; "recorte" quando é trecho de outra pessoa,
  * programa ou podcast repostado; "meme" quando é humor, POV, dublagem ou montagem;
@@ -2353,6 +2372,14 @@ export const roteiros = pgTable(
      * roteiro gerado antes desta coluna existir.
      */
     tipoAbertura: text("tipo_abertura").$type<TipoAbertura>(),
+    /**
+     * Os ganchos alternativos (11a melhoria de `pesquisa/lacunas-kits-versus-app.md`, 25/11/2026): de 3 a 5 outros jeitos de abrir o mesmo vídeo, pedidos só quando a pessoa toca em "Outros ganchos"
+     * (uma geração barata à parte, `servicos/ganchos-alternativos.ts`; o roteiro principal não muda). Guarda o gancho de antes da primeira troca, as alternativas e qual está valendo. Nulo até a pessoa pedir.
+     */
+    ganchosAlternativos: jsonb("ganchos_alternativos").$type<GanchosDoRoteiro>(),
+    /** Qual gancho vale agora, para a curva dizer depois qual rendeu: "original" (o que a IA escreveu) ou "alternativo". Nulo até a pessoa trocar uma vez. O tipo dele já vai em `tipoAbertura`. */
+    ganchoEscolhido: text("gancho_escolhido").$type<"original" | "alternativo">(),
+    ganchoEscolhidoEm: timestamp("gancho_escolhido_em", { withTimezone: true }),
     referenciaVideoId: integer("referencia_video_id").references(() => videos.id),
     versao: integer("versao").notNull().default(1),
     /**

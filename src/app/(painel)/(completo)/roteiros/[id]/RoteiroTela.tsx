@@ -25,6 +25,7 @@ import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/li
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { VisaoDaAnimacao } from "@/servicos/animacao";
+import type { VisaoDosGanchos } from "@/servicos/ganchos-alternativos";
 import type { VisaoDeEditar, VistaCompletaDaEdicao } from "@/servicos/edicao-tela";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { PesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
@@ -69,6 +70,7 @@ import {
   salvarEdicaoAction,
 } from "./acoes";
 import { CartaoDaLegenda } from "./CartaoDaLegenda";
+import { OutrosGanchos } from "./OutrosGanchos";
 import { ChamadoAnimacao } from "./ChamadoAnimacao";
 import { ChamadoEditarMeuVideo } from "./ChamadoEditarMeuVideo";
 import { EditarMeuVideo } from "./EditarMeuVideo";
@@ -271,6 +273,8 @@ type Props = {
   editar?: VisaoDeEditar | null;
   /** E68 A3: "Sem tempo de gravar hoje?", só para as marcas da lista `ANIMACAO_CONTAS`; `null` (ou ausente) esconde o cartão. */
   animacao?: VisaoDaAnimacao | null;
+  /** Os ganchos alternativos ("Outros ganchos"): nulo no Story, no sem fala e no vídeo longo, que não têm gancho para trocar. */
+  ganchos?: VisaoDosGanchos | null;
   /** E70: as até 5 hashtags para colar no post (`hashtagsDoPost`); vazio ou ausente: o bloco não aparece. */
   hashtags?: string[];
 };
@@ -300,6 +304,7 @@ export function RoteiroTela({
   publicar = null,
   editar = null,
   animacao = null,
+  ganchos = null,
 }: Props) {
   const router = useRouter();
   const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
@@ -1102,11 +1107,14 @@ export function RoteiroTela({
               {ehLongo ? (
                 <RoteiroLongo corpo={corpo} somenteLeitura={fala.somenteLeitura} semConexao={semConexao} marcas={mostrarMarcas ? marcasProntas : null} salvar={salvarCapitulo} />
               ) : (
+                <>
+                  {ganchos ? <OutrosGanchos key={roteiro.id} roteiroId={roteiro.id} visao={ganchos} /> : null}
                 <RoteiroTexto
                   blocos={blocosVisiveis}
                   comCenas={roteiro.formato !== "story" && roteiro.estilo !== "sem_fala"}
                   comMarcas={mostrarMarcas}
                 />
+                </>
               )}
               {/* Só no celular (design v2, ".julgar"): do tablet para cima "Reprovar" já está na barra de ações. */}
               <p className={styles.julgar}>
