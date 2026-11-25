@@ -159,7 +159,7 @@ const CRITERIO_TOM: Record<GeneroTexto, string> = {
     "ou usar jargão de marketing ou de tecnologia;",
 };
 
-/** Só os generos "roteiro", "regra" e "tema" precisam desta explicação extra; os outros não mudam de comportamento. */
+/** Só os generos "roteiro", "carrossel", "regra" e "tema" precisam desta explicação extra; os outros não mudam de comportamento. */
 const CONTEXTO_GENERO: Partial<Record<GeneroTexto, string>> = {
   roteiro:
     "\nO texto é um roteiro que o próprio dono do negócio vai gravar sozinho no celular: gancho, " +
@@ -231,13 +231,12 @@ export const CRITERIO_RAMO =
  */
 export const ETIQUETA_DO_TITULO = (n: number): string => `Título do slide ${n}: `;
 
-export const CRITERIO_RAMO_CARROSSEL = CRITERIO_RAMO.replace(
-  "o título e o gancho têm pelo menos UM elemento",
-  'cada título de slide (as linhas que começam com "Título do slide"; o da capa é o gancho) tem pelo menos UM elemento',
-)
-  .replace("se o título e o gancho continuam", "se o título do slide continua")
-  .replace("servem para qualquer página", "serve para qualquer página")
-  .replace("Exemplo que REPROVA:", "Slides que só repetem a ideia de um modo geral (\"Cuide bem do que é seu\") REPROVAM. Exemplo que REPROVA:");
+export const CRITERIO_RAMO_CARROSSEL =
+  "\n- cada título de slide (as linhas que começam com " + '"Título do slide"' + "; o da capa é o gancho) tem pelo menos UM elemento que só existe nesta marca ou neste ramo: o serviço, o lugar, o público, um fato ou um nome que as FONTES trazem. Teste: troque o ramo " +
+  "(dentista por pizzaria, loja de roupa por oficina) e leia o título de novo; se ele continua verdadeiro e faz sentido sem mudar mais nada, serve para qualquer ramo e REPROVA, " +
+  "com o motivo " + '"serve para qualquer ramo"' + " e o que faltou (o serviço, o lugar, o público ou o fato). NA DÚVIDA, APROVE: um título curto que cita o assunto do tema, o produto, o serviço ou o bairro " +
+  "já passa. Só reprove quando tiver certeza de que nada ali é desta marca nem deste ramo.\n" +
+  "  Exemplo que REPROVA: 'Cuide bem do que é seu' (serve para qualquer ramo). Exemplos que APROVAM: 'Mancha de vinho no sofá de linho: o que não fazer' (o serviço e o material), 'Clareamento em Campinas: quanto custa de verdade' (o serviço e o lugar).";
 
 /** O que o verificador lê no lugar do que está entre colchetes (1.8.2). */
 export const MARCADOR_DE_ESPACO = "[espaço para a pessoa completar]";

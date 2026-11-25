@@ -367,6 +367,8 @@ describe("verificarTexto 1.11.0: o teste do ramo no título de cada slide do car
     expect(CRITERIO_RAMO_CARROSSEL).toContain("serve para qualquer ramo");
     expect(CRITERIO_RAMO_CARROSSEL).toContain("Título do slide");
     expect(CRITERIO_RAMO_CARROSSEL).toContain("troque o ramo");
+    expect(CRITERIO_RAMO_CARROSSEL).not.toContain("o título e o gancho");
+    expect(CRITERIO_RAMO_CARROSSEL).not.toContain("servem para qualquer página");
     expect(CRITERIO_RAMO_CARROSSEL).not.toContain(String.fromCharCode(0x2014));
     expect(ETIQUETA_DO_TITULO(3)).toBe("Título do slide 3: ");
   });
