@@ -13,13 +13,15 @@ import { Botao } from "@/ui/componentes/Botao";
 import estilos from "../carrossel/CarrosselTela.module.css";
 import { ErroDaRota, pedir, type DadosDoCarrossel, type PreviaDoSlide } from "../carrossel/tipos";
 
-type Fase = "titulos" | "escolher" | "montando" | "pronto" | "erro" | "limite";
+type Fase = "abrindo" | "erroAoAbrir" | "titulos" | "escolher" | "montando" | "pronto" | "erro" | "limite";
 
 type Props = {
   noticia: { id: number; titulo: string; veiculo: string; data: string };
   corMarca: string | null;
   arroba: string;
   ramoSaude: boolean;
+  /** A capa pronta aberta pelo endereço (`?id=`): a tela abre direto no pronto, carregando por este id. */
+  capaInicialId?: number;
 };
 
 type Titulos = { titulos: string[]; veiculo: string; data: string };
@@ -48,9 +50,9 @@ function useEtapa(ativa: boolean): number {
  * A tela da capa de notícia (E66). O desenho não tem uma tela própria: monta com as peças da tela do carrossel (mesmas classes, mesmos estados: escolher, montando, pronto, erro, limite). Fala com
  * `/api/carrossel/capa/titulos` (os títulos), `/api/carrossel/capa` (cria a capa, um carrossel de um slide) e as rotas de sempre do carrossel (foto, prévia, baixar, trocar o título).
  */
-export function CapaTela({ noticia, corMarca, arroba, ramoSaude }: Props) {
+export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }: Props) {
   const router = useRouter();
-  const [fase, setFase] = useState<Fase>("titulos");
+  const [fase, setFase] = useState<Fase>(capaInicialId ? "abrindo" : "titulos");
   const [sugeridos, setSugeridos] = useState<Titulos | null>(null);
   const [falhaDosTitulos, setFalhaDosTitulos] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
@@ -111,9 +113,31 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude }: Props) {
   useEffect(() => {
     if (jaPediu.current) return;
     jaPediu.current = true;
+    if (capaInicialId) {
+      void abrirCapaPronta(capaInicialId);
+      return;
+    }
     void buscarTitulos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** O endereço da tela guarda o id da capa pronta (recarregar a página volta para ela) e o tira quando a pessoa começa outra. */
+  function guardarIdNaUrl(id: number | null) {
+    const endereco = id ? `/criar/capa?noticia=${noticia.id}&id=${id}` : `/criar/capa?noticia=${noticia.id}`;
+    window.history.replaceState(window.history.state, "", endereco);
+  }
+
+  async function abrirCapaPronta(id: number) {
+    setFase("abrindo");
+    try {
+      setDados(await pedir<DadosDoCarrossel>(`/api/carrossel/${id}`, undefined, t.abrirFalhouAjuda));
+      setFase("pronto");
+      void carregarPrevia(id);
+    } catch (e) {
+      setMensagem(e instanceof ErroDaRota && [400, 402, 403, 409].includes(e.status) ? e.message : null);
+      setFase(e instanceof ErroDaRota && e.status === 402 ? "limite" : "erroAoAbrir");
+    }
+  }
 
   function escolherFoto(arquivo: File | undefined) {
     setAvisoDeFoto(null);
@@ -173,6 +197,7 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude }: Props) {
       );
       if (foto) await mandarFoto(id, foto.arquivo);
       setDados(await pedir<DadosDoCarrossel>(`/api/carrossel/${id}`));
+      guardarIdNaUrl(id);
       setFase("pronto");
       void carregarPrevia(id);
     } catch (e) {
@@ -235,7 +260,7 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude }: Props) {
     }
   }
 
-  /** No celular a imagem vai pelo compartilhar do aparelho (galeria), em dois toques (preparar e enviar); no computador, o arquivo baixa direto. */
+  /** No celular a imagem vai pelo compartilhar do aparelho (galeria), em dois toques (preparar e enviar); no computador, ela baixa como arquivo. Sempre por fetch e blob: se falhar, a frase de erro fica na tela. */
   const compartilhaArquivos =
     typeof navigator !== "undefined" && typeof navigator.canShare === "function" && typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
@@ -249,26 +274,36 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude }: Props) {
       }
       return;
     }
-    if (compartilhaArquivos) {
-      setBaixando(true);
-      try {
-        const resposta = await fetch(`/api/carrossel/${capa.id}/slide/1`);
-        if (!resposta.ok) throw new Error("falhou");
-        const arquivo = new File([await resposta.blob()], "capa-noticia.png", { type: "image/png" });
-        if (navigator.canShare({ files: [arquivo] })) setArquivoParaCompartilhar(arquivo);
-        else window.location.assign(`/api/carrossel/${capa.id}/slide/1`);
-      } catch {
-        setAviso(t.baixarFalhou);
-      } finally {
-        setBaixando(false);
+    setBaixando(true);
+    setAviso(null);
+    try {
+      const resposta = await fetch(`/api/carrossel/${capa.id}/slide/1`);
+      if (!resposta.ok) throw new Error("falhou");
+      const blob = await resposta.blob();
+      const arquivo = new File([blob], "capa-noticia.png", { type: "image/png" });
+      if (compartilhaArquivos && navigator.canShare({ files: [arquivo] })) {
+        setArquivoParaCompartilhar(arquivo);
+      } else {
+        const endereco = URL.createObjectURL(blob);
+        const ancora = document.createElement("a");
+        ancora.href = endereco;
+        ancora.download = "capa-noticia.png";
+        document.body.appendChild(ancora);
+        ancora.click();
+        ancora.remove();
+        setTimeout(() => URL.revokeObjectURL(endereco), 10_000);
       }
-      return;
+    } catch {
+      setAviso(t.baixarFalhou);
+    } finally {
+      setBaixando(false);
     }
-    window.location.assign(`/api/carrossel/${capa.id}/slide/1`);
   }
 
   function fazerOutra() {
-    setFase("escolher");
+    guardarIdNaUrl(null);
+    if (!sugeridos) void buscarTitulos();
+    else setFase("escolher");
     setDados(null);
     setPrevia(null);
     setAviso(null);
@@ -333,6 +368,31 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude }: Props) {
   return (
     <div className={estilos.pagina}>
       <BarraTopo titulo={t.tituloCompacto} esquerda={voltar} />
+
+      {fase === "abrindo" ? (
+        <div className={`${estilos.miolo} ${estilos.larga}`} data-fase="abrindo">
+          <div className={estilos.cabecalho}>
+            <span className={estilos.data}>{t.data}</span>
+            <h1>{t.abrindoTitulo}</h1>
+          </div>
+        </div>
+      ) : null}
+
+      {fase === "erroAoAbrir" ? (
+        <div className={estilos.miolo} data-fase="erroAoAbrir">
+          <div className={estilos.erroCartao} role="alert">
+            <p className={estilos.aviso}>
+              <CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+              {t.erroRotulo}
+            </p>
+            <h3>{t.abrirFalhouTitulo}</h3>
+            <p>{mensagem ?? t.abrirFalhouAjuda}</p>
+            <Botao type="button" onClick={() => void abrirCapaPronta(capaInicialId ?? 0)}>
+              {t.tentarDeNovo}
+            </Botao>
+          </div>
+        </div>
+      ) : null}
 
       {fase === "titulos" ? (
         <div className={`${estilos.miolo} ${estilos.larga}`} data-fase="titulos">

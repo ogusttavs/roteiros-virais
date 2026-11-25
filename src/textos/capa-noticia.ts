@@ -81,6 +81,10 @@ export const textosCapa = {
   tentarDeNovo: "Tentar de novo",
   falhouAoSalvar: "Não deu para salvar agora. Tente de novo.",
 
+  abrindoTitulo: "Abrindo a sua capa",
+  abrirFalhouTitulo: "Não deu para abrir a capa",
+  abrirFalhouAjuda: "Ela continua guardada. Tente de novo em instantes.",
+
   // Erro e limite
   erroRotulo: "Não deu certo",
   erroTitulo: "A capa não ficou pronta",
