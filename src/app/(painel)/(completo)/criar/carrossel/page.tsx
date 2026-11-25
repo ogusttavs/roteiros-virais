@@ -22,5 +22,5 @@ export default async function CriarCarrossel() {
   await exigirAssinaturaValida();
   const temas = await temasParaCliente(cliente).catch(() => null);
   const titulos = temas && temas.status === "ok" ? temas.temas.filter((t) => !t.doMomento).map((t) => t.titulo) : [];
-  return <CarrosselTela temasDeHoje={titulos} />;
+  return <CarrosselTela temasDeHoje={titulos} corMarca={cliente.corMarca} />;
 }

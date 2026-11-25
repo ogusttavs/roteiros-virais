@@ -6,9 +6,10 @@
  */
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 
-import { corValida } from "@/carrossel/modelos";
+import { corValida, garantirLeitura } from "@/carrossel/modelos";
 import { normalizarHashtags, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
 import {
+  COR_NEUTRA,
   ESTADOS_DO_CARROSSEL,
   MAXIMO_DE_FOTOS,
   TAMANHOS_DO_CARROSSEL,
@@ -21,7 +22,7 @@ import {
 import { formatoPorChave } from "@/config/formatos";
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
-import { carrosselFotos, carrosseis, type Carrossel, type CarrosselFoto } from "@/db/schema";
+import { carrosselFotos, carrosseis, clientes, type Carrossel, type CarrosselFoto } from "@/db/schema";
 import * as carrosselIA from "@/ia/prompts/carrossel";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
@@ -57,22 +58,8 @@ export type DeOndeVem =
   | { origem: "roteiro"; roteiroId: number }
   | { origem: "noticia"; noticiaId: number };
 
-export type PedidoDeCarrossel = { quantidade: number; cor?: string; observacao?: string; de: DeOndeVem };
-
-/** Uma cor de destaque para a marca que não escolheu: a mesma sempre para o mesmo nome (matiz pelo texto), nem muito clara nem muito apagada. */
-export function corPadraoDaMarca(nome: string): string {
-  let h = 0;
-  for (const c of nome) h = (h * 31 + c.charCodeAt(0)) % 360;
-  const s = 0.62;
-  const l = 0.42;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) => {
-    const k = (n + h / 30) % 12;
-    const v = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-    return Math.round(v * 255).toString(16).padStart(2, "0");
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-}
+/** `fotos`: quantas fotos o cliente vai mandar para este carrossel (0 a 9); sem foto, o texto não usa capa-foto nem prova-resultado. */
+export type PedidoDeCarrossel = { quantidade: number; cor?: string; observacao?: string; fotos?: number; de: DeOndeVem };
 
 function tamanhoValido(n: number): TamanhoDoCarrossel {
   if (!(TAMANHOS_DO_CARROSSEL as readonly number[]).includes(n)) throw new ErroCarrossel("Escolha um carrossel de 5, 7 ou 9 slides.");
@@ -141,6 +128,12 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
   const nichoId = cliente.nichoId;
   const perfil = await perfilDoCliente(clienteId);
   if (!perfil) throw new ErroCarrossel("Falta terminar o briefing antes de criar um carrossel.", "sem-briefing");
+
+  const fotosPrometidas = Math.min(MAXIMO_DE_FOTOS, Math.max(0, Math.floor(pedido.fotos ?? 0)));
+  // A cor da marca: a que a pessoa escolheu agora (e fica guardada na marca, trocável depois), a que a marca já tem, ou o neutro escuro do produto. Clara demais, escurece e avisa.
+  const corEscolhida = pedido.cor ?? cliente.corMarca ?? COR_NEUTRA;
+  const leitura = garantirLeitura(corEscolhida);
+  const avisosDoCarrossel = leitura.escureceu ? ["A cor da sua marca era clara demais para ler bem nos slides, então a gente escureceu um pouco."] : [];
 
   const origem = await resolverOrigem(clienteId, nichoId, pedido.de);
   const alternativos = (await ramosAlternativosDaMarca(clienteId)).map((a) => a.nichoId);
@@ -223,7 +216,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       noticia: origem.noticia,
       noticiasDoAssunto,
       roteiroDeOrigem: origem.roteiroDeOrigem,
-      quantidadeDeFotos: 0,
+      quantidadeDeFotos: fotosPrometidas,
       carrosseisRecentes: recentes.map((r) => r.tema),
     }),
     fontesDosFatos,
@@ -247,7 +240,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     },
     verificarExtra: (d) => [
       ...verificarOrdemDosSlides(d.slides, quantidade),
-      ...verificarLimitesDosSlides(d.slides, { ramoSaude }),
+      ...verificarLimitesDosSlides(d.slides, { ramoSaude, fotosPrometidas, fontes: fontesDosFatos }),
       ...verificarLegenda(d.legenda, d.hashtags),
       ...conformidadeDoCarrossel(d.slides, { fontes: fontesDosFatos, ramoSaude }),
     ],
@@ -262,13 +255,15 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       origemRef: origem.origemRef,
       tema: origem.tema,
       quantidade,
-      cor: pedido.cor ?? corPadraoDaMarca(cliente.nome),
+      cor: leitura.cor,
+      avisos: avisosDoCarrossel,
       slides,
       legenda: saida.legenda.trim(),
       hashtags: normalizarHashtags(saida.hashtags),
       geracaoId,
     })
     .returning();
+  if (pedido.cor !== undefined && pedido.cor !== cliente.corMarca) await db().update(clientes).set({ corMarca: pedido.cor }).where(eq(clientes.id, clienteId));
   logger.info({ clienteId, carrosselId: criado.id, quantidade }, "carrossel gerado");
   return criado;
 }

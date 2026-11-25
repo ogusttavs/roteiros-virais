@@ -45,6 +45,8 @@ RUN apt-get update \
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public
+# E65: o render do carrossel le a letra do projeto direto do disco (o standalone nao leva src/); sem isto ele cai na letra do sistema
+COPY --from=build --chown=app:app /app/src/ui/fontes ./src/ui/fontes
 # O rastreamento do standalone so copia o que o import estatico usa
 # (chromium de "playwright"), sem o cli.js nem playwright-core inteiro que o
 # instalador do Chromium precisa; por isso os dois entram por cima, prontos,

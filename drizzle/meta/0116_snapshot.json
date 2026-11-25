@@ -1,5 +1,5 @@
 {
-  "id": "71ff2c17-3df8-422b-9790-c0dd0c581e77",
+  "id": "c903a0dc-9992-4ffd-92a1-55f99ae3c683",
   "prevId": "0e17b5e1-e9f1-4048-840e-3d79526c7cb8",
   "version": "7",
   "dialect": "postgresql",
@@ -1518,6 +1518,12 @@
         "nicho_id": {
           "name": "nicho_id",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cor_marca": {
+          "name": "cor_marca",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

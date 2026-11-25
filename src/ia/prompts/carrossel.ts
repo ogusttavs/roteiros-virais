@@ -41,14 +41,16 @@ export type SaidaCarrossel = z.infer<typeof schema>;
 
 const DESCRICAO_DOS_TIPOS = [
   "Os tipos de slide (use só estes, escritos exatamente assim):",
-  `- capa: o primeiro slide. Uma promessa clara e concreta do que a pessoa aprende ("3 erros que estragam o seu estofado"), nunca uma frase vaga. Título até ${LIMITE_DE_PALAVRAS.capa.titulo} palavras; o corpo é uma linha de apoio, até ${LIMITE_DE_PALAVRAS.capa.corpo} palavras (pode ficar vazio).`,
+  `- capa-foto: o primeiro slide, com uma foto do cliente de fundo. Só use se a entrada disser que o cliente tem foto. Uma promessa clara e concreta do que a pessoa aprende ("3 erros que estragam o seu estofado"), nunca uma frase vaga. Título até ${LIMITE_DE_PALAVRAS["capa-foto"].titulo} palavras; o corpo é uma linha de apoio, até ${LIMITE_DE_PALAVRAS["capa-foto"].corpo} palavras (pode ficar vazio).`,
+  `- capa-texto: o primeiro slide, só com texto. Mesma regra da capa-foto; é a capa quando o cliente não tem foto.`,
   `- passo: um passo de um passo a passo, na ordem. Título até ${LIMITE_DE_PALAVRAS.passo.titulo} palavras (começa com o verbo); corpo até ${LIMITE_DE_PALAVRAS.passo.corpo} palavras.`,
   `- item: um item de uma lista (um erro, uma dica, um sinal). Título até ${LIMITE_DE_PALAVRAS.item.titulo} palavras; corpo até ${LIMITE_DE_PALAVRAS.item.corpo} palavras.`,
-  `- antes_depois: como estava e como ficou, só quando o perfil, o tema ou a notícia contam um resultado real; o corpo diz os dois lados ("Antes: ... Depois: ..."). Título até ${LIMITE_DE_PALAVRAS.antes_depois.titulo} palavras; corpo até ${LIMITE_DE_PALAVRAS.antes_depois.corpo}.`,
-  `- dado: um número que a entrada traz, com a fonte. O título é o número com o que ele mede; o corpo explica em uma frase; o campo fonte tem o nome de quem publicou e o ano ("Nome da fonte, 2026"). Título até ${LIMITE_DE_PALAVRAS.dado.titulo} palavras; corpo até ${LIMITE_DE_PALAVRAS.dado.corpo}.`,
-  `- prova: um slide que pede uma foto real do negócio (o lugar, o trabalho, o resultado). Título até ${LIMITE_DE_PALAVRAS.prova.titulo} palavras; corpo até ${LIMITE_DE_PALAVRAS.prova.corpo}, dizendo o que a foto mostra ou o que a pessoa conta sobre ela.`,
-  `- resumo: o que guardar, em poucas linhas. Título até ${LIMITE_DE_PALAVRAS.resumo.titulo} palavras; corpo até ${LIMITE_DE_PALAVRAS.resumo.corpo}.`,
-  `- chamada: o último slide, com UMA ação só (salvar, comentar, mandar para alguém, chamar). Título até ${LIMITE_DE_PALAVRAS.chamada.titulo} palavras; corpo até ${LIMITE_DE_PALAVRAS.chamada.corpo}.`,
+  `- antes-depois: como estava e como ficou, só quando o perfil, o tema ou a notícia contam um resultado real; o corpo diz os dois lados ("Antes: ... Depois: ...", até 16 palavras cada). Título até ${LIMITE_DE_PALAVRAS["antes-depois"].titulo} palavras.`,
+  `- dado: um número que a entrada traz, com a fonte. O título é só o valor com a unidade ("42%", "2 minutos", até ${LIMITE_DE_PALAVRAS.dado.titulo} palavras); o corpo é a frase que explica, até ${LIMITE_DE_PALAVRAS.dado.corpo} palavras; o campo fonte tem quem publicou e o ano ("Nome da fonte, 2026"). Sem fonte e ano, o slide não existe.`,
+  `- prova-fala: uma frase que o próprio cliente disse de verdade, escrita IGUAL a como está no perfil, entre as frases da fala dele. O título é quem disse (sem sobrenome), o corpo é a citação (até ${LIMITE_DE_PALAVRAS["prova-fala"].corpo} palavras). Sem uma frase assim no perfil, não use este tipo.`,
+  `- prova-resultado: um slide com uma foto do cliente do lugar, do trabalho ou do resultado. Só use se a entrada disser que o cliente tem foto. Título até ${LIMITE_DE_PALAVRAS["prova-resultado"].titulo} palavras; corpo opcional, até ${LIMITE_DE_PALAVRAS["prova-resultado"].corpo}.`,
+  `- resumo: o que guardar, em até 5 linhas curtas (separe as linhas com ponto e vírgula; cada uma até 7 palavras). Título até ${LIMITE_DE_PALAVRAS.resumo.titulo} palavras.`,
+  `- chamada: o último slide: uma pergunta no título e UMA ação no corpo (salvar, comentar, mandar para alguém, chamar). Título até ${LIMITE_DE_PALAVRAS.chamada.titulo} palavras; corpo até ${LIMITE_DE_PALAVRAS.chamada.corpo}.`,
 ].join(QUEBRA);
 
 export function montarSistemaEstavel(dados: {
@@ -78,17 +80,17 @@ export function montarSistemaEstavel(dados: {
       ? " Este cliente quer ficar conhecido no que faz, não vender agora: a chamada nunca é preço, comprar ou agendar; é seguir, comentar, salvar ou mandar para alguém."
       : "";
   const saude = dados.ramoSaude
-    ? `${QUEBRA}9. Este ramo é de saúde: nunca use o tipo antes_depois, nunca prometa cura, resultado ou garantia, e não cite número de tratamento que a entrada não traga.`
+    ? `${QUEBRA}9. Este ramo é de saúde: nunca use os tipos antes-depois e prova-fala, nunca prometa cura, resultado ou garantia, e não cite número de tratamento que a entrada não traga.`
     : "";
 
   return `Você escreve um carrossel de Instagram para um dono de pequeno negócio postar no próprio perfil. O carrossel ENSINA alguma coisa útil a quem compra dele (uma lista, um passo a passo, um antes e depois): não é tendência cultural, não é frase de efeito, não é anúncio. As fotos são do cliente (enviadas por ele); você escreve só o texto e o tipo de cada slide, e nunca descreve imagem para gerar. Regras duras:
 
-1. A entrada diz quantos slides são (5, 7 ou 9): escreva exatamente essa quantidade. O primeiro é sempre "capa" e o último é sempre "chamada"; "capa" e "chamada" não aparecem no meio. Nunca ${MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO + 1} slides seguidos do mesmo tipo: misture (por exemplo, itens com uma prova ou um dado no meio). Um slide, uma ideia só.
+1. A entrada diz quantos slides são (5, 7 ou 9): escreva exatamente essa quantidade. O primeiro é sempre uma capa (capa-foto ou capa-texto) e o último é sempre "chamada"; capa e chamada não aparecem no meio. Título sem ponto final. Nunca ${MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO + 1} slides seguidos do mesmo tipo: misture (por exemplo, itens com uma prova ou um dado no meio). Um slide, uma ideia só.
 2. Respeite o limite de palavras de cada tipo, contado no título e no corpo separadamente. Texto de slide é curto: quem passa o dedo lê em dois segundos. Frases curtas, uma coisa por frase.
 3. Fale com a pessoa que lê em segunda pessoa ("você"), em português simples, sem jargão, sem travessão, sem emoji. Escreva sempre acentuado.
 4. Nenhum fato que ninguém contou: todo fato concreto (uma pessoa, um lugar, um número, uma data, uma coisa que aconteceu) tem de estar no perfil, no tema, na notícia, no que o cliente pediu ou na evidência. O que faltaria, você não inventa: escreva uma instrução entre colchetes para a pessoa completar, como "[o número real do seu preço]". Nunca invente cliente, depoimento, resultado nem como o negócio trabalha.
 5. Número só com fonte: um número (porcentagem, valor, quantidade, ano) só aparece se está na entrada, e então vai num slide do tipo "dado", com a fonte e o ano no campo fonte. Sem número na entrada, não use o tipo "dado". O campo fonte é nulo em todos os outros tipos. "3 passos" ou "5 erros" como contagem do próprio carrossel não são dado.
-6. O tipo "prova" e o "antes_depois" só entram quando o perfil, o tema ou a notícia dão o que mostrar; a foto que vai neles é do cliente, então o corpo diz o que a foto precisa mostrar ou o que a pessoa conta sobre ela, sem afirmar o que a foto não pode provar.
+6. Os tipos prova-fala, prova-resultado e antes-depois só entram quando o perfil, o tema ou a notícia dão o que mostrar; a foto que vai neles é do cliente, então o corpo diz o que a foto precisa mostrar ou o que a pessoa conta sobre ela, sem afirmar o que a foto não pode provar.
 7. ${voz}${conhecido}
 8. Proibição do cliente no perfil vale sempre; promessa de resultado ou de cura que ninguém garante nunca entra.${saude}
 
@@ -155,8 +157,8 @@ export function montarEntrada(dados: {
     blocoDasNoticiasDoAssunto(dados.noticiasDoAssunto),
     blocoRoteiro,
     dados.quantidadeDeFotos > 0
-      ? `O cliente enviou ${dados.quantidadeDeFotos} foto(s) do próprio negócio; os slides prova, antes_depois, passo e item podem pedir uma foto.`
-      : "O cliente ainda não enviou fotos: use prova e antes_depois só se o texto fizer sentido sem a foto, e diga o que ela mostraria.",
+      ? `O cliente enviou ${dados.quantidadeDeFotos} foto(s) do próprio negócio; capa-foto, prova-resultado, passo e antes-depois podem usar foto.`
+      : "O cliente não tem foto para este carrossel: use capa-texto e não use capa-foto nem prova-resultado.",
     blocoEvidencia,
     `Carrosséis recentes deste cliente, para não repetir o ângulo:${QUEBRA}${dados.carrosseisRecentes.length > 0 ? dados.carrosseisRecentes.map((t) => `"${t}"`).join("; ") : "nenhum carrossel anterior"}`,
   ].filter((p): p is string => Boolean(p));

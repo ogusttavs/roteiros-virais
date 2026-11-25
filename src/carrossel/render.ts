@@ -46,7 +46,7 @@ export function distribuirFotos(slides: SlideDoCarrossel[], fotosEmOrdem: { id: 
   return slides.map((s) => {
     if (!TIPOS_COM_FOTO.has(s.tipo)) return { foto: null, fotoDepois: null };
     const foto = s.fotoId && existentes.has(s.fotoId) ? s.fotoId : (livres.shift() ?? null);
-    const fotoDepois = s.tipo === "antes_depois" ? (s.fotoDepoisId && existentes.has(s.fotoDepoisId) ? s.fotoDepoisId : (livres.shift() ?? null)) : null;
+    const fotoDepois = s.tipo === "antes-depois" ? (s.fotoDepoisId && existentes.has(s.fotoDepoisId) ? s.fotoDepoisId : (livres.shift() ?? null)) : null;
     return { foto, fotoDepois };
   });
 }

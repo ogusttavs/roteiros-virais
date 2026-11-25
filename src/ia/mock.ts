@@ -613,7 +613,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
  * descrição lê errado) e `[mock:nome-com-colchete]` (um espaço marcado dentro do nome).
  */
 /**
- * E65 PR 1: o carrossel simulado, determinístico: a quantidade vem da entrada, a capa abre, a chamada fecha e o meio alterna passo, item e prova (nunca três iguais). Marcadores de teste no tema:
+ * E65 PR 1: o carrossel simulado, determinístico: a quantidade vem da entrada, a capa abre (capa-foto só se a entrada diz que há foto), a chamada fecha e o meio alterna passo e item (nunca três iguais). Marcadores de teste no tema:
  * "[mock:carrossel-longo]" estoura o limite de palavras de um slide, "[mock:carrossel-tres-iguais]" repete o tipo três vezes, "[mock:carrossel-dado-sem-fonte]" tira a fonte do dado,
  * "[mock:carrossel-numero-solto]" escreve um número que a entrada não traz. Os marcadores valem só na primeira tentativa (a segunda corrige, como um modelo corrigiria).
  */
@@ -623,15 +623,16 @@ function mockCarrossel(entrada: string) {
   const segunda = entrada.includes("A tentativa anterior foi reprovada.");
   const marcado = (nome: string) => entrada.includes(`[mock:${nome}]`) && !segunda;
   const ids = extrairIds(entrada);
-  const meio = ["passo", "item", "prova", "passo", "item", "resumo", "item"] as const;
-  const slides: { tipo: string; titulo: string; corpo: string; fonte: string | null }[] = [{ tipo: "capa", titulo: `${quantidade - 2} dicas sobre ${tema}`.split(" ").slice(0, 10).join(" "), corpo: "Para você salvar e usar hoje", fonte: null }];
+  const meio = ["passo", "item", "passo", "item", "passo", "item", "passo"] as const;
+  const slides: { tipo: string; titulo: string; corpo: string; fonte: string | null }[] = [{ tipo: entrada.includes("O cliente enviou") ? "capa-foto" : "capa-texto", titulo: `${quantidade - 2} dicas sobre ${tema}`.split(" ").slice(0, 10).join(" "), corpo: "Para você salvar e usar hoje", fonte: null }];
   for (let i = 0; i < quantidade - 2; i += 1) {
     const tipo = marcado("carrossel-tres-iguais") ? "item" : meio[i % meio.length];
     slides.push({ tipo, titulo: `Dica ${i + 1} para você`, corpo: `Olhe com calma o que importa no ponto ${i + 1} e faça um passo de cada vez.`, fonte: null });
   }
   slides.push({ tipo: "chamada", titulo: "Salve este post", corpo: "Mande para quem precisa ver isso.", fonte: null });
   if (marcado("carrossel-longo")) slides[1].corpo = Array.from({ length: 60 }, () => "palavra").join(" ");
-  if (marcado("carrossel-dado-sem-fonte")) slides[1] = { tipo: "dado", titulo: "Mais de 30% das pessoas erram", corpo: "É o que a pesquisa diz.", fonte: null };
+  if (marcado("carrossel-dado-sem-fonte")) slides[1] = { tipo: "dado", titulo: "30%", corpo: "É o que a pesquisa diz.", fonte: null };
+  if (marcado("carrossel-antes-depois")) slides[1] = { tipo: "antes-depois", titulo: "Como ficou", corpo: "Antes: manchado. Depois: limpo.", fonte: null };
   if (marcado("carrossel-numero-solto")) slides[1].corpo = "Nove em cada dez pessoas, 87% delas, erram isso todo mês.";
   return {
     slides,

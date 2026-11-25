@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { carrosselAtivo, TIPOS_DE_SLIDE, type TipoDeSlide } from "@/config/carrossel";
 
-import { contraste, corValida, htmlDoSlide, paletaDoSlide } from "./modelos";
+import { contraste, corValida, garantirLeitura, htmlDoSlide, paletaDoSlide } from "./modelos";
 import { distribuirFotos } from "./render";
 import { crc32, montarZip } from "./zip";
 
@@ -24,6 +24,15 @@ describe("paleta", () => {
   });
 });
 
+describe("garantirLeitura", () => {
+  it("escurece uma cor clara demais até passar de 3:1 e avisa; cor escura fica como está", () => {
+    const amarelo = garantirLeitura("#fff3a0");
+    expect(amarelo.escureceu).toBe(true);
+    expect(contraste(amarelo.cor, "#ffffff")).toBeGreaterThanOrEqual(3);
+    expect(garantirLeitura("#0e5a6a")).toEqual({ cor: "#0e5a6a", escureceu: false });
+  });
+});
+
 describe("htmlDoSlide", () => {
   it("escapa o texto e gera um modelo para cada tipo", () => {
     for (const tipo of TIPOS_DE_SLIDE) {
@@ -39,11 +48,11 @@ describe("distribuirFotos", () => {
   const fotos = [{ id: 10 }, { id: 11 }, { id: 12 }];
   const slide = (tipo: TipoDeSlide, extra = {}) => ({ tipo, titulo: "t", corpo: "c", fonte: null, ...extra });
   it("entrega as fotos na ordem aos tipos que aceitam foto, e duas ao antes e depois", () => {
-    const r = distribuirFotos([slide("capa"), slide("antes_depois"), slide("dado"), slide("chamada")], fotos);
+    const r = distribuirFotos([slide("capa-foto"), slide("antes-depois"), slide("dado"), slide("chamada")], fotos);
     expect(r.map((x) => [x.foto, x.fotoDepois])).toEqual([[10, null], [11, 12], [null, null], [null, null]]);
   });
   it("respeita a foto escolhida e ignora uma que não existe", () => {
-    const r = distribuirFotos([slide("capa", { fotoId: 12 }), slide("passo", { fotoId: 999 })], fotos);
+    const r = distribuirFotos([slide("capa-foto", { fotoId: 12 }), slide("passo", { fotoId: 999 })], fotos);
     expect(r.map((x) => x.foto)).toEqual([12, 10]);
   });
 });

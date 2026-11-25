@@ -240,6 +240,8 @@ export const clientes = pgTable("clientes", {
   usuarioId: text("usuario_id").references(() => user.id, { onDelete: "cascade" }),
   nome: text("nome").notNull(),
   nichoId: integer("nicho_id").references(() => nichos.id),
+  /** E65: a cor da marca ("#rrggbb"), escolhida no primeiro carrossel e trocável depois; nula usa o neutro escuro do produto. */
+  corMarca: text("cor_marca"),
   /** V12c, item 1: ficam no banco, sem uso na tela desde que `alcance` existe. */
   cidade: text("cidade"),
   bairro: text("bairro"),

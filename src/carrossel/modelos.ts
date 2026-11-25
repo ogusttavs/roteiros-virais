@@ -3,7 +3,7 @@
  * arquivo (e a fonte, se mudar): o texto, as fotos e a cor entram por `DadosDoModelo`, e nada fora daqui conhece HTML de slide. Cor de destaque vem da marca; claro e escuro se alternam
  * de um slide para o outro. Toda caixa de texto leva `data-caixa`, que o render mede no navegador antes de fotografar (`ajustarCaixas`).
  */
-import { ALTURA_DO_SLIDE, LARGURA_DO_SLIDE, type SlideDoCarrossel, type TipoDeSlide } from "@/config/carrossel";
+import { ALTURA_DO_SLIDE, ehCapa, LARGURA_DO_SLIDE, type SlideDoCarrossel, type TipoDeSlide } from "@/config/carrossel";
 import { escaparHtml } from "@/lib/chromium-de-impressao";
 
 export type FotoParaOModelo = { tipo: string; base64: string };
@@ -52,6 +52,20 @@ export function contraste(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
+/**
+ * A cor da marca precisa ler bem: se for clara demais (contraste com o branco abaixo de 3:1, o mínimo de forma e de letra grande), escurece 10% por vez até passar. Devolve a cor a usar e
+ * se teve de mudar (o serviço guarda um aviso para a pessoa).
+ */
+export function garantirLeitura(cor: string): { cor: string; escureceu: boolean } {
+  let atual = cor;
+  let escureceu = false;
+  for (let i = 0; i < 30 && contraste(atual, "#ffffff") < 3; i += 1) {
+    atual = misturar(atual, "#000000", 0.1);
+    escureceu = true;
+  }
+  return { cor: atual, escureceu };
+}
+
 export type Paleta = { fundo: string; texto: string; suave: string; destaque: string; sobreDestaque: string };
 
 /** Claro e escuro a partir da cor da marca. O destaque é a própria cor, escurecida no fundo claro e clareada no escuro, até ler bem. */
@@ -63,7 +77,7 @@ export function paletaDoSlide(cor: string, escuro: boolean): Paleta {
   return { fundo, texto, suave: escuro ? "#c9c5c0" : "#4a4650", destaque, sobreDestaque: contraste("#17151a", destaque) >= contraste("#ffffff", destaque) ? "#17151a" : "#ffffff" };
 }
 
-const ROTULO_DO_TIPO: Partial<Record<TipoDeSlide, string>> = { passo: "Passo", item: "Dica", dado: "Dado", prova: "Na prática", resumo: "Para guardar" };
+const ROTULO_DO_TIPO: Partial<Record<TipoDeSlide, string>> = { passo: "Passo", item: "Dica", dado: "Dado", "prova-fala": "Quem já usou", "prova-resultado": "Na prática", resumo: "Para guardar" };
 
 function imagem(foto: FotoParaOModelo | null | undefined, classe: string): string {
   return foto ? `<div class="foto ${classe}" style="background-image:url('data:${foto.tipo};base64,${foto.base64}')"></div>` : "";
@@ -76,10 +90,11 @@ function corpoDoSlide(d: DadosDoModelo): string {
   const n = `${String(d.numero).padStart(2, "0")}/${String(d.total).padStart(2, "0")}`;
   const rotulo = ROTULO_DO_TIPO[slide.tipo];
   switch (slide.tipo) {
-    case "capa":
+    case "capa-foto":
+    case "capa-texto":
       return `${imagem(d.foto, "cheia")}<div class="velo ${d.foto ? "" : "sem"}"></div>
         <div class="miolo capa"><div class="faixa"></div><h1 data-caixa data-base="96">${t}</h1>${c ? `<p data-caixa data-base="44">${c}</p>` : ""}<span class="desliza">deslize</span></div>`;
-    case "antes_depois": {
+    case "antes-depois": {
       const [antes, depois] = c.includes("Depois:") ? c.split("Depois:") : [c, ""];
       return `<div class="miolo"><span class="selo">${n}</span><h2 data-caixa data-base="64">${t}</h2>
         <div class="par">${d.foto ? imagem(d.foto, "metade") : ""}${d.fotoDepois ? imagem(d.fotoDepois, "metade") : ""}</div>
@@ -96,7 +111,7 @@ function corpoDoSlide(d: DadosDoModelo): string {
 
 /** O documento HTML completo de um slide, com as caixas marcadas para o render medir. */
 export function htmlDoSlide(d: DadosDoModelo): string {
-  const escuro = d.slide.tipo === "capa" || d.slide.tipo === "chamada" ? true : d.numero % 2 === 0;
+  const escuro = ehCapa(d.slide.tipo) || d.slide.tipo === "chamada" ? true : d.numero % 2 === 0;
   const p = paletaDoSlide(d.cor, escuro);
   const fonte = d.fonteBase64 ? `@font-face{font-family:"Letra";src:url(data:font/woff2;base64,${d.fonteBase64}) format("woff2");font-weight:100 900;}` : "";
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>
@@ -133,7 +148,7 @@ p{line-height:1.3;color:${p.suave};overflow-wrap:break-word}
 }
 
 /**
- * O script que roda no navegador antes da foto: para cada caixa `data-caixa`, encolhe a letra (até 55% do tamanho base) enquanto o texto passa da caixa; se ainda passar, tira palavras do fim
+ * O script que roda no navegador antes da foto: para cada caixa `data-caixa`, encolhe a letra (até 80% do tamanho base, um passo abaixo, como no desenho do designer) enquanto o texto passa da caixa; se ainda passar, tira palavras do fim
  * e põe reticências. Devolve a lista do que teve de ser cortado (o servidor registra). É um texto de script, não uma função do servidor: roda dentro da página.
  */
 export const AJUSTAR_CAIXAS = `(() => {
@@ -145,7 +160,7 @@ export const AJUSTAR_CAIXAS = `(() => {
     let tam = base;
     const estoura = () => el.getBoundingClientRect().height > max || el.scrollWidth > el.clientWidth + 1;
     el.style.fontSize = tam + 'px';
-    while (estoura() && tam > base * 0.55) { tam -= 2; el.style.fontSize = tam + 'px'; }
+    while (estoura() && tam > base * 0.8) { tam -= 2; el.style.fontSize = tam + 'px'; }
     if (estoura()) {
       const palavras = el.textContent.trim().split(/\\s+/);
       while (estoura() && palavras.length > 1) { palavras.pop(); el.textContent = palavras.join(' ') + '...'; }

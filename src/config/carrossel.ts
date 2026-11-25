@@ -12,30 +12,48 @@ export const TAMANHOS_DO_CARROSSEL = [5, 7, 9] as const;
 export type TamanhoDoCarrossel = (typeof TAMANHOS_DO_CARROSSEL)[number];
 
 /** A lista fechada de tipos de slide: a saída da IA só pode ter estes. */
-export const TIPOS_DE_SLIDE = ["capa", "passo", "item", "antes_depois", "dado", "prova", "resumo", "chamada"] as const;
+export const TIPOS_DE_SLIDE = ["capa-foto", "capa-texto", "passo", "item", "antes-depois", "dado", "prova-fala", "prova-resultado", "resumo", "chamada"] as const;
 export type TipoDeSlide = (typeof TIPOS_DE_SLIDE)[number];
 
 /** O limite de palavras de cada tipo de slide: o título e o corpo, contados em separado. Estourou, o verificador reprova e o render corta. */
 export const LIMITE_DE_PALAVRAS: Record<TipoDeSlide, { titulo: number; corpo: number }> = {
-  capa: { titulo: 12, corpo: 14 },
+  "capa-foto": { titulo: 12, corpo: 14 },
+  "capa-texto": { titulo: 12, corpo: 14 },
   passo: { titulo: 8, corpo: 30 },
   item: { titulo: 8, corpo: 30 },
-  antes_depois: { titulo: 8, corpo: 30 },
-  dado: { titulo: 10, corpo: 25 },
-  prova: { titulo: 8, corpo: 25 },
-  resumo: { titulo: 8, corpo: 35 },
+  // o corpo leva os dois lados ("Antes: ... Depois: ..."), até 16 palavras cada
+  "antes-depois": { titulo: 8, corpo: 34 },
+  // o título é o valor com a unidade ("42%"), o corpo é a frase
+  dado: { titulo: 3, corpo: 18 },
+  // o título é quem disse (sem sobrenome), o corpo é a citação, dita de verdade
+  "prova-fala": { titulo: 3, corpo: 28 },
+  "prova-resultado": { titulo: 12, corpo: 14 },
+  resumo: { titulo: 6, corpo: 35 },
   chamada: { titulo: 10, corpo: 20 },
 };
 
+/** Tipos que exigem uma foto do cliente (sem foto, não podem ser gerados). */
+export const TIPOS_COM_FOTO_OBRIGATORIA: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "prova-resultado"]);
+/** Tipos que não valem em ramo de saúde (o conselho da profissão limita antes e depois e depoimento). */
+export const TIPOS_PROIBIDOS_NA_SAUDE: ReadonlySet<TipoDeSlide> = new Set(["antes-depois", "prova-fala"]);
+/** Tipos em que o corpo pode ficar vazio. */
+export const TIPOS_SEM_CORPO_OBRIGATORIO: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "capa-texto", "chamada", "prova-resultado"]);
+
+export const ehCapa = (tipo: TipoDeSlide): boolean => tipo === "capa-foto" || tipo === "capa-texto";
+
+/** A cor da marca quando a pessoa ainda não escolheu: o neutro escuro do produto. */
+export const COR_NEUTRA = "#3a3633";
+
 /** A legenda do post e as hashtags. */
 export const LIMITE_DA_LEGENDA_PALAVRAS = 150;
-export const HASHTAGS = { min: 3, max: 8 } as const;
+/** De 3 a 5, como a regra de legenda das plataformas que o roteiro já usa (R-IG-REEL-09). */
+export const HASHTAGS = { min: 3, max: 5 } as const;
 
 /** Nunca três slides seguidos do mesmo tipo (o código confere depois da IA). */
 export const MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO = 2;
 
 /** Quais tipos aceitam foto do cliente: o antes e depois aceita duas (a do antes e a do depois). */
-export const TIPOS_COM_FOTO: ReadonlySet<TipoDeSlide> = new Set(["capa", "passo", "item", "antes_depois", "prova"]);
+export const TIPOS_COM_FOTO: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "passo", "antes-depois", "prova-resultado"]);
 
 /** As fotos do cliente: até 9 por carrossel, só estes tipos, com teto de tamanho. Nunca imagem gerada. */
 export const MAXIMO_DE_FOTOS = 9;

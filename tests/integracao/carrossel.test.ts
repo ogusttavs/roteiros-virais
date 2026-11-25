@@ -9,8 +9,8 @@ import { deflateSync } from "node:zlib";
 import { and, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { crc32, montarZip } from "@/carrossel/zip";
 import { pngDoCarrossel } from "@/carrossel/entrega";
+import { crc32, montarZip } from "@/carrossel/zip";
 import { db, getPool } from "@/db";
 import { briefings, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, user, videos, type PerfilCompilado } from "@/db/schema";
 import { ErroCarrossel, apagarFoto, carrosselDaMarca, carrosseisDaMarca, enviarFoto, fotoDaMarca, fotosDoCarrossel, gerarCarrossel, tipoPelosBytes, trocarSlide } from "@/servicos/carrossel";
@@ -36,11 +36,11 @@ const PERFIL: PerfilCompilado = {
 let nichoId: number;
 let contador = 0;
 
-async function criarCliente(): Promise<number> {
+async function criarCliente(nicho: number = nichoId): Promise<number> {
   contador += 1;
   const usuarioId = `carrossel-teste-${contador}`;
   await db().insert(user).values({ id: usuarioId, name: `[teste] marca ${contador}`, email: `${usuarioId}@carrossel.teste` });
-  const [cliente] = await db().insert(clientes).values({ usuarioId, nome: `[teste] marca ${contador}`, nichoId, cidade: "Sao Paulo", bairro: "Pinheiros" }).returning();
+  const [cliente] = await db().insert(clientes).values({ usuarioId, nome: `[teste] marca ${contador}`, nichoId: nicho, cidade: "Sao Paulo", bairro: "Pinheiros" }).returning();
   await db().insert(briefings).values({ clienteId: cliente.id, completo: true, perfil: PERFIL });
   return cliente.id;
 }
@@ -110,7 +110,7 @@ describe("gerarCarrossel", () => {
     const videoId = await criarVideo(`ev-${quantidade}`, "mancha de vinho no estofado");
     const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado", quantidade));
     expect(c.slides).toHaveLength(quantidade);
-    expect(c.slides[0].tipo).toBe("capa");
+    expect(c.slides[0].tipo).toBe("capa-texto");
     expect(c.slides[quantidade - 1].tipo).toBe("chamada");
     for (let i = 2; i < c.slides.length; i += 1) expect(new Set([c.slides[i].tipo, c.slides[i - 1].tipo, c.slides[i - 2].tipo]).size).toBeGreaterThan(1);
     expect(c.clienteId).toBe(clienteId);
@@ -124,6 +124,38 @@ describe("gerarCarrossel", () => {
     const entrada = JSON.stringify(geracoes[0].entradas);
     expect(entrada).toContain(`id ${videoId}:`);
     expect(JSON.stringify(geracoes[0].evidencias)).toContain(String(videoId));
+  });
+
+  it("com fotos prometidas a capa é capa-foto; sem foto é capa-texto, e a cor da marca fica guardada na marca", async () => {
+    const clienteId = await criarCliente();
+    const sem = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado", 5));
+    expect(sem.slides[0].tipo).toBe("capa-texto");
+    expect(sem.cor).toBe("#3a3633");
+    const com = await gerarCarrossel(clienteId, { ...pedidoLivre("mancha de vinho no estofado", 5), fotos: 3, cor: "#0e5a6a" });
+    expect(com.slides[0].tipo).toBe("capa-foto");
+    expect(com.cor).toBe("#0e5a6a");
+    expect((await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0].corMarca).toBe("#0e5a6a");
+    // sem cor no pedido, vale a da marca
+    expect((await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado", 5))).cor).toBe("#0e5a6a");
+  });
+
+  it("cor clara demais é escurecida e o carrossel guarda o aviso", async () => {
+    const clienteId = await criarCliente();
+    const c = await gerarCarrossel(clienteId, { ...pedidoLivre("mancha de vinho no estofado", 5), cor: "#fff3a0" });
+    expect(c.cor).not.toBe("#fff3a0");
+    expect(c.avisos.join()).toMatch(/clara demais/);
+  });
+
+  it("ramo de saúde não recebe antes-depois (reprova e refaz); outro ramo recebe", async () => {
+    const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude", nome: "Odontologia teste", termos: [], ramoCatalogo: "odontologia" }).returning();
+    const saude = await criarCliente(nichoSaude.id);
+    const outro = await criarCliente();
+    const deSaude = await gerarCarrossel(saude, pedidoLivre("cuidados com o aparelho [mock:carrossel-antes-depois]"));
+    expect(deSaude.slides.map((s) => s.tipo)).not.toContain("antes-depois");
+    expect((await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, saude)))).length).toBe(2);
+    const comum = await gerarCarrossel(outro, pedidoLivre("mancha de vinho no estofado [mock:carrossel-antes-depois]"));
+    expect(comum.slides.map((s) => s.tipo)).toContain("antes-depois");
+    expect((await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, outro)))).length).toBe(1);
   });
 
   it("recusa quantidade fora de 5, 7 e 9, cor inválida e tema vazio", async () => {

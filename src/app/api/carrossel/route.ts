@@ -47,6 +47,7 @@ export async function POST(request: Request) {
     const carrossel = await gerarCarrossel(marca.clienteId, {
       quantidade: typeof corpo.quantidade === "number" ? corpo.quantidade : Number.NaN,
       cor: typeof corpo.cor === "string" ? corpo.cor : undefined,
+      fotos: typeof corpo.fotos === "number" ? corpo.fotos : undefined,
       observacao: typeof corpo.observacao === "string" ? corpo.observacao.slice(0, 500) : undefined,
       de,
     });

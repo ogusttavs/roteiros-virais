@@ -8,7 +8,7 @@ import { textosCarrossel as t } from "@/textos/carrossel";
 import estilos from "./CarrosselTela.module.css";
 
 type Slide = { tipo: string; titulo: string; corpo: string; fonte: string | null };
-type Carrossel = { id: number; slides: Slide[]; legenda: string; hashtags: string[] };
+type Carrossel = { id: number; slides: Slide[]; legenda: string; hashtags: string[]; avisos?: string[] };
 
 async function lerErro(resposta: Response): Promise<string> {
   try {
@@ -20,11 +20,11 @@ async function lerErro(resposta: Response): Promise<string> {
 }
 
 /** A página provisória do carrossel (E65 PR 1): escolher, enviar fotos, gerar, ver os slides, copiar a legenda e baixar. */
-export function CarrosselTela({ temasDeHoje }: { temasDeHoje: string[] }) {
+export function CarrosselTela({ temasDeHoje, corMarca }: { temasDeHoje: string[]; corMarca: string | null }) {
   const [tema, setTema] = useState("");
   const [quantidade, setQuantidade] = useState<number>(7);
   const [fotos, setFotos] = useState<File[]>([]);
-  const [cor, setCor] = useState("");
+  const [cor, setCor] = useState(corMarca ?? "");
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carrossel, setCarrossel] = useState<Carrossel | null>(null);
@@ -59,6 +59,7 @@ export function CarrosselTela({ temasDeHoje }: { temasDeHoje: string[] }) {
         body: JSON.stringify({
           quantidade,
           cor: cor || undefined,
+          fotos: fotos.length,
           de: temasDeHoje.includes(tema) ? { origem: "tema", titulo: tema } : { origem: "tema", texto: tema },
         }),
       });
@@ -136,6 +137,9 @@ function Resultado({ carrossel, aoAtualizar, aoRecarregar }: { carrossel: Carros
   return (
     <section>
       <h2>{t.seusSlides}</h2>
+      {(carrossel.avisos ?? []).map((a) => (
+        <p key={a} className={estilos.ajuda}>{a}</p>
+      ))}
       <a className={estilos.principal} href={`/api/carrossel/${carrossel.id}/zip`}>{t.baixarTodos}</a>
       <label className={estilos.rotulo}>
         {t.enviarFotos}

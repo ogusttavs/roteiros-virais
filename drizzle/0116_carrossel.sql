@@ -27,6 +27,7 @@ CREATE TABLE "carrossel_fotos" (
 	"criado_em" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "clientes" ADD COLUMN "cor_marca" text;--> statement-breakpoint
 ALTER TABLE "carrosseis" ADD CONSTRAINT "carrosseis_cliente_id_clientes_id_fk" FOREIGN KEY ("cliente_id") REFERENCES "public"."clientes"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "carrosseis" ADD CONSTRAINT "carrosseis_geracao_id_geracoes_ia_id_fk" FOREIGN KEY ("geracao_id") REFERENCES "public"."geracoes_ia"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "carrossel_fotos" ADD CONSTRAINT "carrossel_fotos_carrossel_id_carrosseis_id_fk" FOREIGN KEY ("carrossel_id") REFERENCES "public"."carrosseis"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
