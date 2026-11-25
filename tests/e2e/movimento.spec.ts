@@ -1,6 +1,6 @@
 /**
  * A fluidez do painel (E51 PR 2, passo 16 do Opus): a folha acompanha o dedo e fecha ao arrastar, "reduzir movimento" troca o deslizar pelo esmaecer, a
- * tela que chega anima na entrada (e só `transform` e `opacity`), a cápsula do celular fica encolhida ao soltar, e o aperto dos botões usa os tokens.
+ * tela que chega anima na entrada (e só `transform` e `opacity`), a barra de abas do celular não muda de tamanho ao rolar, e o aperto dos botões usa os tokens.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
@@ -185,32 +185,25 @@ test.describe("movimento (E51 PR 2)", () => {
     expect(await page.locator("[data-transicao]").first().evaluate((el) => getComputedStyle(el).animationName)).toMatch(/tela-esmaece/);
   });
 
-  test("a cápsula encolhe ao rolar para baixo e FICA encolhida ao soltar; tocar nela a abre", async ({ page }) => {
+  test("a barra de abas não encolhe nem muda de altura ao rolar para baixo (25/11/2026: presa na borda, igual à de um aplicativo nativo)", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page);
     await page.goto("/referencias");
     await page.waitForLoadState("networkidle");
     await page.addStyleTag({ content: "body { padding-bottom: 1600px !important; }" });
-    const capsula = page.getByRole("navigation", { name: "Navegação principal" });
-    const larguraCheia = (await capsula.boundingBox())!.width;
+    const barra = page.locator("[data-capsula-abas] > div");
+    const antes = (await barra.boundingBox())!;
 
     for (let y = 0; y <= 320; y += 40) {
       await page.evaluate((alvo) => window.scrollTo(0, alvo), y);
       await page.waitForTimeout(16);
     }
     await page.waitForTimeout(600);
-    const larguraEncolhida = (await capsula.boundingBox())!.width;
-    expect(larguraEncolhida).toBeLessThan(larguraCheia - 40);
-
-    // Parada, sem tocar em nada: continua encolhida.
-    await page.waitForTimeout(800);
-    expect((await capsula.boundingBox())!.width).toBeLessThan(larguraCheia - 40);
-
-    // Um toque nela abre (o toque num ícone vai direto ao destino e a cápsula abre junto).
-    await page.getByRole("link", { name: "Hoje" }).click();
-    await expect(page).toHaveURL(/\/hoje/);
-    await page.waitForTimeout(700);
-    expect((await capsula.boundingBox())!.width).toBeGreaterThan(larguraEncolhida + 40);
+    const depois = (await barra.boundingBox())!;
+    expect(Math.abs(depois.width - antes.width)).toBeLessThan(1);
+    expect(Math.abs(depois.height - antes.height)).toBeLessThan(1);
+    expect(Math.abs(depois.y - antes.y)).toBeLessThan(1);
+    await expect(page.getByRole("link", { name: "Hoje" })).toBeVisible();
   });
 
   test("o botão aperta com o token de escala e volta (:active), e a seleção da cápsula desliza por transform", async ({ page }) => {

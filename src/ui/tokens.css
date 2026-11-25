@@ -417,6 +417,8 @@
   --margem-celular: 1rem;
   --altura-toque: 2.75rem;
   --altura-toque-lg: 3.25rem;
+  /** A barra de abas do celular, sem a area segura de baixo (que a barra soma por conta propria, `env(safe-area-inset-bottom)`): a linha de cima, o respiro, a linha de itens e o respiro de baixo. Todo fim de tela soma isto mais a area segura, para o conteudo terminar acima dela. */
+  --altura-barra-abas: calc(var(--largura-borda) + var(--espaco-1) + var(--altura-toque-lg) + var(--espaco-1));
   /** A faixa "Sem conexao" no topo (V7, item 8): quando aparece, o resto do topo desce esta altura (--faixa-topo, base.css). */
   --altura-faixa-conexao: 2rem;
   --traco-icone: 1.5;
