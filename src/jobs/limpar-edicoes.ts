@@ -41,6 +41,7 @@ import type { PerfilDeRender } from "@/edicao/render-grafo";
 import { TAREFAS_DA_EDICAO_COM_FALA } from "@/edicao/resumo-numerico";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { logger } from "@/lib/log";
+import { limparAnimacoes } from "@/servicos/limpar-animacoes";
 import { enfileirarRender, ESTADOS_DO_RENDER } from "@/servicos/render-edicao";
 import { fraseDaEdicao } from "@/textos/edicao";
 
@@ -279,7 +280,14 @@ export async function rodarLimparEdicoes(deps: DepsDaLimpeza = {}): Promise<Reco
   }
   const sobras = await varrerSobrasDoVolume(nomesComDono, agora, IDADE_MINIMA_DO_ORFAO_MS, PARTE_VELHA_APOS_MS);
 
+  // 4e. (E68 A2) O vídeo de animação tem a mesma guarda de 7 dias e a mesma varredura; uma falha aqui nunca derruba a limpeza da edição.
+  const animacoesLimpas = await limparAnimacoes(agora).catch((erro: unknown) => {
+    logger.warn({ err: erro }, "animacao: a limpeza dos videos de animacao falhou");
+    return {};
+  });
+
   return {
+    ...animacoesLimpas,
     enviosParados: enviosParados.length,
     transcricoesDevolvidas,
     transcricoesDesistidas,

@@ -83,6 +83,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# E68 A1: o Chromium do video de animacao de texto (`src/animacao/render.ts`, o mesmo `playwright` do app, mesma versao do `package-lock.json`). O render roda no contêiner `roteiros-render`,
+# que usa esta imagem; fica num caminho fixo fora de node_modules e legivel pelo usuario `app`. `--with-deps` instala as bibliotecas de sistema (apt) e por isso roda antes do USER app. Entra
+# na imagem de todo o worker (cerca de 400 MB a mais); so o render chama o navegador, e so com `ANIMACAO_ATIVA=1`.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+RUN node node_modules/playwright/cli.js install --with-deps chromium \
+  && chmod -R a+rX /opt/playwright \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY . .
 
 # Sha curto do commit (etapa 13, decisao 1): vira `release` no Sentry, so

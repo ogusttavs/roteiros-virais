@@ -56,6 +56,7 @@ import { rodarPesquisaDoFoco } from "./pesquisa-do-foco";
 import { type PayloadPesquisaNaHora, rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
 import { type PayloadPublicarInstagram, rodarPublicarInstagram } from "./publicar-instagram";
+import { rodarFilaDePosts, rodarPublicarPostPronto, type PayloadPublicarPostPronto } from "./publicar-post-pronto";
 import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
@@ -274,6 +275,12 @@ async function main(): Promise<void> {
   /** Por evento (E47 PR 3): `rodarTranscreverEdicao` manda `{ edicaoId }` quando a fala ficou transcrita. */
   await boss().work<PayloadDecidirEdicao>(FILAS.decidirEdicao, async (job) => {
     await executarComRegistro(FILAS.decidirEdicao, () => rodarDecidirEdicao(job[0].data.edicaoId));
+  });
+  await boss().work<PayloadPublicarPostPronto>(FILAS.publicarPostPronto, async (job) => {
+    await executarComRegistro(FILAS.publicarPostPronto, () => rodarPublicarPostPronto(job[0].data.postId));
+  });
+  await boss().work(FILAS.filaDePosts, async () => {
+    await executarComRegistro(FILAS.filaDePosts, () => rodarFilaDePosts());
   });
   await boss().work(FILAS.limparEdicoes, async () => {
     await executarComRegistro(FILAS.limparEdicoes, () => rodarLimparEdicoes());

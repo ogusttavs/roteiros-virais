@@ -7,7 +7,7 @@
 .pagina {
   margin: calc(-1 * (56px + var(--area-topo) + var(--espaco-6)))
     calc(-1 * var(--margem-celular))
-    calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
+    calc(-1 * (var(--altura-barra-abas) + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
 }
 
 @media (min-width: 768px) {
@@ -50,7 +50,7 @@
 }
 
 .miolo {
-  padding: var(--espaco-5) var(--margem-celular) calc(64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px));
+  padding: var(--espaco-5) var(--margem-celular) calc(var(--altura-barra-abas) + var(--espaco-6) + env(safe-area-inset-bottom, 0px));
   max-width: var(--largura-leitura);
   margin: 0 auto;
   display: grid;

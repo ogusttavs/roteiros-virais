@@ -14,7 +14,7 @@ export const PRECO_TRIMESTRAL_TOTAL = "R$ 1.191";
 export const textosInteressados = {
   topo: { entrar: "Entrar" },
   heroi: {
-    titulo: "Todo dia, o roteiro pronto para você gravar.",
+    titulo: "Todo dia, o roteiro pronto para você gravar",
     subtitulo:
       "A gente descobre o que está funcionando no seu ramo e escreve o roteiro, com a edição junto. Você grava no celular, do seu jeito. Quem aparece no vídeo é você.",
     botao: "Quero testar",
@@ -89,7 +89,7 @@ export const textosInteressados = {
     passoDaEdicao: {
       numero: "4",
       etiqueta: "novo",
-      titulo: "Gravou? A gente edita.",
+      titulo: "Gravou? A gente edita",
       texto: "Mande o vídeo que você gravou e a gente corta as pausas e os erros, põe a legenda e o título na tela. Você assiste antes de aprovar. A música você escolhe na hora de postar.",
     },
     itemDaEdicao: "A edição do vídeo que você gravou: cortes, legenda e título",

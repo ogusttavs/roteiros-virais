@@ -27,8 +27,8 @@ export const textosDatas = {
   titulo: "Datas para lembrar",
 
   /** O Hoje: o que é hoje e o que vem aí. */
-  hoje: (nome: string) => `Hoje é ${nome}.`,
-  emDias: (nome: string, dias: number) => (dias === 1 ? `Amanhã é ${nome}.` : `Daqui a ${dias} dias é ${nome}.`),
+  hoje: (nome: string) => `Hoje é ${nome}`,
+  emDias: (nome: string, dias: number) => (dias === 1 ? `Amanhã é ${nome}` : `Daqui a ${dias} dias é ${nome}`),
   /** A linha de baixo do cartão do Hoje: o que fazer com a data. */
   seDaTempo: "Dá tempo de gravar sobre isso.",
   seEHoje: "Dá para gravar sobre isso ainda hoje.",

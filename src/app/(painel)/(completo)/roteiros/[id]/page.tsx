@@ -5,10 +5,12 @@ import { conviteDeInstalarPodeAparecer } from "@/lib/convite-instalar";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
+import { visaoDaAnimacao } from "@/servicos/animacao";
 import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
 import { visaoDeEditar } from "@/servicos/edicao-tela";
 import { momentoDoRoteiro } from "@/servicos/em-alta";
 import { fontesDosParagrafos, pesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
+import { hashtagsDoPost } from "@/servicos/hashtags-do-post";
 import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { diaPorExtenso, enderecoHttpsSeguro } from "@/servicos/noticias-assuntos";
@@ -46,7 +48,7 @@ export default async function Roteiro({ params }: Props) {
   }
 
   const preferencias = await preferenciasDoUsuario(sessao.user.id);
-  const [video, versoes, momento, grupoDeVersoes, publicar] = await Promise.all([
+  const [video, versoes, momento, grupoDeVersoes, publicar, hashtags] = await Promise.all([
     roteiro.referenciaVideoId ? videoPorId(roteiro.referenciaVideoId) : Promise.resolve(null),
     versoesDoRoteiro(roteiroId),
     // E55 PR 2b: o roteiro que nasceu de um assunto em alta diz se o assunto ainda está em alta (selo e linha de prazo) ou já passou (selo neutro e aviso). Uma falha aqui só tira o selo.
@@ -58,10 +60,15 @@ export default async function Roteiro({ params }: Props) {
     grupoDoRoteiro(cliente.id, roteiroId).then((g) => (g && g.total > 1 ? g : null)).catch(() => null),
     // E56 PR 1: "Publicar no Instagram". Uma falha aqui só tira a função da tela.
     visaoDePublicar({ usuarioId: sessao.user.id, clienteId: cliente.id, roteiro, verComo: sessao.verComo != null }).catch(() => null),
+    // E70: as até 5 hashtags para colar (do banco, sem IA). O vídeo longo é do YouTube e não leva o bloco. Uma falha aqui só tira o bloco.
+    roteiro.duracaoDoVideo === "longo" ? Promise.resolve([] as string[]) : hashtagsDoPost({ clienteId: cliente.id, tema: roteiro.tema }).catch(() => [] as string[]),
   ]);
 
   // E47 PR 4: "Editar o meu vídeo". Uma falha aqui só tira a função da tela. Publicar o vídeo editado só aparece se "Publicar no Instagram" também aparece (e o roteiro ainda não foi publicado).
   const editar = await visaoDeEditar({ clienteId: cliente.id, roteiro, verComo: sessao.verComo != null, podePublicar: publicar !== null && publicar.situacao.pode }).catch(() => null);
+
+  // E68 A3: "Sem tempo de gravar hoje?". Só para as marcas da lista `ANIMACAO_CONTAS` (as outras recebem `null` e a tela nem sabe que existe). Uma falha aqui só tira a função da tela.
+  const animacao = await visaoDaAnimacao({ clienteId: cliente.id, roteiro, verComo: sessao.verComo != null }).catch(() => null);
 
   // E50 parte 2, PR 4: os vídeos do banco que o "Por quê" cita (o link só https, a conta e quantas vezes acima do normal). Uma falha em um vídeo só tira o link dele.
   const idsDosPorQues = [...new Set((corpoDoRoteiro(roteiro).porQueDosBlocos ?? []).flatMap((i) => (i.video ? [i.video.videoId] : [])))].slice(0, 8);
@@ -112,6 +119,8 @@ export default async function Roteiro({ params }: Props) {
       conviteInstalarPodeAparecer={conviteDeInstalarPodeAparecer(preferencias, new Date())}
       publicar={publicar}
       editar={editar}
+      animacao={animacao}
+      hashtags={hashtags}
     />
   );
 }

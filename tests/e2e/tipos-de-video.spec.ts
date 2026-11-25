@@ -231,7 +231,7 @@ test.describe("tipos de vídeo (E44 PR 2)", () => {
     await expect(page.locator("[data-selo-tipo]").filter({ hasText: "Tipo: erro comum" })).toBeVisible();
   });
 
-  test("cabeçalho de vidro no celular: sem fundo no topo, vidro depois de rolar, e o 'Atualizar' só com o ícone (o nome fica para o leitor de tela)", async ({ page }) => {
+  test("cabeçalho no celular: sem fundo no topo, fundo sólido depois de rolar (#285, nada passa legível por baixo), e o 'Atualizar' só com o ícone (o nome fica para o leitor de tela)", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, EMAIL_B);
     await page.goto("/conta");
@@ -248,7 +248,9 @@ test.describe("tipos de vídeo (E44 PR 2)", () => {
     await page.waitForTimeout(400);
     const fundoRolada = await cabecalho.evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(fundoRolada).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
-    expect(await cabecalho.evaluate((el) => getComputedStyle(el).backdropFilter)).toMatch(/blur/);
+    // 25/11/2026 (#285): rolado, o fundo é sólido e sem desfoque (o WebKit do iPhone perde a posição de elemento fixo com camada de desfoque).
+    await expect.poll(() => cabecalho.evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(/^rgb\(/);
+    expect(await cabecalho.evaluate((el) => getComputedStyle(el).backdropFilter)).toBe("none");
 
     // O botão é uma bolha de 44 px; o nome "Atualizar" continua para o leitor de tela (aria-label), sem texto à vista.
     const atualizar = page.getByRole("button", { name: "Atualizar" });

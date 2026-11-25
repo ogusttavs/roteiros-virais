@@ -43,7 +43,7 @@
 /** Sem capa viva: o nome da rede embaixo do play, no mesmo tom discreto do rótulo de data. */
 .redeSemCapa {
   font: var(--peso-medio) var(--tamanho-rodape) / 1 var(--fonte-mono);
-  font-size: 0.625rem;
+  font-size: var(--tamanho-rodape);
   text-transform: uppercase;
   letter-spacing: var(--espacamento-rotulo);
   color: var(--cor-texto-dica);

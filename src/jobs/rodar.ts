@@ -49,6 +49,8 @@ import { rodarPesquisaDoFoco } from "./pesquisa-do-foco";
 import { rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
 import { rodarPublicarInstagram } from "./publicar-instagram";
+import { rodarFilaDePosts, rodarPublicarPostPronto } from "./publicar-post-pronto";
+import { rodarRenderizarAnimacao } from "./renderizar-animacao";
 import { rodarRenderizarEdicao } from "./renderizar-edicao";
 import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
@@ -159,12 +161,17 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.pesquisaNaHora]: () => rodarPesquisaNaHora(Number(process.argv[3])),
   /** Por evento (E56): `npm run job -- publicar-instagram <publicacaoId>` confere (e publica, se o vídeo estiver pronto) uma publicação já criada. */
   [FILAS.publicarInstagram]: () => rodarPublicarInstagram(Number(process.argv[3])),
+  /** Por evento (E56 PR 2): `npm run job -- publicar-post-pronto <postId>` publica aquele post da fila agora. */
+  [FILAS.publicarPostPronto]: () => rodarPublicarPostPronto(Number(process.argv[3])),
+  [FILAS.filaDePosts]: () => rodarFilaDePosts(),
   /** Por evento (E47 PR 2): `npm run job -- transcrever-edicao <edicaoId>` transcreve uma edição já guardada (usa a chave da Groq do ambiente). */
   [FILAS.transcreverEdicao]: () => rodarTranscreverEdicao(Number(process.argv[3])),
   /** Por evento (E47 PR 3): `npm run job -- decidir-edicao <edicaoId>` decide a edição de uma fala já transcrita (usa a chave da Anthropic do ambiente). */
   [FILAS.decidirEdicao]: () => rodarDecidirEdicao(Number(process.argv[3])),
   /** Por evento (E47 PR 4): `npm run job -- renderizar-edicao <edicaoId> <previa|final>` monta a prévia ou o vídeo final de uma edição já verificada (precisa de ffmpeg; em produção roda no contêiner de render). */
   [FILAS.renderizarEdicao]: () => rodarRenderizarEdicao(Number(process.argv[3]), process.argv[4] === "final" ? "final" : "previa"),
+  /** Por evento (E68 A2): `npm run job -- renderizar-animacao <animacaoId> <previa|final>` monta a prévia ou o vídeo final de uma animação de texto já pedida (precisa de Chromium e ffmpeg; em produção roda no contêiner de render). */
+  [FILAS.renderizarAnimacao]: () => rodarRenderizarAnimacao(Number(process.argv[3]), process.argv[4] === "final" ? "final" : "previa"),
   /** E47 PR 2: apaga o que passou do prazo de guarda e o que não tem dono no volume de edição. */
   [FILAS.limparEdicoes]: () => rodarLimparEdicoes(),
   /** Alarme do disco do servidor: mede agora e avisa se passou do limite. */

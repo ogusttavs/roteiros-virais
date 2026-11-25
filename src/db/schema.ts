@@ -24,6 +24,8 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
+import type { CenaDeEntrada } from "@/animacao/tipos";
+import type { EstadoDaAnimacao } from "@/config/animacao-fila";
 import type { EstadoDoCarrossel, OrigemDoCarrossel, SlideDoCarrossel } from "@/config/carrossel";
 import type { Edl, Legendas, PalavraFalada } from "@/edicao/tipos";
 import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
@@ -2724,6 +2726,44 @@ export const publicacoes = pgTable(
 );
 export type Publicacao = typeof publicacoes.$inferSelect;
 
+/** E56 PR 2: o post pronto (imagem ou carrossel) que a marca publica pelo aplicativo. */
+export type EstadoDoPostPronto = "na_fila" | "publicando" | "publicado" | "falhou" | "cancelado";
+export type ImagemDoPost = { arquivo: string; bytes: number; largura: number; altura: number };
+
+/**
+ * E56 PR 2: um post pronto de imagem (1 imagem) ou carrossel (2 a 10), feito fora do aplicativo, na fila de publicação da marca. As imagens ficam em disco (`lib/imagens-do-post.ts`, já em JPEG)
+ * até o post terminar; aqui só o nome dos arquivos. Na fila: espera a vez (o worker publica um por vez, com intervalo). Publicando: a reserva (UPDATE condicional, só uma por marca) que impede publicar duas
+ * vezes. Nunca guarda o acesso da Meta. `motivo` é a frase em língua de gente; `codigoFalha` e os códigos da Meta são só para o diagnóstico; `aviso` é o recado da fila (ex.: esperando o limite do dia).
+ */
+export const postsProntos = pgTable(
+  "posts_prontos",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    estado: text("estado").$type<EstadoDoPostPronto>().notNull().default("na_fila"),
+    legenda: text("legenda").notNull().default(""),
+    imagens: jsonb("imagens").$type<ImagemDoPost[]>().notNull(),
+    /** A pessoa tocou em "Publicar agora": a vez dele não espera o intervalo entre posts. */
+    agora: boolean("agora").notNull().default(false),
+    containerId: text("container_id"),
+    midiaId: text("midia_id"),
+    permalink: text("permalink"),
+    motivo: text("motivo"),
+    codigoFalha: text("codigo_falha"),
+    codigoMeta: integer("codigo_meta"),
+    subcodigoMeta: integer("subcodigo_meta"),
+    aviso: text("aviso"),
+    criadoPor: text("criado_por").references(() => user.id, { onDelete: "set null" }),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+    terminadoEm: timestamp("terminado_em", { withTimezone: true }),
+  },
+  (t) => [index("posts_prontos_marca_estado").on(t.clienteId, t.estado), uniqueIndex("posts_prontos_um_publicando_por_marca").on(t.clienteId).where(sql`${t.estado} = 'publicando'`)],
+);
+export type PostPronto = typeof postsProntos.$inferSelect;
+
 /**
  * Subindo: a edição foi aberta e o vídeo ainda não começou a chegar. Enviando: o corpo do vídeo está chegando (a reserva do envio, um UPDATE condicional; a limpeza de 45 minutos recolhe o que morreu). Guardado: o vídeo chegou inteiro, foi conferido (duração, qualidade, som) e espera a transcrição. Transcrevendo: o worker está ouvindo
  * o áudio. Transcrito: as palavras com tempo e a curva de energia estão guardadas e o motor de corte já pode trabalhar. Falhou: recusada ou parada, com a frase em `motivo`. Expirada: o vídeo
@@ -3251,3 +3291,45 @@ export const carrosselFotos = pgTable(
   (t) => [index("carrossel_fotos_carrossel").on(t.carrosselId, t.ordem)],
 );
 export type CarrosselFoto = typeof carrosselFotos.$inferSelect;
+
+/**
+ * E68 A2: o vídeo de animação de texto de um roteiro (sem ninguém na tela), o plano B do dia em que a pessoa não consegue gravar. Sempre preso a uma marca (`cliente_id`): nenhuma consulta lê uma
+ * animação sem filtrar pela marca da sessão. Estados em `config/animacao-fila.ts`. `cenas` é o texto do roteiro (já passou pelo verificador) cortado em blocos curtos; `progresso` nulo quer dizer
+ * "esperando a vez na fila", um número é "sendo montado agora". `codigoDoErro` é só um código curto (o erro técnico vai para o log), `motivo` é a frase para a pessoa. Os arquivos são relativos ao
+ * volume de edição (`animacao/an-<id>-previa.mp4` e `animacao/an-<id>-final.mp4`). Uma animação por marca fora de um estado final (índice único parcial).
+ */
+export const animacoes = pgTable(
+  "animacoes",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    roteiroId: integer("roteiro_id")
+      .notNull()
+      .references(() => roteiros.id, { onDelete: "cascade" }),
+    estado: text("estado").$type<EstadoDaAnimacao>().notNull().default("pedida"),
+    molde: text("molde").notNull(),
+    cenas: jsonb("cenas").$type<CenaDeEntrada[]>().notNull(),
+    /** A duração do vídeo, em segundos, como o montador calculou ao pedir (para a tela dizer quanto tempo costuma levar). */
+    duracaoS: numeric("duracao_s", { precision: 8, scale: 3 }).notNull(),
+    caminhoPrevia: text("caminho_previa"),
+    caminhoFinal: text("caminho_final"),
+    progresso: integer("progresso"),
+    tentativas: integer("tentativas").notNull().default(0),
+    motivo: text("motivo"),
+    codigoDoErro: text("codigo_do_erro"),
+    criadaPor: text("criada_por").references(() => user.id, { onDelete: "set null" }),
+    criadaEm: criadoEm(),
+    atualizadaEm: timestamp("atualizada_em", { withTimezone: true }).notNull().defaultNow(),
+    /** Quando o vídeo final fica pronto + 7 dias: depois disso o arquivo e a linha saem na limpeza. */
+    finalExpiraEm: timestamp("final_expira_em", { withTimezone: true }),
+  },
+  (t) => [
+    index("animacoes_marca_roteiro").on(t.clienteId, t.roteiroId),
+    uniqueIndex("animacoes_uma_em_andamento_por_marca")
+      .on(t.clienteId)
+      .where(sql`${t.estado} in ('pedida', 'fazendo_previa', 'previa_pronta', 'fazendo_final')`),
+  ],
+);
+export type Animacao = typeof animacoes.$inferSelect;

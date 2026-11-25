@@ -43,19 +43,19 @@
   --cor-superficie-pressionada: #dcdcd7;
   --cor-superficie-desabilitada: #f0f0ee;
   --cor-titulo: #0c0c0e;
-  --cor-texto: #1e1e22;
-  --cor-texto-suave: #4e4e56;
-  --cor-texto-dica: #56565e;
-  --cor-texto-desabilitado: #8a8a90;
+  --cor-texto: #1f1f1b;
+  --cor-texto-suave: #4f4f48;
+  --cor-texto-dica: #575750;
+  --cor-texto-desabilitado: #8b8b85;
   --cor-acao: #0c0c0e;
   --cor-acao-texto: #ffffff;
   --cor-acao-hover: #26262b;
   --cor-acao-pressionada: #3a3a40;
   --cor-destaque: #3e5c00;
-  --cor-borda: rgba(15, 15, 20, 0.12);
-  --cor-borda-forte: rgba(15, 15, 20, 0.28);
-  --cor-divisor: rgba(15, 15, 20, 0.09);
-  --cor-sobreposicao: rgba(12, 12, 14, 0.28);
+  --cor-borda: rgba(16, 16, 12, 0.12);
+  --cor-borda-forte: rgba(16, 16, 12, 0.28);
+  --cor-divisor: rgba(16, 16, 12, 0.09);
+  --cor-sobreposicao: rgba(14, 14, 10, 0.28);
   --cor-esqueleto-base: #e9e9e5;
   --cor-esqueleto-luz: #f7f7f4;
   --cor-gravando: #e5382b;
@@ -68,7 +68,7 @@
   --cor-video: #0b0b0d;
   --cor-video-texto: #ffffff;
   --cor-nota: #0c0c0e;
-  --cor-nota-trilho: rgba(15, 15, 20, 0.12);
+  --cor-nota-trilho: rgba(16, 16, 12, 0.12);
   --cor-selecao-suave: #f0f8da;
   --cor-selecao-borda: #c7e27a;
   --cor-foco: rgba(12, 12, 14, 0.25);
@@ -84,9 +84,9 @@
   --cor-erro-suave: var(--cor-erro-fundo);
   --cor-skeleton-brilho: var(--cor-esqueleto-luz);
 
-  --sombra-sm: 0 0.5rem 1.5rem rgba(20, 20, 30, 0.10);
-  --sombra-md: 0 1.25rem 3.75rem rgba(20, 20, 30, 0.18);
-  --sombra-controle: 0 1px 3px rgba(0, 0, 0, 0.10);
+  --sombra-sm: 0 0.5rem 1.5rem rgba(30, 28, 18, 0.10);
+  --sombra-md: 0 1.25rem 3.75rem rgba(30, 28, 18, 0.18);
+  --sombra-controle: 0 1px 3px rgba(30, 28, 18, 0.12);
   /* Proprio do codigo: o anel de foco, reconstruido com a cor de foco nova. */
   --sombra-foco: 0 0 0 3px var(--cor-foco);
 
@@ -110,9 +110,9 @@
   --vidro-solido: #f4f4f2;
   --vidro-desfoque: blur(24px) saturate(180%);
   --vidro-borda: rgba(255, 255, 255, 0.95);
-  --vidro-contorno: rgba(12, 12, 14, 0.08);
+  --vidro-contorno: rgba(14, 14, 10, 0.08);
   --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(12, 12, 14, 0.04);
-  --vidro-sombra: 0 12px 32px rgba(20, 20, 30, 0.14), 0 2px 6px rgba(20, 20, 30, 0.06);
+  --vidro-sombra: 0 12px 32px rgba(30, 28, 18, 0.14), 0 2px 6px rgba(20, 20, 30, 0.06);
   --vidro-selecao: rgba(12, 12, 14, 0.07);
   --raio-folha: 2.25rem;
 
@@ -326,7 +326,9 @@
   --peso-forte: 850;
 
   /** Escala da HIG (BRIEF.md, secao 3). Nomes do painel mantidos; os nomes novos do design entram como estao na entrega. */
-  --tamanho-rotulo: 0.6875rem;
+  --tamanho-rotulo: 0.8125rem;
+  /** 11 px, so para o que reforca outra informacao: o rotulo da capsula das abas (medido para caber a 360 px) e os contadores dos campos. */
+  --tamanho-minusculo: 0.6875rem;
   --tamanho-legenda: 0.8125rem;
   --tamanho-secundario: 0.9375rem;
   --tamanho-corpo: 1.0625rem;
@@ -358,7 +360,7 @@
   --altura-compacta: 1.28;
   --altura-gravacao: 1.45;
   --espacamento-titulo: -0.015em;
-  --espacamento-rotulo: 0.12em;
+  --espacamento-rotulo: 0.035em;
   --espacamento-legenda: 0.035em;
 
   /* Forma: cantos concentricos com o do aparelho. */
@@ -415,6 +417,8 @@
   --margem-celular: 1rem;
   --altura-toque: 2.75rem;
   --altura-toque-lg: 3.25rem;
+  /** A barra de abas do celular, sem a area segura de baixo (que a barra soma por conta propria, `env(safe-area-inset-bottom)`): a linha de cima, o respiro, a linha de itens e o respiro de baixo. Todo fim de tela soma isto mais a area segura, para o conteudo terminar acima dela. */
+  --altura-barra-abas: calc(var(--largura-borda) + var(--espaco-1) + var(--altura-toque-lg) + var(--espaco-1));
   /** A faixa "Sem conexao" no topo (V7, item 8): quando aparece, o resto do topo desce esta altura (--faixa-topo, base.css). */
   --altura-faixa-conexao: 2rem;
   --traco-icone: 1.5;

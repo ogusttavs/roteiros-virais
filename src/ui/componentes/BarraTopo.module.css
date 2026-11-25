@@ -87,11 +87,12 @@
       border-color var(--duracao-troca) var(--curva-padrao);
   }
 
+  /* 25/11/2026: rolada, o fundo é sólido (`--vidro-solido`), sem desfoque nem transparência: nada do que rola passa legível por baixo do título, e a âncora não carrega `backdrop-filter` (o WebKit do iPhone perde a posição de elemento fixo com camada de desfoque, #218). */
   .barra.rolada {
-    background: var(--vidro-fundo);
-    backdrop-filter: var(--vidro-desfoque);
-    -webkit-backdrop-filter: var(--vidro-desfoque);
-    border-bottom-color: var(--vidro-contorno);
+    background: var(--vidro-solido);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom-color: var(--cor-divisor);
   }
 
   .direita {

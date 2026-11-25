@@ -1,0 +1,283 @@
+/**
+ * "Publicar post pronto" (E56 PR 2). Só tokens do painel, na mesma linha da folha de publicar do PR 1 (`roteiros/[id]/PublicarNoInstagram.module.css`): corpo em grade, frases de apoio, erro e sucesso,
+ * link sublinhado e o campo de arquivo com o rótulo fazendo o papel do botão. Aqui entram a prévia das imagens e a lista da fila.
+ */
+
+.pagina {
+  display: grid;
+  gap: var(--espaco-5);
+  max-width: var(--largura-leitura);
+}
+
+.voltar {
+  justify-self: start;
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.titulo {
+  margin: 0;
+}
+
+.subtitulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.cartao {
+  display: grid;
+}
+
+.corpo {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.rotulo {
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+}
+
+.explica {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto-suave);
+}
+
+.erro {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+  color: var(--cor-erro);
+}
+
+.erro svg {
+  flex: 0 0 auto;
+  margin-top: 0.15em;
+}
+
+.sucesso {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  color: var(--cor-positivo);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  justify-self: start;
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.link:focus-visible,
+.voltar:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+  border-radius: var(--raio-md);
+}
+
+.arquivo {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.inputArquivo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.botaoArquivo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque-lg);
+  padding: 0 var(--espaco-6);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  cursor: pointer;
+}
+
+.botaoArquivo:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.inputArquivo:focus-visible + .botaoArquivo {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.previa {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.miniaturas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.miniatura {
+  position: relative;
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.imagem {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: var(--raio-md);
+  border: var(--largura-borda) solid var(--cor-divisor);
+  background: var(--cor-superficie-recuada);
+}
+
+.numero {
+  position: absolute;
+  top: var(--espaco-2);
+  left: var(--espaco-2);
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 var(--espaco-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+}
+
+.controles {
+  display: flex;
+  gap: var(--espaco-1);
+  justify-content: space-between;
+}
+
+.controle {
+  flex: 1 1 0;
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--largura-borda) solid var(--cor-divisor);
+  border-radius: var(--raio-md);
+  background: transparent;
+  color: var(--cor-titulo);
+  cursor: pointer;
+}
+
+.controle:hover:not(:disabled) {
+  background: var(--cor-superficie-hover);
+}
+
+.controle:disabled {
+  color: var(--cor-texto-suave);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.controle:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+
+/* A fila. */
+.fila {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.post {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-divisor);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.postTopo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.estado {
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.estado[data-estado="publicado"] {
+  color: var(--cor-positivo);
+}
+
+.estado[data-estado="falhou"] {
+  color: var(--cor-erro);
+}
+
+.legendaDoPost {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}

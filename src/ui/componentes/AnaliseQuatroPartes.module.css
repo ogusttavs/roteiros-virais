@@ -53,7 +53,8 @@
 
 .rotulo {
   font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rotulo);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
   text-transform: uppercase;
   letter-spacing: var(--espacamento-rotulo);
   color: var(--cor-texto-suave);

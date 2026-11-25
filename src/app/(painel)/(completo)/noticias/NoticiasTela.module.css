@@ -9,7 +9,7 @@
 
 @media (max-width: 767px) {
   .pagina {
-    --toast-base: calc(62px + var(--espaco-4));
+    --toast-base: calc(var(--altura-barra-abas) + var(--espaco-4));
   }
 }
 

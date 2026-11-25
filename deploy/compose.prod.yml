@@ -37,6 +37,9 @@ services:
     # juntos: volume nomeado, mesmo caminho nos dois. PUBLICAR_PASTA_TEMP aponta para ele.
     # E47 PR 2: o volume da edicao de video (bruto por 48 h, editado por 7 dias): o app recebe e confere o video, o worker transcreve e apaga. Mesmo caminho nos dois; EDICAO_PASTA aponta para ele.
     environment:
+      # E68 A2: o video de animacao de texto: o aplicativo le a lista de marcas a cada pedido. Desligado por padrao (o `env_file` ja traria as duas; listar aqui deixa o padrao a vista).
+      ANIMACAO_ATIVA: ${ANIMACAO_ATIVA:-0}
+      ANIMACAO_CONTAS: ${ANIMACAO_CONTAS:-}
       PUBLICAR_PASTA_TEMP: /var/publicar
       EDICAO_PASTA: /var/edicao
     volumes:
@@ -124,6 +127,12 @@ services:
       # O ffmpeg (legenda com fontconfig) e o tsx guardam cache; o contêiner e so de leitura, entao tudo vai para o /tmp.
       HOME: /tmp
       XDG_CACHE_HOME: /tmp/.cache
+      # E68 A2: o video de animacao de texto (so na conta da lista). Desligado por padrao: sem estas tres no `.env` nada muda. `ANIMACAO_SEM_SANDBOX=1` e para o Chromium subir neste conteiner (sem capacidades,
+      # so de leitura); `ANIMACAO_CONTAS` (ids de marca separados por virgula) e lida pelo aplicativo, mas vem aqui tambem para as tres variaveis andarem juntas.
+      ANIMACAO_ATIVA: ${ANIMACAO_ATIVA:-0}
+      # Padrao 1 aqui: este conteiner roda sem capacidades e so de leitura, e o sandbox do Chromium nao sobe assim.
+      ANIMACAO_SEM_SANDBOX: ${ANIMACAO_SEM_SANDBOX:-1}
+      ANIMACAO_CONTAS: ${ANIMACAO_CONTAS:-}
     volumes:
       - roteiros_edicao:/var/edicao
     depends_on:

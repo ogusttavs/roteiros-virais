@@ -1,13 +1,13 @@
 /**
- * Defeito de 23/10/2026 (iPhone, Safari com a barra de endereço à vista, Criar rolada até o fim): a cápsula de abas, na forma encolhida (só os ícones), ficou parada no meio da tela, por
- * cima do conteúdo. Mesma família do hotfix de 06/10 (#139, barra de ações e cápsula no meio da tela no iPhone instalado). A causa lida no código está em `layout.module.css`
- * (`.barraInferior`): o elemento `position: fixed` tinha o `transform: translateX(-50%)` do centramento, o `backdrop-filter` e a transição de `width` ao encolher; o desenho agora
- * tem a ancoragem fixa sem nada que mexa na geometria e a cápsula dentro dela.
+ * A barra de abas do celular presa no rodapé. Dois pedidos do Gustavo: 23/10/2026 (iPhone, Safari com a barra de endereço à vista, Criar rolada até o fim: a cápsula ficou parada no meio da tela, por cima
+ * do conteúdo; mesma família do hotfix de 06/10, #139) e 25/11/2026 ("a parte de baixo fica meio que flutuando quando não deveria": a cápsula de vidro solta, com vão embaixo e nos lados, virou a barra de
+ * abas de um aplicativo nativo, de ponta a ponta, colada na borda, com a área segura dentro dela e o conteúdo de toda tela terminando acima dela). A estrutura de `layout.module.css` (`.barraInferior`
+ * âncora fixa sem `transform` nem `backdrop-filter`, e `.capsula` dentro dela) segue a mesma, pelo que o WebKit perde.
  *
- * O que o Chromium prova aqui: depois de rolar até o fim (a cápsula encolhe), de subir e descer de novo, e de encolher e devolver a janela (a barra do Safari que aparece e some),
- * o retângulo da cápsula termina colado no rodapé e centrado; e o elemento fixo não tem `transform` nem `backdrop-filter` (para ninguém trazer de volta o que o WebKit perde). O que o
- * Chromium NÃO prova: a camada do WebKit no iPhone; essa prova é do aparelho do Gustavo (ver o PR). De 768 para cima a cápsula não existe (a barra lateral toma o lugar): nesse
- * tamanho o teste confere que ela continua sumida e que a barra lateral fica à vista depois de rolar.
+ * O que o Chromium prova aqui: a barra tem a largura da janela e o fundo dela é o fundo da janela (sem vão), em qualquer altura de janela (a barra do Safari que aparece e some) e depois de rolar até o fim;
+ * a altura dela não muda ao rolar; o último elemento da tela fica inteiro acima dela com a rolagem no fim; e o elemento fixo não tem `transform` nem `backdrop-filter`. O que o Chromium NÃO prova: a camada do WebKit
+ * no iPhone (as capturas do PR vêm do WebKit do Playwright; o aparelho do Gustavo é a prova final). De 768 para cima a barra não existe (a barra lateral toma o lugar): nesse tamanho o teste confere que ela
+ * continua sumida e que a barra lateral fica à vista depois de rolar.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
@@ -62,63 +62,82 @@ test.describe("a cápsula de abas fica no rodapé depois de rolar até o fim", (
   test.describe("iPhone, 390x844", () => {
     test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
 
-    /** O retângulo da cápsula (o vidro, não a faixa de ancoragem), e a altura da janela de agora. */
+    /** O retângulo da barra (o fundo, não a faixa de ancoragem), e o tamanho da janela de agora. */
     async function medir(page: Page) {
       const caixa = await page.locator("[data-capsula-abas] > div").boundingBox();
-      if (!caixa) throw new Error("cápsula sem caixa delimitadora");
+      if (!caixa) throw new Error("barra de abas sem caixa delimitadora");
       const janela = await page.evaluate(() => ({ altura: window.innerHeight, largura: window.innerWidth }));
-      return { ...caixa, folgaBaixo: janela.altura - (caixa.y + caixa.height), centro: caixa.x + caixa.width / 2, larguraJanela: janela.largura };
+      return { ...caixa, folgaBaixo: janela.altura - (caixa.y + caixa.height), larguraJanela: janela.largura };
     }
 
-    function colada(m: Awaited<ReturnType<typeof medir>>) {
-      // 8 px de respiro (`--espaco-2`) mais a área segura de baixo, que o Chromium emula como 0: nunca mais que 24 px do rodapé, e nunca abaixo dele.
-      expect(m.folgaBaixo).toBeGreaterThanOrEqual(0);
-      expect(m.folgaBaixo).toBeLessThanOrEqual(24);
-      expect(Math.abs(m.centro - m.larguraJanela / 2)).toBeLessThan(1);
+    function presa(m: Awaited<ReturnType<typeof medir>>) {
+      // Colada na borda de baixo (a área segura, que o Chromium emula como 0, fica dentro dela) e de ponta a ponta.
+      expect(Math.abs(m.folgaBaixo)).toBeLessThan(1);
+      expect(Math.abs(m.x)).toBeLessThan(1);
+      expect(Math.abs(m.width - m.larguraJanela)).toBeLessThan(1);
     }
 
-    test("rolar até o fim encolhe a cápsula e ela termina no rodapé; subir e descer, e a barra do Safari indo e vindo, não a soltam", async ({ page }) => {
+    test("a barra fica presa na borda, com a mesma altura, ao rolar até o fim; a barra do Safari indo e vindo não a solta; o último item termina acima dela", async ({ page }) => {
       await entrar(page);
       await page.goto("/criar");
       await page.waitForLoadState("networkidle");
       await alongarATela(page);
 
       const antes = await medir(page);
-      colada(antes);
-      expect(antes.width).toBeGreaterThan(300); // cheia, com os rótulos
+      presa(antes);
 
-      // A estrutura que o WebKit perde: o elemento fixo não carrega `transform` nem `backdrop-filter` (ficam na cápsula dentro dele).
+      // A estrutura que o WebKit perde: o elemento fixo não carrega `transform` nem `backdrop-filter` (ficam na barra dentro dele).
       const ancora = await page.locator("[data-capsula-abas]").evaluate((el) => {
         const css = getComputedStyle(el);
         return { posicao: css.position, transform: css.transform, desfoque: css.backdropFilter || "none" };
       });
       expect(ancora).toEqual({ posicao: "fixed", transform: "none", desfoque: "none" });
 
-      // Até o fim da página, em passos: a cápsula encolhe (só os ícones) e fica no rodapé.
+      // Até o fim da página, em passos: a barra não muda de altura nem de largura, e termina na borda.
       const fim = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
       expect(fim).toBeGreaterThan(1000);
       await rolarEm(page, 0, fim, 60);
-      await expect.poll(async () => (await medir(page)).width, { timeout: 5000 }).toBeLessThan(260);
-      await page.waitForTimeout(500); // a mola da largura (300 ms) assentou
-      colada(await medir(page));
+      await page.waitForTimeout(400);
+      const noFim = await medir(page);
+      presa(noFim);
+      expect(Math.abs(noFim.height - antes.height)).toBeLessThan(1);
       await expect(page.locator("[data-capsula-abas] a").first()).toBeVisible();
+      await expect(page.locator("[data-capsula-abas] a").first().locator("span").last()).toBeVisible(); // o rótulo escrito continua à vista
 
-      // A barra de endereço do Safari aparece e some (a altura da janela muda) com a página no fim: a cápsula acompanha o rodapé de cada altura.
+      // A barra de endereço do Safari aparece e some (a altura da janela muda) com a página no fim: a barra acompanha a borda de cada altura.
       await page.setViewportSize({ width: 390, height: 730 });
-      colada(await medir(page));
+      presa(await medir(page));
       await page.setViewportSize({ width: 390, height: 844 });
-      colada(await medir(page));
+      presa(await medir(page));
 
-      // Subir de propósito abre a cápsula; descer de novo a encolhe; nos dois casos ela fica no rodapé.
+      // Subir e descer de novo não a muda.
       await rolarEm(page, fim, Math.max(fim - 600, 0), 60);
-      await expect.poll(async () => (await medir(page)).width, { timeout: 5000 }).toBeGreaterThan(300);
-      await page.waitForTimeout(500);
-      colada(await medir(page));
+      presa(await medir(page));
       await rolarEm(page, Math.max(fim - 600, 0), fim, 60);
-      await expect.poll(async () => (await medir(page)).width, { timeout: 5000 }).toBeLessThan(260);
-      await page.waitForTimeout(500);
-      colada(await medir(page));
+      presa(await medir(page));
     });
+
+    for (const rota of ["/hoje", "/criar", "/conta"]) {
+      test(`${rota}: com a rolagem no fim, o último elemento da tela termina inteiro acima da barra`, async ({ page }) => {
+        await entrar(page);
+        await page.goto(rota);
+        await page.waitForLoadState("networkidle");
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await page.waitForTimeout(500);
+        const { topoBarra, fundoConteudo } = await page.evaluate(() => {
+          const barra = document.querySelector("[data-capsula-abas] > div") as HTMLElement;
+          let fundo = 0;
+          document.querySelectorAll("main *").forEach((el) => {
+            if (el.children.length > 0) return;
+            const caixa = (el as HTMLElement).getBoundingClientRect();
+            if (caixa.height > 0 && getComputedStyle(el).position !== "fixed") fundo = Math.max(fundo, caixa.bottom);
+          });
+          return { topoBarra: barra.getBoundingClientRect().top, fundoConteudo: fundo };
+        });
+        expect(fundoConteudo).toBeGreaterThan(0);
+        expect(fundoConteudo).toBeLessThanOrEqual(topoBarra);
+      });
+    }
   });
 
   /**

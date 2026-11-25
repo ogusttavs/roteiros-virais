@@ -87,11 +87,10 @@
     border-color var(--duracao-troca) var(--curva-padrao);
 }
 
+/* 25/11/2026: rolado, o fundo é sólido e sem desfoque (nada do que rola passa legível por baixo; a âncora fixa não carrega `backdrop-filter`, #218). */
 .cabecalho.rolada {
-  background: var(--vidro-fundo);
-  backdrop-filter: var(--vidro-desfoque);
-  -webkit-backdrop-filter: var(--vidro-desfoque);
-  border-bottom-color: var(--vidro-contorno);
+  background: var(--vidro-solido);
+  border-bottom-color: var(--cor-divisor);
 }
 
 .identidade {

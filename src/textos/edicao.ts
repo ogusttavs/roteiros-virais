@@ -136,7 +136,7 @@ export const textosEdicao = {
    * deste roteiro, o cartão diz em uma linha em que ponto ela está, e o botão abre a folha nesse ponto.
    */
   chamado: {
-    titulo: "Gravou? Mande o vídeo que a gente edita para você.",
+    titulo: "Gravou? Mande o vídeo que a gente edita para você",
     botao: "Editar o meu vídeo",
     botaoAbrir: "Abrir a edição",
     montando: "Sua edição está sendo montada",

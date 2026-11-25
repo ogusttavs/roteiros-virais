@@ -59,7 +59,10 @@ jobs:
       # O Chromium do Playwright serve ao e2e e tambem aos testes de integracao (PNG do carrossel, motor da animacao): instala uma vez, antes de `npm run test`.
       - run: npx playwright install --with-deps chromium
 
+      # O Chromium com sandbox pode nao subir no runner; so a CI, o conteiner de render de producao tem a propria regra.
       - run: npm run test
+        env:
+          ANIMACAO_SEM_SANDBOX: "1"
 
       # e2e roda contra o build de producao (next start), nao o next dev
       # (etapa 13, parte 3, decisao 2 do PROXIMO.md): builda aqui, uma vez,

@@ -52,7 +52,7 @@ test.describe("com a chave do cadastro ligada", () => {
 
     // A página de vendas leva ao cadastro e o formulário de interessado continua embaixo.
     await page.goto("/");
-    await expect(page.getByText("Gravou? A gente edita.")).toBeVisible();
+    await expect(page.getByText("Gravou? A gente edita")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Quero testar" })).toBeVisible();
     await page.getByRole("link", { name: "Começar o teste grátis" }).first().click();
     await page.waitForURL("**/criar-conta");

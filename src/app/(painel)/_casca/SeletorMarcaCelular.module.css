@@ -212,7 +212,7 @@
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-legenda);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: var(--espacamento-legenda);
   color: var(--cor-texto-suave);
 }
 
@@ -310,7 +310,7 @@
   position: fixed;
   left: var(--margem-celular);
   right: var(--margem-celular);
-  bottom: calc(64px + var(--espaco-4) + env(safe-area-inset-bottom));
+  bottom: calc(var(--altura-barra-abas) + var(--espaco-4) + env(safe-area-inset-bottom));
   z-index: 52;
   pointer-events: none;
   padding: var(--espaco-3);
