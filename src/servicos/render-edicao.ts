@@ -89,6 +89,11 @@ async function falhar(edicao: Pick<Edicao, "id" | "caminhoBruto" | "caminhoPrevi
     .where(eq(edicoes.id, edicao.id));
 }
 
+/** A parte da chave do pg-boss do render refeito pela conferência: muda a cada rodada, para um reenvio depois de um "refazer" nunca ser descartado como duplicado do anterior. */
+export function chaveDoRefeito(rodada: number): string {
+  return `conferencia-${rodada}`;
+}
+
 type ConferenciaComTempo = Conferencia & { segundos: number; naoConferido?: boolean };
 
 /** Mede a prévia e confere com o plano. Se a conferência em si falhar (o ffmpeg não leu, passou do tempo), a prévia segue sem ela: conferir não pode derrubar o que já foi montado. */
@@ -100,7 +105,25 @@ async function conferirOVideo(edicao: Edicao, caminho: string, duracaoS: number,
     const c = deps.conferir
       ? await deps.conferir(caminho, esperado, resultado)
       : await conferirVideo({ caminho, esperado: { perfil: "previa", ...esperado }, blocos: resultado.legenda.blocos, titulo: resultado.titulo });
-    return { ...c, segundos: (Date.now() - inicio) / 1000 };
+    const comTempo = { ...c, segundos: (Date.now() - inicio) / 1000 };
+    // Uma linha por conferência, para a Central calibrar os limites com vídeo real. Só números e o id da edição, nada da fala.
+    const m = c.medidas;
+    logger.info(
+      {
+        edicaoId: edicao.id,
+        desfecho: c.graves.length > 0 ? "grave" : c.leves.length > 0 ? "aviso" : "ok",
+        graves: c.graves.length,
+        leves: c.leves.length,
+        volumeLufs: m.volumeLufs ?? null,
+        pretoMaxS: m.pretoMaxS ?? null,
+        paradoMaxS: m.paradoMaxS ?? null,
+        mudoMaxS: m.mudoMaxS ?? null,
+        diferencaDeDuracaoS: m.diferencaDeDuracaoS ?? null,
+        segundos: Math.round(comTempo.segundos * 100) / 100,
+      },
+      "edicao: conferencia do video",
+    );
+    return comTempo;
   } catch (erro) {
     logger.warn({ edicaoId: edicao.id, erro: erro instanceof Error ? erro.name : "erro" }, "edicao: a conferencia do video nao rodou");
     return { graves: [], leves: ["a conferencia do video nao rodou"], medidas: {}, segundos: (Date.now() - inicio) / 1000, naoConferido: true };
@@ -127,7 +150,8 @@ function guardarConferencia(edicao: Pick<Edicao, "conferenciaDoVideo">, c: Confe
 async function resolverDefeitoGrave(edicao: Edicao, conferencia: ConferenciaComTempo, deps: DepsDoRender): Promise<Record<string, unknown>> {
   const agora = new Date();
   const { montando, espera } = ESTADOS_DO_RENDER.previa;
-  const refazer = (edicao.conferenciaDoVideo?.rodada ?? 0) < 1;
+  const rodadaNova = (edicao.conferenciaDoVideo?.rodada ?? 0) + 1;
+  const refazer = rodadaNova <= 1;
   if (!refazer) {
     await db()
       .update(edicoes)
@@ -149,7 +173,7 @@ async function resolverDefeitoGrave(edicao: Edicao, conferencia: ConferenciaComT
     .set({ estado: espera, progressoDoRender: null, tentativasDoRender: 0, conferenciaDoVideo: guardarConferencia(edicao, conferencia, agora, "refeito"), atualizadaEm: agora })
     .where(and(eq(edicoes.id, edicao.id), eq(edicoes.estado, montando)));
   try {
-    await (deps.enfileirar ?? ((id, p, s) => enfileirarRender(id, p, s, "conferencia")))(edicao.id, "previa", 5);
+    await (deps.enfileirar ?? ((id, p, s) => enfileirarRender(id, p, s, chaveDoRefeito(rodadaNova))))(edicao.id, "previa", 5);
   } catch (erro) {
     // A limpeza de hora em hora enfileira de novo o que ficou esperando sem ninguém pegar.
     logger.warn({ err: erro, edicaoId: edicao.id }, "edicao: nao foi possivel enfileirar o render refeito pela conferencia");

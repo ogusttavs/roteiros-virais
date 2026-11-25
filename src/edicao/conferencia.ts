@@ -2,8 +2,9 @@
  * Conferência do vídeo montado: depois que o render escreve a prévia e antes de a pessoa ver, o arquivo é medido (ffprobe e uma passada do ffmpeg com `ebur128`, `silencedetect`, `blackdetect` e
  * `freezedetect`, sem dependência nova nem IA) e comparado com o plano. `avaliar` é puro e é onde estão os limites (`LIMITES_DA_CONFERENCIA`); `medirVideo` é quem roda os processos.
  *
- * O que é grave (sem som, duração muito diferente, quadro preto longo, arquivo sem imagem ou do tamanho errado) manda refazer o render uma vez e, na segunda, a edição vai para revisão. O que é
- * leve (volume fora do alvo, silêncio ou quadro parado que o plano não pediu, texto que passa do quadro) só vira aviso guardado. Os textos daqui são técnicos e só o admin os lê; a pessoa nunca vê.
+ * Só o defeito de forma é grave (arquivo sem imagem, sem som quando o bruto tinha, do tamanho errado ou ilegível) e manda refazer o render uma vez e, na segunda, a edição vai para revisão.
+ * Todo o resto (volume, quadro preto, duração, silêncio ou quadro parado que o plano não pediu, texto que passa do quadro) só vira aviso guardado e a prévia segue normal. É assim até calibrar
+ * os limites com as medidas de produção (decisão da Central em 25/11/2026). Os textos daqui são técnicos e só o admin os lê; a pessoa nunca vê.
  * Nada da fala, do título ou da legenda vai para log: só números.
  */
 import { AJUSTES_DO_RENDER, LIMITES_DA_CONFERENCIA as L } from "@/config/edicao";
@@ -35,6 +36,8 @@ export type EsperadoDoVideo = {
   /** A duração que o plano calculou, com o respiro final. */
   duracaoS: number;
   respiroFinalS: number;
+  /** O bruto tinha faixa de áudio? O padrão é sim: o grafo do render exige áudio, então um render que terminou veio de um bruto com som. */
+  brutoTinhaAudio?: boolean;
 };
 
 export type TextoForaDoQuadro = { legenda: number; titulo: number; piorFolgaPx: number };
@@ -88,21 +91,19 @@ export function avaliar(medidas: MedidasDoVideo, esperado: EsperadoDoVideo, text
 
   // Forma: tem imagem, tem som, o tamanho e a proporção do perfil.
   if (!medidas.temVideo) graves.push("o arquivo nao tem imagem");
-  if (!medidas.temAudio) graves.push("o arquivo nao tem audio");
+  if (!medidas.temAudio && esperado.brutoTinhaAudio !== false) graves.push("o arquivo nao tem audio");
   if (medidas.temVideo && (medidas.largura !== tela.largura || medidas.altura !== tela.altura)) {
     graves.push(`tamanho da imagem ${medidas.largura}x${medidas.altura}, esperado ${tela.largura}x${tela.altura}`);
   }
 
-  // Duração contra a soma dos trechos do plano (com o respiro final).
+  // Duração contra a soma dos trechos do plano (com o respiro final). Só `null` (ffprobe não leu) é grave; fora da tolerância é aviso.
   const diferenca = Math.abs(duracao - esperado.duracaoS);
-  const limiteGrave = Math.max(L.duracaoGraveS, esperado.duracaoS * L.duracaoGraveFracao);
-  if (medidas.duracaoS === null || diferenca > limiteGrave) graves.push(`duracao ${medidas.duracaoS === null ? "ilegivel" : `${arredondar(duracao)} s`}, esperada ${arredondar(esperado.duracaoS)} s`);
+  if (medidas.duracaoS === null) graves.push(`duracao ilegivel, esperada ${arredondar(esperado.duracaoS)} s`);
   else if (diferenca > L.duracaoLeveS) leves.push(`duracao ${arredondar(duracao)} s, esperada ${arredondar(esperado.duracaoS)} s`);
 
   // Volume e silêncio (só faz sentido se há áudio).
   if (medidas.temAudio) {
-    if (medidas.volumeLufs !== null && medidas.volumeLufs < L.volumeMudoLufs) graves.push(`volume de ${arredondar(medidas.volumeLufs, 1)} LUFS: o audio esta praticamente mudo`);
-    else if (medidas.volumeLufs !== null && Math.abs(medidas.volumeLufs - L.alvoDeVolumeLufs) > L.toleranciaDoVolumeLu) {
+    if (medidas.volumeLufs !== null && Math.abs(medidas.volumeLufs - L.alvoDeVolumeLufs) > L.toleranciaDoVolumeLu) {
       leves.push(`volume de ${arredondar(medidas.volumeLufs, 1)} LUFS, alvo ${L.alvoDeVolumeLufs}`);
     } else if (medidas.volumeLufs === null) leves.push("volume nao medido");
     const aPartirDoFim = esperado.duracaoS - esperado.respiroFinalS - 0.5;
@@ -113,8 +114,7 @@ export function avaliar(medidas: MedidasDoVideo, esperado: EsperadoDoVideo, text
   // Imagem: quadro preto (o fim escurece de propósito) e quadro parado (o último quadro segura pelo respiro do plano).
   const pretos = medidas.preto.map((i) => semOEsperado(i, esperado.duracaoS - L.folgaDoFadeFinalS)).filter((i): i is Intervalo => i !== null);
   const maiorPreto = Math.max(0, ...pretos.map((i) => i.duracao));
-  if (maiorPreto >= L.pretoGraveS) graves.push(`quadro preto de ${arredondar(maiorPreto, 1)} s`);
-  else if (maiorPreto >= L.pretoLeveS) leves.push(`quadro preto de ${arredondar(maiorPreto, 1)} s`);
+  if (maiorPreto >= L.pretoLeveS) leves.push(`quadro preto de ${arredondar(maiorPreto, 1)} s`);
   const parados = medidas.parado.map((i) => semOEsperado(i, esperado.duracaoS - esperado.respiroFinalS - 0.3)).filter((i): i is Intervalo => i !== null && i.duracao >= L.paradoLeveS);
   if (parados.length > 0) leves.push(`${parados.length} trecho(s) de imagem parada acima de ${L.paradoLeveS} s, o maior com ${arredondar(Math.max(...parados.map((i) => i.duracao)), 1)} s`);
 
@@ -127,6 +127,7 @@ export function avaliar(medidas: MedidasDoVideo, esperado: EsperadoDoVideo, text
     leves,
     medidas: {
       duracaoS: medidas.duracaoS === null ? null : arredondar(medidas.duracaoS),
+      diferencaDeDuracaoS: medidas.duracaoS === null ? null : arredondar(diferenca),
       esperadaS: arredondar(esperado.duracaoS),
       largura: medidas.largura,
       altura: medidas.altura,

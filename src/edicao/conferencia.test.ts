@@ -56,9 +56,10 @@ describe("a medição com o ffmpeg de verdade", () => {
     expect(c.graves.join(" ")).toContain("nao tem audio");
   }, 30_000);
 
-  it("3 segundos de quadro preto no meio são defeito grave", async () => {
+  it("3 segundos de quadro preto no meio são só aviso", async () => {
     const c = await conferirVideo({ caminho: gerar("preto.mp4", { filtroDeVideo: "drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill:enable='between(t,2,5)'" }), esperado, blocos: [], titulo: { texto: "Oi", subtitulo: null } });
-    expect(c.graves.join(" ")).toContain("quadro preto");
+    expect(c.graves).toEqual([]);
+    expect(c.leves.join(" ")).toContain("quadro preto");
   }, 30_000);
 
   it("o fim que escurece de propósito não conta como quadro preto", async () => {
@@ -78,16 +79,18 @@ describe("a medição com o ffmpeg de verdade", () => {
     expect(noRespiro.leves.join(" ")).not.toContain("imagem parada");
   }, 30_000);
 
-  it("um vídeo curto demais para o plano é defeito grave de duração", async () => {
+  it("um vídeo curto demais para o plano é só aviso de duração", async () => {
     const c = await conferirVideo({ caminho: gerar("curto.mp4", { segundos: 3 }), esperado, blocos: [], titulo: { texto: "Oi", subtitulo: null } });
-    expect(c.graves.join(" ")).toContain("duracao");
+    expect(c.graves).toEqual([]);
+    expect(c.leves.join(" ")).toContain("duracao");
   }, 30_000);
 
-  it("silêncio longo que o plano não pediu é aviso, e áudio praticamente mudo é grave", async () => {
+  it("silêncio longo que o plano não pediu é aviso, e áudio praticamente mudo também é só aviso", async () => {
     const mudoNoMeio = await conferirVideo({ caminho: gerar("mudo-meio.mp4", { filtroDeAudio: "volume=8dB,volume=0:enable='between(t,1,5)'" }), esperado, blocos: [], titulo: { texto: "Oi", subtitulo: null } });
     expect(mudoNoMeio.leves.join(" ")).toContain("mudo");
     const quaseMudo = await conferirVideo({ caminho: gerar("quase-mudo.mp4", { filtroDeAudio: "volume=-40dB" }), esperado, blocos: [], titulo: { texto: "Oi", subtitulo: null } });
-    expect(quaseMudo.graves.join(" ")).toContain("mudo");
+    expect(quaseMudo.graves).toEqual([]);
+    expect(quaseMudo.leves.join(" ")).toContain("LUFS");
   }, 30_000);
 
   it("um volume longe do alvo é só aviso", async () => {
@@ -111,35 +114,34 @@ describe("os limites de `avaliar`", () => {
     expect(ok({})).toMatchObject({ graves: [], leves: [] });
   });
 
-  it("duração: até 0,35 s de diferença passa, acima é aviso, acima de 1,5 s é grave", () => {
+  it("duração: até 0,35 s de diferença passa e acima é só aviso, por maior que seja; só a duração ilegível é grave", () => {
     expect(ok({ duracaoS: 8.3 }).leves).toEqual([]);
     expect(ok({ duracaoS: 8.4 }).leves).toHaveLength(1);
-    expect(ok({ duracaoS: 9.4 })).toMatchObject({ graves: [] });
-    expect(ok({ duracaoS: 9.6 }).graves).toHaveLength(1);
+    expect(ok({ duracaoS: 9.6 })).toMatchObject({ graves: [] });
+    expect(ok({ duracaoS: 9.6 }).leves).toHaveLength(1);
+    expect(ok({ duracaoS: 20 }).graves).toEqual([]);
+    expect(ok({ duracaoS: 20 }).medidas).toMatchObject({ diferencaDeDuracaoS: 12 });
     expect(ok({ duracaoS: null }).graves).toHaveLength(1);
   });
 
-  it("duração: em vídeo longo o limite grave cresce com a duração (8%)", () => {
-    const longo: EsperadoDoVideo = { ...esperado, duracaoS: 100 };
-    expect(avaliar({ ...medidasBoas, duracaoS: 106 }, longo, semTexto).graves).toEqual([]);
-    expect(avaliar({ ...medidasBoas, duracaoS: 109 }, longo, semTexto).graves).toHaveLength(1);
-  });
-
-  it("volume: dentro de 2 LU do alvo passa, fora é aviso, abaixo de -35 LUFS é grave", () => {
+  it("volume: dentro de 2 LU do alvo passa, fora é aviso, e fala baixa (abaixo de -35 LUFS) também é só aviso", () => {
     expect(ok({ volumeLufs: -12.1 }).leves).toEqual([]);
     expect(ok({ volumeLufs: -11.5 }).leves).toHaveLength(1);
     expect(ok({ volumeLufs: -20 })).toMatchObject({ graves: [] });
-    expect(ok({ volumeLufs: -36 }).graves).toHaveLength(1);
+    expect(ok({ volumeLufs: -36 })).toMatchObject({ graves: [] });
+    expect(ok({ volumeLufs: -36 }).leves).toHaveLength(1);
     expect(ok({ volumeLufs: null }).leves).toEqual(["volume nao medido"]);
   });
 
-  it("quadro preto: 0,5 s é aviso e 2 s é grave, mas o escurecer do fim (a partir de duração - 1,2 s) não conta", () => {
+  it("quadro preto: 0,5 s é aviso e 2 s ou mais também é só aviso, e o escurecer do fim (a partir de duração - 1,2 s) não conta", () => {
     expect(ok({ preto: [{ inicio: 3, duracao: 0.4 }] })).toMatchObject({ graves: [], leves: [] });
     expect(ok({ preto: [{ inicio: 3, duracao: 0.6 }] }).leves).toHaveLength(1);
-    expect(ok({ preto: [{ inicio: 3, duracao: 2 }] }).graves).toHaveLength(1);
+    expect(ok({ preto: [{ inicio: 3, duracao: 2 }] })).toMatchObject({ graves: [] });
+    expect(ok({ preto: [{ inicio: 3, duracao: 2 }] }).leves).toHaveLength(1);
     expect(ok({ preto: [{ inicio: 6.9, duracao: 1.1 }] })).toMatchObject({ graves: [], leves: [] });
     // Um preto longo que começa antes do fim conta só até o fim esperado do escurecer.
-    expect(ok({ preto: [{ inicio: 4, duracao: 4 }] }).graves).toHaveLength(1);
+    expect(ok({ preto: [{ inicio: 4, duracao: 4 }] }).leves).toHaveLength(1);
+    expect(ok({ preto: [{ inicio: 4, duracao: 4 }] }).medidas.pretoMaxS).toBeCloseTo(2.8, 1);
   });
 
   it("imagem parada e silêncio: abaixo do limite não avisa, e o que está no respiro final do plano é esperado", () => {
@@ -151,17 +153,30 @@ describe("os limites de `avaliar`", () => {
     expect(ok({ mudo: [{ inicio: 7, duracao: 1 }] }).leves).toEqual([]);
   });
 
-  it("forma: sem imagem, sem som ou do tamanho errado são graves", () => {
+  it("forma: sem imagem, sem som (com bruto com som) ou do tamanho errado são graves", () => {
     expect(ok({ temVideo: false, largura: null, altura: null }).graves.length).toBeGreaterThan(0);
     expect(ok({ temAudio: false }).graves).toContain("o arquivo nao tem audio");
+    expect(avaliar({ ...medidasBoas, temAudio: false }, { ...esperado, brutoTinhaAudio: true }, semTexto).graves).toContain("o arquivo nao tem audio");
+    // Bruto que nunca teve som: a saída sem som não é defeito do render.
+    expect(avaliar({ ...medidasBoas, temAudio: false }, { ...esperado, brutoTinhaAudio: false }, semTexto).graves).toEqual([]);
     expect(ok({ largura: 1080, altura: 1920 }).graves).toHaveLength(1);
     expect(ok({ largura: 960, altura: 540 }).graves).toHaveLength(1);
+    expect(ok({ largura: 544 }).graves).toHaveLength(1);
+    expect(ok({ altura: 964 }).graves).toHaveLength(1);
   });
 
   it("texto fora do quadro é só aviso", () => {
     const c = avaliar(medidasBoas, esperado, { legenda: 2, titulo: 1, piorFolgaPx: -40 });
     expect(c.graves).toEqual([]);
     expect(c.leves).toHaveLength(2);
+  });
+});
+
+describe("a chave do render refeito pela conferência", () => {
+  it("muda a cada rodada, para o pg-boss não descartar o reenvio", async () => {
+    const { chaveDoRefeito } = await import("@/servicos/render-edicao");
+    expect(chaveDoRefeito(1)).not.toBe(chaveDoRefeito(2));
+    expect(chaveDoRefeito(1)).toContain("1");
   });
 });
 

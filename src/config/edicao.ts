@@ -117,31 +117,27 @@ export function limiteDoRenderMs(perfil: "previa" | "final", duracaoDoVideoS: nu
 }
 
 /**
- * A conferência do vídeo montado (a prévia), medida com o ffmpeg e o ffprobe do próprio render, antes de a pessoa ver. Defeito grave refaz o render uma vez e, se repetir, a edição vai para
- * revisão (`para_revisao`); defeito leve vira só aviso guardado em `edicoes.conferencia_do_video`. Os limites são de 25/11/2026: ainda sem vídeo real de cliente para calibrar, então os
- * graves são largos (pegam só o que a pessoa notaria na hora) e os leves são estreitos (só avisam).
+ * A conferência do vídeo montado (a prévia), medida com o ffmpeg e o ffprobe do próprio render, antes de a pessoa ver. Só os defeitos de forma (sem imagem, sem áudio quando o bruto tinha, tamanho do quadro
+ * diferente do pedido, arquivo ilegível) são graves: refazem o render uma vez e, se repetirem, a edição vai para revisão (`para_revisao`). Volume, quadro preto, imagem parada, silêncio e
+ * duração são sempre aviso guardado em `edicoes.conferencia_do_video`, e a prévia segue normal para a pessoa. É assim até calibrar com as medidas de produção (decisão da Central em
+ * 25/11/2026): vídeo legítimo (fala baixa gravada longe, cena escura, taxa de quadros variável do celular) não pode ser barrado por limite chutado.
  */
 export const LIMITES_DA_CONFERENCIA = {
   /** O alvo do `loudnorm` do render. */
   alvoDeVolumeLufs: -14,
   /** Até aqui do alvo é normal (o `loudnorm` de uma passada só erra um ou dois decibéis em vídeo curto); além disso é aviso. */
   toleranciaDoVolumeLu: 2,
-  /** Mais baixo que isto o vídeo está, para quem ouve, sem som: grave. */
-  volumeMudoLufs: -35,
   /** Trecho de silêncio total (abaixo de `limiarDoMudoDb`) mais longo que isto é aviso. O plano só deixa pausas de até 0,6 s, então 2,5 s não foi pedido por ninguém. */
   mudoLongoS: 2.5,
   limiarDoMudoDb: -50,
-  /** Quadro preto: a partir de `pretoLeveS` é aviso; a partir de `pretoGraveS` é grave. */
+  /** Quadro preto a partir daqui é aviso (nunca grave, até calibrar). */
   pretoLeveS: 0.5,
-  pretoGraveS: 2,
   /** O fim do vídeo escurece de propósito (`fadeFinalS`); preto que começa depois de `duração - esta folga` é esperado. */
   folgaDoFadeFinalS: 1.2,
   /** Quadro parado a partir daqui é aviso. O último quadro segura pelo `respiroFinal` do plano, e isso é ignorado. */
   paradoLeveS: 3,
-  /** Duração do arquivo contra a do plano: acima da primeira é aviso, acima da maior entre a segunda e a fração da duração é grave. */
+  /** Duração do arquivo contra a do plano: acima disto é aviso (nunca grave, até calibrar). */
   duracaoLeveS: 0.35,
-  duracaoGraveS: 1.5,
-  duracaoGraveFracao: 0.08,
   /** A conferência inteira (uma passada do ffmpeg) passou disto: o processo é morto e a prévia segue sem conferência. */
   tempoMaximoDaConferenciaMs: 90_000,
 } as const;
