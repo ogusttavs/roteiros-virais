@@ -203,7 +203,7 @@ export const textosBriefing = {
     rotuloPergunta: (perguntaId: string, rotuloCurto: string) => `${perguntaId.toUpperCase()} · ${rotuloCurto}`,
   },
   liberacao: {
-    titulo: "Seu painel está aberto.",
+    titulo: "Seu painel está aberto",
     introducao:
       "A partir de amanhã de manhã você recebe os temas do dia. As suas respostas continuam ali, e você pode mudar qualquer uma quando quiser.",
     botao: "ver o tema de hoje",

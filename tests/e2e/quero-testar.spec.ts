@@ -36,7 +36,7 @@ async function entrar(page: Page, email: string): Promise<void> {
 
 test("sem conta: a página mostra o que o produto faz, o preço do trimestral e o formulário", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Todo dia, o roteiro pronto para você gravar.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Todo dia, o roteiro pronto para você gravar");
   await expect(page.getByRole("heading", { name: "Como funciona" })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "Um roteiro pronto, com a edição junto" })).toBeVisible();
   await expect(page.locator("[data-preco]")).toHaveText("R$ 397 por mês");

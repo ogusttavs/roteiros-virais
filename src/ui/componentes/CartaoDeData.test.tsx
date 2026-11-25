@@ -28,8 +28,8 @@ describe("CartaoDeData", () => {
 
   it("no Hoje: 'Hoje é' para a de hoje e 'Daqui a 7 dias é' para a que vem, com o selo do tipo", () => {
     render(<CartaoDeData hoje={[NATAL]} proximas={[MAES]} variante="hoje" />);
-    expect(screen.getByText("Hoje é Natal.")).not.toBeNull();
-    expect(screen.getByText("Daqui a 7 dias é Dia das Mães.")).not.toBeNull();
+    expect(screen.getByText("Hoje é Natal")).not.toBeNull();
+    expect(screen.getByText("Daqui a 7 dias é Dia das Mães")).not.toBeNull();
     expect(screen.getByText("Feriado")).not.toBeNull();
     expect(screen.getByText("Data que vende")).not.toBeNull();
     expect(screen.getAllByRole("button", { name: "Gravar sobre esta data" })).toHaveLength(2);
@@ -37,15 +37,15 @@ describe("CartaoDeData", () => {
 
   it("um dia antes, a frase é 'Amanhã é'", () => {
     render(<CartaoDeData hoje={[]} proximas={[{ ...MAES, dias: 1 }]} variante="hoje" />);
-    expect(screen.getByText("Amanhã é Dia das Mães.")).not.toBeNull();
+    expect(screen.getByText("Amanhã é Dia das Mães")).not.toBeNull();
   });
 
   it("mostra no máximo três linhas, as de hoje primeiro", () => {
     const quatro: DataProxima[] = [2, 3, 4, 5].map((dias) => ({ ...MAES, chave: `d${dias}`, nome: `Data ${dias}`, dias }));
     render(<CartaoDeData hoje={[NATAL]} proximas={quatro} variante="hoje" />);
     expect(screen.getAllByRole("listitem")).toHaveLength(3);
-    expect(screen.getByText("Hoje é Natal.")).not.toBeNull();
-    expect(screen.queryByText("Daqui a 4 dias é Data 4.")).toBeNull();
+    expect(screen.getByText("Hoje é Natal")).not.toBeNull();
+    expect(screen.queryByText("Daqui a 4 dias é Data 4")).toBeNull();
   });
 
   it("na tela de temas: uma data só, a mais perto, dita como ponto de partida e com a fonte", () => {
