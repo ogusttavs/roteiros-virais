@@ -24,6 +24,7 @@ import { baixarArquivo, guardarImagens, pedirImagensDoRoteiro, pedirPdfDoRoteiro
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { ehFalhaDeRede } from "@/lib/offline";
+import type { VisaoDaAnimacao } from "@/servicos/animacao";
 import type { VisaoDeEditar, VistaCompletaDaEdicao } from "@/servicos/edicao-tela";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { PesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
@@ -67,6 +68,7 @@ import {
   reprovarERescreverAction,
   salvarEdicaoAction,
 } from "./acoes";
+import { ChamadoAnimacao } from "./ChamadoAnimacao";
 import { ChamadoEditarMeuVideo } from "./ChamadoEditarMeuVideo";
 import { EditarMeuVideo } from "./EditarMeuVideo";
 import { PublicarNoInstagram } from "./PublicarNoInstagram";
@@ -265,6 +267,8 @@ type Props = {
   publicar?: VisaoDePublicar | null;
   /** E47 PR 4: "Editar o meu vídeo" (a IA corta, legenda e põe o título; a pessoa aprova a prévia). Nulo quando a função não aparece: no vídeo longo e no estilo sem fala. */
   editar?: VisaoDeEditar | null;
+  /** E68 A3: "Sem tempo de gravar hoje?", só para as marcas da lista `ANIMACAO_CONTAS`; `null` (ou ausente) esconde o cartão. */
+  animacao?: VisaoDaAnimacao | null;
 };
 
 /**
@@ -290,6 +294,7 @@ export function RoteiroTela({
   conviteInstalarPodeAparecer,
   publicar = null,
   editar = null,
+  animacao = null,
 }: Props) {
   const router = useRouter();
   const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
@@ -1183,6 +1188,7 @@ export function RoteiroTela({
                   />
                 ))}
                 {editar ? <ChamadoEditarMeuVideo estado={edicaoViva?.estado ?? null} aoAbrir={() => setPainel("editar")} /> : null}
+                {animacao ? <ChamadoAnimacao roteiroId={roteiro.id} visao={animacao} /> : null}
               </>
             ) : (
               /*
@@ -1195,6 +1201,7 @@ export function RoteiroTela({
                   <BlocoEdicao titulo={ehLongo ? textosRoteiro.capitulos.comoEditarOVideoInteiro : textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
                   {/* E47: o chamado de "Editar o meu vídeo" à vista, logo depois de "Como editar" (o item do menu "Mais opções" continua). Não vem no vídeo longo nem no sem fala: `editar` é nulo neles. */}
                   {editar ? <ChamadoEditarMeuVideo estado={edicaoViva?.estado ?? null} aoAbrir={() => setPainel("editar")} /> : null}
+                {animacao ? <ChamadoAnimacao roteiroId={roteiro.id} visao={animacao} /> : null}
                   {/* Hotfix de 05/10/2026: no Reels falado "Por que assim" vem junto de "Como editar", na MESMA caixa do lado (eram dois `.ladoGrudado` na mesma área da grade, uma por cima da outra). */}
                   {corpo.porQueAssim.length > 0 ? <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} /> : null}
                 </div>

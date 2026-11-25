@@ -20,7 +20,7 @@ const TEXTO_DO_WORKER = semComentarios("worker.ts");
 const TEXTO_DO_RENDER = semComentarios("worker-render.ts");
 
 /** As filas que o worker comum NÃO consome: o contêiner de render (`worker-render.ts`, 1 vCPU, um vídeo por vez) é o único que as registra. */
-const FILAS_DO_RENDER: string[] = ["renderizarEdicao"];
+const FILAS_DO_RENDER: string[] = ["renderizarEdicao", "renderizarAnimacao"];
 
 describe("worker.ts", () => {
   it("toda fila de FILAS tem um boss().work no worker", () => {

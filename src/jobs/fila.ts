@@ -124,6 +124,11 @@ export const FILAS = {
    * Alarme do disco do servidor (29/10/2026): a cada 15 minutos mede o espaço livre e o tamanho dos volumes de vídeo e avisa o admin com 80% (atenção) e 90% (crítico) de uso. Job curto.
    */
   vigiarDisco: "vigiar-disco",
+  /**
+   * E68 A2: o render do vídeo de animação de texto (a prévia 540 por 960 e, depois do sim da pessoa, o final 1080 por 1920), `{ animacaoId, perfil }`. Por evento, e consumida SÓ pelo contêiner
+   * `roteiros-render` (a mesma trava de um vídeo por vez da edição); o worker comum nunca registra esta fila. Sem repetição da fila: a animação conta as tentativas e o próprio job se enfileira de novo.
+   */
+  renderizarAnimacao: "renderizar-animacao",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
@@ -134,7 +139,7 @@ export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
  * `clienteId`, que só `reprovarERescrever` sabe qual é; disparada sem isso,
  * o worker chama o job com `clienteId` indefinido e ele sempre quebra.
  */
-export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram, FILAS.transcreverEdicao, FILAS.decidirEdicao, FILAS.renderizarEdicao]);
+export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram, FILAS.transcreverEdicao, FILAS.decidirEdicao, FILAS.renderizarEdicao, FILAS.renderizarAnimacao]);
 
 /**
  * As filas que aceitam rodar só para um ramo (`{ nichoId }` no disparo) e gravam o ramo em
@@ -222,7 +227,7 @@ export type OpcoesFila = { retryLimit: number; retryBackoff: boolean; expireInSe
  */
 export function opcoesDaFila(nome: string): OpcoesFila {
   // O render (E47 PR 4) passa de 15 minutos no pior caso (final de 3 minutos de vídeo, 1 vCPU); o teto de tempo é o do ffmpeg (`limiteDoRenderMs`, no máximo 30 minutos), então a fila espera 45.
-  if (nome === FILAS.renderizarEdicao) return { retryLimit: 0, retryBackoff: false, expireInSeconds: 45 * 60, heartbeatSeconds: PULSO_DO_WORKER_S };
+  if (nome === FILAS.renderizarEdicao || nome === FILAS.renderizarAnimacao) return { retryLimit: 0, retryBackoff: false, expireInSeconds: 45 * 60, heartbeatSeconds: PULSO_DO_WORKER_S };
   if (FILAS_CURTAS.has(nome)) {
     return { retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60, heartbeatSeconds: PULSO_DO_WORKER_S };
   }
