@@ -71,6 +71,9 @@ export const TIPOS_COM_FOTO_DE_PACIENTE: ReadonlySet<TipoDeSlide> = new Set(["an
 export const LINHA_FIXA_ANTES_DEPOIS_SAUDE = "Imagens publicadas com autorização do paciente. O resultado varia de pessoa para pessoa.";
 /** A frase da recusa quando falta a autorização. */
 export const FRASE_SEM_AUTORIZACAO_DO_PACIENTE = "Para usar foto de paciente, confirme que você tem a autorização dele por escrito.";
+/** E65 PR 5: em saúde, o antes e depois e o resultado só aceitam foto de paciente; foto de paciente só serve a esses dois. */
+export const FRASE_SO_FOTO_DE_PACIENTE = "O antes e depois e o resultado só aceitam foto de paciente, mandada com a autorização dele.";
+export const FRASE_FOTO_DE_PACIENTE_SO_NO_ANTES_E_DEPOIS = "Foto de paciente só entra no antes e depois ou no resultado. Escolha uma das suas fotos do lugar ou do trabalho.";
 
 export const ehCapa = (tipo: TipoDeSlide): boolean => tipo === "capa-foto" || tipo === "capa-texto";
 

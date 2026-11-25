@@ -9,7 +9,7 @@ import { textosCarrossel } from "@/textos/carrossel";
 
 export const dynamic = "force-dynamic";
 
-/** Manda uma foto (multipart, campo `foto`) para o carrossel da marca da sessão: jpg, png ou webp, até 9 por carrossel, com teto de tamanho. Em marca de saúde, com slide de antes e depois ou de resultado, o campo `autorizacaoDoPaciente=true` confirma a autorização escrita do paciente. */
+/** Manda uma foto (multipart, campo `foto`) para o carrossel da marca da sessão: jpg, png ou webp, até 9 por carrossel, com teto de tamanho. Em marca de saúde, `dePaciente=true` marca a foto como de paciente (só ela entra em antes e depois e em resultado) e exige `autorizacaoDoPaciente=true`, a confirmação da autorização escrita; a foto comum não exige nada. */
 export async function POST(request: Request, contexto: { params: Promise<{ id: string }> }) {
   const marca = await marcaDoCarrossel();
   if (marca instanceof NextResponse) return marca;
@@ -32,7 +32,7 @@ export async function POST(request: Request, contexto: { params: Promise<{ id: s
   const arquivo = formulario.get("foto");
   if (!(arquivo instanceof File)) return respostaDeErro("mande a foto no campo foto", 400);
   try {
-    const foto = await enviarFoto(marca.clienteId, id, { tipoDeclarado: arquivo.type, bytes: Buffer.from(await arquivo.arrayBuffer()), autorizacaoDoPaciente: formulario.get("autorizacaoDoPaciente") === "true" });
+    const foto = await enviarFoto(marca.clienteId, id, { tipoDeclarado: arquivo.type, bytes: Buffer.from(await arquivo.arrayBuffer()), autorizacaoDoPaciente: formulario.get("autorizacaoDoPaciente") === "true", dePaciente: formulario.get("dePaciente") === "true" });
     // Foto mais estreita que o slide (1080 px) entra, mas a pessoa é avisada de que pode sair borrada.
     const { largura, ...semLargura } = foto;
     const aviso = largura !== null && largura < LARGURA_MINIMA_DA_FOTO ? textosCarrossel.metodo.fotoEstreita(largura) : null;

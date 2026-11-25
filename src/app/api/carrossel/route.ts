@@ -49,6 +49,7 @@ export async function POST(request: Request) {
       quantidade: typeof corpo.quantidade === "number" ? corpo.quantidade : Number.NaN,
       cor: typeof corpo.cor === "string" ? corpo.cor : undefined,
       fotos: typeof corpo.fotos === "number" ? corpo.fotos : undefined,
+      fotosDePaciente: typeof corpo.fotosDePaciente === "number" ? corpo.fotosDePaciente : undefined,
       observacao: typeof corpo.observacao === "string" ? corpo.observacao.slice(0, 500) : undefined,
       de,
     }, () => recusaDaCobranca({ gasto: "roteiro" }));
