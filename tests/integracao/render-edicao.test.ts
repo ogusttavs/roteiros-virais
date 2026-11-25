@@ -631,3 +631,89 @@ describe("a fila do render", () => {
     ]);
   });
 });
+
+describe("a conferência do vídeo montado, antes da prévia", () => {
+  const defeitoGrave = async () => ({ graves: ["quadro preto de 3 s"], leves: [], medidas: { pretoMaxS: 3 } });
+  const semDefeito = async () => ({ graves: [], leves: [], medidas: {} });
+
+  it("o render de verdade sai conferido: a prévia fica pronta e o registro guarda as medidas, sem defeito grave", async () => {
+    const id = await criarEdicao(marcaA, roteiroA, "verificado");
+    await rodarRenderizarEdicao(id, "previa", semFila);
+    const l = await linha(id);
+    expect(l.estado).toBe("previa_pronta");
+    expect(l.conferenciaDoVideo).toMatchObject({ rodada: 1, graves: [] });
+    expect(["ok", "aviso"]).toContain(l.conferenciaDoVideo?.desfecho);
+    expect(l.conferenciaDoVideo?.medidas).toMatchObject({ largura: 540, altura: 960, temAudio: true, temVideo: true });
+    expect(l.conferenciaDoVideo?.segundosDaConferencia).toBeGreaterThan(0);
+  }, 120_000);
+
+  it("defeito grave na primeira vez: o arquivo some, a edição volta à vez e o render é pedido de novo", async () => {
+    const id = await criarEdicao(marcaA, roteiroA, "verificado");
+    const pedidos: unknown[][] = [];
+    const resumo = await rodarRenderizarEdicao(id, "previa", { ...semFila, enfileirar: async (...a: unknown[]) => void pedidos.push(a), conferir: defeitoGrave } as never);
+    expect(resumo).toMatchObject({ estado: "verificado", conferencia: "refeito" });
+    const l = await linha(id);
+    expect(l).toMatchObject({ estado: "verificado", caminhoPrevia: null, motivo: null, tentativasDoRender: 0 });
+    expect(l.conferenciaDoVideo).toMatchObject({ rodada: 1, desfecho: "refeito", graves: ["quadro preto de 3 s"] });
+    expect(pedidos).toEqual([[id, "previa", 5]]);
+    expect(await arquivosDoVolume()).toEqual([`bruto/ed-${id}.video`]);
+  }, 120_000);
+
+  it("defeito grave de novo na segunda vez: vai para revisão com a frase de sempre, sem prévia e sem outro render", async () => {
+    const id = await criarEdicao(marcaA, roteiroA, "verificado");
+    const pedidos: unknown[][] = [];
+    const deps = { ...semFila, enfileirar: async (...a: unknown[]) => void pedidos.push(a), conferir: defeitoGrave } as never;
+    await rodarRenderizarEdicao(id, "previa", deps);
+    const segunda = await rodarRenderizarEdicao(id, "previa", deps);
+    expect(segunda).toMatchObject({ estado: "para_revisao" });
+    const l = await linha(id);
+    expect(l).toMatchObject({ estado: "para_revisao", caminhoPrevia: null, motivo: fraseDaEdicao("em-revisao") });
+    expect(l.conferenciaDoVideo).toMatchObject({ rodada: 2, desfecho: "revisao" });
+    expect(pedidos).toHaveLength(1);
+    expect((await arquivosDoVolume()).filter((a) => a.startsWith("previa/"))).toEqual([]);
+  }, 120_000);
+
+  it("grave na primeira e bom na segunda: a prévia fica pronta e o registro conta as duas rodadas", async () => {
+    const id = await criarEdicao(marcaA, roteiroA, "verificado");
+    await rodarRenderizarEdicao(id, "previa", { ...semFila, conferir: defeitoGrave } as never);
+    await rodarRenderizarEdicao(id, "previa", { ...semFila, conferir: semDefeito } as never);
+    const l = await linha(id);
+    expect(l.estado).toBe("previa_pronta");
+    expect(l.conferenciaDoVideo).toMatchObject({ rodada: 2, desfecho: "ok" });
+  }, 120_000);
+
+  it("defeito leve só vira aviso guardado: a prévia fica pronta", async () => {
+    const id = await criarEdicao(marcaA, roteiroA, "verificado");
+    await rodarRenderizarEdicao(id, "previa", { ...semFila, conferir: async () => ({ graves: [], leves: ["volume de -18 LUFS, alvo -14"], medidas: {} }) } as never);
+    const l = await linha(id);
+    expect(l.estado).toBe("previa_pronta");
+    expect(l.conferenciaDoVideo).toMatchObject({ desfecho: "aviso", leves: ["volume de -18 LUFS, alvo -14"] });
+  }, 120_000);
+
+  it("se a própria conferência quebrar, a prévia segue sem ela", async () => {
+    const id = await criarEdicao(marcaA, roteiroA, "verificado");
+    await rodarRenderizarEdicao(id, "previa", {
+      ...semFila,
+      conferir: async () => {
+        throw new Error("ffmpeg sumiu");
+      },
+    } as never);
+    const l = await linha(id);
+    expect(l.estado).toBe("previa_pronta");
+    expect(l.conferenciaDoVideo).toMatchObject({ desfecho: "nao-conferido" });
+  }, 120_000);
+
+  it("o vídeo final não passa pela conferência", async () => {
+    const id = await criarEdicao(marcaA, roteiroA, "aprovada");
+    let chamou = false;
+    await rodarRenderizarEdicao(id, "final", {
+      ...semFila,
+      conferir: async () => {
+        chamou = true;
+        return defeitoGrave();
+      },
+    } as never);
+    expect(chamou).toBe(false);
+    expect((await linha(id)).estado).toBe("pronta");
+  }, 180_000);
+});

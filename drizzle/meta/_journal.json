@@ -792,6 +792,13 @@
       "when": 1795624175589,
       "tag": "0116_carrossel",
       "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1795626086637,
+      "tag": "0117_conferencia-do-video",
+      "breakpoints": true
     }
   ]
 }

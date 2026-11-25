@@ -2770,6 +2770,18 @@ export type DecisaoDaEdicao = {
   avisos: string[];
 };
 
+/** A conferência do vídeo montado (a prévia): o que o ffmpeg mediu e o que o código achou. Texto técnico, só o admin lê; nada da fala. */
+export type ConferenciaDoVideo = {
+  /** Quantas vezes o vídeo foi montado e conferido (1, ou 2 se a primeira teve defeito grave). */
+  rodada: number;
+  desfecho: "ok" | "aviso" | "refeito" | "revisao" | "nao-conferido";
+  graves: string[];
+  leves: string[];
+  medidas: Record<string, number | boolean | null>;
+  segundosDaConferencia: number;
+  conferidaEm: string;
+};
+
 /** O plano de edição pronto para o render: o `Edl` do motor, a legenda (blocos e SubRip), o título e o que a conferência achou. Guardado em `edicoes.resultado`. */
 export type ResultadoDaEdicao = {
   edl: Edl;
@@ -2844,6 +2856,8 @@ export const edicoes = pgTable(
     pedidosDeAjuste: jsonb("pedidos_de_ajuste").$type<string[]>(),
     /** E47 PR 4: quantas vezes a pessoa pediu para refazer (teto de 3, porque cada uma é outra decisão da IA e outra prévia). */
     refeitas: integer("refeitas").notNull().default(0),
+    /** Conferência do vídeo montado (a prévia), antes de a pessoa ver. Zerada quando a pessoa pede para refazer com motivo. */
+    conferenciaDoVideo: jsonb("conferencia_do_video").$type<ConferenciaDoVideo>(),
   },
   (t) => [index("edicoes_marca_mes").on(t.clienteId, t.criadaEm), index("edicoes_marca_roteiro").on(t.clienteId, t.roteiroId)],
 );
