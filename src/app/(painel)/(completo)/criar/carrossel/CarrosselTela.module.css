@@ -512,7 +512,7 @@
   padding: 2px var(--espaco-3);
   border-radius: var(--raio-pill);
   background: var(--cor-erro);
-  color: #fff;
+  color: var(--cor-fundo);
   font-size: var(--tamanho-rodape);
   font-weight: var(--peso-semibold);
 }

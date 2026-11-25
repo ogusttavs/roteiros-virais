@@ -165,8 +165,16 @@ async function main(): Promise<void> {
       for (const t of TAMANHOS) {
         const contexto = await browser.newContext({ viewport: { width: t.largura, height: t.altura }, colorScheme: v.cs, timezoneId: "America/Sao_Paulo" });
         const page = await contexto.newPage();
+        // vale em toda página que a captura abrir (o indicador do Next fica de fora)
+        await page.addInitScript(() => {
+          const estilo = document.createElement("style");
+          estilo.textContent = "nextjs-portal { display: none !important; }";
+          document.documentElement.appendChild(estilo);
+        });
         await entrar(page, baseUrl);
-        const salvar = async (estado: string, tela = true) => {
+        // O indicador do Next (nextjs-portal) nunca entra. A captura do tamanho da tela (390x844, 1280x800) mantém a barra e a cápsula onde estão; a da página inteira vai para `rolagem/`, com o que é fixo
+        // (a barra, a cápsula) escondido só durante a captura, para não aparecer no meio da página.
+        const salvar = async (estado: string, comRolagem = false) => {
           const arquivo = `CriarCarrossel.${estado}.${t.rotulo}.${v.modo}.png`;
           // A conferência do desenho: nada passa da borda e todo alvo de toque tem 44 px ou mais (os campos do formulário e os botões visíveis).
           const problemas = await page.evaluate(() => {
@@ -179,8 +187,26 @@ async function main(): Promise<void> {
             return [...fora, ...pequenos];
           });
           if (problemas.length > 0) console.log(`ATENCAO ${arquivo}: ${problemas.join("; ")}`);
-          await page.screenshot({ path: path.join(pasta, arquivo), fullPage: tela });
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.screenshot({ path: path.join(pasta, arquivo) });
           gravados.push(arquivo);
+          if (comRolagem) {
+            await mkdir(path.join(pasta, "rolagem"), { recursive: true });
+            const escondidos = await page.evaluate(() => {
+              const lista: HTMLElement[] = [];
+              for (const el of Array.from(document.querySelectorAll<HTMLElement>("body *"))) {
+                if (getComputedStyle(el).position === "fixed" && !el.closest("[role=dialog]")) {
+                  el.dataset.escondidoNaCaptura = el.style.visibility;
+                  el.style.visibility = "hidden";
+                  lista.push(el);
+                }
+              }
+              return lista.length;
+            });
+            await page.screenshot({ path: path.join(pasta, "rolagem", arquivo), fullPage: true });
+            gravados.push(`rolagem/${arquivo}`);
+            if (escondidos > 0) await page.evaluate(() => document.querySelectorAll<HTMLElement>("[data-escondido-na-captura]").forEach((el) => { el.style.visibility = el.dataset.escondidoNaCaptura ?? ""; delete el.dataset.escondidoNaCaptura; }));
+          }
         };
         // as fotos que a tela manda ao servidor não vão para o carrossel de exemplo
         await page.route(/\/api\/carrossel\/\d+\/fotos$/, (rota) => rota.fulfill({ json: { foto: { id: 1 } } }));
@@ -190,7 +216,7 @@ async function main(): Promise<void> {
           await page.getByLabel("Tenho a autorização por escrito do paciente").check();
           await page.locator('input[type="file"]').first().setInputFiles([1, 2, 3].map((n) => path.join(PASTA_FOTOS, `foto${n}.jpg`)));
           await page.waitForTimeout(400);
-          await salvar("Escolher");
+          await salvar("Escolher", true);
           // gerando: o servidor demora; a captura é feita no meio da espera
           let soltar: () => void = () => undefined;
           const espera = new Promise<void>((resolve) => (soltar = resolve));
@@ -212,7 +238,7 @@ async function main(): Promise<void> {
         await page.locator('button[aria-pressed] img').first().waitFor({ timeout: 60_000 });
         await page.waitForFunction(() => document.querySelectorAll("button[aria-pressed] img").length >= 7, undefined, { timeout: 60_000 });
         await page.waitForTimeout(500);
-        await salvar("Pronto");
+        await salvar("Pronto", true);
 
         if (v.estados.includes("trocarTexto")) {
           await page.getByRole("button", { name: "Slide 3 de 7" }).click();
@@ -220,13 +246,13 @@ async function main(): Promise<void> {
           const dialogo = page.getByRole("dialog");
           await dialogo.getByLabel("Explicação").fill("O dente que levou um golpe escurece por dentro. Com o clareamento, ele volta ao branco em uma sessão.");
           await page.waitForTimeout(400);
-          await salvar("TrocarTexto", false);
+          await salvar("TrocarTexto");
           await page.keyboard.press("Escape");
           await page.waitForTimeout(500);
           await page.getByRole("button", { name: "Slide 6 de 7" }).click();
           await page.getByRole("button", { name: "Trocar a foto" }).click();
           await page.waitForTimeout(600);
-          await salvar("TrocarFoto", false);
+          await salvar("TrocarFoto");
           await page.keyboard.press("Escape");
           await page.waitForTimeout(500);
         }
@@ -237,13 +263,13 @@ async function main(): Promise<void> {
           await preencherEscolher(page, baseUrl);
           await page.getByRole("button", { name: "Criar o carrossel" }).click();
           await page.getByRole("heading", { name: "O carrossel não ficou pronto" }).waitFor();
-          await salvar("Erro", false);
+          await salvar("Erro");
           await page.unroute(/\/api\/carrossel$/);
           await page.route(/\/api\/carrossel$/, (rota) => (rota.request().method() === "POST" ? rota.fulfill({ status: 402, json: { erro: "O seu teste chegou ao fim: para continuar criando, escolha um plano." } }) : rota.continue()));
           await preencherEscolher(page, baseUrl);
           await page.getByRole("button", { name: "Criar o carrossel" }).click();
           await page.getByRole("heading", { name: "Não dá para criar mais carrosséis agora" }).waitFor();
-          await salvar("Limite", false);
+          await salvar("Limite");
         }
         await contexto.close();
       }
