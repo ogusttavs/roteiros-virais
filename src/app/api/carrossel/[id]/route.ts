@@ -19,7 +19,7 @@ export async function GET(_request: Request, contexto: { params: Promise<{ id: s
   return NextResponse.json({ carrossel, fotos }, { headers: SEM_CACHE });
 }
 
-/** Troca o texto de um slide: `{ indice, titulo?, corpo?, fonte?, fotoId?, fotoDepoisId? }`. O tipo do slide não muda. */
+/** Troca o texto de um slide: `{ indice, titulo?, corpo?, fonte?, fotoId?, fotoDepoisId?, autorizacaoDoPaciente? }`. O tipo do slide não muda. */
 export async function PATCH(request: Request, contexto: { params: Promise<{ id: string }> }) {
   const marca = await marcaDoCarrossel();
   if (marca instanceof NextResponse) return marca;
@@ -42,6 +42,7 @@ export async function PATCH(request: Request, contexto: { params: Promise<{ id: 
       fonte: corpo.fonte === null ? null : typeof corpo.fonte === "string" ? corpo.fonte : undefined,
       fotoId: numeroOuNulo(corpo.fotoId),
       fotoDepoisId: numeroOuNulo(corpo.fotoDepoisId),
+      autorizacaoDoPaciente: corpo.autorizacaoDoPaciente === true,
     });
     return NextResponse.json({ carrossel: atualizado }, { headers: SEM_CACHE });
   } catch (erro) {

@@ -98,7 +98,7 @@ function corpoDoSlide(d: DadosDoModelo): string {
       const [antes, depois] = c.includes("Depois:") ? c.split("Depois:") : [c, ""];
       return `<div class="miolo"><span class="selo">${n}</span><h2 data-caixa data-base="64">${t}</h2>
         <div class="par">${d.foto ? imagem(d.foto, "metade") : ""}${d.fotoDepois ? imagem(d.fotoDepois, "metade") : ""}</div>
-        <div class="lados"><p data-caixa data-base="38" data-max="260"><b>Antes</b> ${antes.replace(/^Antes:\s*/, "")}</p>${depois ? `<p data-caixa data-base="38" data-max="260"><b>Depois</b> ${depois.trim()}</p>` : ""}</div></div>`;
+        <div class="lados"><p data-caixa data-base="38" data-max="260"><b>Antes</b> ${antes.replace(/^Antes:\s*/, "")}</p>${depois ? `<p data-caixa data-base="38" data-max="260"><b>Depois</b> ${depois.trim()}</p>` : ""}</div>${slide.rodape ? `<small class="rodape-fixo">${escaparHtml(slide.rodape)}</small>` : ""}</div>`;
     }
     case "dado":
       return `<div class="miolo centro"><span class="selo">${n}</span><span class="rotulo">${rotulo}</span><h2 class="grande" data-caixa data-base="104">${t}</h2><p data-caixa data-base="46">${c}</p>${slide.fonte ? `<small class="fonte">Fonte: ${escaparHtml(slide.fonte)}</small>` : ""}</div>`;
@@ -126,6 +126,7 @@ p{line-height:1.3;color:${p.suave};overflow-wrap:break-word}
 .selo{position:absolute;top:64px;right:88px;font-size:28px;color:${p.suave};font-variant-numeric:tabular-nums}
 .rotulo{display:inline-block;align-self:flex-start;background:${p.destaque};color:${p.sobreDestaque};font-weight:700;font-size:30px;padding:10px 26px;border-radius:999px}
 .fonte{font-size:28px;color:${p.suave}}
+.rodape-fixo{font-size:26px;line-height:1.25;color:${p.suave}}
 .grande{color:${p.destaque}}
 .bloco-cor{background:${p.destaque};color:${p.sobreDestaque};border-radius:48px;padding:72px 64px;display:flex;flex-direction:column;gap:28px}
 .bloco-cor p{color:${p.sobreDestaque}}

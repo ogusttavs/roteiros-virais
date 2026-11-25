@@ -615,7 +615,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
 /**
  * E65 PR 1: o carrossel simulado, determinístico: a quantidade vem da entrada, a capa abre (capa-foto só se a entrada diz que há foto), a chamada fecha e o meio alterna passo e item (nunca três iguais). Marcadores de teste no tema:
  * "[mock:carrossel-longo]" estoura o limite de palavras de um slide, "[mock:carrossel-tres-iguais]" repete o tipo três vezes, "[mock:carrossel-dado-sem-fonte]" tira a fonte do dado,
- * "[mock:carrossel-numero-solto]" escreve um número que a entrada não traz. Os marcadores valem só na primeira tentativa (a segunda corrige, como um modelo corrigiria).
+ * "[mock:carrossel-prova-resultado]" põe um slide de resultado com foto, "[mock:carrossel-prova-fala-outro]" e "[mock:carrossel-prova-fala-cliente]" põem uma fala que só está no tema (nunca do cliente) e uma do perfil, "[mock:carrossel-numero-solto]" escreve um número que a entrada não traz. Os marcadores valem só na primeira tentativa (a segunda corrige, como um modelo corrigiria).
  */
 function mockCarrossel(entrada: string) {
   const tema = extrairCampo(entrada, "Tema escolhido:").replace(/\[mock:[^\]]*\]/g, "").trim() || "tema simulado";
@@ -633,6 +633,9 @@ function mockCarrossel(entrada: string) {
   if (marcado("carrossel-longo")) slides[1].corpo = Array.from({ length: 60 }, () => "palavra").join(" ");
   if (marcado("carrossel-dado-sem-fonte")) slides[1] = { tipo: "dado", titulo: "30%", corpo: "É o que a pesquisa diz.", fonte: null };
   if (marcado("carrossel-antes-depois")) slides[1] = { tipo: "antes-depois", titulo: "Como ficou", corpo: "Antes: manchado. Depois: limpo.", fonte: null };
+  if (marcado("carrossel-prova-resultado")) slides[1] = { tipo: "prova-resultado", titulo: "Resultado de verdade", corpo: "", fonte: null };
+  if (marcado("carrossel-prova-fala-outro")) slides[1] = { tipo: "prova-fala", titulo: "Ana", corpo: tema, fonte: null };
+  if (marcado("carrossel-prova-fala-cliente")) slides[1] = { tipo: "prova-fala", titulo: "Ana", corpo: "relaxa que sai sim", fonte: null };
   if (marcado("carrossel-numero-solto")) slides[1].corpo = "Nove em cada dez pessoas, 87% delas, erram isso todo mês.";
   return {
     slides,

@@ -25,6 +25,9 @@ export function cortarPalavras(texto: string, limite: number): string {
   return palavras.length <= limite ? texto.trim() : palavras.slice(0, limite).join(" ");
 }
 
+/** Uma citação mais curta que isso está contida em qualquer texto e não prova que o cliente falou. */
+export const MINIMO_DE_PALAVRAS_DA_CITACAO = 4;
+
 const TEM_ANO = /(?:^|\D)(?:19|20)\d{2}(?:\D|$)/;
 
 export type SlideDaIA = { tipo: TipoDeSlide; titulo: string; corpo: string; fonte: string | null };
@@ -54,11 +57,11 @@ const semAcentoMinusculo = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g,
 
 /**
  * O limite de palavras de cada tipo, a fonte do `dado`, o título que não pode ficar vazio, os tipos que o ramo de saúde não aceita, as fotos que o pedido prometeu (capa-foto e
- * prova-resultado só existem com foto) e a citação do `prova-fala`, que só vale se for uma frase que a própria pessoa disse (está nas fontes).
+ * prova-resultado só existem com foto) e a citação do `prova-fala`, que só vale se for uma frase que a própria pessoa disse (está nas falas DELA, nunca nas de outros criadores, na notícia ou no tema) e tiver ao menos `MINIMO_DE_PALAVRAS_DA_CITACAO` palavras (uma citação curta cabe em qualquer texto).
  */
-export function verificarLimitesDosSlides(slides: SlideDaIA[], opcoes: { ramoSaude: boolean; fotosPrometidas?: number; fontes?: string }): string[] {
+export function verificarLimitesDosSlides(slides: SlideDaIA[], opcoes: { ramoSaude: boolean; fotosPrometidas?: number; falasDoCliente?: string }): string[] {
   const motivos: string[] = [];
-  const fontesNormalizadas = opcoes.fontes === undefined ? null : semAcentoMinusculo(opcoes.fontes);
+  const falasNormalizadas = opcoes.falasDoCliente === undefined ? null : semAcentoMinusculo(opcoes.falasDoCliente);
   const comFotoObrigatoria = slides.filter((s) => TIPOS_COM_FOTO_OBRIGATORIA.has(s.tipo)).length;
   if (opcoes.fotosPrometidas !== undefined && comFotoObrigatoria > opcoes.fotosPrometidas) {
     motivos.push(`carrossel: ${comFotoObrigatoria} slides pedem foto (capa-foto e prova-resultado) e o cliente tem ${opcoes.fotosPrometidas}; sem foto use capa-texto e não use prova-resultado`);
@@ -79,9 +82,11 @@ export function verificarLimitesDosSlides(slides: SlideDaIA[], opcoes: { ramoSau
       motivos.push(`slide ${n} (${s.tipo}): só o tipo "dado" leva fonte`);
     }
     if (opcoes.ramoSaude && TIPOS_PROIBIDOS_NA_SAUDE.has(s.tipo)) motivos.push(`slide ${n}: o tipo "${s.tipo}" não vale num ramo de saúde`);
-    if (s.tipo === "prova-fala" && fontesNormalizadas !== null) {
+    if (s.tipo === "prova-fala" && falasNormalizadas !== null) {
       const citacao = semAcentoMinusculo(s.corpo);
-      if (citacao && !fontesNormalizadas.includes(citacao)) motivos.push(`slide ${n} (prova-fala): a citação precisa ser uma frase que o cliente disse de verdade (que está no perfil), escrita igual`);
+      if (!citacao || contarPalavras(citacao) < MINIMO_DE_PALAVRAS_DA_CITACAO || !falasNormalizadas.includes(citacao)) {
+        motivos.push(`slide ${n} (prova-fala): a citação precisa ser uma frase que o cliente disse de verdade (que está no perfil), escrita igual, com pelo menos ${MINIMO_DE_PALAVRAS_DA_CITACAO} palavras; sem uma frase assim, não use este tipo`);
+      }
     }
   });
   return motivos;

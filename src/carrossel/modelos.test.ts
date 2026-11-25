@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { carrosselAtivo, TIPOS_DE_SLIDE, type TipoDeSlide } from "@/config/carrossel";
+import { carrosselAtivo, LINHA_FIXA_ANTES_DEPOIS_SAUDE, TIPOS_DE_SLIDE, type TipoDeSlide } from "@/config/carrossel";
 
 import { contraste, corValida, garantirLeitura, htmlDoSlide, paletaDoSlide } from "./modelos";
 import { distribuirFotos } from "./render";
@@ -34,6 +34,13 @@ describe("garantirLeitura", () => {
 });
 
 describe("htmlDoSlide", () => {
+  it("o antes e depois mostra a linha fixa de saúde só quando o slide a leva", () => {
+    const base = { tipo: "antes-depois" as const, titulo: "Como ficou", corpo: "Antes: a. Depois: b.", fonte: null };
+    const com = htmlDoSlide({ slide: { ...base, rodape: LINHA_FIXA_ANTES_DEPOIS_SAUDE }, numero: 2, total: 5, cor: "#1f6feb", fonteBase64: null });
+    expect(com).toContain(LINHA_FIXA_ANTES_DEPOIS_SAUDE);
+    expect(htmlDoSlide({ slide: base, numero: 2, total: 5, cor: "#1f6feb", fonteBase64: null })).not.toContain("autorização do paciente");
+  });
+
   it("escapa o texto e gera um modelo para cada tipo", () => {
     for (const tipo of TIPOS_DE_SLIDE) {
       const html = htmlDoSlide({ slide: { tipo, titulo: "<b>x</b>", corpo: "a & b", fonte: tipo === "dado" ? "Fonte, 2026" : null }, numero: 2, total: 5, cor: "#1f6feb", fonteBase64: null });

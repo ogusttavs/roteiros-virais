@@ -13,7 +13,7 @@ import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, 
  * do ramo, a evidência do banco, as regras de copy e de conformidade); o que muda é a forma. Quem confere o resultado é `carrossel/regras.ts` (limites por tipo, ordem, números e fonte) mais o verificador
  * de texto de sempre (`gerarComVerificacao`). A foto de cada slide é do cliente, enviada por ele; o texto só diz onde uma foto faria sentido, nunca descreve uma imagem para gerar.
  */
-export const versao = "1.0.0";
+export const versao = "1.1.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -80,7 +80,7 @@ export function montarSistemaEstavel(dados: {
       ? " Este cliente quer ficar conhecido no que faz, não vender agora: a chamada nunca é preço, comprar ou agendar; é seguir, comentar, salvar ou mandar para alguém."
       : "";
   const saude = dados.ramoSaude
-    ? `${QUEBRA}9. Este ramo é de saúde: nunca use os tipos antes-depois e prova-fala, nunca prometa cura, resultado ou garantia, e não cite número de tratamento que a entrada não traga.`
+    ? `${QUEBRA}9. Este ramo é de saúde: nunca use o tipo prova-fala (depoimento). Antes-depois e prova-resultado valem só como diagnóstico ou resultado final, nunca com foto ou texto do procedimento em andamento. Nunca escreva o preço do serviço nem ofereça serviço grátis (desconto pode, se o cliente quiser). Nunca prometa cura, resultado, prazo ou garantia, e não cite número de tratamento que a entrada não traga.`
     : "";
 
   return `Você escreve um carrossel de Instagram para um dono de pequeno negócio postar no próprio perfil. O carrossel ENSINA alguma coisa útil a quem compra dele (uma lista, um passo a passo, um antes e depois): não é tendência cultural, não é frase de efeito, não é anúncio. As fotos são do cliente (enviadas por ele); você escreve só o texto e o tipo de cada slide, e nunca descreve imagem para gerar. Regras duras:

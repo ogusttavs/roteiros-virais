@@ -17,7 +17,7 @@ export function respostaDeErro(mensagem: string, status: number): NextResponse {
   return NextResponse.json({ erro: mensagem }, { status, headers: SEM_CACHE });
 }
 
-const STATUS_DO_ERRO: Record<ErroCarrossel["codigo"], number> = { "pedido-invalido": 400, "nao-achou": 404, "sem-briefing": 409, "limite-de-fotos": 409, "foto-invalida": 400 };
+const STATUS_DO_ERRO: Record<ErroCarrossel["codigo"], number> = { "pedido-invalido": 400, "nao-achou": 404, "sem-briefing": 409, "limite-de-fotos": 409, "foto-invalida": 400, "em-andamento": 409, indisponivel: 503, "sem-autorizacao": 400 };
 
 export function respostaDoErroDoCarrossel(erro: unknown): NextResponse | null {
   return erro instanceof ErroCarrossel ? respostaDeErro(erro.message, STATUS_DO_ERRO[erro.codigo]) : null;
@@ -37,4 +37,29 @@ export async function marcaDoCarrossel(): Promise<{ clienteId: number } | NextRe
 /** O id de um parâmetro de rota, ou nulo. */
 export function idDoParametro(valor: string): number | null {
   return idDoBancoOuNulo(valor);
+}
+
+/** Lê o corpo do pedido contando os bytes; passou do teto, cancela a leitura e devolve "grande-demais". */
+export async function lerCorpoComTeto(request: Request, teto: number): Promise<Uint8Array<ArrayBuffer> | "grande-demais"> {
+  if (!request.body) return new Uint8Array(0);
+  const leitor = request.body.getReader();
+  const pedacos: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await leitor.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > teto) {
+      await leitor.cancel().catch(() => undefined);
+      return "grande-demais";
+    }
+    pedacos.push(value);
+  }
+  const inteiro = new Uint8Array(total);
+  let posicao = 0;
+  for (const p of pedacos) {
+    inteiro.set(p, posicao);
+    posicao += p.byteLength;
+  }
+  return inteiro;
 }

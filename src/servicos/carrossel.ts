@@ -13,7 +13,10 @@ import {
   ESTADOS_DO_CARROSSEL,
   MAXIMO_DE_FOTOS,
   TAMANHOS_DO_CARROSSEL,
+  FRASE_SEM_AUTORIZACAO_DO_PACIENTE,
+  LINHA_FIXA_ANTES_DEPOIS_SAUDE,
   TETO_DA_FOTO_BYTES,
+  TIPOS_COM_FOTO_DE_PACIENTE,
   TIPOS_DE_FOTO,
   type OrigemDoCarrossel,
   type SlideDoCarrossel,
@@ -29,6 +32,7 @@ import { gerarComVerificacao } from "@/ia/verificador";
 import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
+import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
@@ -43,11 +47,28 @@ import { ramoAtualDoCliente } from "./ramos";
 import { ramosAlternativosDaMarca } from "./ramos-da-conta";
 import { combinarEvidencias, ErroRoteiro, filtrarEvidenciaPelaMarca, formatarCamadaExclusiva, LIMITE_EVIDENCIA, resolverTemaDoPedido, roteiroPorId } from "./roteiro";
 
+/** Saúde vale quando o ramo principal OU qualquer ramo alternativo da marca é de saúde. `ramoPrincipal` é o slug já lido; sem ele, lê da marca. */
+async function marcaEhDeSaude(clienteId: number, ramoPrincipal?: string | null): Promise<boolean> {
+  let principal = ramoPrincipal;
+  if (principal === undefined) {
+    const cliente = await clientePorId(clienteId);
+    principal = (await ramoAtualDoCliente(cliente?.nichoId))?.ramoSlug;
+  }
+  const slugsDosAlternativos = (await ramosAlternativosDaMarca(clienteId)).map((a) => a.ramoSlug);
+  return [principal, ...slugsDosAlternativos].some((slug) => ramoPorSlug(slug)?.grupo === "saude");
+}
+
+/** Em ramo de saúde, foto de antes e depois ou de resultado é foto de paciente: sem a confirmação da autorização escrita, recusa. */
+async function exigirAutorizacaoDoPaciente(clienteId: number, autorizado: boolean | undefined): Promise<void> {
+  if (autorizado === true) return;
+  if (await marcaEhDeSaude(clienteId)) throw new ErroCarrossel(FRASE_SEM_AUTORIZACAO_DO_PACIENTE, "sem-autorizacao");
+}
+
 /** O erro que a tela e a rota podem mostrar: a mensagem já é para a pessoa. */
 export class ErroCarrossel extends Error {
   constructor(
     message: string,
-    readonly codigo: "pedido-invalido" | "nao-achou" | "sem-briefing" | "limite-de-fotos" | "foto-invalida" = "pedido-invalido",
+    readonly codigo: "pedido-invalido" | "nao-achou" | "sem-briefing" | "limite-de-fotos" | "foto-invalida" | "em-andamento" | "indisponivel" | "sem-autorizacao" = "pedido-invalido",
   ) {
     super(message);
   }
@@ -119,6 +140,26 @@ function conformidadeDoCarrossel(slides: { tipo: string; titulo: string; corpo: 
   );
 }
 
+/** A primeira parte do par da trava de aviso do Postgres (cada família de trava tem a sua; ver `lib/reserva-de-envio.ts`). */
+const TRAVA_DA_GERACAO_DO_CARROSSEL = 6500;
+
+/**
+ * Uma geração de carrossel por vez por marca: pega a trava do banco (`pg_try_advisory_lock`, sem migração), lê o teto (`conferirTeto`, que devolve a recusa ou nulo) JÁ dentro da trava e só então gera.
+ * Duplo clique ou dois pedidos ao mesmo tempo: o segundo recebe "já tem um carrossel sendo escrito" e não gasta a IA. A trava solta ao fim, e sozinha se o processo cair.
+ */
+export async function gerarCarrosselComTrava<R>(clienteId: number, pedido: PedidoDeCarrossel, conferirTeto: () => Promise<R | null>): Promise<{ recusa: R } | { carrossel: Carrossel }> {
+  const reserva = await reservarEnvioPorTrava(TRAVA_DA_GERACAO_DO_CARROSSEL, clienteId, "carrossel");
+  if (reserva === "ocupada") throw new ErroCarrossel("Já tem um carrossel sendo escrito para esta marca. Espere ele ficar pronto.", "em-andamento");
+  if (reserva === "indisponivel") throw new ErroCarrossel("Estamos escrevendo vários carrosséis agora. Tente de novo em instantes.", "indisponivel");
+  try {
+    const recusa = await conferirTeto();
+    if (recusa !== null) return { recusa };
+    return { carrossel: await gerarCarrossel(clienteId, pedido) };
+  } finally {
+    await reserva.soltar();
+  }
+}
+
 export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrossel): Promise<Carrossel> {
   const quantidade = tamanhoValido(pedido.quantidade);
   if (pedido.cor !== undefined && !corValida(pedido.cor)) throw new ErroCarrossel("A cor precisa ser no formato #rrggbb.");
@@ -153,7 +194,8 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
   const perfilCompilado = formatarPerfilCompilado(perfil);
   const combinadas = combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, regua.proporcaoBrasil, cliente.redePrincipal, "falado");
   const evidencias = await filtrarEvidenciaPelaMarca(combinadas, formatarPerfilCompilado(perfil, { semContextoConfirmado: true }), clienteId);
-  const ramoSaude = ramoPorSlug(ramoDaMarca?.ramoSlug)?.grupo === "saude";
+  // Saúde vale quando o ramo principal OU qualquer ramo alternativo da marca é de saúde (o conselho da profissão limita igual).
+  const ramoSaude = await marcaEhDeSaude(clienteId, ramoDaMarca?.ramoSlug);
   const camadaExclusiva = formatarCamadaExclusiva(
     cliente,
     leituras.filter((l) => l.existeNaRede && l.leitura).map((l) => ({ handle: l.handle, leitura: l.leitura as string })),
@@ -164,6 +206,15 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     origem.noticia?.veiculo ? { titulo: origem.noticia.titulo, veiculo: origem.noticia.veiculo, dia: origem.noticia.dia ?? "", resumo: origem.noticia.resumo } : null,
     casadas,
   );
+
+  // O que o PRÓPRIO cliente disse: as frases, os medos e as crenças do perfil e a camada exclusiva dele. Fala de concorrente, de outro criador, a notícia e o tema nunca entram aqui.
+  const falasDoCliente = [
+    ...perfil.fatos.frasesDaFala,
+    ...perfil.fatos.medos,
+    ...(perfil.fatos.posicionamentos ?? []),
+    perfil.fatos.historia ?? "",
+    formatarCamadaExclusiva(cliente, []),
+  ].join(String.fromCharCode(10));
 
   const fontesDosFatos = [
     montarFontesDosFatos({
@@ -240,13 +291,13 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     },
     verificarExtra: (d) => [
       ...verificarOrdemDosSlides(d.slides, quantidade),
-      ...verificarLimitesDosSlides(d.slides, { ramoSaude, fotosPrometidas, fontes: fontesDosFatos }),
+      ...verificarLimitesDosSlides(d.slides, { ramoSaude, fotosPrometidas, falasDoCliente }),
       ...verificarLegenda(d.legenda, d.hashtags),
       ...conformidadeDoCarrossel(d.slides, { fontes: fontesDosFatos, ramoSaude }),
     ],
   });
 
-  const slides: SlideDoCarrossel[] = saida.slides.map((s) => ({ tipo: s.tipo, titulo: s.titulo.trim(), corpo: s.corpo.trim(), fonte: s.tipo === "dado" ? (s.fonte ?? "").trim() || null : null }));
+  const slides: SlideDoCarrossel[] = saida.slides.map((s) => ({ tipo: s.tipo, titulo: s.titulo.trim(), corpo: s.corpo.trim(), fonte: s.tipo === "dado" ? (s.fonte ?? "").trim() || null : null, ...(ramoSaude && s.tipo === "antes-depois" ? { rodape: LINHA_FIXA_ANTES_DEPOIS_SAUDE } : {}) }));
   const [criado] = await db()
     .insert(carrosseis)
     .values({
@@ -287,7 +338,7 @@ export async function trocarSlide(
   clienteId: number,
   carrosselId: number,
   indice: number,
-  mudanca: { titulo?: string; corpo?: string; fonte?: string | null; fotoId?: number | null; fotoDepoisId?: number | null },
+  mudanca: { titulo?: string; corpo?: string; fonte?: string | null; fotoId?: number | null; fotoDepoisId?: number | null; autorizacaoDoPaciente?: boolean },
 ): Promise<Carrossel> {
   const atual = await carrosselDaMarca(clienteId, carrosselId);
   if (!atual) throw new ErroCarrossel("Não achei esse carrossel.", "nao-achou");
@@ -297,6 +348,8 @@ export async function trocarSlide(
   for (const id of [mudanca.fotoId, mudanca.fotoDepoisId]) {
     if (id !== undefined && id !== null && !ids.has(id)) throw new ErroCarrossel("Essa foto não é deste carrossel.", "foto-invalida");
   }
+  const poeFoto = [mudanca.fotoId, mudanca.fotoDepoisId].some((id) => id !== undefined && id !== null);
+  if (poeFoto && TIPOS_COM_FOTO_DE_PACIENTE.has(atual.slides[indice].tipo)) await exigirAutorizacaoDoPaciente(clienteId, mudanca.autorizacaoDoPaciente);
   const slides = atual.slides.map((s, i) => {
     if (i !== indice) return s;
     const novo = { ...s };
@@ -352,9 +405,11 @@ export function tipoPelosBytes(bytes: Buffer): (typeof TIPOS_DE_FOTO)[number] | 
   return null;
 }
 
-export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer }): Promise<FotoSemBytes> {
+export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer; autorizacaoDoPaciente?: boolean }): Promise<FotoSemBytes> {
   const carrossel = await carrosselDaMarca(clienteId, carrosselId);
   if (!carrossel) throw new ErroCarrossel("Não achei esse carrossel.", "nao-achou");
+  // Um carrossel com slide de antes e depois ou de resultado só recebe foto de marca de saúde com a autorização do paciente confirmada.
+  if (carrossel.slides.some((s) => TIPOS_COM_FOTO_DE_PACIENTE.has(s.tipo))) await exigirAutorizacaoDoPaciente(clienteId, arquivo.autorizacaoDoPaciente);
   if (arquivo.bytes.length === 0) throw new ErroCarrossel("A foto veio vazia.", "foto-invalida");
   if (arquivo.bytes.length > TETO_DA_FOTO_BYTES) throw new ErroCarrossel(`A foto passa de ${Math.round(TETO_DA_FOTO_BYTES / 1024 / 1024)} MB. Mande uma menor.`, "foto-invalida");
   const tipo = tipoPelosBytes(arquivo.bytes);

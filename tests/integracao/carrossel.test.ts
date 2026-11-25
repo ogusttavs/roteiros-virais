@@ -7,15 +7,17 @@ import path from "node:path";
 import { deflateSync } from "node:zlib";
 
 import { and, eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { pngDoCarrossel } from "@/carrossel/entrega";
 import { crc32, montarZip } from "@/carrossel/zip";
 import { TETO_DO_TESTE } from "@/config/cadastro";
+import { LINHA_FIXA_ANTES_DEPOIS_SAUDE } from "@/config/carrossel";
 import { db, getPool } from "@/db";
-import { briefings, cadastrosProprios, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, user, videos, type PerfilCompilado } from "@/db/schema";
+import { briefings, cadastrosProprios, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, ramosDaConta, user, videos, type PerfilCompilado } from "@/db/schema";
+import { lerCorpoComTeto } from "@/lib/porta-do-carrossel";
 import { barreiraDoCadastro } from "@/servicos/cadastro-travas";
-import { ErroCarrossel, apagarFoto, carrosselDaMarca, carrosseisDaMarca, enviarFoto, fotoDaMarca, fotosDoCarrossel, gerarCarrossel, tipoPelosBytes, trocarSlide } from "@/servicos/carrossel";
+import { ErroCarrossel, apagarFoto, carrosselDaMarca, carrosseisDaMarca, enviarFoto, fotoDaMarca, fotosDoCarrossel, gerarCarrossel, gerarCarrosselComTrava, tipoPelosBytes, trocarSlide } from "@/servicos/carrossel";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -148,16 +150,71 @@ describe("gerarCarrossel", () => {
     expect(c.avisos.join()).toMatch(/clara demais/);
   });
 
-  it("ramo de saúde não recebe antes-depois (reprova e refaz); outro ramo recebe", async () => {
+  it("ramo de saúde recebe antes-depois com a linha fixa escrita por código; outro ramo não leva a linha", async () => {
     const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude", nome: "Odontologia teste", termos: [], ramoCatalogo: "odontologia" }).returning();
     const saude = await criarCliente(nichoSaude.id);
     const outro = await criarCliente();
     const deSaude = await gerarCarrossel(saude, pedidoLivre("cuidados com o aparelho [mock:carrossel-antes-depois]"));
-    expect(deSaude.slides.map((s) => s.tipo)).not.toContain("antes-depois");
-    expect((await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, saude)))).length).toBe(2);
+    const slide = deSaude.slides.find((x) => x.tipo === "antes-depois");
+    expect(slide?.rodape).toBe(LINHA_FIXA_ANTES_DEPOIS_SAUDE);
+    expect(deSaude.slides.filter((x) => x.tipo !== "antes-depois").every((x) => x.rodape === undefined)).toBe(true);
     const comum = await gerarCarrossel(outro, pedidoLivre("mancha de vinho no estofado [mock:carrossel-antes-depois]"));
-    expect(comum.slides.map((s) => s.tipo)).toContain("antes-depois");
-    expect((await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, outro)))).length).toBe(1);
+    expect(comum.slides.find((x) => x.tipo === "antes-depois")?.rodape).toBeUndefined();
+  });
+
+  it("o prompt de saúde proíbe preço, promessa e procedimento em andamento, e a versão subiu", async () => {
+    const { montarSistemaEstavel, versao } = await import("@/ia/prompts/carrossel");
+    const texto = montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", ramoSaude: true });
+    expect(texto).toMatch(/procedimento em andamento/);
+    expect(texto).toMatch(/preço do serviço nem ofereça serviço grátis/);
+    expect(texto).toMatch(/prazo ou garantia/);
+    expect(montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", ramoSaude: false })).not.toMatch(/procedimento em andamento/);
+    expect(versao).toBe("1.1.0");
+  });
+
+  it("ramo alternativo de saúde também conta: a linha fixa entra e o depoimento é reprovado e refeito", async () => {
+    const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude-alt", nome: "Nutricao alternativa", termos: [], ramoCatalogo: "nutricao" }).returning();
+    const marca = await criarCliente();
+    await db().insert(ramosDaConta).values({ clienteId: marca, nichoId: nichoSaude.id });
+    const c = await gerarCarrossel(marca, pedidoLivre("cuidados com a dieta [mock:carrossel-antes-depois]"));
+    expect(c.slides.find((x) => x.tipo === "antes-depois")?.rodape).toBe(LINHA_FIXA_ANTES_DEPOIS_SAUDE);
+    const fala = await gerarCarrossel(marca, pedidoLivre("cuidados com a dieta [mock:carrossel-prova-fala-cliente]"));
+    expect(fala.slides.map((x) => x.tipo)).not.toContain("prova-fala");
+  });
+
+  it("foto de paciente: em ramo de saúde, pôr foto em antes-depois ou resultado exige a autorização; fora da saúde, não", async () => {
+    const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude-aut", nome: "Medicina teste", termos: [], ramoCatalogo: "medicina-e-clinicas" }).returning();
+    const saude = await criarCliente(nichoSaude.id);
+    const comum = await criarCliente();
+    const png = pngLiso(8, 8, [1, 2, 3]);
+    const paraSaude = await gerarCarrossel(saude, pedidoLivre("cuidados com a pele [mock:carrossel-antes-depois]"));
+    const indice = paraSaude.slides.findIndex((x) => x.tipo === "antes-depois");
+    // o envio para um carrossel com antes e depois
+    await expect(enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png })).rejects.toThrow(/autorização dele por escrito/);
+    const foto = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, autorizacaoDoPaciente: true });
+    // a troca de foto no slide
+    await expect(trocarSlide(saude, paraSaude.id, indice, { fotoId: foto.id })).rejects.toThrow(/autorização dele por escrito/);
+    const ok = await trocarSlide(saude, paraSaude.id, indice, { fotoId: foto.id, autorizacaoDoPaciente: true });
+    expect(ok.slides[indice].fotoId).toBe(foto.id);
+    expect(ok.slides[indice].rodape).toBe(LINHA_FIXA_ANTES_DEPOIS_SAUDE);
+    // texto e slide sem foto de paciente não pedem nada
+    await trocarSlide(saude, paraSaude.id, indice, { titulo: "Novo título" });
+    await trocarSlide(saude, paraSaude.id, 1 === indice ? 2 : 1, { fotoId: null });
+    // fora da saúde, sem a autorização
+    const paraComum = await gerarCarrossel(comum, pedidoLivre("mancha de vinho no estofado [mock:carrossel-antes-depois]"));
+    const f2 = await enviarFoto(comum, paraComum.id, { tipoDeclarado: "image/png", bytes: png });
+    await trocarSlide(comum, paraComum.id, paraComum.slides.findIndex((x) => x.tipo === "antes-depois"), { fotoId: f2.id });
+  });
+
+  it("prova-fala só com frase do próprio cliente: a do tema e das fontes (que não são falas dele) reprova e refaz, a do perfil passa", async () => {
+    const clienteId = await criarCliente();
+    await criarVideo("ev-fala", "mancha de vinho no estofado");
+    const outro = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-prova-fala-outro]"));
+    expect(outro.slides.map((s) => s.tipo)).not.toContain("prova-fala");
+    expect((await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, clienteId)))).length).toBe(2);
+    const dele = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-prova-fala-cliente]"));
+    expect(dele.slides.map((s) => s.tipo)).toContain("prova-fala");
+    expect((await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, clienteId)))).length).toBe(3);
   });
 
   it("recusa quantidade fora de 5, 7 e 9, cor inválida e tema vazio", async () => {
@@ -217,6 +274,83 @@ describe("isolamento entre marcas", () => {
     const fotoAlheia = await enviarFoto(outra, alheio.id, { tipoDeclarado: "image/png", bytes: pngLiso(10, 10, [0, 0, 0]) });
     await expect(trocarSlide(dona, meu.id, 0, { fotoId: fotoAlheia.id })).rejects.toThrow(/foto/);
     expect((await carrosselDaMarca(dona, meu.id))?.slides[0].fotoId).toBeUndefined();
+  });
+});
+
+describe("uma geração por vez por marca", () => {
+  it("duas requisições ao mesmo tempo geram um carrossel só; a segunda recebe o aviso e não gasta a IA", async () => {
+    const clienteId = await criarCliente();
+    let conferencias = 0;
+    const gerar = () =>
+      gerarCarrosselComTrava(clienteId, pedidoLivre("mancha de vinho no estofado", 5), async () => {
+        conferencias += 1;
+        return null;
+      });
+    const resultados = await Promise.allSettled([gerar(), gerar()]);
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const recusada = resultados.find((r): r is PromiseRejectedResult => r.status === "rejected");
+    expect(recusada?.reason).toBeInstanceOf(ErroCarrossel);
+    expect((recusada?.reason as ErroCarrossel).codigo).toBe("em-andamento");
+    expect((recusada?.reason as ErroCarrossel).message).toMatch(/Já tem um carrossel sendo escrito/);
+    expect(conferencias).toBe(1);
+    expect(await db().select().from(carrosseis).where(eq(carrosseis.clienteId, clienteId))).toHaveLength(1);
+    expect(await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, clienteId)))).toHaveLength(1);
+    // a trava solta no fim: o próximo pedido passa
+    expect("carrossel" in (await gerar())).toBe(true);
+  });
+
+  it("a recusa do teto lida dentro da trava volta sem gerar, e a trava solta", async () => {
+    const clienteId = await criarCliente();
+    const resultado = await gerarCarrosselComTrava(clienteId, pedidoLivre("x", 5), async () => "teto");
+    expect(resultado).toEqual({ recusa: "teto" });
+    expect(await db().select().from(carrosseis).where(eq(carrosseis.clienteId, clienteId))).toHaveLength(0);
+    expect("carrossel" in (await gerarCarrosselComTrava(clienteId, pedidoLivre("mancha de vinho no estofado", 5), async () => null))).toBe(true);
+  });
+
+  it("marcas diferentes geram ao mesmo tempo", async () => {
+    const [a, b] = [await criarCliente(), await criarCliente()];
+    const resultados = await Promise.all([a, b].map((id) => gerarCarrosselComTrava(id, pedidoLivre("mancha de vinho no estofado", 5), async () => null)));
+    expect(resultados.every((r) => "carrossel" in r)).toBe(true);
+  });
+});
+
+describe("o corpo da foto sem content-length", () => {
+  const corpoEmPedacos = (pedacos: number, tamanho: number) => {
+    let enviados = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controle) {
+        if (enviados >= pedacos) return controle.close();
+        enviados += 1;
+        controle.enqueue(new Uint8Array(tamanho));
+      },
+    });
+    return { requisicao: new Request("http://localhost/api/carrossel/1/fotos", { method: "POST", body: stream, duplex: "half" } as RequestInit), lidos: () => enviados };
+  };
+
+  it("acima do teto dá grande-demais e para de ler; abaixo devolve os bytes", async () => {
+    const grande = corpoEmPedacos(100, 1024 * 1024);
+    expect(grande.requisicao.headers.get("content-length")).toBeNull();
+    expect(await lerCorpoComTeto(grande.requisicao, 6 * 1024 * 1024)).toBe("grande-demais");
+    expect(grande.lidos()).toBeLessThan(100);
+    const pequeno = corpoEmPedacos(3, 1000);
+    const lido = await lerCorpoComTeto(pequeno.requisicao, 6 * 1024 * 1024);
+    expect(lido).not.toBe("grande-demais");
+    expect((lido as Uint8Array).byteLength).toBe(3000);
+  });
+
+  it("a rota responde 413 a um corpo grande em pedaços (sem content-length)", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/porta-do-carrossel", async (importarOriginal) => ({ ...(await importarOriginal<typeof import("@/lib/porta-do-carrossel")>()), marcaDoCarrossel: async () => ({ clienteId: 1 }) }));
+    vi.doMock("@/lib/portao-cobranca", () => ({ recusaDaCobranca: async () => null }));
+    try {
+      const rota = await import("@/app/api/carrossel/[id]/fotos/route");
+      const resposta = await rota.POST(corpoEmPedacos(100, 1024 * 1024).requisicao, { params: Promise.resolve({ id: "1" }) });
+      expect(resposta.status).toBe(413);
+    } finally {
+      vi.doUnmock("@/lib/porta-do-carrossel");
+      vi.doUnmock("@/lib/portao-cobranca");
+      vi.resetModules();
+    }
   });
 });
 

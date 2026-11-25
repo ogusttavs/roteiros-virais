@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { logger } from "@/lib/log";
 import { marcaDoCarrossel, respostaDeErro, respostaDoErroDoCarrossel, SEM_CACHE } from "@/lib/porta-do-carrossel";
 import { recusaDaCobranca } from "@/lib/portao-cobranca";
-import { carrosseisDaMarca, gerarCarrossel, type DeOndeVem } from "@/servicos/carrossel";
+import { carrosseisDaMarca, gerarCarrosselComTrava, type DeOndeVem } from "@/servicos/carrossel";
 
 export const dynamic = "force-dynamic";
 
@@ -44,14 +44,16 @@ export async function POST(request: Request) {
   const de = deOndeVem(corpo);
   if (!de) return respostaDeErro("diga de onde vem o carrossel", 400);
   try {
-    const carrossel = await gerarCarrossel(marca.clienteId, {
+    // O teto do teste é lido de novo DENTRO da trava da marca: dois pedidos ao mesmo tempo não passam dele por um.
+    const resultado = await gerarCarrosselComTrava(marca.clienteId, {
       quantidade: typeof corpo.quantidade === "number" ? corpo.quantidade : Number.NaN,
       cor: typeof corpo.cor === "string" ? corpo.cor : undefined,
       fotos: typeof corpo.fotos === "number" ? corpo.fotos : undefined,
       observacao: typeof corpo.observacao === "string" ? corpo.observacao.slice(0, 500) : undefined,
       de,
-    });
-    return NextResponse.json({ id: carrossel.id }, { headers: SEM_CACHE });
+    }, () => recusaDaCobranca({ gasto: "roteiro" }));
+    if ("recusa" in resultado) return resultado.recusa;
+    return NextResponse.json({ id: resultado.carrossel.id }, { headers: SEM_CACHE });
   } catch (erro) {
     const resposta = respostaDoErroDoCarrossel(erro);
     if (resposta) return resposta;

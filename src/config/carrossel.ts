@@ -34,8 +34,14 @@ export const LIMITE_DE_PALAVRAS: Record<TipoDeSlide, { titulo: number; corpo: nu
 
 /** Tipos que exigem uma foto do cliente (sem foto, não podem ser gerados). */
 export const TIPOS_COM_FOTO_OBRIGATORIA: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "prova-resultado"]);
-/** Tipos que não valem em ramo de saúde (o conselho da profissão limita antes e depois e depoimento). */
-export const TIPOS_PROIBIDOS_NA_SAUDE: ReadonlySet<TipoDeSlide> = new Set(["antes-depois", "prova-fala"]);
+/** Tipos que não valem em ramo de saúde: o depoimento (fala de cliente) fica de fora até o Gustavo decidir outra coisa. Antes e depois e resultado valem, com a autorização do paciente (ver abaixo). */
+export const TIPOS_PROIBIDOS_NA_SAUDE: ReadonlySet<TipoDeSlide> = new Set(["prova-fala"]);
+/** Tipos cuja foto é de paciente: em ramo de saúde, pôr foto neles exige a confirmação de que a pessoa tem a autorização escrita do paciente (Resolução CFO 196/2019 para odontologia). */
+export const TIPOS_COM_FOTO_DE_PACIENTE: ReadonlySet<TipoDeSlide> = new Set(["antes-depois", "prova-resultado"]);
+/** A linha fixa do slide de antes e depois em ramo de saúde. Escrita por código, nunca pelo modelo. */
+export const LINHA_FIXA_ANTES_DEPOIS_SAUDE = "Imagens publicadas com autorização do paciente. O resultado varia de pessoa para pessoa.";
+/** A frase da recusa quando falta a autorização. */
+export const FRASE_SEM_AUTORIZACAO_DO_PACIENTE = "Para usar foto de paciente, confirme que você tem a autorização dele por escrito.";
 /** Tipos em que o corpo pode ficar vazio. */
 export const TIPOS_SEM_CORPO_OBRIGATORIO: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "capa-texto", "chamada", "prova-resultado"]);
 
@@ -79,4 +85,6 @@ export type SlideDoCarrossel = {
   fonte: string | null;
   fotoId?: number | null;
   fotoDepoisId?: number | null;
+  /** Só em antes-depois de ramo de saúde: a linha fixa escrita por código (`LINHA_FIXA_ANTES_DEPOIS_SAUDE`), que o render desenha pequena no rodapé. */
+  rodape?: string;
 };
