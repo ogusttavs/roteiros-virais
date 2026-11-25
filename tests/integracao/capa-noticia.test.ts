@@ -1,6 +1,6 @@
 /**
  * A capa de notícia (E66) contra o Postgres real, em mock (`AI_PROVIDER=mock`): os títulos saem da notícia da marca (veículo e data vêm dela), a capa é um carrossel de um slide só, notícia velha ou de
- * outro setor é recusada, uma marca nunca vê a capa da outra, em saúde a foto exige a autorização do paciente, e o PNG sai em 1080 por 1350 com e sem foto.
+ * outro setor é recusada, uma marca nunca vê a capa da outra, em saúde a foto de paciente exige a autorização, e o PNG sai em 1080 por 1350 com e sem foto.
  */
 import { deflateSync } from "node:zlib";
 
@@ -231,14 +231,14 @@ describe("criar a capa", () => {
     expect(await carrosselDaMarca(a, capa.id)).not.toBeNull();
   });
 
-  it("em saúde, a foto da capa exige a autorização do paciente; em outro ramo, não", async () => {
+  it("em saúde, a foto da capa entra como foto comum, sem autorização; a de paciente (E65 PR 5) exige a autorização; em outro ramo, nada muda", async () => {
     const saude = await criarCliente(nichoSaude);
     const outra = await criarCliente(nichoOutro);
     const capaSaude = await criarCapa(saude, { noticiaId: await criarNoticia(nichoSaude), titulo: "Título bom" });
     const capaOutra = await criarCapa(outra, { noticiaId: await criarNoticia(nichoOutro), titulo: "Título bom" });
     const png = pngLiso(8, 8, [1, 2, 3]);
-    await expect(enviarFoto(saude, capaSaude.id, { tipoDeclarado: "image/png", bytes: png })).rejects.toThrow(/autorização dele por escrito/);
-    await expect(enviarFoto(saude, capaSaude.id, { tipoDeclarado: "image/png", bytes: png, autorizacaoDoPaciente: true })).resolves.toMatchObject({ ordem: 1 });
+    await expect(enviarFoto(saude, capaSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true })).rejects.toThrow(/autorização dele por escrito/);
+    await expect(enviarFoto(saude, capaSaude.id, { tipoDeclarado: "image/png", bytes: png })).resolves.toMatchObject({ ordem: 1, dePaciente: false });
     await expect(enviarFoto(outra, capaOutra.id, { tipoDeclarado: "image/png", bytes: png })).resolves.toMatchObject({ ordem: 1 });
   });
 });

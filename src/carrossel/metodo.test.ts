@@ -4,11 +4,12 @@ import type { SlideDoCarrossel } from "@/config/carrossel";
 
 import { larguraDaImagem } from "./fotos";
 import { avisosDoMetodo, capaTemPromessaConcreta, moldeVagoDaCapa, promessaDeContagem, rotularItens, verificarCapaVaga, verificarPromessaDaCapa } from "./metodo";
-import { formulasDeMaquinaDosSlides } from "./regras";
+import { formulasDeMaquinaDosSlides, slidesDaSaida, type SlideDaSaida } from "./regras";
 
 const capa = (titulo: string, sub?: string): SlideDoCarrossel => ({ tipo: "capa-texto", titulo, ...(sub ? { sub } : {}) });
 const item = (texto = "Um texto de explicação com mais de oito palavras para ensinar"): SlideDoCarrossel => ({ tipo: "item", titulo: "Um item", texto });
 const passo = (texto = "Um texto de explicação com mais de oito palavras para ensinar"): SlideDoCarrossel => ({ tipo: "passo", titulo: "Um passo", texto });
+const saidaBase: SlideDaSaida = { tipo: "item", rotulo: "", titulo: "", texto: "", antes: "", depois: "", valor: "", unidade: "", fonte: "", referencia: "", quem: "", contexto: "", linhas: [], acoes: [] };
 const chamada: SlideDoCarrossel = { tipo: "chamada", titulo: "Quer?", texto: "Salve", acoes: ["a", "b"] };
 
 describe("promessaDeContagem", () => {
@@ -40,6 +41,14 @@ describe("verificarPromessaDaCapa", () => {
     const m = verificarPromessaDaCapa([capa("5 erros que..."), item(), item(), item(), chamada]).join();
     expect(m).toMatch(/a capa promete 5 erros e o carrossel traz 3/);
     expect(verificarPromessaDaCapa([capa("Dois passos"), passo(), passo(), passo(), chamada]).join()).toMatch(/promete 2 passos e o carrossel traz 3/);
+  });
+  it("com item e passo juntos, a promessa conta só a coisa de que a capa fala (casos reais da prova de 25/11)", () => {
+    expect(verificarPromessaDaCapa([capa("2 causas do mau hálito"), item(), item(), passo(), passo(), chamada])).toEqual([]);
+    expect(verificarPromessaDaCapa([capa("2 erros com o fio dental"), item(), item(), passo(), passo(), chamada])).toEqual([]);
+    expect(verificarPromessaDaCapa([capa("3 erros com o fio dental"), item(), item(), chamada]).join()).toMatch(/promete 3 erros/);
+    expect(verificarPromessaDaCapa([capa("2 passos para escovar"), item(), item(), item(), passo(), passo(), chamada])).toEqual([]);
+    expect(verificarPromessaDaCapa([capa("3 passos para escovar"), item(), item(), item(), passo(), passo(), chamada]).join()).toMatch(/promete 3 passos e o carrossel traz 2 passos/);
+    expect(verificarPromessaDaCapa([capa("2 dicas"), item(), item(), item(), passo(), passo(), chamada])).toEqual([]);
   });
   it("a linha de apoio também vale, e capa sem promessa de número passa", () => {
     expect(verificarPromessaDaCapa([capa("Seu dente escureceu?", "4 causas possíveis"), item(), item(), chamada]).join()).toMatch(/promete 4 causas/);
@@ -94,12 +103,34 @@ describe("avisos da legenda e da densidade", () => {
 describe("rotularItens", () => {
   it("escreve o N de M do item por código e guarda a palavra que a IA escolheu", () => {
     const r = rotularItens([capa("x"), { ...item(), rotulo: "Erro 9 de 1" }, { ...item(), rotulo: "Sinal" }, passo(), { ...item(), rotulo: "" }, chamada]);
-    expect(r.filter((s) => s.tipo === "item").map((s) => s.rotulo)).toEqual(["Erro 1 de 3", "Sinal 2 de 3", "Dica 3 de 3"]);
+    expect(r.filter((s) => s.tipo === "item").map((s) => s.rotulo)).toEqual(["Erro 1 de 3", "Erro 2 de 3", "Erro 3 de 3"]);
     expect(r.find((s) => s.tipo === "passo")!.rotulo).toBeUndefined();
   });
   it("fica só com a primeira palavra do rótulo, para não estourar o limite (Sinal de alerta, Erro comum)", () => {
     const r = rotularItens([capa("x"), { ...item(), rotulo: "Sinal de alerta" }, { ...item(), rotulo: "Erro comum" }, { ...item(), rotulo: "Sinal" }, chamada]);
-    expect(r.filter((s) => s.tipo === "item").map((s) => s.rotulo)).toEqual(["Sinal 1 de 3", "Erro 2 de 3", "Sinal 3 de 3"]);
+    expect(r.filter((s) => s.tipo === "item").map((s) => s.rotulo)).toEqual(["Sinal 1 de 3", "Sinal 2 de 3", "Sinal 3 de 3"]);
+  });
+});
+
+describe("rotularItens, a série única (prova real de 25/11)", () => {
+  const rotulos = (slides: SlideDoCarrossel[]) => rotularItens(slides).filter((s) => s.tipo === "item").map((s) => s.rotulo);
+  it("pula artigo e palavra curta: 'A 4 de 4' não vira rótulo, a palavra seguinte ou Dica", () => {
+    expect(rotulos([capa("x"), { ...item(), rotulo: "A 4 de 4" }, { ...item(), rotulo: "Sinal" }, chamada])).toEqual(["Sinal 1 de 2", "Sinal 2 de 2"]);
+    expect(rotulos([capa("x"), { ...item(), rotulo: "A 4 de 4" }, { ...item(), rotulo: "O" }, chamada])).toEqual(["Dica 1 de 2", "Dica 2 de 2"]);
+  });
+  it("a série não sai misturada: a palavra do primeiro item vale para todos", () => {
+    expect(rotulos([capa("x"), { ...item(), rotulo: "Causa 1 de 3" }, { ...item(), rotulo: "Causa 2 de 3" }, { ...item(), rotulo: "Erro 3 de 3" }, chamada])).toEqual(["Causa 1 de 3", "Causa 2 de 3", "Causa 3 de 3"]);
+  });
+  it("a capa que diz causas, erros, sinais ou mitos dá a palavra", () => {
+    expect(rotulos([capa("3 causas do mau hálito"), { ...item(), rotulo: "Erro" }, { ...item(), rotulo: "Dica" }, chamada])).toEqual(["Causa 1 de 2", "Causa 2 de 2"]);
+    expect(rotulos([capa("Dois mitos sobre clareamento"), item(), item(), chamada])).toEqual(["Mito 1 de 2", "Mito 2 de 2"]);
+  });
+  it("com um item só, sem '1 de 1'; com um passo só, sem 'de 1'", () => {
+    expect(rotulos([capa("x"), { ...item(), rotulo: "Erro" }, chamada])).toEqual(["Erro"]);
+    const um = slidesDaSaida([{ ...saidaBase, tipo: "passo", titulo: "t", texto: "um texto" }], { ramoSaude: false });
+    expect(um[0].de).toBeUndefined();
+    const dois = slidesDaSaida([{ ...saidaBase, tipo: "passo", titulo: "t", texto: "a" }, { ...saidaBase, tipo: "passo", titulo: "u", texto: "b" }], { ramoSaude: false });
+    expect(dois.map((s) => s.de)).toEqual([2, 2]);
   });
 });
 

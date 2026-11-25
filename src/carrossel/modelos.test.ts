@@ -228,6 +228,25 @@ describe("distribuirFotos", () => {
     const r = distribuirFotos([slide("capa-foto", { fotoId: 12 }), slide("passo", { fotoId: 999 })], fotos);
     expect(r.map((x) => x.foto)).toEqual([12, 10]);
   });
+  describe("em saúde, foto comum e foto de paciente separadas (E65 PR 5)", () => {
+    const misturadas = [{ id: 10, dePaciente: false }, { id: 11, dePaciente: false }, { id: 12, dePaciente: true }, { id: 13, dePaciente: true }, { id: 14, dePaciente: true }];
+    it("a comum nunca vai em antes-depois nem em resultado, e a de paciente só vai neles", () => {
+      const r = distribuirFotos([slide("capa-foto"), slide("antes-depois"), slide("prova-resultado"), slide("passo"), slide("passo")], misturadas, true);
+      expect(r.map((x) => [x.foto, x.fotoDepois])).toEqual([[10, null], [12, 13], [14, null], [11, null], [null, null]]);
+    });
+    it("só com foto comum, antes-depois e resultado ficam sem foto", () => {
+      const r = distribuirFotos([slide("capa-foto"), slide("antes-depois"), slide("prova-resultado")], [{ id: 1, dePaciente: false }, { id: 2, dePaciente: false }, { id: 3, dePaciente: false }], true);
+      expect(r.map((x) => [x.foto, x.fotoDepois])).toEqual([[1, null], [null, null], [null, null]]);
+    });
+    it("a foto que o slide aponta só vale se for do tipo certo; senão cai na distribuição", () => {
+      const r = distribuirFotos([slide("antes-depois", { fotoId: 10, fotoDepoisId: 11 }), slide("capa-foto", { fotoId: 12 })], misturadas, true);
+      expect(r.map((x) => [x.foto, x.fotoDepois])).toEqual([[12, 13], [10, null]]);
+    });
+    it("fora da saúde (sem separar), a foto vale para qualquer tipo, como sempre", () => {
+      const r = distribuirFotos([slide("antes-depois")], [{ id: 1 }, { id: 2 }], false);
+      expect(r.map((x) => [x.foto, x.fotoDepois])).toEqual([[1, 2]]);
+    });
+  });
 });
 
 describe("zip", () => {
