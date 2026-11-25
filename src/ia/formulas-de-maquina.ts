@@ -103,28 +103,31 @@ const AFIRMA = "(?:é|foi|era|eh|sao|eram|esta|estao|se trata|tem a ver|vem|mas 
 const LIGA = "(?: so| apenas| somente| sobre| de| do| da| dos| das| com)?";
 const CONTRASTE = new RegExp(
   `(?:^|[^a-z])${NEGA}${LIGA}[ ]+([^,.;:!?]{2,40}?)[ ]*[,;:.!][ ]*(?:mas |e |na verdade,? )?${AFIRMA}${LIGA}[ ]+([^,.;:!?]{2,40})`,
+  "g",
 );
 const PALAVRAS_FRACAS = new Set(["problema", "questao", "coisa", "sobre", "apenas", "somente", "outro", "outra", "muito", "pouco", "assim", "isso", "esse", "essa", "aquilo", "porque"]);
 
-/** A metade tem base nas fontes quando alguma palavra de conteúdo (5 letras ou mais, fora a lista fraca) está lá. */
+/** A metade tem base nas fontes quando alguma palavra de conteúdo (4 letras ou mais, fora a lista fraca) está lá. */
 function metadeTemBaseNasFontes(metade: string, fontes: string): boolean {
   return metade
     .replace(/é/g, "e")
     .split(/[^a-z0-9]+/)
-    .filter((p) => p.length >= 5 && !PALAVRAS_FRACAS.has(p))
+    .filter((p) => p.length >= 4 && !PALAVRAS_FRACAS.has(p))
     .some((p) => fontes.includes(p));
 }
 
 function acharContraste(_texto: string, opcoes: OpcoesDoDetector, comVerbo: string): string | null {
   const fontes = normalizar(emUmaLinha(opcoes.fontes ?? ""));
-  const m = CONTRASTE.exec(comVerbo);
-  if (!m) return null;
-  const [trecho, a, b] = m;
-  // Número é fato: "não é 30 dias, é 45" não é fórmula, é conta.
-  if (TEM_ALGARISMO.test(a) || TEM_ALGARISMO.test(b)) return null;
-  // As duas metades vêm das fontes (ficha, momento, evidência): é o fato do ramo, não o molde.
-  if (fontes && metadeTemBaseNasFontes(a, fontes) && metadeTemBaseNasFontes(b, fontes)) return null;
-  return trecho.replace(/é/g, "e").replace(/^[^a-z]+/, "").trim();
+  // Percorre todos os casamentos do bloco: o primeiro pode ser conta ou fato e o segundo, fórmula.
+  for (const m of comVerbo.matchAll(CONTRASTE)) {
+    const [trecho, a, b] = m;
+    // Número é fato: "não é 30 dias, é 45" não é fórmula, é conta.
+    if (TEM_ALGARISMO.test(a) || TEM_ALGARISMO.test(b)) continue;
+    // As duas metades vêm das fontes (ficha, momento, evidência): é o fato do ramo, não o molde.
+    if (fontes && metadeTemBaseNasFontes(a, fontes) && metadeTemBaseNasFontes(b, fontes)) continue;
+    return trecho.replace(/é/g, "e").replace(/^[^a-z]+/, "").trim();
+  }
+  return null;
 }
 
 // --- 2. Frase de virada de efeito --------------------------------------------------------------
@@ -154,12 +157,13 @@ function acharVirada(texto: string): string | null {
 const PREPARACAO = new RegExp(
   [
     "(?:^|[^a-z])(?:hoje|agora) (?:eu )?(?:vou|vamos|quero|venho) (?:te |lhe |vos )?(?:falar|contar|mostrar|explicar|ensinar|trazer|compartilhar|apresentar|dividir)",
-    "(?:^|[^a-z])(?:neste|nesse) (?:video|conteudo|reels|post)",
+    // "neste vídeo" só no começo do bloco ou da frase; "nesse vídeo quando eu piso" é referência a outro vídeo.
+    "(?:^|[.!?;][ ]+)[^a-z0-9.!?;]*(?:neste|nesse) (?:video|conteudo|reels|post)",
     "(?:^|[^a-z])no video de hoje",
     // Só como abertura solta ("antes de começar, um aviso"); com objeto ("antes de começar a reforma") é frase normal.
     "(?:^|[^a-z])antes de comecar(?=[ ]*(?:[,.;:!?]|$))",
     "(?:^|[^a-z])(?:fica|fique|assista|assiste|presta atencao) ate (?:o )?(?:final|fim)",
-    "(?:^|[^a-z])bora la",
+    "(?:^|[^a-z])bora la(?![a-z])",
     "(?:^|[^a-z])(?:o tema|o assunto) de hoje",
   ].join("|"),
 );
@@ -178,14 +182,14 @@ const DESPEDIDA = new RegExp(
     // "até a próxima" só no fim do bloco ou com "vídeo"/"post"; "até a próxima sexta" é prazo.
     "(?:^|[^a-z])ate (?:o |a )?(?:proximo|proxima)(?:[ ]*(?:[,.;:!?]|$)|[ ](?:video|post)(?![a-z]))",
     "(?:^|[^a-z])ate (?:o |a )?breve(?![a-z])",
-    "(?:^|[^a-z])(?:fico|ficamos|estou|estamos) a (?:sua |nossa )?disposicao",
     // "dê" perde o acento na normalização e viraria "de" ("número de likes"): só o verbo inteiro, ou "de" com artigo.
     "(?:^|[^a-z])(?:deixe|deixa) (?:o |seu |um )?like",
     "(?:^|[^a-z])de (?:o |seu |um )like",
-    "(?:^|[^a-z])(?:se inscreva|inscreva-se|se inscreve)",
     "(?:^|[^a-z])curt[ae] e compartilh[ae]",
   ].join("|"),
 );
+/** Cortesias que viram pedido concreto quando a frase traz o canal: "estamos à disposição no WhatsApp", "se inscreva ... pelo link". */
+const CORTESIA_COM_EXCECAO_DO_CANAL = /(?:^|[^a-z])(?:(?:fico|ficamos|estou|estamos) a (?:sua |nossa )?disposicao|se inscreva|inscreva-se|se inscreve)/;
 const DUVIDA_GENERICA = /(?:^|[^a-z])(?:qualquer|se tiver) duvidas?,? (?:e so|me chama|me chame|fico|estou|estamos|conte comigo|conta comigo)[^.!?;]*/;
 
 /** "Um beijo.", "Abraço!": só como despedida, a última frase do bloco e sozinha, nunca no meio de uma frase. */
@@ -197,6 +201,10 @@ function acharDespedida(texto: string): string | null {
   const direto = DESPEDIDA.exec(texto)?.[0];
   if (direto) return direto.replace(/^[^a-z]+/, "").trim();
   // "Qualquer dúvida, me chama" sem dizer onde é cortesia; com o canal (zap, direct, link) é o pedido final, que o projeto quer.
+  for (const frase of frasesDe(texto)) {
+    const c = CORTESIA_COM_EXCECAO_DO_CANAL.exec(frase);
+    if (c && !CANAL_CONCRETO.test(frase)) return c[0].replace(/^[^a-z]+/, "").trim();
+  }
   const duvida = DUVIDA_GENERICA.exec(texto)?.[0];
   if (duvida && !CANAL_CONCRETO.test(duvida)) return duvida.replace(/^[^a-z]+/, "").trim();
   return null;
@@ -204,13 +212,15 @@ function acharDespedida(texto: string): string | null {
 
 // --- 5. Intensificador vazio -------------------------------------------------------------------
 
-const INTENSIFICADOR = /(?:^|[^a-z0-9])(incriveis|incrivel|poderos[oa]s?|transformador(?:es|as|a)?|revolucionari[oa]s?|surpreendentes?|extraordinari[oa]s?|inacreditaveis|inacreditavel|impressionantes?|espetaculares|espetacular|fenomenal|fenomenais)(?![a-z0-9])/;
+// "transformador" no masculino singular é peça ("o transformador queimou"); "transformadora" e plurais só valem depois de é, foi, muito ou super.
+const TRANSFORMADOR_INTENSO = /(?:^|[^a-z0-9])(?:e|foi|muito|super) (transformador(?:es|as|a))(?![a-z0-9])/;
+const INTENSIFICADOR = /(?:^|[^a-z0-9])(incriveis|incrivel|poderos[oa]s?|revolucionari[oa]s?|surpreendentes?|extraordinari[oa]s?|inacreditaveis|inacreditavel|impressionantes?|espetaculares|espetacular|fenomenal|fenomenais)(?![a-z0-9])/;
 
 function acharIntensificador(texto: string): string | null {
   for (const frase of frasesDe(texto)) {
     // Com número na mesma frase o adjetivo está apoiado num fato, e na dúvida não pega.
     if (TEM_ALGARISMO.test(frase)) continue;
-    const m = INTENSIFICADOR.exec(frase);
+    const m = INTENSIFICADOR.exec(frase) ?? TRANSFORMADOR_INTENSO.exec(frase);
     if (m) return m[1];
   }
   return null;
@@ -220,7 +230,9 @@ function acharIntensificador(texto: string): string | null {
 
 const CADA_VEZ_MAIS = new RegExp(
   [
-    "(?:^|[^a-z])cada (?:vez|dia) mais",
+    // Só no começo da frase ("cada vez mais gente...") ou com as palavras da tendência vaga; "está ficando cada vez mais duro" é fato do carro.
+    "^[^a-z0-9]*cada (?:vez|dia) mais",
+    "(?:^|[^a-z])cada (?:vez|dia) mais (?:pessoas|gente|empresas|clientes|importante|comum|necessario|dificil)",
     "(?:^|[^a-z])mais e mais(?:[^a-z]|$)",
     "(?:^|[^a-z])nos dias de hoje",
     "(?:^|[^a-z])nos tempos (?:atuais|modernos)",
@@ -242,9 +254,9 @@ function acharCadaVezMais(texto: string): string | null {
 
 // --- 7. Paralelismo de slogan ------------------------------------------------------------------
 
-// Só o par que se opõe ("menos A, mais B" ou "mais A, menos B"); "mais grosso, mais fácil" descreve o produto.
-const SLOGAN_MENOS_MAIS = /(?:^|[^a-z])(?<!quanto )menos (?!que |do que |de )([a-z]+(?: [a-z]+){0,2}), mais (?!que |do que )([a-z]+)/;
-const SLOGAN_MAIS_MENOS = /(?:^|[^a-z])(?<!quanto )mais (?!que |do que |de )([a-z]+(?: [a-z]+){0,2}), menos (?!que |do que )([a-z]+)/;
+// A frase tem de COMEÇAR por "menos" ou "mais" ("se usar menos sabão, mais fácil fica" é condição). Só o par que se opõe ("menos A, mais B" ou "mais A, menos B"); "mais grosso, mais fácil" descreve o produto.
+const SLOGAN_MENOS_MAIS = /^[^a-z0-9]*menos (?!que |do que |de )([a-z]+(?: [a-z]+){0,2}), mais (?!que |do que )([a-z]+)/;
+const SLOGAN_MAIS_MENOS = /^[^a-z0-9]*mais (?!que |do que |de )([a-z]+(?: [a-z]+){0,2}), menos (?!que |do que )([a-z]+)/;
 const SLOGAN_SEM_SEM_SEM = /(?:^|[^a-z])sem ([a-z]+(?: [a-z]+){0,2}), sem ([a-z]+(?: [a-z]+){0,2})(?:,| e) sem ([a-z]+)/;
 
 function acharSlogan(texto: string, opcoes: OpcoesDoDetector): string | null {
@@ -264,7 +276,7 @@ function acharSlogan(texto: string, opcoes: OpcoesDoDetector): string | null {
 
 const REVELACAO = new RegExp(
   [
-    "^[^a-z0-9]*(?:descubra|desvende|conheca|voce sabia que)(?![a-z])",
+    "^[^a-z0-9]*(?:descubra|desvende)(?![a-z])",
     "(?:^|[^a-z])(?:o que|a verdade que) ninguem (?:te )?(?:conta|fala|diz|avisa|mostra)",
     "(?:^|[^a-z])ninguem te (?:conta|fala|diz|avisa)",
     "(?:^|[^a-z])segredo revelado",

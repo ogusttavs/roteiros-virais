@@ -70,6 +70,17 @@ describe("formulas-de-maquina: o que NÃO pode pegar", () => {
     ["'número de likes' não é pedir like", { fechamento: "O que traz cliente é a prova, e não o número de likes." }],
     ["'mais A, mais B' descreve o produto", { corpo: "Esse pano é mais grosso, mais fácil de torcer e seca rápido." }],
     ["'sem A, sem B e sem C' com o fato nas fontes", { corpo: "A fórmula é sem cloro, sem álcool e sem perfume." }, "produto sem cloro, sem alcool e sem perfume"],
+    // Segunda rodada (revisor independente, 25/11)
+    ["contraste com as duas palavras de 4 letras nas fontes", { corpo: "Não é óleo, é água." }, "o oleo e a agua do sistema"],
+    ["'transformador' é peça", { corpo: "O transformador do aparelho queimou." }],
+    ["'bora' sem 'lá'", { gancho: "Bora lavar esse carro?" }],
+    ["'nesse vídeo' no meio da frase", { gancho: "Esse barulho aparece nesse vídeo quando eu piso no freio." }],
+    ["'se inscreva' com o link", { chamada: "Se inscreva na nossa oficina gratuita de troca de pneus pelo link." }],
+    ["'à disposição' com o WhatsApp", { chamada: "Estamos à disposição no WhatsApp para passar o orçamento." }],
+    ["'cada vez mais' fato do carro", { corpo: "O pedal está ficando cada vez mais duro." }],
+    ["'menos A, mais B' no meio da frase", { corpo: "Se usar menos sabão, mais fácil fica enxaguar." }],
+    ["'conheça' apresenta alguém", { gancho: "Conheça a Ana, nossa nova recepcionista." }],
+    ["'você sabia que' com fato concreto", { gancho: "Você sabia que água sanitária mancha roupa colorida?" }],
     ["revelação com algarismo", { gancho: "Você sabia que 7 em cada 10 manchas de sofá vêm de bebida?" }],
   ];
   it.each(naoPega)("%s", (_nome, texto, fontes) => {
@@ -93,7 +104,16 @@ describe("formulas-de-maquina: o que NÃO pode pegar", () => {
     expect(familias({ fechamento: "Dê um like." })).toContain("despedida-cordial");
     expect(familias({ corpo: "Mais tempo, menos custo." })).toContain("paralelismo-de-slogan");
     expect(familias({ corpo: "Sem cloro, sem álcool e sem perfume." }, "ficha da clínica")).toContain("paralelismo-de-slogan");
-    expect(familias({ gancho: "Você sabia que o sofá guarda ácaro?" })).toContain("revelacao-vazia");
+    expect(familias({ gancho: "Descubra o que o sofá guarda." })).toContain("revelacao-vazia");
+    expect(familias({ corpo: "Não são 2 dias, são 3 dias. Não é sorte, é método." })).toContain("contraste-negado");
+    expect(familias({ gancho: "Neste vídeo eu mostro." })).toContain("abertura-de-preparacao");
+    expect(familias({ gancho: "Olha isso. Nesse vídeo eu mostro." })).toContain("abertura-de-preparacao");
+    expect(familias({ corpo: "O motor é potente e transformador." })).toEqual([]);
+    expect(familias({ corpo: "A mudança foi transformadora." })).toContain("intensificador-vazio");
+    expect(familias({ gancho: "Bora lá, vamos lavar!" })).toContain("abertura-de-preparacao");
+    expect(familias({ fechamento: "Estamos à disposição." })).toContain("despedida-cordial");
+    expect(familias({ corpo: "Cada vez mais gente lava o sofá em casa." })).toContain("cada-vez-mais");
+    expect(familias({ corpo: "O cliente acha que está cada vez mais importante." })).toContain("cada-vez-mais");
   });
 
   it("família de abertura só olha gancho, título e tema; despedida só fechamento e chamada", () => {
