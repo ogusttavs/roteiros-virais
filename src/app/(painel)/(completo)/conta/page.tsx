@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
+import { publicarImagensAtivo } from "@/config/post-pronto";
 import { config } from "@/lib/config";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { assinaturasDaMarca, ehDonoDaMarca } from "@/servicos/assinatura";
@@ -21,6 +22,7 @@ import { BriefingLinha } from "./BriefingLinha";
 import { FormularioConta } from "./FormularioConta";
 import { InformacoesDoAparelhoAdmin } from "./InformacoesDoAparelhoAdmin";
 import { InstalarNoCelular } from "./InstalarNoCelular";
+import { LinkPostPronto } from "./LinkPostPronto";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
 import { codigoDoRetorno, montarVisaoSeuInstagram } from "./seu-instagram-visao";
@@ -119,6 +121,8 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
       <div className={styles.colunaPrincipal}>
         {mostrarAssinatura && situacaoAssinatura ? <SuaAssinatura situacao={situacaoAssinatura} dono={donoDaMarca} verComo={sessao.verComo !== null} /> : null}
         {visaoInstagram ? <SeuInstagram visao={visaoInstagram} /> : null}
+        {/* E56 PR 2: a entrada de "Publicar post pronto" (com a chave aberta, o Instagram ligado e a dona da marca fora do "ver como"). */}
+        {publicarImagensAtivo() && visaoInstagram?.conta && visaoInstagram.podeMexer ? <LinkPostPronto /> : null}
         {/* E46 PR 2: no "ver como" nada que inscreve, instala ou sai em nome da pessoa aparece (o aviso de manhã, o convite de instalar e o Sair são do aparelho e da sessão de quem está olhando). */}
         {/* E58: a senha é de quem está logado; no "ver como" o admin olha e não troca a senha de ninguém. */}
         {sessao.verComo ? null : <TrocarSenha />}

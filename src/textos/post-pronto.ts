@@ -125,6 +125,7 @@ export const textosPostPronto = {
     semConexao: "Sem conexão agora. Tente de novo quando voltar a internet.",
     irParaConta: "Ir para a Conta",
     voltar: "Voltar para a Conta",
+    verComo: "Você está vendo a conta como a pessoa. Publicar é só dela.",
     filaTitulo: "A fila",
     filaVazia: "Nenhum post na fila. Os que você montar aparecem aqui.",
     estado: {
