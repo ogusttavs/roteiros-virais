@@ -28,14 +28,14 @@ const CAMINHO_GERADO = path.resolve(process.cwd(), "src/ia/prompts/regras-copy-r
 const TRAVESSOES = [String.fromCharCode(0x2013), String.fromCharCode(0x2014)];
 const QUEBRA = String.fromCharCode(10);
 
-describe("a tabela gerada das 55 regras (seção 11)", () => {
-  it("tem 25 R-COPY, 20 R-ROTEIRO e 10 R-CONF, sem número repetido", () => {
+describe("a tabela gerada das 59 regras (seção 11)", () => {
+  it("tem 29 R-COPY, 20 R-ROTEIRO e 10 R-CONF, sem número repetido", () => {
     const por = (g: string) => REGRAS_COPY_ROTEIRO.filter((r) => r.grupo === g).length;
-    expect(REGRAS_COPY_ROTEIRO).toHaveLength(55);
-    expect(por("COPY")).toBe(25);
+    expect(REGRAS_COPY_ROTEIRO).toHaveLength(59);
+    expect(por("COPY")).toBe(29);
     expect(por("ROTEIRO")).toBe(20);
     expect(por("CONF")).toBe(10);
-    expect(NUMEROS_REGRAS_COPY_ROTEIRO.size).toBe(55);
+    expect(NUMEROS_REGRAS_COPY_ROTEIRO.size).toBe(59);
   });
 
   it("o arquivo gerado tem versão (o checar-versao-prompt exige quando ele muda) e ela é a do gerador", () => {
@@ -100,7 +100,7 @@ describe("o gerador (lógica pura)", () => {
   });
 
   it("recusa quantidade diferente da esperada", () => {
-    expect(() => lerTabelaDaSecao11(doc([linha("R-COPY-01")]))).toThrow(/R-COPY: esperava 25/);
+    expect(() => lerTabelaDaSecao11(doc([linha("R-COPY-01")]))).toThrow(/R-COPY: esperava 29/);
   });
 
   it("recusa linha com número de colunas errado", () => {
@@ -113,21 +113,21 @@ describe("o gerador (lógica pura)", () => {
 
   it("lê só a seção 11 (para na próxima de nível 2) e normaliza força e coluna de conferência", () => {
     const todas = [
-      ...Array.from({ length: 25 }, (_, i) => linha(`R-COPY-${String(i + 1).padStart(2, "0")}`)),
+      ...Array.from({ length: 29 }, (_, i) => linha(`R-COPY-${String(i + 1).padStart(2, "0")}`)),
       ...Array.from({ length: 20 }, (_, i) => linha(`R-ROTEIRO-${String(i + 1).padStart(2, "0")}`)),
       ...Array.from({ length: 10 }, (_, i) => linha(`R-CONF-${String(i + 1).padStart(2, "0")}`, "forte (lei)")),
     ];
     const regras = lerTabelaDaSecao11(doc(todas));
-    expect(regras).toHaveLength(55);
+    expect(regras).toHaveLength(59);
     expect(regras[0]).toMatchObject({ numero: "R-COPY-01", forca: "media", conferePorCodigo: "sim", grupo: "COPY" });
-    expect(regras[54]).toMatchObject({ numero: "R-CONF-10", forca: "forte" });
+    expect(regras[58]).toMatchObject({ numero: "R-CONF-10", forca: "forte" });
   });
 });
 
 describe("o que o prompt recebe", () => {
   it("só as de força forte e média entram; as de indício ficam fora", () => {
     const entram = regrasQueEntramNoPrompt();
-    expect(entram).toHaveLength(29);
+    expect(entram).toHaveLength(32);
     expect(entram.every((r) => r.forca !== "indicio")).toBe(true);
     const texto = textoRegrasCopyRoteiro();
     expect(texto).toContain("R-ROTEIRO-05");

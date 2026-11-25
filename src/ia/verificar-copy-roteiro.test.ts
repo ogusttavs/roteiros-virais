@@ -521,3 +521,36 @@ describe("R-CONF-10: reconhece a pessoa pública em todas as variações da fras
     expect(reprovam({ itensDaEdicao: ["Print das figuras do manual do produto."] })).toEqual([]);
   });
 });
+
+describe("R-COPY-26: fórmula de texto de máquina (onda 1 de texto)", () => {
+  const comFormula = { gancho: "Não é sorte, é método: o box da Neusa ficou limpo em 5 minutos." };
+
+  it("na 1ª tentativa reprova, com o motivo para o modelo refazer", () => {
+    const r = verificarRegrasCopyRoteiro(entrada(comFormula));
+    expect(com(r.reprovam, "R-COPY-26")).toBe(true);
+    expect(r.reprovam.join(" ")).toContain("contraste em duas metades");
+  });
+
+  it("na 2ª tentativa vira só aviso: nunca derruba a geração", () => {
+    const r = verificarRegrasCopyRoteiro(entrada({ ...comFormula, tentativa: 2 }));
+    expect(com(r.reprovam, "R-COPY-26")).toBe(false);
+    expect(com(r.avisos, "R-COPY-26")).toBe(true);
+  });
+
+  it("vale também no título e na despedida do fechamento", () => {
+    expect(com(reprovam({ titulo: "O que ninguém te conta sobre vidro" }), "R-COPY-26")).toBe(true);
+    expect(com(reprovam({ fechamento: "Espero que tenha gostado." }), "R-COPY-26")).toBe(true);
+  });
+
+  it("o contraste que vem da ficha passa (a frase é conversa do ramo)", () => {
+    const fontes = "perfil: limpeza de vidros; mancha pode ser calcario ou sabao seco";
+    expect(com(reprovam({ gancho: "Não é calcário, é sabão seco: o box da Neusa em 5 minutos.", fontes }), "R-COPY-26")).toBe(false);
+  });
+
+  it("R-COPY-28 e R-COPY-29 só avisam, nunca reprovam", () => {
+    const a = verificarRegrasCopyRoteiro(entrada({ corpo: "Molhe o vidro. Passe o rodo. Pronto. Sai tudo com 10x menos esforço." }));
+    expect(com(a.avisos, "R-COPY-28")).toBe(true);
+    expect(com(a.avisos, "R-COPY-29")).toBe(true);
+    expect(com(a.reprovam, "R-COPY-28") || com(a.reprovam, "R-COPY-29")).toBe(false);
+  });
+});
