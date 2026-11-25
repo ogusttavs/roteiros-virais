@@ -10,7 +10,7 @@ export const ROTINAS: Rotina[] = [
   { chave: "buscar", titulo: "Buscar vídeos novos", faz: "Procura, em cada rede, os vídeos novos das contas que a gente acompanha.", filas: [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaMeioDia, FILAS.contasBase, FILAS.metaContas, FILAS.metaHashtags, FILAS.descobertaInstagram] },
   { chave: "foco", titulo: "Pesquisar o assunto de cada conta", faz: "Para a conta que tem foco, busca no YouTube vídeos do assunto dela (e de alguns canais de referência), dentro de um teto por conta, para o ramo ter prova do que ela fala.", filas: [FILAS.pesquisaDoFoco] },
   { chave: "capas", titulo: "Guardar a capa dos vídeos", faz: "Baixa a imagem de capa dos vídeos do Instagram enquanto o link da rede ainda abre, para a referência não aparecer vazia depois.", filas: [FILAS.guardarCapas] },
-  { chave: "noticias", titulo: "Ler as notícias do ramo", faz: "Junta as notícias do dia de cada ramo, separa as que importam para quem tem negócio ali e guarda a foto de cada matéria.", filas: [FILAS.coletaNoticias, FILAS.filtrarNoticias] },
+  { chave: "noticias", titulo: "Ler as notícias do ramo", faz: "Junta as notícias do dia de cada ramo, separa as que importam para quem tem negócio ali e guarda a foto de cada matéria.", filas: [FILAS.coletaNoticias, FILAS.coletaNoticiasQuentes, FILAS.filtrarNoticias] },
   { chave: "tendencias", titulo: "Ver o que está em alta no Brasil", faz: "Junta as buscas e os vídeos em alta no país, para todos os ramos, e põe o tema do momento no dia de cada ramo.", filas: [FILAS.tendenciasBrasil] },
   { chave: "pontuar", titulo: "Ver quais vídeos estão indo bem", faz: "Compara cada vídeo com a conta dele e separa os que passaram da média.", filas: [FILAS.pontuar, FILAS.vigilancia] },
   { chave: "contas", titulo: "Conferir se as contas são do ramo", faz: "Uma vez por semana, olha os vídeos mais vistos de cada conta e tira do ramo (sem apagar nada) a que fala de outro assunto, para ela deixar de aparecer como referência, tema e o que o público pergunta.", filas: [FILAS.faxinaDeContas] },
@@ -41,6 +41,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.coletaApify]: "a coleta do TikTok e do Instagram",
   [FILAS.coletaMeioDia]: "a coleta do meio-dia",
   [FILAS.coletaNoticias]: "a leitura das notícias",
+  [FILAS.coletaNoticiasQuentes]: "a leitura rápida das notícias",
   [FILAS.filtrarNoticias]: "a escolha das notícias que importam",
   [FILAS.tendenciasBrasil]: "a leitura do que está em alta no Brasil",
   [FILAS.contasBase]: "a base das contas novas",
@@ -87,6 +88,8 @@ export function quandoDoCron(cron: string): string {
   const [min, hora, dia, mes, semana] = cron.trim().split(/\s+/);
   const dois = (n: string) => n.padStart(2, "0");
   if (mes !== "*") return cron;
+  const faixa = /^(\d{1,2})-(\d{1,2})\/(\d{1,2})$/.exec(hora);
+  if (faixa && /^\d+$/.test(min) && dia === "*" && semana === "*") return `a cada ${faixa[3]} horas, das ${dois(faixa[1])}:${dois(min)} às ${dois(faixa[2])}:${dois(min)}`;
   const aCada = /^\*\/(\d{1,2})$/.exec(min);
   if (aCada && hora === "*" && dia === "*" && semana === "*") return `a cada ${aCada[1]} minutos`;
   if (hora === "*" && dia === "*" && semana === "*") return min === "0" ? "de hora em hora, em ponto" : `de hora em hora, aos ${min} minutos`;

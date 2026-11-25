@@ -26,9 +26,15 @@ type Props = {
   novasDesdeOntem: number;
   /** A coleta ou a leitura falhou; o que já estava guardado continua (se houver). */
   falha: boolean;
+  /** Quantos dias para trás a capa olhou (3, ou 7 depois de "Ver a última semana"). */
+  dias: number;
   /** O "ver como" só olha. */
   somenteLeitura: boolean;
 };
+
+/** Menos notícias que isto na janela: a tela diz quantas achou e oferece ampliar. */
+export const NOTICIAS_PARA_NAO_AVISAR = 5;
+const DIAS_DA_SEMANA = 7;
 
 type Filtro = "tudo" | "setor" | `a-${number}`;
 
@@ -50,7 +56,7 @@ function passa(n: NoticiaNaTela, filtro: Filtro): boolean {
  * `/noticias` (E53, passo 20): a capa do dia. A data, a linha dos assuntos que a pessoa acompanha (com "Editar", que abre a folha), as pílulas de origem, o destaque com a foto grande e os
  * cartões. Sem notícia nova hoje, o aviso e as de ontem embaixo. Abrir o original ou pedir o roteiro de uma notícia de assunto mantém o assunto vivo (a recusa do "ver como" é ignorada).
  */
-export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, assuntos, emAlta, novasDesdeOntem, falha, somenteLeitura }: Props) {
+export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, assuntos, emAlta, novasDesdeOntem, falha, dias, somenteLeitura }: Props) {
   const router = useRouter();
   const [folhaAberta, setFolhaAberta] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>("tudo");
@@ -62,6 +68,7 @@ export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, ass
   const hoje = deHoje.filter((n) => passa(n, filtroValido));
   const ontem = deOntem.filter((n) => passa(n, filtroValido));
   // O destaque é a mais nova com foto; sem nenhuma com foto, a mais nova.
+  const poucas = !falha && deHoje.length + deOntem.length < NOTICIAS_PARA_NAO_AVISAR;
   const destaque = hoje.find((n) => n.imagemUrl) ?? hoje[0] ?? null;
   const restoDeHoje = hoje.filter((n) => n !== destaque);
 
@@ -155,8 +162,25 @@ export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, ass
         </div>
       ) : null}
 
+      {poucas ? (
+        <div className={[styles.cartao, styles.semNovidade].join(" ")} data-poucas-noticias role="status">
+          <Newspaper aria-hidden="true" strokeWidth={1.5} />
+          <div>
+            <h2>{textosNoticias.achamosSo(deHoje.length + deOntem.length, dias)}</h2>
+            <p>{dias < DIAS_DA_SEMANA ? textosNoticias.quererVerSemana : textosNoticias.naoTemMais}</p>
+            {/* Sem nenhuma de hoje, a hora da próxima coleta vai aqui, num cartão só (o de "nada novo" não aparece junto). */}
+            {hoje.length === 0 ? <p>{ontem.length > 0 ? textosNoticias.nadaNovoFrase : textosNoticias.nadaNovoSemOntem}</p> : null}
+            {dias < DIAS_DA_SEMANA ? (
+              <Botao variante="secundario" tamanho="md" onClick={() => router.push("/noticias?ver=semana")}>
+                {textosNoticias.verDaSemana}
+              </Botao>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {hoje.length === 0 ? (
-        <div className={[styles.cartao, styles.semNovidade].join(" ")} data-sem-novidade>
+        poucas ? null : <div className={[styles.cartao, styles.semNovidade].join(" ")} data-sem-novidade>
           <Newspaper aria-hidden="true" strokeWidth={1.5} />
           <div>
             <h2>{textosNoticias.nadaNovoTitulo}</h2>
@@ -178,7 +202,7 @@ export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, ass
 
       {ontem.length > 0 ? (
         <section className={styles.secao} aria-labelledby="titulo-de-ontem">
-          <h2 id="titulo-de-ontem">{textosNoticias.deOntem}</h2>
+          <h2 id="titulo-de-ontem">{dias > 3 ? textosNoticias.dosDiasAnteriores : textosNoticias.deOntem}</h2>
           <div className={styles.grade}>
             {ontem.map((n) => (
               <CartaoDeNoticia key={n.chave} noticia={n} aoAbrir={abrir} aoCriarRoteiro={criarRoteiro} />
