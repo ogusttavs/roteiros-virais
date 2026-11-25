@@ -54,6 +54,7 @@ export function FolhaTrocarFoto({
   const [autorizado, setAutorizado] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
+  const [avisoDaFoto, setAvisoDaFoto] = useState<string | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
 
   const doPaciente = ramoSaude && TIPOS_COM_FOTO_DE_PACIENTE.has(slide.tipo);
@@ -69,11 +70,12 @@ export function FolhaTrocarFoto({
       const corpo = new FormData();
       corpo.append("foto", arquivo);
       if (ramoSaude) corpo.append("autorizacaoDoPaciente", "true");
-      const { foto } = await pedir<{ foto: { id: number } }>(
+      const { foto, aviso } = await pedir<{ foto: { id: number }; aviso?: string | null }>(
         `/api/carrossel/${carrosselId}/fotos`,
         { method: "POST", body: corpo },
         t.fotoNaoValida,
       );
+      setAvisoDaFoto(aviso ?? null);
       await aoMandar();
       setEscolhidas((a) => ({ ...a, [ehPar ? lado : "antes"]: foto.id }));
     } catch (e) {
@@ -139,6 +141,8 @@ export function FolhaTrocarFoto({
     >
       <div className={estilos.folhaCorpo}>
         <p>{t.trocarFotoAjuda}</p>
+        {t.metodo.dicasDeFoto[slide.tipo] ? <p>{t.metodo.dicasDeFoto[slide.tipo]}</p> : null}
+        {avisoDaFoto ? <p role="status">{avisoDaFoto}</p> : null}
         {ehPar ? (
           <div className={estilos.ladoDoPar} role="radiogroup" aria-label={t.trocarFoto}>
             {(["antes", "depois"] as const).map((l) => (

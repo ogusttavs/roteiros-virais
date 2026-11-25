@@ -20,6 +20,7 @@ import {
 } from "@/config/carrossel";
 
 import { distribuirFotos } from "./fotos";
+import { rotularItens } from "./metodo";
 
 export function contarPalavras(texto: string): number {
   return texto.trim() === "" ? 0 : texto.trim().split(/\s+/).length;
@@ -57,7 +58,7 @@ const limpo = (v: string | undefined): string => (v ?? "").trim();
 export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolean }): SlideDoCarrossel[] {
   const totalDePassos = saida.filter((s) => s.tipo === "passo").length;
   let passo = 0;
-  return saida.map((s): SlideDoCarrossel => {
+  return rotularItens(saida.map((s): SlideDoCarrossel => {
     const opcional = (valor: string, chave: ChaveDeCampo) => (limpo(valor) ? { [chave]: limpo(valor) } : {});
     switch (s.tipo) {
       case "capa-foto":
@@ -85,7 +86,7 @@ export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolea
       case "noticia":
         return { tipo: s.tipo, titulo: limpo(s.titulo), veiculo: limpo(s.fonte), data: limpo(s.referencia) };
     }
-  });
+  }));
 }
 
 /** Todo o texto de um slide, na ordem em que aparece, para o verificador de fatos e a conformidade lerem. */

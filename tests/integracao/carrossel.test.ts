@@ -721,3 +721,72 @@ describe("a chave desligada", () => {
     expect(respostas.map((r) => r.status)).toEqual(Array(10).fill(404));
   });
 });
+
+describe("o método: o carrossel cumpre o que a capa promete (E65 PR 3)", () => {
+  const geracoesDa = async (clienteId: number) => db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, clienteId)));
+
+  it("a capa que promete mais do que o carrossel traz é reprovada com o motivo e a segunda tentativa sai certa", async () => {
+    const clienteId = await criarCliente();
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-capa-errada]", 5));
+    const geracoes = await geracoesDa(clienteId);
+    expect(geracoes).toHaveLength(2);
+    expect(geracoes.map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/a capa promete 9 erros e o carrossel traz 3/);
+    expect(JSON.stringify(geracoes.map((g) => g.entradas))).toContain("A tentativa anterior foi reprovada.");
+    expect(c.slides[0].titulo).not.toMatch(/9 erros/);
+  });
+
+  it("o rótulo N de M do item é escrito por código", async () => {
+    const clienteId = await criarCliente();
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado", 9));
+    const itens = c.slides.filter((x) => x.tipo === "item");
+    expect(itens.length).toBeGreaterThan(1);
+    expect(itens.map((x) => x.rotulo)).toEqual(itens.map((_, i) => `Dica ${i + 1} de ${itens.length}`));
+  });
+
+  it("a capa com molde vago (tudo sobre o assunto) é reprovada e refeita; sem número, pergunta nem verbo só gera aviso, sem segunda chamada", async () => {
+    const clienteId = await criarCliente();
+    const vaga = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-capa-vaga]", 5));
+    expect((await geracoesDa(clienteId)).map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/molde vago \(promete tudo sobre o assunto\)/);
+    expect(vaga.slides[0].titulo).not.toMatch(/^Tudo sobre/);
+    const outra = await criarCliente();
+    const fraca = await gerarCarrossel(outra, pedidoLivre("mancha de vinho no estofado [mock:carrossel-capa-sem-promessa]", 5));
+    expect(await geracoesDa(outra)).toHaveLength(1);
+    expect(fraca.avisos.join()).toMatch(/não tem número, pergunta nem verbo de ação/);
+    expect(fraca.avisos.join()).toMatch(/pouco texto|número, pergunta/);
+  });
+
+  it("trocar a cor mantém os avisos do método e só troca o da cor", async () => {
+    const clienteId = await criarCliente();
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-capa-sem-promessa]", 5));
+    const antes = c.avisos.filter((a) => /número, pergunta/.test(a));
+    expect(antes).toHaveLength(1);
+    const clara = await trocarCor(clienteId, c.id, "#f5d90a");
+    expect(clara.avisos.join()).toMatch(/clara demais/);
+    expect(clara.avisos.join()).toMatch(/número, pergunta/);
+    const escura = await trocarCor(clienteId, c.id, "#0e5a6a");
+    expect(escura.avisos.join()).not.toMatch(/clara demais/);
+    expect(escura.avisos.join()).toMatch(/número, pergunta/);
+  });
+
+  it("a foto mais estreita que o slide entra, mas a rota avisa; a de 1080 ou mais não avisa", async () => {
+    const clienteId = await criarCliente();
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado", 5));
+    const rotaDeFotos = await import("@/app/api/carrossel/[id]/fotos/route");
+    estadoDaSessao.clienteId = clienteId;
+    process.env.CARROSSEL_ATIVO = "1";
+    try {
+      const enviar = async (largura: number) => {
+        const f = new FormData();
+        f.append("foto", new File([new Uint8Array(pngLiso(largura, 8, [9, 9, 9]))], "foto.png", { type: "image/png" }));
+        return rotaDeFotos.POST(new Request(`http://localhost/api/carrossel/${c.id}/fotos`, { method: "POST", body: f }), { params: Promise.resolve({ id: String(c.id) }) });
+      };
+      const estreita = await enviar(600);
+      expect(estreita.status).toBe(200);
+      expect(((await estreita.json()) as { aviso: string }).aviso).toMatch(/só 600 pixels de largura/);
+      const larga = await enviar(1080);
+      expect(((await larga.json()) as { aviso: string | null }).aviso).toBeNull();
+    } finally {
+      estadoDaSessao.clienteId = 0;
+    }
+  });
+});

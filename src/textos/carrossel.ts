@@ -182,4 +182,18 @@ export const textosCarrossel = {
   limiteAjuda: "Os carrosséis que você já fez continuam aqui para baixar.",
   verOpcoes: "Ver as opções",
   agoraNao: "Agora não",
+
+  // E65 PR 3 (bloco novo no fim do objeto, para não colidir com a E66): o carrossel cumpre o que a capa promete
+  metodo: {
+    capaFraca: "A capa não tem número, pergunta nem verbo de ação. Uma promessa mais concreta, como \"3 erros que...\" ou uma pergunta sobre uma dúvida real, chama mais o toque.",
+    legendaRepeteACapa: "A legenda começa repetindo o título da capa. Abra com outra frase, que dê um motivo a mais para a pessoa abrir o carrossel.",
+    textoCurto: (slides: number[]) => `${slides.length === 1 ? "O slide" : "Os slides"} ${slides.join(", ")} ${slides.length === 1 ? "tem" : "têm"} pouco texto. Dê uma explicação a mais, de pelo menos 8 palavras, para o slide ensinar de verdade.`,
+    fotoEstreita: (largura: number) => `Essa foto tem só ${largura} pixels de largura e pode ficar borrada no slide. Se der, mande uma maior, com 1080 pixels ou mais.`,
+    dicasDeFoto: {
+      "capa-foto": "Foto na vertical, com o assunto no meio e espaço livre embaixo, onde entra o título.",
+      passo: "Mostre o passo acontecendo, de perto, com boa luz. Uma foto por passo ajuda mais do que uma foto geral.",
+      "antes-depois": "As duas fotos com o mesmo ângulo e a mesma luz, para a diferença aparecer sem truque.",
+      "prova-resultado": "O lugar, o trabalho ou o resultado de verdade, sem filtro e sem montagem.",
+    } as Record<string, string>,
+  },
 } as const;
