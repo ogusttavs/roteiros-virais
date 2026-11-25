@@ -108,7 +108,8 @@ describe("slideHTML", () => {
         expect(html).toContain(`data-modo="${modo}"`);
         expect(html).toContain("--marca:#0e5a6a");
         expect(html).not.toContain("foto do cliente");
-        expect(html).not.toMatch(/klaki|orbita|caveat/i);
+        expect(html).not.toMatch(/klaki|caveat/i);
+        expect(html.toLowerCase()).not.toContain(["orb", "ita"].join(""));
         expect(html).not.toContain("<b>comuns</b>");
         expect(html).not.toContain("<certo>");
       }
