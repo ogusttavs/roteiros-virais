@@ -60,7 +60,7 @@ export function paletaDoSlide(cor: string, escuro: boolean): Paleta {
   const texto = escuro ? "#f7f5f2" : "#17151a";
   let destaque = cor;
   for (let i = 0; i < 12 && contraste(destaque, fundo) < 4.5; i += 1) destaque = misturar(destaque, escuro ? "#ffffff" : "#000000", 0.15);
-  return { fundo, texto, suave: escuro ? "#c9c5c0" : "#4a4650", destaque, sobreDestaque: luminancia(destaque) > 0.4 ? "#17151a" : "#ffffff" };
+  return { fundo, texto, suave: escuro ? "#c9c5c0" : "#4a4650", destaque, sobreDestaque: contraste("#17151a", destaque) >= contraste("#ffffff", destaque) ? "#17151a" : "#ffffff" };
 }
 
 const ROTULO_DO_TIPO: Partial<Record<TipoDeSlide, string>> = { passo: "Passo", item: "Dica", dado: "Dado", prova: "Na prática", resumo: "Para guardar" };
@@ -83,7 +83,7 @@ function corpoDoSlide(d: DadosDoModelo): string {
       const [antes, depois] = c.includes("Depois:") ? c.split("Depois:") : [c, ""];
       return `<div class="miolo"><span class="selo">${n}</span><h2 data-caixa data-base="64">${t}</h2>
         <div class="par">${d.foto ? imagem(d.foto, "metade") : ""}${d.fotoDepois ? imagem(d.fotoDepois, "metade") : ""}</div>
-        <div class="lados"><p data-caixa data-base="38"><b>Antes</b> ${antes.replace(/^Antes:\s*/, "")}</p>${depois ? `<p data-caixa data-base="38"><b>Depois</b> ${depois.trim()}</p>` : ""}</div></div>`;
+        <div class="lados"><p data-caixa data-base="38" data-max="260"><b>Antes</b> ${antes.replace(/^Antes:\s*/, "")}</p>${depois ? `<p data-caixa data-base="38" data-max="260"><b>Depois</b> ${depois.trim()}</p>` : ""}</div></div>`;
     }
     case "dado":
       return `<div class="miolo centro"><span class="selo">${n}</span><span class="rotulo">${rotulo}</span><h2 class="grande" data-caixa data-base="104">${t}</h2><p data-caixa data-base="46">${c}</p>${slide.fonte ? `<small class="fonte">Fonte: ${escaparHtml(slide.fonte)}</small>` : ""}</div>`;
@@ -106,9 +106,8 @@ html,body{width:${LARGURA_DO_SLIDE}px;height:${ALTURA_DO_SLIDE}px;overflow:hidde
 body{background:${p.fundo};color:${p.texto};font-family:"Letra",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;position:relative}
 .miolo{position:absolute;inset:0;padding:96px 88px;display:flex;flex-direction:column;gap:36px;justify-content:center}
 .miolo.centro{justify-content:center}
-h1,h2{font-weight:800;line-height:1.08;letter-spacing:-0.02em;overflow:hidden;max-height:560px}
-h1{max-height:760px}
-p{line-height:1.3;color:${p.suave};overflow:hidden;max-height:520px}
+h1,h2{font-weight:800;line-height:1.08;letter-spacing:-0.02em;overflow-wrap:break-word}
+p{line-height:1.3;color:${p.suave};overflow-wrap:break-word}
 .selo{position:absolute;top:64px;right:88px;font-size:28px;color:${p.suave};font-variant-numeric:tabular-nums}
 .rotulo{display:inline-block;align-self:flex-start;background:${p.destaque};color:${p.sobreDestaque};font-weight:700;font-size:30px;padding:10px 26px;border-radius:999px}
 .fonte{font-size:28px;color:${p.suave}}
@@ -121,7 +120,7 @@ p{line-height:1.3;color:${p.suave};overflow:hidden;max-height:520px}
 .par{display:flex;gap:24px;height:520px;flex:none}
 .foto.metade{flex:1;height:100%}
 .lados{display:flex;gap:24px}
-.lados p{flex:1;max-height:260px}
+.lados p{flex:1}
 .lados b{display:block;color:${p.destaque};font-size:30px;margin-bottom:6px}
 .velo{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 0%,rgba(0,0,0,.78) 100%)}
 .velo.sem{background:none}
@@ -139,10 +138,12 @@ p{line-height:1.3;color:${p.suave};overflow:hidden;max-height:520px}
  */
 export const AJUSTAR_CAIXAS = `(() => {
   const cortados = [];
+  const MAXIMO = { H1: 760, H2: 520, P: 480 };
   document.querySelectorAll('[data-caixa]').forEach((el, i) => {
     const base = Number(el.getAttribute('data-base')) || 48;
+    const max = Number(el.getAttribute('data-max')) || MAXIMO[el.tagName] || 480;
     let tam = base;
-    const estoura = () => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+    const estoura = () => el.getBoundingClientRect().height > max || el.scrollWidth > el.clientWidth + 1;
     el.style.fontSize = tam + 'px';
     while (estoura() && tam > base * 0.55) { tam -= 2; el.style.fontSize = tam + 'px'; }
     if (estoura()) {
