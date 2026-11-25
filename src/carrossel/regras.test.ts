@@ -80,7 +80,15 @@ describe("os limites de cada campo", () => {
   it("em ramo de saúde só a fala de cliente (depoimento) fica de fora; antes-depois e prova-resultado valem", () => {
     expect(verificarLimitesDosSlides([s("prova-fala")], { ramoSaude: true }).join()).toMatch(/saúde/);
     expect(verificarLimitesDosSlides([s("antes-depois")], { ramoSaude: true })).toEqual([]);
-    expect(verificarLimitesDosSlides([s("prova-resultado")], { ramoSaude: true, fotosPrometidas: 1 })).toEqual([]);
+    expect(verificarLimitesDosSlides([s("prova-resultado")], { ramoSaude: true, fotosPrometidas: 0, fotosDePacientePrometidas: 1 })).toEqual([]);
+  });
+  it("em saúde, antes-depois e prova-resultado só contam com foto de paciente, a comum não basta (E65 PR 5)", () => {
+    expect(verificarLimitesDosSlides([s("prova-resultado")], { ramoSaude: true, fotosPrometidas: 3, fotosDePacientePrometidas: 0 }).join()).toMatch(/só usam foto de paciente/);
+    expect(verificarLimitesDosSlides([s("antes-depois")], { ramoSaude: true, fotosPrometidas: 2, fotosDePacientePrometidas: 1 }).join()).toMatch(/só usam foto de paciente/);
+    expect(verificarLimitesDosSlides([s("antes-depois")], { ramoSaude: true, fotosPrometidas: 0, fotosDePacientePrometidas: 2 })).toEqual([]);
+    expect(verificarLimitesDosSlides([s("capa-foto")], { ramoSaude: true, fotosPrometidas: 0, fotosDePacientePrometidas: 2 }).join()).toMatch(/pedem foto/);
+    expect(slidesComFoto([s("antes-depois")], 2, 0)).toEqual([false]);
+    expect(slidesComFoto([s("antes-depois")], 0, 2)).toEqual([true]);
   });
   it("capa-foto e prova-resultado só existem com foto", () => {
     expect(verificarLimitesDosSlides([s("capa-foto"), s("prova-resultado")], { ramoSaude: false, fotosPrometidas: 1 }).join()).toMatch(/2 slides pedem foto.*tem 1/);

@@ -17,7 +17,7 @@ import { CONFERIR_TEXTO, faltaFoto, htmlDoSlide, modosDosSlides, type FotoParaOM
 
 export { distribuirFotos } from "./fotos";
 
-export type FotoDoCarrossel = { id: number; tipo: string; bytes: Buffer };
+export type FotoDoCarrossel = { id: number; tipo: string; bytes: Buffer; dePaciente?: boolean };
 
 let fundosEmBase64: string[] | undefined;
 
@@ -54,6 +54,8 @@ export type ResultadoDoRender = { png: Buffer[]; slides: SlideRenderizado[]; avi
 export async function renderizarSlides(entrada: {
   slides: SlideDoCarrossel[];
   fotos: FotoDoCarrossel[];
+  /** Marca de saúde: foto de paciente só em antes e depois e resultado, foto comum nunca neles (E65 PR 5). */
+  separarFotoDePaciente?: boolean;
   cor: string;
   arroba?: string;
   /** Só este slide (índice a partir de 0); ausente, todos. */
@@ -67,7 +69,7 @@ export async function renderizarSlides(entrada: {
     const f = id ? porId.get(id) : undefined;
     return f ? { tipo: f.tipo, base64: f.bytes.toString("base64") } : null;
   };
-  const escolhidas = distribuirFotos(entrada.slides, entrada.fotos);
+  const escolhidas = distribuirFotos(entrada.slides, entrada.fotos, entrada.separarFotoDePaciente === true);
   const modos = modosDosSlides(entrada.slides.map((s, i) => ({ tipo: s.tipo, comFoto: escolhidas[i].foto !== null })));
   const fontes = { mona: letraDoProjeto("monasans-latin.woff2"), mono: letraDoProjeto("jetbrainsmono-latin.woff2") };
   const fundos = fundosDoProjeto();

@@ -2,7 +2,7 @@ import type { SlideDoCarrossel } from "@/config/carrossel";
 
 /** O que as rotas `/api/carrossel` devolvem (E65 PR 2), como a tela usa. */
 export type CarrosselDaTela = { id: number; tema: string; quantidade: number; cor: string; avisos: string[]; slides: SlideDoCarrossel[]; legenda: string; hashtags: string[] };
-export type FotoDaTela = { id: number; ordem: number };
+export type FotoDaTela = { id: number; ordem: number; dePaciente?: boolean };
 export type DadosDoCarrossel = {
   carrossel: CarrosselDaTela;
   fotos: FotoDaTela[];

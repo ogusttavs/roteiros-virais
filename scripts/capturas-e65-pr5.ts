@@ -1,5 +1,5 @@
 /**
- * Capturas da E65 PR 5 (os achados da prova real): o pronto com o aviso do espaço para completar (trecho entre colchetes) a 390x844, no claro, numa marca de clínica odontológica (#0e5a6a, @clinica.exemplo).
+ * Capturas da E65 PR 5 (os achados da prova real): o pronto com o aviso do espaço para completar (trecho entre colchetes) e o escolher em marca de saúde com as duas áreas de foto (as suas fotos e as de paciente) a 390x844, no claro, numa marca de clínica odontológica (#0e5a6a, @clinica.exemplo).
  * Pré-requisito: um `next dev` em `CAPTURAS_URL` com `AI_PROVIDER=mock` e `CARROSSEL_ATIVO=1`, no banco do `.env`. Uso: `npx tsx scripts/capturas-e65-pr5.ts`.
  */
 import { mkdir } from "node:fs/promises";
@@ -77,6 +77,12 @@ async function main(): Promise<void> {
     const page = await contexto.newPage();
     await page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => { const st = document.createElement("style"); st.textContent = "nextjs-portal{display:none!important}"; document.head.appendChild(st); }));
     await entrar(page, baseUrl);
+    await page.goto(`${baseUrl}/criar/carrossel`);
+    await page.getByRole("heading", { name: "As suas fotos" }).waitFor();
+    await page.getByRole("heading", { name: "As suas fotos" }).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: path.join(pasta, `Escolher-fotos-saude.${t.rotulo}.Claro.png`) });
+    await page.locator("#t-fotos").screenshot({ path: path.join(pasta, `Escolher-fotos-saude-secao.${t.rotulo}.Claro.png`) });
     await page.goto(`${baseUrl}/criar/carrossel?id=${id}`);
     await page.waitForLoadState("networkidle");
     await page.getByRole("heading", { name: /pronto/i }).first().waitFor();

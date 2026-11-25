@@ -13,13 +13,31 @@ import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, 
  * do ramo, a evidência do banco, as regras de copy e de conformidade); o que muda é a forma. Quem confere o resultado é `carrossel/regras.ts` (limites por tipo, ordem, números e fonte) mais o verificador
  * de texto de sempre (`gerarComVerificacao`). A foto de cada slide é do cliente, enviada por ele; o texto só diz onde uma foto faria sentido, nunca descreve uma imagem para gerar.
  */
-export const versao = "2.0.0";
+export const versao = "2.1.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
 export const LEMBRETE_ACENTUACAO = LEMBRETE_DO_ROTEIRO;
 
 const QUEBRA = String.fromCharCode(10);
+
+/** O que o texto pode contar de foto. Em saúde (`dePaciente` presente) a foto comum nunca vale para antes-depois nem prova-resultado, e a de paciente só vale para eles. */
+function blocoDasFotos(comuns: number, dePaciente?: number): string {
+  if (dePaciente === undefined) {
+    return comuns > 0
+      ? `O cliente enviou ${comuns} foto(s) do próprio negócio; capa-foto, prova-resultado, passo e antes-depois podem usar foto.`
+      : "O cliente não tem foto para este carrossel: use capa-texto e não use capa-foto nem prova-resultado.";
+  }
+  const linhaComum =
+    comuns > 0
+      ? `O cliente enviou ${comuns} foto(s) do próprio negócio (o lugar, a equipe, o trabalho); capa-foto e passo podem usar foto. Essas fotos NUNCA vão em antes-depois nem em prova-resultado.`
+      : "O cliente não tem foto do negócio para este carrossel: use capa-texto e não use capa-foto.";
+  const linhaPaciente =
+    dePaciente > 0
+      ? `Há ${dePaciente} foto(s) de paciente, mandadas com autorização: só elas servem ao antes-depois (duas por slide) e ao prova-resultado (uma por slide), e só se o tema pede.`
+      : "O cliente não tem foto de paciente: NÃO use antes-depois nem prova-resultado.";
+  return `${linhaComum}${QUEBRA}${linhaPaciente}`;
+}
 
 /**
  * O slide como a IA o escreve: todos os campos, vazios quando o tipo não usa (sem nulos nem opcionais, para a gramática da saída ficar pequena). O código leva cada um para o campo certo do tipo
@@ -145,6 +163,8 @@ export function montarEntrada(dados: {
   roteiroDeOrigem?: { titulo: string; texto: string };
   /** Quantas fotos o cliente já enviou, para o texto saber se pode contar com "prova" e "antes_depois". */
   quantidadeDeFotos: number;
+  /** Só em marca de saúde (E65 PR 5): quantas fotos de paciente, com autorização, o cliente enviou. Só elas servem ao antes-depois e ao prova-resultado; presente (mesmo zero) quer dizer que os dois tipos de foto são separados. */
+  quantidadeDeFotosDePaciente?: number;
   /** Os temas dos últimos carrosséis da marca, para não repetir o ângulo. */
   carrosseisRecentes: string[];
 }): string {
@@ -173,9 +193,7 @@ export function montarEntrada(dados: {
     blocoNoticia,
     blocoDasNoticiasDoAssunto(dados.noticiasDoAssunto),
     blocoRoteiro,
-    dados.quantidadeDeFotos > 0
-      ? `O cliente enviou ${dados.quantidadeDeFotos} foto(s) do próprio negócio; capa-foto, prova-resultado, passo e antes-depois podem usar foto.`
-      : "O cliente não tem foto para este carrossel: use capa-texto e não use capa-foto nem prova-resultado.",
+    blocoDasFotos(dados.quantidadeDeFotos, dados.quantidadeDeFotosDePaciente),
     blocoEvidencia,
     `Carrosséis recentes deste cliente, para não repetir o ângulo:${QUEBRA}${dados.carrosseisRecentes.length > 0 ? dados.carrosseisRecentes.map((t) => `"${t}"`).join("; ") : "nenhum carrossel anterior"}`,
   ].filter((p): p is string => Boolean(p));
