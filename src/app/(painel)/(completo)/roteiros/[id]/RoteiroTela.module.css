@@ -6,7 +6,7 @@
  */
 .pagina {
   margin: calc(-1 * (56px + var(--area-topo) + var(--espaco-6))) calc(-1 * var(--margem-celular))
-    calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
+    calc(-1 * (var(--altura-barra-abas) + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
   /* Onde o Toast pousa: acima da barra de ações fixa (altura do botão mais o respiro dela, mais uma folga, mais a linha do motivo sem rede), V7, item 4 do PROXIMO.md. */
   --toast-base: calc(var(--altura-toque-lg) + var(--espaco-8) + var(--folga-motivo, 0px));
   /* A altura da barra de ações fixa de baixo (o botão, o respiro de cima e de baixo, a borda e, sem conexão, a linha do motivo), sem a área segura do aparelho, que cada uso soma por conta própria. */

@@ -5,21 +5,21 @@
 
 .corpo {
   padding: calc(56px + var(--area-topo) + var(--espaco-6)) var(--margem-celular)
-    calc(64px + var(--espaco-6) + env(safe-area-inset-bottom));
+    calc(var(--altura-barra-abas) + var(--espaco-6) + env(safe-area-inset-bottom));
   max-width: var(--largura-leitura);
   margin: 0 auto;
 }
 
 /**
  * V7, item 2 do PROXIMO.md: o Toast das telas que nao definem base propria
- * (Conta, Referencias) sobe acima da capsula das abas, que ocupa 62px na
+ * (Conta, Referencias) sobe acima da barra de abas, que ocupa `--altura-barra-abas` na
  * base. As telas com barra de acoes propria (o Roteiro) definem
  * `--toast-base` no proprio container, e esse valor, mais perto do Toast,
  * vale por cima deste.
  */
 @media (max-width: 767px) {
   .pagina {
-    --toast-base: calc(62px + var(--espaco-4));
+    --toast-base: calc(var(--altura-barra-abas) + var(--espaco-4));
   }
 }
 
@@ -28,60 +28,37 @@
 }
 
 /**
- * A cápsula das abas (V5, item 5; IDENTIDADE.md): vidro que flutua solto das
- * bordas, canto concêntrico com o do aparelho. Encolhe para só os ícones ao
- * rolar para baixo (`.encolhida`, `useCapsulaAbas.ts`) e volta inteira ao
- * subir; o nome de cada aba continua para o leitor de tela, só escondido da
- * vista (`Nav.module.css`). Some inteira na tela com barra de ações própria
- * (o Roteiro, `data-barra-acoes-propria`), para uma não flutuar sobre a
- * outra (`:has()`, como o design descreve).
+ * A barra de abas do celular (25/11/2026, pedido do Gustavo: "a parte de baixo fica meio que flutuando quando não deveria"): como a barra de abas de um aplicativo nativo do iPhone, presa
+ * na borda de baixo, de ponta a ponta, sem vão entre ela e a borda, com fundo quase sólido e um leve desfoque, uma linha fina em cima e a área segura de baixo (`env(safe-area-inset-bottom)`)
+ * somada por dentro dela. Antes era uma cápsula de vidro solta, com 8 px de vão embaixo e 12 px dos lados, que o conteúdo atravessava por trás (e que encolhia para só os ícones ao rolar).
+ * Agora ela tem sempre a mesma altura, `--altura-barra-abas` mais a área segura, e toda tela do painel termina acima dela com esse mesmo valor de espaço embaixo.
+ * Some inteira na tela com barra de ações própria (o Roteiro, `data-barra-acoes-propria`, `:has()`), para uma não ficar por cima da outra.
  *
- * Duas camadas (achado do Gustavo, 23/10/2026: no Safari do iPhone, com a barra de endereço à vista, a cápsula encolhida ficou parada no meio da tela
- * depois de rolar até o fim). `.barraInferior` é só o ponto de ancoragem: `position: fixed` com `left`/`right`/`bottom` e NADA mais que mexa na geometria dele
- * (sem `transform`, sem `backdrop-filter`, sem transição de tamanho, altura constante). O vidro, a largura que anima e o `transform` da seleção ficam em `.capsula`,
- * um elemento comum dentro dele. Antes, o próprio elemento fixo centrava com `transform: translateX(-50%)`, tinha `backdrop-filter` e animava a `width`: no iOS
- * o elemento fixo com `transform` e camada de desfoque que muda de tamanho enquanto a barra do Safari recolhe é o caso em que o WebKit perde a âncora de baixo.
+ * Duas camadas, de propósito (achado de 23/10/2026, #218: no Safari do iPhone, com a barra de endereço à vista, a cápsula ficou parada no meio da tela depois de rolar até o fim). `.barraInferior` é só a
+ * âncora: `position: fixed` com `left`/`right`/`bottom: 0` e NADA mais que mexa na geometria dele (sem `transform`, sem `backdrop-filter`, sem transição de tamanho, altura constante). O desfoque e o
+ * fundo ficam em `.capsula`, um elemento comum dentro dele: um elemento fixo com `transform` e camada de desfoque é o caso em que o WebKit perde a âncora de baixo.
  */
 .barraInferior {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--espaco-2) + env(safe-area-inset-bottom, 0px));
+  bottom: 0;
   z-index: 30;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  /* O mesmo respiro lateral de antes (a cápsula tinha `width: calc(100% - 1.5rem)`). */
-  padding-inline: 0.75rem;
-  box-sizing: border-box;
-  /* Só a cápsula recebe o toque; a faixa de ancoragem, que cobre a largura toda, deixa passar para o conteúdo. */
-  pointer-events: none;
 }
 
 .capsula {
-  pointer-events: auto;
-  flex: none;
-  /* Passo 16: a cápsula é SEMPRE centrada do mesmo jeito (`justify-content: center` do pai); o que anima é só a largura. */
-  width: 100%;
-  max-width: 26rem;
-  padding: 0.25rem;
   box-sizing: border-box;
-  border-radius: var(--raio-pill);
-  border: var(--largura-borda) solid var(--vidro-borda);
-  background: var(--vidro-fundo);
+  /* A linha de itens, mais o respiro de cima e de baixo, e a área segura de baixo (a barra do iPhone sem botão, o "home indicator"). */
+  padding: var(--espaco-1) var(--espaco-2) calc(var(--espaco-1) + env(safe-area-inset-bottom, 0px));
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+  background: var(--vidro-fundo-forte);
   backdrop-filter: var(--vidro-desfoque);
   -webkit-backdrop-filter: var(--vidro-desfoque);
-  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
-  transition: width var(--duracao-capsula) var(--curva-mola);
 }
-/* Encolhida: quatro lugares de 3.25rem (52 px) e o respiro. Continua grade de frações: a largura manda, as colunas acompanham. */
-.barraInferior.encolhida .capsula {
-  width: calc(4 * 3.25rem + 0.5rem + 2px);
-}
-@media (prefers-reduced-motion: reduce) {
-  .capsula {
-    transition: none;
-  }
+/* Em celular largo (até 767 px) os quatro lugares não se espalham pela largura toda: ficam num miolo centrado, com a seleção do tamanho de uma coluna. */
+.capsula > nav {
+  max-width: 28rem;
+  margin-inline: auto;
 }
 :global(body:has([data-barra-acoes-propria])) .barraInferior {
   display: none;
