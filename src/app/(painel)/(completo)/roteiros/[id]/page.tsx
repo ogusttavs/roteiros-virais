@@ -9,6 +9,7 @@ import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@
 import { visaoDeEditar } from "@/servicos/edicao-tela";
 import { momentoDoRoteiro } from "@/servicos/em-alta";
 import { fontesDosParagrafos, pesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
+import { hashtagsDoPost } from "@/servicos/hashtags-do-post";
 import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { diaPorExtenso, enderecoHttpsSeguro } from "@/servicos/noticias-assuntos";
@@ -59,6 +60,8 @@ export default async function Roteiro({ params }: Props) {
     // E56 PR 1: "Publicar no Instagram". Uma falha aqui só tira a função da tela.
     visaoDePublicar({ usuarioId: sessao.user.id, clienteId: cliente.id, roteiro, verComo: sessao.verComo != null }).catch(() => null),
   ]);
+  // E70: as até 5 hashtags para colar (do banco, sem IA). Uma falha aqui só tira o bloco.
+  const hashtags = await hashtagsDoPost({ clienteId: cliente.id, tema: roteiro.tema }).catch(() => []);
 
   // E47 PR 4: "Editar o meu vídeo". Uma falha aqui só tira a função da tela. Publicar o vídeo editado só aparece se "Publicar no Instagram" também aparece (e o roteiro ainda não foi publicado).
   const editar = await visaoDeEditar({ clienteId: cliente.id, roteiro, verComo: sessao.verComo != null, podePublicar: publicar !== null && publicar.situacao.pode }).catch(() => null);
@@ -112,6 +115,7 @@ export default async function Roteiro({ params }: Props) {
       conviteInstalarPodeAparecer={conviteDeInstalarPodeAparecer(preferencias, new Date())}
       publicar={publicar}
       editar={editar}
+      hashtags={hashtags}
     />
   );
 }
