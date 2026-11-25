@@ -47,6 +47,7 @@
   color: var(--cor-titulo);
   font-size: var(--tamanho-secundario);
   font-weight: 500;
+  text-decoration: none;
 }
 
 .heroi {
@@ -128,8 +129,8 @@
 
 .numeroDoPasso {
   font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
-  color: var(--cor-texto-dica);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-destaque);
 }
 
 .tituloDoPasso {
@@ -372,6 +373,7 @@
   color: var(--cor-acao-texto);
   font-size: var(--tamanho-secundario);
   font-weight: var(--peso-semibold);
+  text-decoration: none;
 }
 
 .botaoTopo:hover {
