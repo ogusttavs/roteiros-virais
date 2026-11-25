@@ -3,14 +3,15 @@
  * regras estao em checar-admin-protegido-regras.ts, sem process.exit, para
  * dar para testar.
  */
-import { listarArquivos, PADRAO_ACOES, verificarArquivo, verificarArquivoDeAcoes } from "./checar-admin-protegido-regras";
+import { listarArquivos, PADRAO_ACOES, PADRAO_ROTAS, verificarArquivo, verificarArquivoDeAcoes, verificarArquivoDeRota } from "./checar-admin-protegido-regras";
 
 const arquivos = listarArquivos();
 const acoes = listarArquivos(PADRAO_ACOES);
-const problemas = [...arquivos.flatMap(verificarArquivo), ...acoes.flatMap(verificarArquivoDeAcoes)];
+const rotas = listarArquivos(PADRAO_ROTAS);
+const problemas = [...arquivos.flatMap(verificarArquivo), ...acoes.flatMap(verificarArquivoDeAcoes), ...rotas.flatMap(verificarArquivoDeRota)];
 
 if (problemas.length === 0) {
-  console.log(`checar-admin-protegido: ${arquivos.length + acoes.length} arquivo(s) verificado(s), nenhum problema.`);
+  console.log(`checar-admin-protegido: ${arquivos.length + acoes.length + rotas.length} arquivo(s) verificado(s), nenhum problema.`);
   process.exit(0);
 }
 

@@ -3,6 +3,8 @@
  */
 import { SEM_FOTO, TIPOS_COM_FOTO, TIPOS_COM_FOTO_DE_PACIENTE, type SlideDoCarrossel } from "@/config/carrossel";
 
+import { TIPOS_ILUSTRADOS_COMO_FUNDO } from "./ilustracao";
+
 /**
  * Qual foto vai em qual slide: a que o slide aponta (`fotoId`), e, sem apontar, as fotos que sobraram na ordem em que foram enviadas, só nos tipos que aceitam foto (o antes e depois leva duas).
  * Com `separarPaciente` (marca de saúde, E65 PR 5), os dois tipos de foto nunca se misturam: antes e depois e resultado só recebem foto de paciente (`dePaciente`), e os demais tipos só recebem foto comum,
@@ -31,6 +33,17 @@ export function distribuirFotos(slides: SlideDoCarrossel[], fotosEmOrdem: { id: 
     const fotoDepois = s.tipo !== "antes-depois" || s.fotoDepoisId === SEM_FOTO ? null : serve(s.fotoDepoisId, s.tipo) ? s.fotoDepoisId : proxima(s.tipo);
     return { foto, fotoDepois };
   });
+}
+
+/**
+ * E69: a foto da PESSOA que vira o fundo de um slide de texto (item, capa de texto, dado, resumo, chamada) no lugar da ilustracao: so a que o slide aponta (`fotoId`), nunca por sobra da ordem. Em saude, foto de paciente
+ * nunca serve a esses slides. Nulo quando nao ha. O passo com foto usa o modelo de foto (`distribuirFotos`) e nao passa por aqui.
+ */
+export function fotoDeFundoDoSlide(slide: SlideDoCarrossel, fotosEmOrdem: { id: number; dePaciente?: boolean }[], separarPaciente = false): number | null {
+  if (!TIPOS_ILUSTRADOS_COMO_FUNDO.has(slide.tipo) || slide.tipo === "passo" || !slide.fotoId || slide.fotoId === SEM_FOTO) return null;
+  const foto = fotosEmOrdem.find((f) => f.id === slide.fotoId);
+  if (!foto || (separarPaciente && foto.dePaciente === true)) return null;
+  return foto.id;
 }
 
 /** O slide tem 1080 px de largura: foto com menos que isso é esticada e pode sair borrada. */
