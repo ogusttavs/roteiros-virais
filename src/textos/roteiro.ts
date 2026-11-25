@@ -129,6 +129,13 @@ export const textosRoteiro = {
   },
   /** M4, item 5: a legenda do post, como último cartão, com copiar; só existe no estilo sem fala. */
   legenda: "Legenda do post",
+  /** E70: as até 5 hashtags para colar no post (o Instagram limita a 5 desde dezembro de 2025), tiradas dos vídeos que foram bem no ramo. */
+  hashtags: {
+    titulo: "Hashtags para colar",
+    copiar: "Copiar as hashtags",
+    copiadas: "Hashtags copiadas",
+    nota: "Hashtag ajuda quem procura o assunto a achar o seu vídeo. Até 5 no Instagram.",
+  },
   /**
    * V11, item 6: o que mostrar em cada bloco do modo gravação, junto da fala
    * (`blocosParaLeitura`, `servicos/roteiro.ts`). Story usa as três linhas;
