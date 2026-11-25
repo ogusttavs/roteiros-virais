@@ -64,7 +64,8 @@ import {
  * 1.6.0 (E61 PR 1, 28/10/2026, o foco da conta): o mesmo do roteiro curto (2.24.0). A camada exclusiva ganha a linha "Foco desta conta" quando a pessoa confirmou um foco, e o título do bloco diz
  * que ela manda no assunto e no público. O schema de saída não muda.
  */
-export const versao = "1.6.0";
+/** 1.7.0 (onda 1 de texto, 25/11/2026): o bloco de regras de texto do roteiro longo traz `R-COPY-26` e `R-COPY-27` e a `R-COPY-19` nova (seção 11 das rubricas 1.3.0). O schema não muda. */
+export const versao = "1.7.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 

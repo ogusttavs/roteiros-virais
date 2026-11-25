@@ -319,7 +319,11 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * 2.24.0 (E61 PR 1, 28/10/2026, o foco da conta): a camada exclusiva ganha, quando a pessoa confirmou um foco ("sobre o que você fala e para quem", dentro do setor), a linha "Foco desta conta", e o
  * título do bloco diz que ela manda no assunto e no público. Sem foco confirmado o bloco é o da 2.23.0, palavra por palavra, fora o título. O schema de saída não muda.
  */
-export const versao = "2.24.0";
+/**
+ * 2.25.0 (onda 1 de texto, 25/11/2026): o bloco de regras de texto (`regras-copy-roteiro-uso.ts`, gerado da seção 11 das rubricas 1.3.0) ganha `R-COPY-26` (nenhuma fórmula de texto de máquina) e `R-COPY-27`
+ * (o título e o gancho têm um elemento só desta marca ou deste ramo), e `R-COPY-19` passa a pedir o contraste só com os dois lados em fatos. O schema de saída não muda. Precisa de prova com chave real.
+ */
+export const versao = "2.25.0";
 
 /**
  * E59: o bloco da entrada que liga a prova visual com imagem de outro (`R-ROTEIRO-20`). Só entra quando `motivosDaProvaVisualDeOutro` devolve algum motivo; sem motivo, nada entra e a regra do sistema

@@ -15,6 +15,7 @@ import {
   schema,
   TITULO_DAS_INSTRUCOES,
   versao,
+  CRITERIO_RAMO,
 } from "./verificarTexto";
 
 /**
@@ -62,7 +63,7 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
   });
 
   it("a versão subiu e fato é só o ESPECÍFICO sobre a pessoa, o negócio, o lugar, o momento ou um acontecimento", () => {
-    expect(versao).toBe("1.9.0");
+    expect(versao).toBe("1.10.0");
     expect(sistema).toContain("fato ESPECÍFICO");
     for (const exemplo of ["quem está junto", "onde está", "o que aconteceu", "quando", "quanto custa", "nome de produto, de cliente ou de cidade", "uma cena vivida"]) {
       expect(sistema).toContain(exemplo);
@@ -337,5 +338,21 @@ describe("verificarTexto 1.9.0: no gênero tema, recomendar a chamada para compr
     for (const genero of ["padrao", "analise", "roteiro", "regra"] as const) {
       expect(montarSistemaEstavel(genero)).not.toContain("recomendar que o vídeo feche com uma chamada para comprar");
     }
+  });
+});
+
+describe("verificarTexto 1.10.0: o teste 'serve para qualquer ramo?' (R-COPY-27)", () => {
+  it("entra só no gênero roteiro e só com fontes", () => {
+    expect(montarSistemaEstavel("roteiro", true)).toContain(CRITERIO_RAMO);
+    expect(montarSistemaEstavel("roteiro", false)).not.toContain(CRITERIO_RAMO);
+    expect(montarSistemaEstavel("tema", true)).not.toContain(CRITERIO_RAMO);
+    expect(montarSistemaEstavel("padrao", true)).not.toContain(CRITERIO_RAMO);
+  });
+
+  it("pede um elemento da marca ou do ramo, dá a troca de ramo como teste, manda aprovar na dúvida e não usa travessão", () => {
+    expect(CRITERIO_RAMO).toContain("serve para qualquer ramo");
+    expect(CRITERIO_RAMO).toContain("troque o ramo");
+    expect(CRITERIO_RAMO).toContain("NA DÚVIDA, APROVE");
+    expect(CRITERIO_RAMO).not.toContain(String.fromCharCode(0x2014));
   });
 });

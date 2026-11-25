@@ -522,6 +522,9 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
     ? [...blocoDaPesquisa[1].matchAll(/^dado (\d+) \| ([^|]*)\| ([^|]*)\| ([^|]*)\| trecho: (.*)$/gm)].map((m) => ({ id: Number(m[1]), fonte: m[2].trim(), data: m[3].trim(), texto: m[4].trim() }))
     : [];
   const segundaTentativa = entrada.includes("A tentativa anterior foi reprovada.");
+  // Onda 1 de texto: `[mock:formula]` põe uma fórmula de máquina no gancho (só na 1ª tentativa; `-sempre` em todas) e `[mock:qualquer-ramo]` põe o marcador que o verificador mock lê como "serve para qualquer ramo".
+  const marcadoOnda1 = (nome: string) => entrada.includes(`[mock:${nome}-sempre]`) || (entrada.includes(`[mock:${nome}]`) && !segundaTentativa);
+  const sufixoDoGancho = `${marcadoOnda1("formula") ? " Não é sorte, é método." : ""}${marcadoOnda1("qualquer-ramo") ? " {mock:qualquer-ramo}" : ""}`;
   const citacaoDaPesquisa = dadosDaPesquisa[0]
     ? ` Segundo ${dadosDaPesquisa[0].fonte}${/\d{4}/.exec(dadosDaPesquisa[0].data) ? `, em ${/\d{4}/.exec(dadosDaPesquisa[0].data)![0]}` : ""}, ${dadosDaPesquisa[0].texto.replace(/\.$/, "")}.`
     : "";
@@ -541,7 +544,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
       : {
           gancho: reprovado
             ? `${primeiraPalavra}, um jeito diferente de mostrar ${tema}`
-            : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}`,
+            : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}${sufixoDoGancho}`,
           // E49 PR 1: na ficha "que guardem para depois" o mock devolve passo a passo, como o verificador local exige.
           corpo: entrada.includes("Ficha do vídeo: Que guardem para depois")
             ? `Passo 1: separe o que precisa. Passo 2: faça na ordem certa sobre ${tema}. Passo 3: confira o resultado.`
@@ -753,6 +756,9 @@ function mockVerificarTexto(entrada: string, sistemaEstavel = "") {
   if (texto.includes("[mock:ataque]") && sistemaEstavel.includes("atacar ou ofender")) {
     return { aprovado: false, motivo: "o texto ataca uma pessoa", fatoEspecifico: null, fonteMaisProxima: null };
   }
+  // 1.10.0 (`R-COPY-27`): o teste do ramo. Com o critério no sistema e fontes na entrada, o marcador faz o simulador reprovar o título ou o gancho que serve para qualquer ramo.
+  const qualquerRamo = sistemaEstavel.includes("serve para qualquer ramo") && entrada.includes("FONTES (") && textoSemInstrucoes(entrada).includes("{mock:qualquer-ramo}");
+  if (qualquerRamo) return { aprovado: false, motivo: "o gancho serve para qualquer ramo: falta o serviço, o lugar, o público ou um fato da marca", fatoEspecifico: null, fonteMaisProxima: null };
   const gritando = /!{2,}/.test(texto) || texto === texto.toUpperCase();
   // O roteiro não inventa fato: com fontes na entrada, o marcador de teste faz o verificador reprovar o fato fora delas (só o mock; a prova de verdade é a chave real).
   // 1.9.0: o que vem depois de "INSTRUÇÕES PARA A PESSOA" (gravação e edição) é ordem à pessoa e nunca conta como fato, como no critério do verificador de verdade.
@@ -949,6 +955,7 @@ function mockTemasDoDia(entrada: string) {
   const puxaPara = ["alcance", "engajamento", "conversao"] as const;
   // E28: com o bloco das vozes do público, o primeiro tema responde à primeira pergunta da lista; o marcador manda um número que não existe.
   const numerosDasVozes = [...entrada.matchAll(/^(?:pergunta|reclamação|pedido) (\d+) \|/gm)].map((m) => Number(m[1]));
+  const formulaNoTema = entrada.includes("[mock:formula-tema-sempre]") || (entrada.includes("[mock:formula-tema]") && !entrada.includes("Segunda tentativa."));
   const perguntaDoPrimeiro = entrada.includes("[mock:numero-inexistente]") ? 99 : (numerosDasVozes[0] ?? null);
 
   // Hotfix de 23/10/2026: o modo "completar com notícias" (`MARCADOR_COMPLETAR_COM_NOTICIAS`, `prompts/temasDoDia.ts`): um tema por notícia da lista (até três), sem vídeo, com título que não colide com o dos temas de vídeo.
@@ -1002,7 +1009,8 @@ function mockTemasDoDia(entrada: string) {
     // teste cria video suficiente (3+ de 2+ contas); sem isso, nenhum tema
     // simulado passaria na checagem de prova por codigo.
     temas: [0, 1, 2].map((i) => ({
-      titulo: `tema simulado ${i + 1}`,
+      // Onda 1 de texto: `[mock:formula-tema]` (num assunto da lista) faz o primeiro pedido trazer títulos com fórmula de máquina; `-sempre` também na segunda tentativa.
+      titulo: formulaNoTema ? `Descubra o tema simulado ${i + 1}` : `tema simulado ${i + 1}`,
       descricao: "tema derivado dos videos que estao subindo hoje",
       porQue: "esta subindo mais rapido que o normal da conta",
       evidencias: ids,

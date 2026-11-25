@@ -352,6 +352,11 @@ export function motivosDasFormulas(achados: AchadoDeFormula[]): string[] {
   return achados.map((a) => a.motivo);
 }
 
+/** O que um tema do dia tem para conferir: o título e a descrição (o `porQue` explica o vídeo de prova e não é texto que o dono grava). */
+export function formulasDoTema(tema: { titulo: string; descricao: string }): AchadoDeFormula[] {
+  return acharFormulasDeMaquina({ titulo: tema.titulo, tema: tema.descricao });
+}
+
 // --- Avisos de forma da fala (R-COPY-28 e R-COPY-29) -------------------------------------------
 
 const PALAVRAS_MAX_DA_FRASE_CURTA = 4;
