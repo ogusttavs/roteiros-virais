@@ -68,6 +68,7 @@ export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, ass
   const hoje = deHoje.filter((n) => passa(n, filtroValido));
   const ontem = deOntem.filter((n) => passa(n, filtroValido));
   // O destaque é a mais nova com foto; sem nenhuma com foto, a mais nova.
+  const poucas = !falha && deHoje.length + deOntem.length < NOTICIAS_PARA_NAO_AVISAR;
   const destaque = hoje.find((n) => n.imagemUrl) ?? hoje[0] ?? null;
   const restoDeHoje = hoje.filter((n) => n !== destaque);
 
@@ -161,12 +162,14 @@ export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, ass
         </div>
       ) : null}
 
-      {!falha && deHoje.length + deOntem.length < NOTICIAS_PARA_NAO_AVISAR ? (
+      {poucas ? (
         <div className={[styles.cartao, styles.semNovidade].join(" ")} data-poucas-noticias role="status">
           <Newspaper aria-hidden="true" strokeWidth={1.5} />
           <div>
             <h2>{textosNoticias.achamosSo(deHoje.length + deOntem.length, dias)}</h2>
             <p>{dias < DIAS_DA_SEMANA ? textosNoticias.quererVerSemana : textosNoticias.naoTemMais}</p>
+            {/* Sem nenhuma de hoje, a hora da próxima coleta vai aqui, num cartão só (o de "nada novo" não aparece junto). */}
+            {hoje.length === 0 ? <p>{ontem.length > 0 ? textosNoticias.nadaNovoFrase : textosNoticias.nadaNovoSemOntem}</p> : null}
             {dias < DIAS_DA_SEMANA ? (
               <Botao variante="secundario" tamanho="md" onClick={() => router.push("/noticias?ver=semana")}>
                 {textosNoticias.verDaSemana}
@@ -177,7 +180,7 @@ export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, ass
       ) : null}
 
       {hoje.length === 0 ? (
-        <div className={[styles.cartao, styles.semNovidade].join(" ")} data-sem-novidade>
+        poucas ? null : <div className={[styles.cartao, styles.semNovidade].join(" ")} data-sem-novidade>
           <Newspaper aria-hidden="true" strokeWidth={1.5} />
           <div>
             <h2>{textosNoticias.nadaNovoTitulo}</h2>

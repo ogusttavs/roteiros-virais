@@ -41,6 +41,27 @@ describe("poucas notícias na janela", () => {
     expect(push).toHaveBeenCalledWith("/noticias?ver=semana");
   });
 
+  it("poucas e nenhuma de hoje: um cartão só, com a hora da próxima coleta como segunda linha", () => {
+    render(<NoticiasTela {...base} dias={3} deHoje={[]} deOntem={[noticia(1)]} />);
+    expect(document.querySelectorAll("[data-poucas-noticias]")).toHaveLength(1);
+    expect(document.querySelector("[data-sem-novidade]")).toBeNull();
+    expect(screen.queryByText("Nada novo ainda hoje")).toBeNull();
+    expect(screen.getByText("A coleta roda às 06:00 e às 14:00. Enquanto isso, as de ontem continuam aqui.")).toBeTruthy();
+  });
+
+  it("poucas e com alguma de hoje: o cartão de poucas e a capa, sem a frase da coleta", () => {
+    render(<NoticiasTela {...base} dias={3} deHoje={[noticia(1)]} deOntem={[]} />);
+    expect(document.querySelectorAll("[data-poucas-noticias]")).toHaveLength(1);
+    expect(screen.getByText("Manchete 1")).toBeTruthy();
+    expect(screen.queryByText(/A coleta roda/)).toBeNull();
+  });
+
+  it("muitas de ontem e nenhuma de hoje: só o cartão de nada novo", () => {
+    render(<NoticiasTela {...base} dias={3} deHoje={[]} deOntem={[1, 2, 3, 4, 5].map((n) => noticia(n))} />);
+    expect(document.querySelector("[data-poucas-noticias]")).toBeNull();
+    expect(document.querySelector("[data-sem-novidade]")).toBeTruthy();
+  });
+
   it("com 5 ou mais, nenhum aviso", () => {
     render(<NoticiasTela {...base} dias={3} deHoje={[1, 2, 3, 4, 5].map((n) => noticia(n))} deOntem={[]} />);
     expect(document.querySelector("[data-poucas-noticias]")).toBeNull();
