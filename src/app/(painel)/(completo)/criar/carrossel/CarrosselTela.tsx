@@ -32,21 +32,57 @@ import { FolhaTrocarTexto } from "./FolhaTrocarTexto";
 import {
   ErroDaRota,
   pedir,
+  reduzirFoto,
   type CarrosselDaTela,
+  type CarrosselRecente,
   type DadosDoCarrossel,
   type PreviaDoSlide,
 } from "./tipos";
 
-type Fase = "escolher" | "gerando" | "pronto" | "erro" | "limite";
+type Fase = "escolher" | "gerando" | "abrindo" | "pronto" | "erro" | "limite";
 
 type Props = {
   temasDeHoje: string[];
   corMarca: string | null;
   arroba: string;
   ramoSaude: boolean;
+  /** O `?id=` do endereço: abre esse carrossel em vez da escolha. */
+  idInicial: number | null;
 };
 
 const COR_INICIAL = "#0e5a6a";
+/** O recado que sobrevive a recarregar a página enquanto o servidor escreve (a tela volta ao "gerando" e espera o carrossel aparecer na lista). */
+const CHAVE_GERANDO = "carrossel-gerando";
+const ESPERA_MAXIMA_MS = 5 * 60_000;
+
+/** O endereço da tela com o carrossel aberto (`?id=`), sem recarregar a página; sem id, o endereço limpo. */
+function marcarEndereco(id: number | null) {
+  try {
+    window.history.replaceState(window.history.state, "", id ? `?id=${id}` : window.location.pathname);
+  } catch {
+    // sem history: a tela segue funcionando
+  }
+}
+
+function lerGerando(): { inicio: number; quantidade: number } | null {
+  try {
+    const bruto = window.sessionStorage.getItem(CHAVE_GERANDO);
+    const lido = bruto ? (JSON.parse(bruto) as { inicio?: number; quantidade?: number }) : null;
+    if (!lido || typeof lido.inicio !== "number" || Date.now() - lido.inicio > ESPERA_MAXIMA_MS) return null;
+    return { inicio: lido.inicio, quantidade: typeof lido.quantidade === "number" ? lido.quantidade : 7 };
+  } catch {
+    return null;
+  }
+}
+
+function guardarGerando(valor: { inicio: number; quantidade: number } | null) {
+  try {
+    if (valor) window.sessionStorage.setItem(CHAVE_GERANDO, JSON.stringify(valor));
+    else window.sessionStorage.removeItem(CHAVE_GERANDO);
+  } catch {
+    // sem sessionStorage: só não reabre sozinha depois de recarregar
+  }
+}
 
 /** A etapa em que a espera está: avança sozinha enquanto o servidor escreve, e a última só acaba quando tudo chega. */
 function useEtapa(ativa: boolean): number {
@@ -68,9 +104,12 @@ function useEtapa(ativa: boolean): number {
  * A tela "Criar carrossel" (E65 PR 2; desenho `entregaveis/design-v2/entrega/carrossel/CriarCarrossel.dc.html`, sete estados: escolher, gerando, pronto, trocarTexto, trocarFoto, erro, limite). Fala com as rotas
  * `/api/carrossel`: criar, ler, a prévia dos slides (o mesmo render do PNG final), trocar texto, foto e cor, e baixar. O tema chega escolhido ou se escolhe aqui.
  */
-export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Props) {
+export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInicial }: Props) {
   const router = useRouter();
-  const [fase, setFase] = useState<Fase>("escolher");
+  const [fase, setFase] = useState<Fase>(idInicial ? "abrindo" : "escolher");
+  const [recentes, setRecentes] = useState<CarrosselRecente[]>([]);
+  const [falhaAoAbrir, setFalhaAoAbrir] = useState<string | null>(null);
+  const [esperandoDepoisDeRecarregar, setEsperandoDepoisDeRecarregar] = useState(false);
   const [tema, setTema] = useState<string | null>(null);
   const [temaLivre, setTemaLivre] = useState("");
   const [quantidade, setQuantidade] = useState<number>(7);
@@ -108,14 +147,16 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
   const corValida = /^#[0-9a-fA-F]{6}$/.test(cor);
   const precisaDeCor = !corMarca;
 
-  function adicionarFotos(lista: FileList | null) {
+  async function adicionarFotos(lista: FileList | null) {
     setAvisoDeFoto(null);
     const novas: { arquivo: File; url: string }[] = [];
-    for (const arquivo of Array.from(lista ?? [])) {
-      if (!["image/jpeg", "image/png", "image/webp"].includes(arquivo.type)) {
+    for (const original of Array.from(lista ?? [])) {
+      if (!["image/jpeg", "image/png", "image/webp"].includes(original.type)) {
         setAvisoDeFoto(t.fotoNaoValida);
         continue;
       }
+      // Foto grande de celular: reduzida aqui (2160 px, JPEG 0,85) antes de o teto de 6 MB do servidor olhar.
+      const arquivo = await reduzirFoto(original, TETO_DA_FOTO_BYTES);
       if (arquivo.size > TETO_DA_FOTO_BYTES) {
         setAvisoDeFoto(t.fotoGrandeDemais);
         continue;
@@ -178,6 +219,9 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
     setDados(null);
     setPrevias({});
     setArquivosParaCompartilhar(null);
+    setFalhaAoAbrir(null);
+    setEsperandoDepoisDeRecarregar(false);
+    guardarGerando({ inicio: Date.now(), quantidade });
     try {
       const { id } = await pedir<{ id: number }>(
         "/api/carrossel",
@@ -195,6 +239,9 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
         },
         t.erroAjuda,
       );
+      // O carrossel já existe e já contou no teto: o endereço guarda o id, e recarregar a página abre este mesmo carrossel.
+      marcarEndereco(id);
+      guardarGerando(null);
       for (const foto of fotos) {
         const corpo = new FormData();
         corpo.append("foto", foto.arquivo);
@@ -215,9 +262,83 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
       setFase("pronto");
       void carregarPrevias(id);
     } catch (e) {
+      guardarGerando(null);
       mostrarFalha(e);
     }
   }
+
+  /** Abre um carrossel que já existe (o `?id=` do endereço ou um da lista): lê os dados e monta as prévias. */
+  const abrir = useCallback(
+    async (id: number) => {
+      setFalhaAoAbrir(null);
+      setEsperandoDepoisDeRecarregar(false);
+      setFase("abrindo");
+      setPrevias({});
+      setArquivosParaCompartilhar(null);
+      try {
+        await carregarDados(id);
+        marcarEndereco(id);
+        setEscolhido(0);
+        setFase("pronto");
+        void carregarPrevias(id);
+      } catch (e) {
+        marcarEndereco(null);
+        setFalhaAoAbrir(e instanceof ErroDaRota && e.status === 404 ? t.naoAchouEste : t.abrirFalhou);
+        setFase("escolher");
+      }
+    },
+    [carregarDados, carregarPrevias],
+  );
+
+  const carregarRecentes = useCallback(async () => {
+    try {
+      const { carrosseis } = await pedir<{ carrosseis: CarrosselRecente[] }>("/api/carrossel");
+      setRecentes(carrosseis.slice(0, 5));
+      return carrosseis;
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // Ao abrir a tela: o carrossel do endereço, ou (se a página foi recarregada no meio da escrita) a espera por ele, ou a escolha com a lista dos recentes.
+  const jaAbriu = useRef(false);
+  useEffect(() => {
+    if (jaAbriu.current) return;
+    jaAbriu.current = true;
+    if (idInicial) {
+      void abrir(idInicial);
+      return;
+    }
+    const gerando = lerGerando();
+    if (gerando) {
+      setQuantidade(gerando.quantidade);
+      setEsperandoDepoisDeRecarregar(true);
+      setFase("gerando");
+      return;
+    }
+    void carregarRecentes();
+  }, [idInicial, abrir, carregarRecentes]);
+
+  // Recarregou a página enquanto o servidor escrevia: ele termina sozinho e o carrossel aparece na lista; a tela espera e abre.
+  useEffect(() => {
+    if (fase !== "gerando" || !esperandoDepoisDeRecarregar) return;
+    const pergunta = setInterval(async () => {
+      const gerando = lerGerando();
+      if (!gerando) {
+        setEsperandoDepoisDeRecarregar(false);
+        setFase("escolher");
+        void carregarRecentes();
+        return;
+      }
+      const lista = await carregarRecentes();
+      const achado = lista.find((c) => Date.parse(c.criadoEm) >= gerando.inicio - 5000);
+      if (achado) {
+        guardarGerando(null);
+        void abrir(achado.id);
+      }
+    }, 5000);
+    return () => clearInterval(pergunta);
+  }, [fase, esperandoDepoisDeRecarregar, carregarRecentes, abrir]);
 
   const carrossel = dados?.carrossel ?? null;
   const total = carrossel?.slides.length ?? 0;
@@ -232,7 +353,8 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
     else fecharFoto();
     setArquivosParaCompartilhar(null);
     await carregarDados(novo.id);
-    await carregarPrevias(novo.id, n);
+    // Foto nova pode mudar a foto de outros slides (a distribuição segue a ordem); texto só muda o slide dele.
+    await carregarPrevias(novo.id, folha === "foto" ? undefined : n);
   }
 
   async function trocarCor() {
@@ -276,13 +398,36 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
     typeof window !== "undefined" &&
     window.matchMedia("(pointer: coarse)").matches;
 
+  /** O zip vem por `fetch` e vira download na mesma página: se falhar, a frase de erro aparece aqui e o carrossel continua na tela (trocar a página pelo JSON do erro o perderia). */
+  async function baixarZip(id: number) {
+    setBaixando(true);
+    try {
+      const resposta = await fetch(`/api/carrossel/${id}/zip`);
+      if (!resposta.ok) throw new Error("falhou");
+      const endereco = URL.createObjectURL(await resposta.blob());
+      const ancora = document.createElement("a");
+      ancora.href = endereco;
+      ancora.download = `carrossel-${id}.zip`;
+      document.body.appendChild(ancora);
+      ancora.click();
+      ancora.remove();
+      setTimeout(() => URL.revokeObjectURL(endereco), 10_000);
+    } catch {
+      setAviso(t.baixarFalhou);
+    } finally {
+      setBaixando(false);
+    }
+  }
+
   async function baixar() {
     if (!carrossel) return;
+    setAviso(null);
     if (arquivosParaCompartilhar) {
       try {
         await navigator.share({ files: arquivosParaCompartilhar });
-      } catch {
-        // a pessoa fechou o compartilhar: nada a fazer
+      } catch (e) {
+        // A pessoa fechar o compartilhar não é erro; qualquer outra falha cai no zip, em vez de o botão ficar mudo.
+        if (!(e instanceof DOMException && e.name === "AbortError")) await baixarZip(carrossel.id);
       }
       return;
     }
@@ -299,16 +444,18 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
             }),
           );
         }
-        if (navigator.canShare({ files: arquivos })) setArquivosParaCompartilhar(arquivos);
-        else window.location.assign(`/api/carrossel/${carrossel.id}/zip`);
+        if (navigator.canShare({ files: arquivos })) {
+          setArquivosParaCompartilhar(arquivos);
+          return;
+        }
       } catch {
         setAviso(t.baixarFalhou);
+        return;
       } finally {
         setBaixando(false);
       }
-      return;
     }
-    window.location.assign(`/api/carrossel/${carrossel.id}/zip`);
+    await baixarZip(carrossel.id);
   }
 
   function fazerOutro() {
@@ -317,6 +464,8 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
     setPrevias({});
     setAviso(null);
     setArquivosParaCompartilhar(null);
+    marcarEndereco(null);
+    void carregarRecentes();
   }
 
   const voltar = (
@@ -370,6 +519,32 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
 
           {fase === "escolher" ? (
             <>
+              {falhaAoAbrir ? (
+                <p className={estilos.alerta} role="alert">
+                  {falhaAoAbrir}
+                </p>
+              ) : null}
+              {recentes.length > 0 ? (
+                <section className={estilos.bloco} aria-labelledby="t-recentes">
+                  <h2 id="t-recentes">{t.recentesTitulo}</h2>
+                  <p className={estilos.ajuda}>{t.recentesAjuda}</p>
+                  <ul className={estilos.recentes}>
+                    {recentes.map((c) => (
+                      <li key={c.id}>
+                        <button type="button" className={estilos.recente} onClick={() => void abrir(c.id)}>
+                          <strong>{c.tema}</strong>
+                          <span>
+                            {t.recenteDetalhe(
+                              c.quantidade,
+                              new Date(c.criadoEm).toLocaleDateString("pt-BR", { day: "numeric", month: "short" }),
+                            )}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
               {/* O tema */}
               {temaEscolhido ? (
                 <article className={`${estilos.cartao} ${estilos.recuado} ${estilos.tema}`}>
@@ -500,7 +675,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
                   tabIndex={-1}
                   aria-hidden="true"
                   onChange={(e) => {
-                    adicionarFotos(e.target.files);
+                    void adicionarFotos(e.target.files);
                     e.target.value = "";
                   }}
                 />
@@ -563,12 +738,21 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
         </div>
       ) : null}
 
+      {fase === "abrindo" ? (
+        <div className={estilos.miolo} data-fase="abrindo">
+          <div className={estilos.cabecalho}>
+            <h1>{t.abrindoTitulo}</h1>
+            <p role="status">{t.abrindoAjuda}</p>
+          </div>
+        </div>
+      ) : null}
+
       {fase === "gerando" ? (
         <div className={`${estilos.miolo} ${estilos.larga}`} data-fase="gerando">
           <div className={estilos.cabecalho}>
             <span className={estilos.data}>{t.gerandoData(quantidade)}</span>
             <h1>{t.gerandoTitulo}</h1>
-            <p>{t.gerandoAjuda}</p>
+            <p>{esperandoDepoisDeRecarregar ? t.aindaGerandoAjuda : t.gerandoAjuda}</p>
           </div>
           <ol className={estilos.etapas} aria-live="polite">
             {[
@@ -686,7 +870,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
                 <p className={estilos.alerta}>{t.precisaDeFoto}</p>
               ) : null}
               {slideAtual.rodape ? <p className={estilos.ajuda}>{t.linhaFixaNaoEdita}</p> : null}
-              {t.metodo.dicasDeFoto[slideAtual.tipo] ? <p className={estilos.ajuda}>{t.metodo.dicasDeFoto[slideAtual.tipo]}</p> : null}
+              {t.metodo.dicasDeFoto[slideAtual.tipo] && !(ramoSaude && slideAtual.tipo === "passo") ? <p className={estilos.ajuda}>{t.metodo.dicasDeFoto[slideAtual.tipo]}</p> : null}
               <div className={estilos.acoesSlide}>
                 <Botao type="button" variante="secundario" onClick={() => setFolhaTexto(true)}>
                   <Pencil

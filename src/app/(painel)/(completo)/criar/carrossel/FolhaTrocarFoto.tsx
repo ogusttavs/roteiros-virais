@@ -14,7 +14,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { Folha } from "@/ui/componentes/Folha";
 
 import estilos from "./CarrosselTela.module.css";
-import { ErroDaRota, pedir, type CarrosselDaTela, type FotoDaTela } from "./tipos";
+import { ErroDaRota, pedir, reduzirFoto, type CarrosselDaTela, type FotoDaTela } from "./tipos";
 
 type Props = {
   aoFechar: () => void;
@@ -62,11 +62,16 @@ export function FolhaTrocarFoto({
   const escolhidaAgora = escolhidas[ehPar ? lado : "antes"];
   const podeFicarSemFoto = slide.tipo === "passo" || slide.tipo === "antes-depois";
 
-  async function mandar(arquivo: File) {
+  async function mandar(original: File) {
     setFalha(null);
-    if (arquivo.size > TETO_DA_FOTO_BYTES) return setFalha(t.fotoGrandeDemais);
     setOcupado(true);
     try {
+      // Foto grande de celular: reduzida aqui (2160 px, JPEG 0,85) antes de o teto de 6 MB do servidor olhar.
+      const arquivo = await reduzirFoto(original, TETO_DA_FOTO_BYTES);
+      if (arquivo.size > TETO_DA_FOTO_BYTES) {
+        setFalha(t.fotoGrandeDemais);
+        return;
+      }
       const corpo = new FormData();
       corpo.append("foto", arquivo);
       if (ramoSaude) corpo.append("autorizacaoDoPaciente", "true");

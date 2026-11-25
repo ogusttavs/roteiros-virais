@@ -153,12 +153,29 @@ describe("legenda e hashtags", () => {
 describe("promessaEmSaude", () => {
   it("acha resultado, cura, garantia e prazo, devolvendo o trecho como a pessoa escreveu", () => {
     expect(promessaEmSaude("Com o clareamento, o dente volta ao branco em uma sessão.")).toBe("volta ao branco");
-    expect(promessaEmSaude("O resultado sai Em 7 dias")).toBe("Em 7 dias");
+    expect(promessaEmSaude("O resultado sai Em 7 dias")).toBe("resultado sai Em 7 dias");
     expect(promessaEmSaude("Tratamento com resultado garantido")).toBe("resultado garantido");
     expect(promessaEmSaude("A gente cura a sua dor")).toBe("cura");
     expect(promessaEmSaude("Fica 100% limpo")).toBe("100%");
-    expect(promessaEmSaude("Clareamento definitivo")).toBe("definitivo");
-    expect(promessaEmSaude("Sem dor nenhuma")).toBe("Sem dor");
+    expect(promessaEmSaude("Clareamento definitivo")).toBe("Clareamento definitivo");
+    expect(promessaEmSaude("Sem dor nenhuma")).toBe("Sem dor nenhuma");
+    expect(promessaEmSaude("Dentes brancos em 7 dias")).toBe("Dentes brancos em 7 dias");
+    expect(promessaEmSaude("Nós garantimos o resultado")).toBe("garantimos");
+    expect(promessaEmSaude("Uma solução definitiva para o seu sorriso")).toBe("solução definitiva");
+  });
+  it("não pega a orientação de dentista: retorno, escova, consulta, dor, peça e a negação da garantia", () => {
+    for (const frase of [
+      "Volte em 6 meses para a revisão",
+      "Troque a escova em 3 meses",
+      "Marque uma consulta de avaliação",
+      "Em uma consulta de avaliação a dentista vê o seu caso",
+      "Mesmo sem dor, vá ao dentista",
+      "O dente definitivo entra depois do provisório",
+      "A prótese definitiva é feita em laboratório",
+      "Nenhum dentista garante resultado igual para todo mundo",
+    ]) {
+      expect(promessaEmSaude(frase), frase).toBeNull();
+    }
   });
   it("não pega texto comum de saúde (avaliação, cuidado, passos, curativo)", () => {
     expect(promessaEmSaude("Na consulta, a dentista avalia se a limpeza resolve antes de falar em clarear.")).toBeNull();

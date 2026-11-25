@@ -2,7 +2,7 @@
  * E65 PR 3: o carrossel cumpre o que a capa promete. Regras por código, sem mexer no prompt (o motivo da reprova vira a instrução da segunda tentativa, que o fluxo de `gerarComVerificacao` já faz), a partir da seção 3
  * de `pesquisa/carrossel-contra-o-metodo-do-kit.md`: (1) o número que a capa promete bate com os itens ou passos; (3) a capa não usa molde vago (lista fechada, escrita por nós) e, sem número, pergunta nem verbo de
  * ação, só gera aviso; (5) a legenda não repete o título da capa; (6) item e passo muito curtos geram aviso. Funções puras, sem banco nem IA. As reprovas voltam como motivos; os avisos são frases para a pessoa
- * (guardadas no carrossel e mostradas na tela, nunca travam). A lista de fórmulas com cara de máquina (item 2) fica para depois do PR #267.
+ * (guardadas no carrossel e mostradas na tela, nunca travam). A lista de fórmulas com cara de máquina (item 2) é a do roteiro (`ia/formulas-de-maquina.ts`), chamada por `formulasDeMaquinaDosSlides` em `regras.ts`.
  */
 import { ehCapa, type SlideDoCarrossel } from "@/config/carrossel";
 import { textosCarrossel } from "@/textos/carrossel";
@@ -24,7 +24,8 @@ export function promessaDeContagem(textoDaCapa: string): { quantidade: number; c
   const m = PROMESSA.exec(semAcento(textoDaCapa));
   if (!m) return null;
   const quantidade = /^\d/.test(m[1]) ? Number(m[1]) : EXTENSO[m[1]];
-  return quantidade >= 1 ? { quantidade, coisa: m[2] } : null;
+  // "Uma das causas" e "Um dos sinais" não prometem lista de um: só conta quando a capa promete 2 ou mais.
+  return quantidade >= 2 ? { quantidade, coisa: m[2] } : null;
 }
 
 /** Os slides que contam como "a lista" da capa: os itens e os passos. */
@@ -53,7 +54,7 @@ export function verificarPromessaDaCapa(slides: SlideDoCarrossel[]): string[] {
  */
 const MOLDES_VAGOS: { nome: string; padrao: RegExp }[] = [
   { nome: "promete tudo sobre o assunto", padrao: /\b(?:tudo (?:sobre|o que (?:voce )?(?:precisa|deve|tem que) saber)|saiba tudo|o guia (?:completo|definitivo|supremo)|guia (?:completo|definitivo|supremo)|manual completo)\b/ },
-  { nome: "guia definitivo", padrao: /\b(?:definitivo|definitiva|a unica coisa que voce precisa)\b/ },
+  { nome: "guia definitivo", padrao: /\b(?:solucao definitiva|(?:metodo|manual|tutorial|receita|checklist|lista|passo a passo) definitiv[oa]|a unica coisa que voce precisa)\b/ },
   { nome: "revelação sem dizer qual", padrao: /\b(?:o segredo (?:que|dos|das|de|do|da)\b|a verdade (?:sobre|que)\b|(?:ninguem|nenhum \w+) (?:te )?(?:conta|fala|diz|avisa)\b|o que (?:\w+ ){0,3}(?:nao|nunca) (?:te )?(?:conta|contam|fala|falam|diz|dizem)\b|voce (?:nao )?vai (?:se )?(?:chocar|surpreender|nem acreditar)\b|vai te chocar)/ },
   { nome: "anúncio de uma era", padrao: /\b(?:a (?:nova )?era d[oae]s?\b|uma nova era\b|nova era\b|a revolucao d[oae]s?\b|o futuro d[oae]s?\b|chegou a hora de\b)/ },
 ];
@@ -117,7 +118,7 @@ export function rotularItens(slides: SlideDoCarrossel[]): SlideDoCarrossel[] {
   return slides.map((s) => {
     if (s.tipo !== "item") return s;
     n += 1;
-    const palavra = (s.rotulo ?? "").replace(/\s*\d.*$/, "").trim().split(/\s+/).slice(0, 2).join(" ");
+    const palavra = (s.rotulo ?? "").replace(/\s*\d.*$/, "").trim().split(/\s+/).slice(0, 1).join(" ");
     return { ...s, rotulo: `${palavra || "Dica"} ${n} de ${total}` };
   });
 }

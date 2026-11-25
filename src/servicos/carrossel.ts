@@ -304,14 +304,16 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
         ...verificarOrdemDosSlides(slidesDeTexto, quantidade),
         ...verificarLimitesDosSlides(slidesDeTexto, { ramoSaude, fotosPrometidas, falasDoCliente }),
         ...verificarLegenda(d.legenda, d.hashtags),
-        ...verificarPromessaDaCapa(slidesDeTexto),
-        ...verificarCapaVaga(slidesDeTexto),
-        // R-COPY-26: fórmula de texto de máquina reprova na 1ª tentativa e só avisa na 2ª (como o roteiro); o aviso sai em `avisarExtra`.
-        ...(tentativa === 1 ? formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos) : []),
+        // A promessa da capa, a capa vaga e as fórmulas de máquina (R-COPY-26) reprovam na 1ª tentativa e só avisam na 2ª (como o roteiro): senão brigam com a regra de "nunca três do mesmo tipo seguidos"; o aviso sai em `avisarExtra`.
+        ...(tentativa === 1 ? [...verificarPromessaDaCapa(slidesDeTexto), ...verificarCapaVaga(slidesDeTexto), ...formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos)] : []),
         ...conformidadeDoCarrossel(slidesDeTexto, { fontes: fontesDosFatos, ramoSaude }),
       ];
     },
-    avisarExtra: (d, tentativa) => (tentativa === 2 ? formulasDeMaquinaDosSlides(slidesDaSaida(d.slides, { ramoSaude }), fontesDosFatos) : []),
+    avisarExtra: (d, tentativa) => {
+      if (tentativa !== 2) return [];
+      const slidesDeTexto = slidesDaSaida(d.slides, { ramoSaude });
+      return [...verificarPromessaDaCapa(slidesDeTexto), ...verificarCapaVaga(slidesDeTexto), ...formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos)];
+    },
   });
 
   const slides: SlideDoCarrossel[] = slidesDaSaida(saida.slides, { ramoSaude });
@@ -324,7 +326,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       tema: origem.tema,
       quantidade,
       cor: leitura.cor,
-      avisos: [...avisosDoCarrossel, ...avisosDaIA, ...avisosDoMetodo(slides, saida.legenda)],
+      avisos: [...avisosDoCarrossel, ...avisosDoMetodo(slides, saida.legenda)],
       slides,
       legenda: saida.legenda.trim(),
       hashtags: normalizarHashtags(saida.hashtags),
@@ -332,7 +334,8 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     })
     .returning();
   if (pedido.cor !== undefined && pedido.cor !== cliente.corMarca) await db().update(clientes).set({ corMarca: pedido.cor }).where(eq(clientes.id, clienteId));
-  logger.info({ clienteId, carrosselId: criado.id, quantidade }, "carrossel gerado");
+  // Os avisos da IA (o motivo escrito para o modelo, com o código da regra) ficam só no log: `avisos` do carrossel é o que a pessoa lê.
+  logger.info({ clienteId, carrosselId: criado.id, quantidade, avisosDaIA }, "carrossel gerado");
   return criado;
 }
 

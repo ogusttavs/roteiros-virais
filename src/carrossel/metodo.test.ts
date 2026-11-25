@@ -17,6 +17,8 @@ describe("promessaDeContagem", () => {
     expect(promessaDeContagem("Cinco passos para escovar certo")).toEqual({ quantidade: 5, coisa: "passos" });
     expect(promessaDeContagem("Três dicas simples")).toEqual({ quantidade: 3, coisa: "dicas" });
     expect(promessaDeContagem("7 principais erros de quem limpa o box")).toEqual({ quantidade: 7, coisa: "erros" });
+    expect(promessaDeContagem("Uma das causas do mau hálito")).toBeNull();
+    expect(promessaDeContagem("Um dos sinais de cárie que você ignora")).toBeNull();
     expect(promessaDeContagem("Escove por 2 minutos")).toBeNull();
     expect(promessaDeContagem("O dente inclinado em 45 graus")).toBeNull();
     expect(promessaDeContagem("Você escova do jeito certo?")).toBeNull();
@@ -49,6 +51,7 @@ describe("capa vaga", () => {
   it("reprova os moldes banidos, com o nome do molde", () => {
     expect(moldeVagoDaCapa("Tudo o que você precisa saber sobre clareamento")).toBe("promete tudo sobre o assunto");
     expect(moldeVagoDaCapa("O guia definitivo da limpeza do box")).toBe("promete tudo sobre o assunto");
+    expect(moldeVagoDaCapa("A solução definitiva para o mofo")).toBe("guia definitivo");
     expect(moldeVagoDaCapa("O segredo que ninguém conta sobre o mofo")).toBe("revelação sem dizer qual");
     expect(moldeVagoDaCapa("O que os dentistas não te contam")).toBe("revelação sem dizer qual");
     expect(moldeVagoDaCapa("Você vai se chocar com isso")).toBe("revelação sem dizer qual");
@@ -93,6 +96,10 @@ describe("rotularItens", () => {
     const r = rotularItens([capa("x"), { ...item(), rotulo: "Erro 9 de 1" }, { ...item(), rotulo: "Sinal" }, passo(), { ...item(), rotulo: "" }, chamada]);
     expect(r.filter((s) => s.tipo === "item").map((s) => s.rotulo)).toEqual(["Erro 1 de 3", "Sinal 2 de 3", "Dica 3 de 3"]);
     expect(r.find((s) => s.tipo === "passo")!.rotulo).toBeUndefined();
+  });
+  it("fica só com a primeira palavra do rótulo, para não estourar o limite (Sinal de alerta, Erro comum)", () => {
+    const r = rotularItens([capa("x"), { ...item(), rotulo: "Sinal de alerta" }, { ...item(), rotulo: "Erro comum" }, { ...item(), rotulo: "Sinal" }, chamada]);
+    expect(r.filter((s) => s.tipo === "item").map((s) => s.rotulo)).toEqual(["Sinal 1 de 3", "Erro 2 de 3", "Sinal 3 de 3"]);
   });
 });
 

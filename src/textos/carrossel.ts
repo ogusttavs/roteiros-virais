@@ -183,6 +183,16 @@ export const textosCarrossel = {
   verOpcoes: "Ver as opções",
   agoraNao: "Agora não",
 
+  // E65 PR 4 (consertos da revisão final): reabrir o carrossel, a lista dos recentes e o zip que falha na tela
+  recentesTitulo: "Os seus carrosséis",
+  recentesAjuda: "Toque em um para abrir de novo, trocar o que quiser e baixar.",
+  recenteDetalhe: (quantidade: number, data: string) => `${quantidade} slides, feito em ${data}`,
+  abrindoTitulo: "Abrindo o seu carrossel",
+  abrindoAjuda: "Já já ele aparece aqui.",
+  aindaGerandoAjuda: "O seu carrossel ainda está sendo escrito. Pode ficar nesta tela: ele abre sozinho quando ficar pronto.",
+  naoAchouEste: "Não achei esse carrossel. Ele pode ser de outra marca ou ter sido apagado.",
+  abrirFalhou: "Não deu para abrir o carrossel agora. Tente de novo em instantes.",
+
   // E65 PR 3 (bloco novo no fim do objeto, para não colidir com a E66): o carrossel cumpre o que a capa promete
   metodo: {
     capaFraca: "A capa não tem número, pergunta nem verbo de ação. Uma promessa mais concreta, como \"3 erros que...\" ou uma pergunta sobre uma dúvida real, chama mais o toque.",
