@@ -173,7 +173,7 @@ describe("gerarCarrossel", () => {
     expect(montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", ramoSaude: false })).not.toMatch(/Este ramo é de saúde/);
     // A regra R-CONF-07 do banco de regras entra nos dois, mas condicionada ("Nos ramos de saúde"); o bloco próprio do carrossel é só da saúde.
     expect(texto).toMatch(/nunca com foto ou texto do procedimento em andamento/);
-    expect(versao).toBe("2.1.0");
+    expect(versao).toBe("2.2.0");
   });
 
   it("ramo alternativo de saúde também conta: a linha fixa entra e o depoimento é reprovado e refeito", async () => {
@@ -818,6 +818,21 @@ describe("o método: o carrossel cumpre o que a capa promete (E65 PR 3)", () => 
     expect(await geracoesDa(outra)).toHaveLength(1);
     expect(fraca.avisos.join()).toMatch(/não tem número, pergunta nem verbo de ação/);
     expect(fraca.avisos.join()).toMatch(/pouco texto|número, pergunta/);
+  });
+
+  it("T35: o título de slide que serve para qualquer ramo é reprovado pelo teste do ramo (R-COPY-27) e a 2ª sai certa; o formato do último carrossel chega na entrada", async () => {
+    const clienteId = await criarCliente();
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-qualquer-ramo]", 5));
+    const geracoes = await geracoesDa(clienteId);
+    expect(geracoes).toHaveLength(2);
+    expect(geracoes.map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/serve para qualquer ramo/);
+    expect(JSON.stringify(c.slides)).not.toMatch(/Cuide bem do que é seu/);
+    const seguinte = await gerarCarrossel(clienteId, pedidoLivre("outro tema do estofado", 5));
+    expect(seguinte.id).not.toBe(c.id);
+    const todas = await geracoesDa(clienteId);
+    const entradas = JSON.stringify(todas.map((g) => (g.entradas as { entrada?: string }).entrada ?? ""));
+    expect(entradas).toMatch(/formato: (lista|passo a passo)/);
+    expect(entradas).toMatch(/use um formato diferente/);
   });
 
   it("fórmula de máquina reprova na 1ª tentativa (o roteiro faz igual) e a 2ª sai certa; se persistir na 2ª, só avisa e não derruba", async () => {

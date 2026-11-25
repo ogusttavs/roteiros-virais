@@ -12,14 +12,30 @@ import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, 
  * O carrossel (E65 PR 1): de um tema, 5, 7 ou 9 slides que ENSINAM (lista, passo a passo, antes e depois), mais a legenda e as hashtags. Usa o mesmo contexto do roteiro (o perfil compilado, o modelo
  * do ramo, a evidência do banco, as regras de copy e de conformidade); o que muda é a forma. Quem confere o resultado é `carrossel/regras.ts` (limites por tipo, ordem, números e fonte) mais o verificador
  * de texto de sempre (`gerarComVerificacao`). A foto de cada slide é do cliente, enviada por ele; o texto só diz onde uma foto faria sentido, nunca descreve uma imagem para gerar.
+ *
+ * 2.2.0 (T35, 26/11/2026, `pesquisa/carrossel-contra-o-metodo-do-kit.md` seção 4): o bloco `COMO_CONTAR` (a capa que promete, o segundo slide com o problema em 7 e 9 slides, o fechamento com uma ação dentro
+ * do último slide, o que não se afirma da marca, o fechamento que varia) e o formato de cada carrossel recente na entrada, com a regra de usar um formato diferente do último. O schema não muda.
  */
-export const versao = "2.1.0";
+export const versao = "2.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
 export const LEMBRETE_ACENTUACAO = LEMBRETE_DO_ROTEIRO;
 
 const QUEBRA = String.fromCharCode(10);
+
+/**
+ * Como contar o carrossel (2.2.0): as regras A, C, E e F da seção 4 de `pesquisa/carrossel-contra-o-metodo-do-kit.md`, mais o que a prova real de 25/11 e o estudo do fornecedor pediram. Texto nosso. A regra D (o teste
+ * do ramo) não está aqui: é a R-COPY-27 do bloco de copy, conferida no título de cada slide pelo verificador de texto (`verificarTexto`, gênero "carrossel").
+ */
+export const COMO_CONTAR = [
+  "Como contar (vale para o carrossel inteiro):",
+  "A. A capa promete e o carrossel cumpre. A capa traz uma destas promessas: um número de itens, um passo a passo que tem fim, um problema que a pessoa reconhece como dela ou uma pergunta sobre uma dúvida que ela de fato tem. Nunca anuncie só o assunto (\"sobre tal coisa\"). Se a capa fala de N coisas, o carrossel traz exatamente N itens ou passos, e o título de cada um bate com o que o texto dele diz. Uma capa que promete \"sinais\" não tem um passo de logística no meio. A linha de apoio da capa amplia o título sem repeti-lo e sem entregar a conclusão. Título curto, de preferência até 8 palavras, que dá a ideia sozinho; texto de apoio de até 25 palavras.",
+  'C. Com 7 ou 9 slides, o segundo slide mostra o problema do jeito que o cliente do ramo o vive, numa situação que ele reconhece, e sai como tipo "item" com o rótulo "O problema"; só a partir do terceiro entram os itens ou os passos (esse slide não conta como um dos N prometidos na capa). Quando o tema corrige uma ideia errada comum, desfaça essa ideia numa frase antes de ensinar o certo. Com 5 slides não há esse slide: a capa faz o papel do problema.',
+  "E. O penúltimo slide fecha o que a capa prometeu; com 9 slides o penúltimo é o resumo, e o resumo só retoma o que os slides anteriores disseram, nunca uma linha nova. O último slide pede UMA só ação, ligada ao que a pessoa acabou de aprender, em frase de ordem, escrita dentro do próprio slide (a ação nunca fica fora dos slides, só na legenda). Não agradeça e não deseje que tenha ajudado. Cada slide acrescenta uma camada nova: a ideia central não se repete em todo slide. Três testes: a capa dá uma razão para começar a ler, o segundo slide uma razão para continuar, o penúltimo uma ideia para lembrar.",
+  "F. Use um formato diferente do último carrossel desta marca (a entrada diz o formato de cada um: lista, passo a passo ou antes e depois), a não ser que o cliente tenha pedido o formato na observação.",
+  "Sobre a marca: não afirme frequência, caso ou costume do negócio que o perfil não diga (\"toda semana alguém chega perguntando\", \"a gente vê isso o tempo todo\"); o que faltar vira colchete para a pessoa completar. Varie o fechamento de um carrossel para outro e nunca copie literalmente uma frase do perfil como fecho.",
+].join(QUEBRA);
 
 /** O que o texto pode contar de foto. Em saúde (`dePaciente` presente) a foto comum nunca vale para antes-depois nem prova-resultado, e a de paciente só vale para eles. */
 function blocoDasFotos(comuns: number, dePaciente?: number): string {
@@ -131,6 +147,8 @@ export function montarSistemaEstavel(dados: {
 
 ${DESCRICAO_DOS_TIPOS}
 
+${COMO_CONTAR}
+
 A legenda é o texto do post: até ${LIMITE_DA_LEGENDA_PALAVRAS} palavras, em conversa, abrindo com uma frase que faça a pessoa abrir o carrossel (sem copiar o título da capa) e fechando com a mesma ação do último slide. As hashtags são de ${HASHTAGS.min} a ${HASHTAGS.max}, do ramo e do lugar quando o perfil diz onde fica, sempre com # na frente, sem espaço e sem acento solto no meio.
 
 Quando a entrada trouxer evidência (vídeos de outras pessoas que renderam bem), use só o JEITO de contar (a ordem, o tipo de promessa, a forma de abrir), nunca o assunto deles como fato do cliente, e devolva em evidencias os ids que de fato usou. Sem evidência, devolva evidencias vazio e não cite nenhum id.
@@ -150,6 +168,15 @@ ${dados.modeloNicho}
 Escreva em português do Brasil, com acentuação correta. O que o cliente escreveu no perfil ou no tema pode vir sem acento; o carrossel que você escreve sai sempre acentuado.`;
 }
 
+/** Os carrosséis recentes com o formato de cada um e, havendo o do último, a ordem de usar outro (regra F). O mais novo vem primeiro. */
+function blocoDosRecentes(temas: string[], formatos?: string[]): string {
+  const base = `Carrosséis recentes deste cliente, para não repetir o ângulo:${QUEBRA}`;
+  if (temas.length === 0) return `${base}nenhum carrossel anterior`;
+  const linhas = temas.map((t, i) => (formatos?.[i] ? `"${t}" (formato: ${formatos[i]})` : `"${t}"`)).join("; ");
+  const ultimo = formatos?.[0];
+  return ultimo ? `${base}${linhas}${QUEBRA}O último carrossel desta marca foi em formato ${ultimo}: use um formato diferente.` : `${base}${linhas}`;
+}
+
 export function montarEntrada(dados: {
   tema: string;
   quantidade: TamanhoDoCarrossel;
@@ -167,6 +194,8 @@ export function montarEntrada(dados: {
   quantidadeDeFotosDePaciente?: number;
   /** Os temas dos últimos carrosséis da marca, para não repetir o ângulo. */
   carrosseisRecentes: string[];
+  /** O formato de cada carrossel recente, na mesma ordem (do mais novo para o mais antigo): "lista", "passo a passo" ou "antes e depois". Ausente, a entrada só lista os temas. */
+  formatosDosRecentes?: string[];
 }): string {
   const blocoEvidencia =
     dados.evidencias.length > 0
@@ -195,7 +224,7 @@ export function montarEntrada(dados: {
     blocoRoteiro,
     blocoDasFotos(dados.quantidadeDeFotos, dados.quantidadeDeFotosDePaciente),
     blocoEvidencia,
-    `Carrosséis recentes deste cliente, para não repetir o ângulo:${QUEBRA}${dados.carrosseisRecentes.length > 0 ? dados.carrosseisRecentes.map((t) => `"${t}"`).join("; ") : "nenhum carrossel anterior"}`,
+    blocoDosRecentes(dados.carrosseisRecentes, dados.formatosDosRecentes),
   ].filter((p): p is string => Boolean(p));
   return partes.join(QUEBRA + QUEBRA);
 }

@@ -107,12 +107,15 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * 1.10.0 (onda 1 de texto, 25/11/2026, `R-COPY-27`): no gênero roteiro, com fontes, o verificador faz o teste "serve para qualquer ramo?" no título e no gancho (`CRITERIO_RAMO`): se os dois continuam
  * verdadeiros trocando o ramo, sem nenhum elemento que só existe nesta marca ou neste ramo (o serviço, o lugar, o público, um fato da ficha ou da evidência), o roteiro volta uma vez para refazer. Na dúvida,
  * aprova (o mesmo princípio do critério de fato). Precisa de prova com chave real antes de valer em produção.
+ *
+ * 1.11.0 (T35, 26/11/2026): o gênero "carrossel", para os slides do carrossel (E65). Mesmo critério de tom e de fato do roteiro; o teste "serve para qualquer ramo?" (R-COPY-27, o mesmo `CRITERIO_RAMO`, sem regra
+ * nova) passa a valer para o TÍTULO DE CADA SLIDE, que chega com a etiqueta "Título do slide N: " (`ETIQUETA_DO_TITULO`). Precisa de prova com chave real antes de valer em produção.
  */
-export const versao = "1.10.0";
+export const versao = "1.11.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
-export type GeneroTexto = "padrao" | "analise" | "roteiro" | "regra" | "tema";
+export type GeneroTexto = "padrao" | "analise" | "roteiro" | "carrossel" | "regra" | "tema";
 
 export const schema = z.object({
   aprovado: z.boolean(),
@@ -140,6 +143,7 @@ const CRITERIO_TOM: Record<GeneroTexto, string> = {
     "como melhorar é esperado e correto, não reprove só por isso; reprove apenas se soar como " +
     "propaganda de venda ou usar uma palavra fora do lugar;",
   roteiro: "o texto soa como uma pessoa falando com outra pessoa, não como propaganda;",
+  carrossel: "o texto soa como uma pessoa falando com outra pessoa, não como propaganda;",
   regra:
     "o texto é uma regra curta e direta sobre o que os próximos roteiros deste cliente devem " +
     "seguir ou evitar: frase imperativa, do tipo não fazer X e sim Y, é o formato esperado e " +
@@ -163,6 +167,9 @@ const CONTEXTO_GENERO: Partial<Record<GeneroTexto, string>> = {
     "corte para ele seguir. Essas instruções de edição são parte do texto que ele lê e segue, " +
     "escritas para ele, não para um editor profissional; nunca reprove achando que não é o " +
     "texto que o cliente vê, isso não é um erro de gênero.\n",
+  carrossel:
+    "\nO texto são os slides de um carrossel de Instagram que o próprio dono do negócio vai postar: capa, itens ou passos curtos, resumo e chamada final, uma linha por campo. Frase curta e direta é o formato " +
+    "certo, nunca reprove por parecer fragmento; cada linha é um campo do slide, não um parágrafo.\n",
   regra:
     "\nO texto é uma regra que resume o que o cliente já reprovou antes, para lembrar os próximos " +
     "roteiros dele do que evitar. Ela aparece numa lista curta na tela do próprio cliente, no " +
@@ -217,6 +224,20 @@ export const CRITERIO_RAMO =
   "já passa. Só reprove quando tiver certeza de que nada ali é desta marca nem deste ramo.\n" +
   "  Exemplo que REPROVA: \"Você não vai acreditar no que acontece quando você começa a cuidar de si\" (serve para qualquer ramo). Exemplos que APROVAM: \"Mancha de vinho no sofá de linho: o que não fazer\" " +
   "(o serviço e o material), \"Clareamento em Campinas: quanto custa de verdade\" (o serviço e o lugar).";
+
+/**
+ * 1.11.0 (R-COPY-27 no carrossel): a etiqueta que o serviço do carrossel põe na frente do título de cada slide, para o teste do ramo saber qual linha é título. O mesmo teste do `CRITERIO_RAMO`, trocando "o
+ * título e o gancho" pelos títulos dos slides (a capa é o gancho).
+ */
+export const ETIQUETA_DO_TITULO = (n: number): string => `Título do slide ${n}: `;
+
+export const CRITERIO_RAMO_CARROSSEL = CRITERIO_RAMO.replace(
+  "o título e o gancho têm pelo menos UM elemento",
+  'cada título de slide (as linhas que começam com "Título do slide"; o da capa é o gancho) tem pelo menos UM elemento',
+)
+  .replace("se o título e o gancho continuam", "se o título do slide continua")
+  .replace("servem para qualquer página", "serve para qualquer página")
+  .replace("Exemplo que REPROVA:", "Slides que só repetem a ideia de um modo geral (\"Cuide bem do que é seu\") REPROVAM. Exemplo que REPROVA:");
 
 /** O que o verificador lê no lugar do que está entre colchetes (1.8.2). */
 export const MARCADOR_DE_ESPACO = "[espaço para a pessoa completar]";
@@ -279,7 +300,7 @@ export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes =
   return `Você confere um texto que vai para a tela de um dono de pequeno negócio. Aprove só
 se:
 - o tom é direto, calmo e de parceiro, sem exclamação e sem entusiasmo forçado;
-- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}${genero === "roteiro" && comFontes ? CRITERIO_RAMO : ""}
+- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}${genero === "roteiro" && comFontes ? CRITERIO_RAMO : ""}${genero === "carrossel" && comFontes ? CRITERIO_RAMO_CARROSSEL : ""}
 - ${proibicaoEhAviso ? CRITERIO_PROIBICAO_COMO_AVISO : CRITERIO_PROIBICAO}
 ${CONTEXTO_GENERO[genero] ?? ""}
 Reprove e diga o motivo em uma frase, sem travessão, quando alguma dessas coisas falhar.

@@ -9,7 +9,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { larguraDaImagem } from "@/carrossel/fotos";
 import { avisosDoMetodo, verificarCapaVaga, verificarPromessaDaCapa } from "@/carrossel/metodo";
 import { corValida, garantirLeitura } from "@/carrossel/modelos";
-import { formulasDeMaquinaDosSlides, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFotoDasFotos, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
+import { formatoDoCarrossel, formulasDeMaquinaDosSlides, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFotoDasFotos, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
 import {
   CAMPOS_DO_TIPO,
   COR_NEUTRA,
@@ -35,6 +35,7 @@ import { db } from "@/db";
 import { carrosselFotos, carrosseis, clientes, type Carrossel, type CarrosselFoto } from "@/db/schema";
 import * as carrosselIA from "@/ia/prompts/carrossel";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
+import { ETIQUETA_DO_TITULO } from "@/ia/prompts/verificarTexto";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { hojeISO } from "@/lib/config";
@@ -204,7 +205,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     leiturasDoCliente(clienteId),
     reguaDoSetor(nichoId),
     ramoAtualDoCliente(nichoId),
-    db().select({ tema: carrosseis.tema }).from(carrosseis).where(eq(carrosseis.clienteId, clienteId)).orderBy(desc(carrosseis.criadoEm)).limit(5),
+    db().select({ tema: carrosseis.tema, slides: carrosseis.slides }).from(carrosseis).where(eq(carrosseis.clienteId, clienteId)).orderBy(desc(carrosseis.criadoEm)).limit(5),
   ]);
   const perfilCompilado = formatarPerfilCompilado(perfil);
   const combinadas = combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, regua.proporcaoBrasil, cliente.redePrincipal, "falado");
@@ -285,6 +286,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       quantidadeDeFotos: fotosPrometidas,
       ...(ramoSaude ? { quantidadeDeFotosDePaciente: fotosDePacientePrometidas } : {}),
       carrosseisRecentes: recentes.map((r) => r.tema),
+      formatosDosRecentes: recentes.map((r) => formatoDoCarrossel(r.slides) ?? ""),
     }),
     fontesDosFatos,
     conferirNumerosNasFontes: true,
@@ -293,14 +295,15 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     citarProibicaoVale: origem.temaDaPessoa,
     exigeEvidencia: false,
     evidenciasFornecidas: evidencias.map((v) => v.id),
-    generoTexto: "roteiro",
+    generoTexto: "carrossel",
     extrairEvidencias: (d) => d.evidencias,
     extrairCampos: (d) => {
       const campos: Record<string, string> = {};
       slidesDaSaida(d.slides, { ramoSaude }).forEach((s, i) => {
         const textos = textoDoSlide(s).filter((t) => t !== s.referencia);
         textos.forEach((t, k) => {
-          campos[`slide ${i + 1} campo ${k + 1}`] = t;
+          // O título de cada slide leva a etiqueta que o verificador lê para o teste do ramo (R-COPY-27, gênero "carrossel"); o resto segue sem etiqueta.
+          campos[`slide ${i + 1} campo ${k + 1}`] = t === s.titulo ? `${ETIQUETA_DO_TITULO(i + 1)}${t}` : t;
         });
       });
       campos.legenda = d.legenda;

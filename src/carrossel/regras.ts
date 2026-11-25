@@ -22,7 +22,7 @@ import {
 import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 
 import { distribuirFotos } from "./fotos";
-import { rotularItens } from "./metodo";
+import { ehOProblema, rotularItens } from "./metodo";
 
 export function contarPalavras(texto: string): number {
   return texto.trim() === "" ? 0 : texto.trim().split(/\s+/).length;
@@ -94,6 +94,21 @@ export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolea
 /** Todo o texto de um slide, na ordem em que aparece, para o verificador de fatos e a conformidade lerem. */
 export function textoDoSlide(s: SlideDoCarrossel): string[] {
   return [s.rotulo, s.titulo, s.sub, s.texto, s.antes, s.depois, s.valor && `${s.valor}${s.unidade ?? ""}`, s.frase, s.fonte, s.citacao, s.quem, s.contexto, ...(s.linhas ?? []), ...(s.acoes ?? [])].filter((t): t is string => Boolean(t && t.trim()));
+}
+
+/**
+ * O formato de um carrossel pelos tipos dos slides (prompt 2.2.0, regra F): "passo a passo" quando há mais passos que itens, "antes e depois" quando o antes-depois pesa mais que os dois, senão "lista" (itens);
+ * sem nenhum dos três, nulo. O slide "O problema" é um item de apoio e não decide o formato.
+ */
+export function formatoDoCarrossel(slides: { tipo: TipoDeSlide; rotulo?: string }[]): string | null {
+  const conta = (f: (s: { tipo: TipoDeSlide; rotulo?: string }) => boolean) => slides.filter(f).length;
+  const passos = conta((s) => s.tipo === "passo");
+  const itens = conta((s) => s.tipo === "item" && !ehOProblema(s));
+  const antesDepois = conta((s) => s.tipo === "antes-depois");
+  if (antesDepois > 0 && antesDepois >= passos && antesDepois >= itens) return "antes e depois";
+  if (passos > itens) return "passo a passo";
+  if (itens > 0) return "lista";
+  return passos > 0 ? "passo a passo" : null;
 }
 
 /** A ordem e a forma da lista: quantidade, capa primeiro, chamada por último, nunca três do mesmo tipo seguidos. */

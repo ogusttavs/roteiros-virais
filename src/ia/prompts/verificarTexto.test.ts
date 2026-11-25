@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   CRITERIO_FATOS,
+  CRITERIO_RAMO_CARROSSEL,
+  ETIQUETA_DO_TITULO,
   CRITERIO_PROIBICAO,
   CRITERIO_PROIBICAO_COMO_AVISO,
   fontesSemProibicoes,
@@ -63,7 +65,7 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
   });
 
   it("a versão subiu e fato é só o ESPECÍFICO sobre a pessoa, o negócio, o lugar, o momento ou um acontecimento", () => {
-    expect(versao).toBe("1.10.0");
+    expect(versao).toBe("1.11.0");
     expect(sistema).toContain("fato ESPECÍFICO");
     for (const exemplo of ["quem está junto", "onde está", "o que aconteceu", "quando", "quanto custa", "nome de produto, de cliente ou de cidade", "uma cena vivida"]) {
       expect(sistema).toContain(exemplo);
@@ -354,5 +356,18 @@ describe("verificarTexto 1.10.0: o teste 'serve para qualquer ramo?' (R-COPY-27)
     expect(CRITERIO_RAMO).toContain("troque o ramo");
     expect(CRITERIO_RAMO).toContain("NA DÚVIDA, APROVE");
     expect(CRITERIO_RAMO).not.toContain(String.fromCharCode(0x2014));
+  });
+});
+
+describe("verificarTexto 1.11.0: o teste do ramo no título de cada slide do carrossel", () => {
+  it("o gênero carrossel, com fontes, traz o teste do ramo para o título de cada slide; sem fontes ou nos outros gêneros não", () => {
+    expect(montarSistemaEstavel("carrossel", true)).toContain(CRITERIO_RAMO_CARROSSEL);
+    expect(montarSistemaEstavel("carrossel", false)).not.toContain(CRITERIO_RAMO_CARROSSEL);
+    expect(montarSistemaEstavel("roteiro", true)).not.toContain(CRITERIO_RAMO_CARROSSEL);
+    expect(CRITERIO_RAMO_CARROSSEL).toContain("serve para qualquer ramo");
+    expect(CRITERIO_RAMO_CARROSSEL).toContain("Título do slide");
+    expect(CRITERIO_RAMO_CARROSSEL).toContain("troque o ramo");
+    expect(CRITERIO_RAMO_CARROSSEL).not.toContain(String.fromCharCode(0x2014));
+    expect(ETIQUETA_DO_TITULO(3)).toBe("Título do slide 3: ");
   });
 });
