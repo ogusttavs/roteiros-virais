@@ -70,6 +70,7 @@
  * caso raro em que a cadeia chegava em `extrair` antes dele gravar).
  */
 import { CRON_DA_COLETA_QUENTE, noticiasQuentesAtivo } from "@/config/noticias-quentes";
+import { publicarImagensAtivo } from "@/config/post-pronto";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 
@@ -285,6 +286,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     fila: FILAS.limparEdicoes,
     cron: "25 * * * *",
     descricao: "limpeza dos videos guardados para editar (bruto em 48 h, editado em 7 dias) e dos arquivos sem dono (E47 PR 2), de hora em hora, aos 25 minutos",
+  },
+  {
+    fila: FILAS.filaDePosts,
+    cron: "* * * * *",
+    descricao: "fila dos posts prontos (E56 PR 2): de minuto em minuto, publica o proximo de cada marca se passou o intervalo e o limite das 24 horas deixa",
+    condicao: () => publicarImagensAtivo(),
   },
   {
     fila: FILAS.vigiarDisco,

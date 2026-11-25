@@ -2726,6 +2726,44 @@ export const publicacoes = pgTable(
 );
 export type Publicacao = typeof publicacoes.$inferSelect;
 
+/** E56 PR 2: o post pronto (imagem ou carrossel) que a marca publica pelo aplicativo. */
+export type EstadoDoPostPronto = "na_fila" | "publicando" | "publicado" | "falhou" | "cancelado";
+export type ImagemDoPost = { arquivo: string; bytes: number; largura: number; altura: number };
+
+/**
+ * E56 PR 2: um post pronto de imagem (1 imagem) ou carrossel (2 a 10), feito fora do aplicativo, na fila de publicação da marca. As imagens ficam em disco (`lib/imagens-do-post.ts`, já em JPEG)
+ * até o post terminar; aqui só o nome dos arquivos. Na fila: espera a vez (o worker publica um por vez, com intervalo). Publicando: a reserva (UPDATE condicional, só uma por marca) que impede publicar duas
+ * vezes. Nunca guarda o acesso da Meta. `motivo` é a frase em língua de gente; `codigoFalha` e os códigos da Meta são só para o diagnóstico; `aviso` é o recado da fila (ex.: esperando o limite do dia).
+ */
+export const postsProntos = pgTable(
+  "posts_prontos",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    estado: text("estado").$type<EstadoDoPostPronto>().notNull().default("na_fila"),
+    legenda: text("legenda").notNull().default(""),
+    imagens: jsonb("imagens").$type<ImagemDoPost[]>().notNull(),
+    /** A pessoa tocou em "Publicar agora": a vez dele não espera o intervalo entre posts. */
+    agora: boolean("agora").notNull().default(false),
+    containerId: text("container_id"),
+    midiaId: text("midia_id"),
+    permalink: text("permalink"),
+    motivo: text("motivo"),
+    codigoFalha: text("codigo_falha"),
+    codigoMeta: integer("codigo_meta"),
+    subcodigoMeta: integer("subcodigo_meta"),
+    aviso: text("aviso"),
+    criadoPor: text("criado_por").references(() => user.id, { onDelete: "set null" }),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+    terminadoEm: timestamp("terminado_em", { withTimezone: true }),
+  },
+  (t) => [index("posts_prontos_marca_estado").on(t.clienteId, t.estado), uniqueIndex("posts_prontos_um_publicando_por_marca").on(t.clienteId).where(sql`${t.estado} = 'publicando'`)],
+);
+export type PostPronto = typeof postsProntos.$inferSelect;
+
 /**
  * Subindo: a edição foi aberta e o vídeo ainda não começou a chegar. Enviando: o corpo do vídeo está chegando (a reserva do envio, um UPDATE condicional; a limpeza de 45 minutos recolhe o que morreu). Guardado: o vídeo chegou inteiro, foi conferido (duração, qualidade, som) e espera a transcrição. Transcrevendo: o worker está ouvindo
  * o áudio. Transcrito: as palavras com tempo e a curva de energia estão guardadas e o motor de corte já pode trabalhar. Falhou: recusada ou parada, com a frase em `motivo`. Expirada: o vídeo

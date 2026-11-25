@@ -49,6 +49,7 @@ import { rodarPesquisaDoFoco } from "./pesquisa-do-foco";
 import { rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
 import { rodarPublicarInstagram } from "./publicar-instagram";
+import { rodarFilaDePosts, rodarPublicarPostPronto } from "./publicar-post-pronto";
 import { rodarRenderizarAnimacao } from "./renderizar-animacao";
 import { rodarRenderizarEdicao } from "./renderizar-edicao";
 import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
@@ -160,6 +161,9 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.pesquisaNaHora]: () => rodarPesquisaNaHora(Number(process.argv[3])),
   /** Por evento (E56): `npm run job -- publicar-instagram <publicacaoId>` confere (e publica, se o vídeo estiver pronto) uma publicação já criada. */
   [FILAS.publicarInstagram]: () => rodarPublicarInstagram(Number(process.argv[3])),
+  /** Por evento (E56 PR 2): `npm run job -- publicar-post-pronto <postId>` publica aquele post da fila agora. */
+  [FILAS.publicarPostPronto]: () => rodarPublicarPostPronto(Number(process.argv[3])),
+  [FILAS.filaDePosts]: () => rodarFilaDePosts(),
   /** Por evento (E47 PR 2): `npm run job -- transcrever-edicao <edicaoId>` transcreve uma edição já guardada (usa a chave da Groq do ambiente). */
   [FILAS.transcreverEdicao]: () => rodarTranscreverEdicao(Number(process.argv[3])),
   /** Por evento (E47 PR 3): `npm run job -- decidir-edicao <edicaoId>` decide a edição de uma fala já transcrita (usa a chave da Anthropic do ambiente). */
