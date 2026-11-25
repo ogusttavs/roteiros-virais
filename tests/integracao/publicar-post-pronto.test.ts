@@ -49,7 +49,7 @@ vi.mock("@/lib/log", () => {
 import { db, getPool } from "@/db";
 import { clientes, contasConectadas, membrosMarca, nichos, postsProntos, user } from "@/db/schema";
 import { config } from "@/lib/config";
-import { caminhoDaImagem, pastaDoPost } from "@/lib/imagens-do-post";
+import { caminhoDaImagem, enderecoPublicoDaImagem, pastaDoPost } from "@/lib/imagens-do-post";
 import { cifrarToken, contextoDoToken } from "@/lib/meta-token";
 import {
   cancelarPostPronto,
@@ -61,7 +61,7 @@ import {
   rodarFilaDePosts,
   varrerImagensDosPosts,
 } from "@/servicos/post-pronto";
-import { importarPostsDaPasta, lerLegendas } from "@/servicos/post-pronto-lote";
+import { FRASE_DE_VIDEO, importarPostsDaPasta, lerLegendas, lerPastaDePosts, recusaDoLote } from "@/servicos/post-pronto-lote";
 import { fraseDeFalhaDoPost, fraseDeRecusaDoPost } from "@/textos/post-pronto";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -91,7 +91,7 @@ let pastaDeImagens: string;
 type Cenario = {
   status?: string[];
   erroNoContainer?: { code: number; subcode?: number };
-  erroAoPublicar?: { code: number; subcode?: number } | "rede";
+  erroAoPublicar?: { code: number; subcode?: number } | { http: number } | "rede";
   limite?: { usadas: number; total: number | null };
   demoraNoPublicar?: number;
 };
@@ -137,6 +137,7 @@ function instalarInstagram(c: Cenario = {}): void {
       registro("publicar");
       if (c.demoraNoPublicar) await new Promise((r) => setTimeout(r, c.demoraNoPublicar));
       if (c.erroAoPublicar === "rede") throw new TypeError("fetch failed");
+      if (c.erroAoPublicar && typeof c.erroAoPublicar === "object" && "http" in c.erroAoPublicar) return new Response("<html>Bad Gateway</html>", { status: c.erroAoPublicar.http, headers: { "content-type": "text/html" } });
       if (c.erroAoPublicar) return json({ error: { message: "erro simulado", code: c.erroAoPublicar.code, error_subcode: c.erroAoPublicar.subcode } }, 400);
       return json({ id: `midia-post-${chamadas.filter((x) => x.tipo === "publicar").length}` });
     }
@@ -627,6 +628,79 @@ describe("publicar uma vez só", () => {
     expect(dasChamadas("publicar")).toHaveLength(0);
   });
 
+  it("502 ao publicar com o contêiner PUBLISHED: termina publicado, uma só publicação", async () => {
+    instalarInstagram({ erroAoPublicar: { http: 502 }, status: ["FINISHED", "PUBLISHED"] });
+    const id = await criarOk();
+    expect(await publicarPost(id, deps())).toBe("publicado");
+    expect(await linha(id)).toMatchObject({ estado: "publicado", codigoFalha: null });
+    expect(dasChamadas("publicar")).toHaveLength(1);
+    expect(existsSync(pastaDoPost(id))).toBe(false);
+  });
+
+  it("502 e 504 ao publicar sem o contêiner publicado: 'não confirmou', sem 'Pôr na fila de novo', e nunca publica de novo", async () => {
+    for (const http of [502, 504]) {
+      instalarInstagram({ erroAoPublicar: { http } });
+      chamadas.length = 0;
+      const id = await criarOk();
+      expect(await publicarPost(id, deps())).toBe("falhou");
+      expect(await linha(id)).toMatchObject({ estado: "falhou", codigoFalha: "nao-confirmou" });
+      expect((await listarPostsDaMarca(marcaA)).find((p) => p.id === id)?.podeRepetir).toBe(false);
+      expect(await repetirPostPronto("pp-dono-a", marcaA, id)).toMatchObject({ ok: false, codigo: "nao-da-para-repetir" });
+      expect(dasChamadas("publicar")).toHaveLength(1);
+    }
+  });
+
+  it("códigos 1 e 2 da Meta ao publicar: 'não confirmou' (a Meta pode ter publicado)", async () => {
+    for (const code of [1, 2]) {
+      instalarInstagram({ erroAoPublicar: { code } });
+      const id = await criarOk();
+      expect(await publicarPost(id, deps())).toBe("falhou");
+      expect((await linha(id)).codigoFalha).toBe("nao-confirmou");
+      expect((await listarPostsDaMarca(marcaA)).find((p) => p.id === id)?.podeRepetir).toBe(false);
+    }
+  });
+
+  it("um código que prova a recusa (formato, 100) continua repetível ao publicar", async () => {
+    instalarInstagram({ erroAoPublicar: { code: 100, subcode: 2207026 } });
+    const id = await criarOk();
+    expect(await publicarPost(id, deps())).toBe("falhou");
+    expect((await linha(id)).codigoFalha).toBe("formato");
+    expect((await listarPostsDaMarca(marcaA)).find((p) => p.id === id)?.podeRepetir).toBe(true);
+  });
+
+  it("com a chave desligada publicarPost não publica nem chama a Meta, e a rota da imagem responde 404", async () => {
+    const id = await criarOk();
+    process.env.PUBLICAR_IMAGENS_ATIVO = "";
+    chamadas.length = 0;
+    expect(await publicarPost(id, deps())).toBe("ignorado");
+    expect(chamadas).toHaveLength(0);
+    expect((await linha(id)).estado).toBe("na_fila");
+    // a rota: com a chave ligada serve a imagem do post que está publicando; desligada, 404 com o mesmo código
+    process.env.PUBLICAR_IMAGENS_ATIVO = "1";
+    const outro = await criarOk();
+    await db().update(postsProntos).set({ estado: "publicando" }).where(eq(postsProntos.id, outro));
+    const url = enderecoPublicoDaImagem(outro, 0, new Date());
+    const partes = new URL(url).pathname.split("/");
+    const pedir = () => baixarImagem(new Request(url), { params: Promise.resolve({ codigo: decodeURIComponent(partes[4] ?? ""), nome: partes[5] ?? "01.jpg" }) });
+    expect((await pedir()).status).toBe(200);
+    process.env.PUBLICAR_IMAGENS_ATIVO = "";
+    expect((await pedir()).status).toBe(404);
+  });
+
+  it("a espera do contêiner atualiza 'atualizadoEm' a cada rodada (o recolhedor não toma por parado um post vivo)", async () => {
+    const id = await criarOk();
+    const tempos: number[] = [];
+    instalarInstagram({ status: ["IN_PROGRESS", "IN_PROGRESS", "IN_PROGRESS", "FINISHED"] });
+    const esperar = async () => {
+      tempos.push((await linha(id)).atualizadoEm.getTime());
+      await new Promise((r) => setTimeout(r, 15));
+    };
+    expect(await publicarPost(id, { agora: () => new Date(), agendar: vi.fn(async () => undefined), esperar })).toBe("publicado");
+    expect(tempos).toHaveLength(3);
+    expect(tempos[1]).toBeGreaterThan(tempos[0]);
+    expect(tempos[2]).toBeGreaterThan(tempos[1]);
+  });
+
   it("o worker que caiu no meio (publicando há demais) vira 'não confirmou' e não publica de novo", async () => {
     const id = await criarOk();
     await db().update(postsProntos).set({ estado: "publicando", atualizadoEm: inicio }).where(eq(postsProntos.id, id));
@@ -845,6 +919,62 @@ describe("envio em lote (admin)", () => {
       expect(fila.map((p) => [p.legenda, p.imagens])).toEqual([["Legenda um #a", 1], ["Legenda dois", 3], ["Legenda dez", 1]]);
       expect(fila.every((p) => p.estado === "na_fila")).toBe(true);
       expect((await db().select().from(postsProntos)).every((p) => p.clienteId === marcaA)).toBe(true);
+    } finally {
+      rmSync(lote, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it("segunda rodada: não cria de novo o que já está na fila e recusa a marca com post na fila (salvo --mesmo-assim)", async () => {
+    const lote = mkdtempSync(join(tmpdir(), "teste-lote-2-"));
+    try {
+      for (const [sub, cor] of [["01-a", "green"], ["02-b", "red"]]) {
+        mkdirSync(join(lote, sub), { recursive: true });
+        writeFileSync(join(lote, sub, "01.png"), await gerarImagem(1080, 1350, "png", cor));
+      }
+      writeFileSync(join(lote, "legendas.md"), "## 01-a\nLegenda A\n\n## 02-b\nLegenda B\n");
+      const um = await importarPostsDaPasta({ clienteId: marcaA, pasta: lote });
+      expect(um.criados).toHaveLength(2);
+      expect(await recusaDoLote(marcaA)).toContain("--mesmo-assim");
+      const dois = await importarPostsDaPasta({ clienteId: marcaA, pasta: lote });
+      expect(dois.criados).toHaveLength(0);
+      expect(dois.recusa).toContain("na fila");
+      expect((await db().select().from(postsProntos)).length).toBe(2);
+      // liberada, a legenda que já existe é pulada, mesmo com a fila ocupada
+      const tres = await importarPostsDaPasta({ clienteId: marcaA, pasta: lote, mesmoAssim: true });
+      expect(tres.criados).toHaveLength(0);
+      expect(tres.pulados.map((p) => p.pasta)).toEqual(["01-a", "02-b"]);
+      expect((await db().select().from(postsProntos)).length).toBe(2);
+      // legenda de post cancelado não conta
+      const [primeiro] = await listarPostsDaMarca(marcaA);
+      await cancelarPostPronto("pp-dono-a", marcaA, primeiro.id);
+      const quatro = await importarPostsDaPasta({ clienteId: marcaA, pasta: lote, mesmoAssim: true });
+      expect(quatro.criados).toHaveLength(1);
+    } finally {
+      rmSync(lote, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it("a subpasta com video.mp4 é pulada (as cenas de referência não viram carrossel) e a marca sem Instagram ligado recusa tudo", async () => {
+    const lote = mkdtempSync(join(tmpdir(), "teste-lote-3-"));
+    try {
+      mkdirSync(join(lote, "01-reels"), { recursive: true });
+      writeFileSync(join(lote, "01-reels", "video.mp4"), Buffer.from("nao e video de verdade"));
+      for (const n of ["cena-01.png", "cena-02.png"]) writeFileSync(join(lote, "01-reels", n), await gerarImagem(1080, 1350));
+      mkdirSync(join(lote, "02-foto"), { recursive: true });
+      writeFileSync(join(lote, "02-foto", "01.png"), await gerarImagem(1080, 1350, "png", "red"));
+      writeFileSync(join(lote, "legendas.md"), "## 01-reels\nLegenda do reels\n\n## 02-foto\nLegenda da foto\n");
+      const lista = await lerPastaDePosts(lote);
+      expect(lista.map((p) => [p.pasta, p.temVideo])).toEqual([["01-reels", true], ["02-foto", false]]);
+      const r = await importarPostsDaPasta({ clienteId: marcaA, pasta: lote });
+      expect(r.criados.map((c) => c.pasta)).toEqual(["02-foto"]);
+      expect(r.pulados).toEqual([{ pasta: "01-reels", frase: FRASE_DE_VIDEO }]);
+      expect((await db().select().from(postsProntos)).length).toBe(1);
+      await db().delete(postsProntos);
+      await db().delete(contasConectadas).where(eq(contasConectadas.clienteId, marcaA));
+      const sem = await importarPostsDaPasta({ clienteId: marcaA, pasta: lote });
+      expect(sem.criados).toHaveLength(0);
+      expect(sem.recusa).toContain("Instagram");
+      expect((await db().select().from(postsProntos)).length).toBe(0);
     } finally {
       rmSync(lote, { recursive: true, force: true });
     }

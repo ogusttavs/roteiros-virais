@@ -20,7 +20,7 @@ import { problemaDaLegenda } from "@/lib/legenda-do-instagram";
 import { logger } from "@/lib/log";
 import { criarContainerDeCarrossel, criarContainerDeImagem, enderecoDaMidia, publicarContainer, statusDoContainer, usoDoLimite } from "@/lib/meta-publicar";
 import { contaParaPublicar, ehDonoDaMarca, erroDaContaPara, registrarErroDaConta } from "@/servicos/conta-conectada";
-import { classificarFalha, situacaoDaPublicacao, type Falha } from "@/servicos/publicar-instagram";
+import { classificarFalha, publicacaoIncerta, situacaoDaPublicacao, type Falha } from "@/servicos/publicar-instagram";
 import { fraseDeFalhaDoPost, fraseDeRecusaDoPost, textosPostPronto, type CodigoDeFalhaDoPost, type CodigoDeRecusaDoPost } from "@/textos/post-pronto";
 
 export type DepsDoPost = {
@@ -271,6 +271,7 @@ export type ResultadoDaPublicacao = "publicado" | "falhou" | "limite" | "ocupada
 export async function publicarPost(postId: number, deps: DepsDoPost = {}): Promise<ResultadoDaPublicacao> {
   const agora = relogio(deps);
   const esperar = deps.esperar ?? esperarDeVerdade;
+  if (!publicarImagensAtivo()) return "ignorado";
   const [post] = await db().select().from(postsProntos).where(eq(postsProntos.id, postId));
   if (!post || post.estado !== "na_fila") return "ignorado";
   const clienteId = post.clienteId;
@@ -353,7 +354,11 @@ export async function publicarPost(postId: number, deps: DepsDoPost = {}): Promi
   // Espera a Meta preparar e publica. O prazo é uma contagem de perguntas (o relógio da fila é outro).
   const rodadas = Math.max(1, Math.ceil(PREPARO_DA_IMAGEM_PRAZO_MS / ESPERA_ENTRE_CONFERENCIAS_DA_IMAGEM_MS));
   for (let rodada = 0; rodada < rodadas; rodada++) {
-    if (rodada > 0) await esperar(ESPERA_ENTRE_CONFERENCIAS_DA_IMAGEM_MS);
+    if (rodada > 0) {
+      await esperar(ESPERA_ENTRE_CONFERENCIAS_DA_IMAGEM_MS);
+      // Sinal de vida: o recolhedor (5 minutos) não pode tomar por parado um post que a Meta só está demorando a preparar.
+      await db().update(postsProntos).set({ atualizadoEm: relogio(deps) }).where(and(eq(postsProntos.id, postId), eq(postsProntos.estado, "publicando")));
+    }
     let status: Awaited<ReturnType<typeof statusDoContainer>>;
     try {
       status = await statusDoContainer(containerId, conta.token, conta.via);
@@ -379,9 +384,19 @@ export async function publicarPost(postId: number, deps: DepsDoPost = {}): Promi
     } catch (erro) {
       const falha = classificarFalha(erro);
       if (falha.subcodigoMeta === 2207027) continue; // a Meta ainda não liberou: pergunta de novo
-      // Sem código, a resposta se perdeu (rede, prazo): pode ter saído. Não tenta de novo.
-      if (falha.codigoMeta === undefined && falha.codigo !== "acesso-perdido") {
-        logger.warn({ clienteId, postId }, "post pronto: sem resposta ao publicar");
+      // Sem código, código 1 ou 2 ou 5xx (a Meta sem JSON devolve o status HTTP como código): a resposta se perdeu e pode ter saído. Pergunta uma vez ao contêiner; só "publicado" é prova.
+      if (publicacaoIncerta(falha)) {
+        let depois: string | null = null;
+        try {
+          depois = await statusDoContainer(containerId, conta.token, conta.via);
+        } catch {
+          depois = null;
+        }
+        if (depois === "PUBLISHED") {
+          await concluir(postId, { midiaId: null, permalink: null }, agora);
+          return "publicado";
+        }
+        logger.warn({ clienteId, postId, codigo: falha.codigoMeta }, "post pronto: sem resposta ao publicar");
         await falhar(post, { codigo: "nao-confirmou" }, agora);
         return "falhou";
       }
