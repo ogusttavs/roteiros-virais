@@ -27,7 +27,7 @@
 .principal {
   min-height: var(--altura-toque);
   padding: 0 var(--espaco-4);
-  border: 1px solid var(--cor-borda, #c9c9c4);
+  border: 1px solid var(--cor-borda);
   border-radius: var(--raio-pill);
   background: var(--cor-superficie);
   color: var(--cor-texto);
@@ -57,13 +57,13 @@
 .rotulo textarea,
 .rotulo input {
   padding: var(--espaco-2);
-  border: 1px solid var(--cor-borda, #c9c9c4);
+  border: 1px solid var(--cor-borda);
   border-radius: 8px;
   font: inherit;
 }
 
 .erro {
-  color: #a1281f;
+  color: var(--cor-erro);
 }
 
 .lista {
@@ -79,7 +79,7 @@
   flex-direction: column;
   gap: var(--espaco-2);
   padding: var(--espaco-3);
-  border: 1px solid var(--cor-borda, #c9c9c4);
+  border: 1px solid var(--cor-borda);
   border-radius: 12px;
   background: var(--cor-superficie);
 }
