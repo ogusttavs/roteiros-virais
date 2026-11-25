@@ -67,6 +67,7 @@ import {
   reprovarERescreverAction,
   salvarEdicaoAction,
 } from "./acoes";
+import { CartaoDaLegenda } from "./CartaoDaLegenda";
 import { ChamadoEditarMeuVideo } from "./ChamadoEditarMeuVideo";
 import { EditarMeuVideo } from "./EditarMeuVideo";
 import { HashtagsParaColar } from "./HashtagsParaColar";
@@ -720,17 +721,6 @@ export function RoteiroTela({
     }
   }
 
-  /** M4, item 5: copia só a legenda do post (o cartão próprio, fora do menu); mesmo toast de `copiarTexto`. */
-  async function copiarLegenda() {
-    if (!corpo.legenda) return;
-    try {
-      await navigator.clipboard.writeText(corpo.legenda);
-      setToast(true);
-    } catch {
-      setErroToast(textosRoteiro.erroCopiar);
-    }
-  }
-
   async function baixarPdf() {
     if (baixandoPdf || semConexao) return;
     setBaixandoPdf(true);
@@ -1208,20 +1198,7 @@ export function RoteiroTela({
           </PorQuesProvider>
         )}
 
-        {!editando && corpo.legenda ? (
-          <section className={styles.referenciaVazia}>
-            <h2>{textosRoteiro.legenda}</h2>
-            <p>{corpo.legenda}</p>
-            <button
-              type="button"
-              onClick={() => void copiarLegenda()}
-              className={styles.linkReprovar}
-            >
-              <Copy size={16} strokeWidth={1.5} aria-hidden="true" />
-              {textosRoteiro.menu.copiarLegenda}
-            </button>
-          </section>
-        ) : null}
+        {!editando ? <CartaoDaLegenda legenda={corpo.legenda} aoCopiar={() => setToast(true)} aoFalhar={() => setErroToast(textosRoteiro.erroCopiar)} /> : null}
 
         {/* E70: as hashtags para colar, em todo roteiro (Reels, Story, sem fala e longo), logo depois da legenda; sem dados o bloco não existe. */}
         {!editando ? <HashtagsParaColar hashtags={hashtags} aoCopiar={() => setToastHashtags(true)} aoFalhar={() => setErroToast(textosRoteiro.erroCopiar)} /> : null}
