@@ -19,6 +19,8 @@ export const FILAS = {
   /** Passada leve do meio-dia (E6 parte 3, terceira rodada, item 6); so agenda com config.coleta.coletaMeioDia. */
   coletaMeioDia: "coleta-meio-dia",
   coletaNoticias: "coleta-noticias",
+  /** A coleta quente (25/11/2026): rodada leve a cada 2 horas, das 08:00 às 20:00, só dos ramos em uso; só agenda com `NOTICIAS_QUENTES_ATIVO`. Depois dela o worker pede o filtro das notícias novas. */
+  coletaNoticiasQuentes: "coleta-noticias-quentes",
   /**
    * O filtro das notícias do ramo e a foto da matéria (fix de 22/10/2026): depois de cada coleta (06:00 e 14:00) para os ramos com marca ativa, e na hora em que uma marca chega num ramo
    * (briefing terminado, conta criada, ramo trocado, tela de Notícias aberta). `{ nichoId }` roda só aquele ramo; sem nada, todos os ramos com marca ativa.

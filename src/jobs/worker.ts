@@ -22,6 +22,7 @@ import { rodarAprenderCliente } from "./aprender-cliente";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
+import { rodarColetaNoticiasQuentes } from "./coleta-noticias-quentes";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarComentariosSemana } from "./comentarios-semana";
 import { rodarContasBase } from "./contas-base";
@@ -129,6 +130,17 @@ async function main(): Promise<void> {
       await boss().send(FILAS.filtrarNoticias, nichoId ? { nichoId } : undefined, { singletonKey: nichoId ? `filtrar-noticias-${nichoId}` : "filtrar-noticias", singletonSeconds: 300 });
     } catch (erro) {
       console.error("worker: nao foi possivel enfileirar o filtro das noticias:", erro);
+    }
+  });
+  await boss().work(FILAS.coletaNoticiasQuentes, async () => {
+    const execucao = await executarComRegistro(FILAS.coletaNoticiasQuentes, () => rodarColetaNoticiasQuentes());
+    // Só pede o filtro se entrou notícia nova (o filtro barato é a única chamada de IA daqui). Falha em enfileirar nunca derruba a coleta que já terminou.
+    if (execucao.status === "ok" && Number(execucao.resumo?.noticiasNovas ?? 0) > 0) {
+      try {
+        await boss().send(FILAS.filtrarNoticias, undefined, { singletonKey: "filtrar-noticias", singletonSeconds: 300 });
+      } catch (erro) {
+        console.error("worker: nao foi possivel enfileirar o filtro das noticias da coleta quente:", erro);
+      }
     }
   });
   await boss().work<{ nichoId?: number }>(FILAS.filtrarNoticias, async (job) => {

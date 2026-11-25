@@ -33,3 +33,9 @@ describe("quandoDoCron", () => {
     expect(quandoDoCron("*/5 3-6 * * 1-5")).toBe("*/5 3-6 * * 1-5");
   });
 });
+
+describe("quandoDoCron: a coleta quente", () => {
+  it("lê a faixa de horas com passo", () => {
+    expect(quandoDoCron("0 8-20/2 * * *")).toBe("a cada 2 horas, das 08:00 às 20:00");
+  });
+});

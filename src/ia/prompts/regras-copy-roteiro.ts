@@ -3,12 +3,12 @@
  * `estrategia/briefing-e-rubricas.md`. NÃO editar à mão: troque o documento e gere de novo
  * (o teste `regras-copy-roteiro.test.ts` reprova se os dois divergirem).
  *
- * E50 parte 2 (20/10/2026) e E59 (22/10/2026): as 55 regras de copy (R-COPY, 25), de estrutura de roteiro (R-ROTEIRO, 20)
+ * E50 parte 2 (20/10/2026) e E59 (22/10/2026): as 59 regras de copy (R-COPY, 29), de estrutura de roteiro (R-ROTEIRO, 20)
  * e de conformidade (R-CONF, 10). `texto` é o que o prompt recebe; `porQue` é a frase para a pessoa,
  * que a tela mostrará por código (PR 3), nunca escrita pelo modelo.
  */
 
-export const versao = "1.2.0";
+export const versao = "1.4.0";
 
 export type RegraCopyRoteiro = {
   numero: string;
@@ -247,14 +247,14 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
   {
     "numero": "R-COPY-19",
     "grupo": "COPY",
-    "texto": "Quando couber, uma frase em duas metades que se opõem (antes e depois, esperado e real, caro e barato).",
-    "porQue": "O contraste se grava na cabeça.",
+    "texto": "Contraste só quando as duas metades são fatos que estão na ficha, no momento ou na evidência (antes e depois reais, esperado e medido, preço e prazo), dito do jeito que se fala. Nunca use o contraste como molde de frase: a fórmula de negar uma coisa para afirmar outra é a de `R-COPY-26`.",
+    "porQue": "O contraste só se grava na cabeça quando é verdade e é dos dois lados; como molde, soa a texto de máquina.",
     "bloco": "gancho, corpo",
-    "forca": "indicio",
-    "forcaNoDocumento": "indício",
+    "forca": "media",
+    "forcaNoDocumento": "média",
     "conferePorCodigo": "parcial",
-    "confereNoDocumento": "parcial (frase com duas metades paralelas)",
-    "fonte": "AR-10 (AR:6339-6345, 6442-6445)"
+    "confereNoDocumento": "parcial (a fórmula de negação é conferida em `R-COPY-26`; a prova dos dois lados é do verificador)",
+    "fonte": "AR-10 (AR:6339-6345, 6442-6445); nossos golden sets e o português de quem lê texto de IA todo dia (25/11/2026); revisão do Gustavo"
   },
   {
     "numero": "R-COPY-20",
@@ -327,6 +327,54 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
     "conferePorCodigo": "sim",
     "confereNoDocumento": "sim (uma chamada; um canal; \"compre\" não é o único verbo)",
     "fonte": "SA-07, SA-15, SA-16, MH-04 (SA:526-545, 556-559, 738-756, 2673-2677, 2712-2725, 3644-3660; MH:3551-3561); F08-1, F08-4 (B, n06); F20-4 (A, n14)"
+  },
+  {
+    "numero": "R-COPY-26",
+    "grupo": "COPY",
+    "texto": "Nenhuma fórmula de texto de máquina: não negue uma coisa para afirmar outra (\"não é A, é B\"), não anuncie a virada (\"e isso muda tudo\"), não abra preparando o assunto (\"hoje vou falar de\", \"neste vídeo\"), não se despeça com cortesia vazia (\"espero que tenha gostado\"), não encha de intensificador sem fato (\"incrível\", \"poderoso\", \"transformador\"), não use \"cada vez mais\" nem \"nos dias de hoje\", nem o slogan \"menos A, mais B\". Diga a coisa direto, uma vez, com o fato da ficha, do momento ou da evidência.",
+    "porQue": "Texto que parece escrito por máquina perde a confiança de quem assiste na primeira frase.",
+    "bloco": "todos",
+    "forca": "media",
+    "forcaNoDocumento": "média",
+    "conferePorCodigo": "sim",
+    "confereNoDocumento": "sim (lista fechada de sete famílias, em `src/ia/formulas-de-maquina.ts`; reprova na primeira tentativa e vira aviso na segunda; o contraste com os dois lados na ficha ou na evidência passa)",
+    "fonte": "decisão do Gustavo de 25/11/2026 (onda 1 de texto, `pesquisa/lacunas-kits-versus-app.md`, melhoria 1); nossos golden sets e o português de quem lê texto de IA todo dia"
+  },
+  {
+    "numero": "R-COPY-27",
+    "grupo": "COPY",
+    "texto": "O gancho e o título só valem se tiverem pelo menos um elemento que existe só nesta marca ou neste ramo: o serviço, o lugar, o público, um fato da ficha ou da evidência. Se continuam verdadeiros trocando o ramo (dentista por pizzaria), reescreva com esse elemento.",
+    "porQue": "Um gancho que serve para qualquer página não pára o dedo de ninguém.",
+    "bloco": "gancho, título",
+    "forca": "media",
+    "forcaNoDocumento": "média",
+    "conferePorCodigo": "nao",
+    "confereNoDocumento": "não (é critério do verificador de texto, com as fontes na entrada; só reprova quando tem certeza)",
+    "fonte": "decisão do Gustavo de 25/11/2026 (onda 1 de texto, melhoria 3)"
+  },
+  {
+    "numero": "R-COPY-28",
+    "grupo": "COPY",
+    "texto": "Três ou mais frases seguidas de até quatro palavras viram uma frase com \"porque\", \"só que\", \"e aí\". Fale como quem conta a um amigo.",
+    "porQue": "Frase picotada em fila cansa e soa a lista, não a conversa.",
+    "bloco": "gancho, corpo, fechamento",
+    "forca": "indicio",
+    "forcaNoDocumento": "indício",
+    "conferePorCodigo": "so_avisa",
+    "confereNoDocumento": "só avisa (conta as palavras de cada frase; só aviso, porque a frase curta no gancho às vezes é o ritmo)",
+    "fonte": "decisão do Gustavo de 25/11/2026 (onda 1 de texto, melhoria 10)"
+  },
+  {
+    "numero": "R-COPY-29",
+    "grupo": "COPY",
+    "texto": "Número na fala se escreve do jeito que se diz em voz alta: \"dez vezes\", \"mais de dez anos\", \"de três a cinco dias\", \"dez mil\"; nunca \"10x\", \"10+\", \"3-5 dias\", \"10k\". Na tela, algarismo.",
+    "porQue": "Quem grava lê o roteiro em voz alta; o que não dá para falar trava a gravação.",
+    "bloco": "gancho, corpo, fechamento, chamada",
+    "forca": "indicio",
+    "forcaNoDocumento": "indício",
+    "conferePorCodigo": "so_avisa",
+    "confereNoDocumento": "só avisa (três formas abreviadas: letra x depois do número, sinal de mais e faixa com hífen, mais o k de mil)",
+    "fonte": "decisão do Gustavo de 25/11/2026 (onda 1 de texto, melhoria 10)"
   },
   {
     "numero": "R-ROTEIRO-01",
@@ -643,14 +691,14 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
   {
     "numero": "R-CONF-07",
     "grupo": "CONF",
-    "texto": "Nos ramos de saúde (dentista, médico, estética clínica, veterinário), o roteiro nunca promete cura, resultado garantido nem diagnóstico à distância; descreve o procedimento com clareza; não usa depoimento de leigo sobre tratamento; deixa em \"Atenção\" a conferência com a norma do conselho profissional. Ver a pendência do conselho de odontologia acima.",
-    "porQue": "Em saúde, não prometa cura nem resultado garantido.",
+    "texto": "Nos ramos de saúde (dentista, médico, estética clínica, veterinário), o roteiro segue o conselho. Pode: antes e depois com o termo de autorização assinado pelo paciente, oferta de desconto e chamar para agendar uma avaliação. Não pode: preço no anúncio, serviço grátis (\"avaliação gratuita\", \"primeira consulta sem custo\"), imagem do procedimento em andamento (só diagnóstico e resultado final), promessa de cura, resultado, prazo ou garantia, diagnóstico à distância nem depoimento de leigo sobre tratamento. Aqui isso vale por cima de `R-CONF-01` e `R-CONF-03`; nos outros ramos elas seguem como estão.",
+    "porQue": "Em saúde o conselho proíbe preço, grátis, procedimento em andamento e promessa de resultado.",
     "bloco": "gancho, corpo, chamada",
     "forca": "forte",
-    "forcaNoDocumento": "forte (CONAR)",
+    "forcaNoDocumento": "forte (conselho)",
     "conferePorCodigo": "sim",
-    "confereNoDocumento": "sim, só nos ramos de saúde (lista: cura, garantido, 100%, sem risco, diagnóstico)",
-    "fonte": "F26-14 (A, n19: Anexo G, itens 1 a 4); F25-2 (A, n18: art. 31, riscos à saúde)"
+    "confereNoDocumento": "sim, só nos ramos de saúde (cura, garantido, 100%, sem risco, diagnóstico, preço em reais, grátis); a gravação do procedimento é regra do prompt",
+    "fonte": "Resolução CFO 196/2019 (antes e depois com termo); Resolução CFO 271/2025 (desconto); decisão do Gustavo de 25/11/2026 (\"faz o que o conselho falou\"); F26-14 (A, n19: Anexo G, itens 1 a 4); F25-2 (A, n18: art. 31, riscos à saúde)"
   },
   {
     "numero": "R-CONF-08",

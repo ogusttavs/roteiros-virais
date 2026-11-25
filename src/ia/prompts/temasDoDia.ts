@@ -68,7 +68,11 @@ import { REGRAS_REEL, REGRAS_SHORT, REGRAS_STORY, REGRAS_TIKTOK, textoRegras } f
  * ao foco em palavras de gente. A prova não muda (3 vídeos, 2 contas, parte brasileira, piso de views) e o sistema estável também não: sem `focoDaConta` a entrada é exatamente a de antes.
  * Precisa de prova com chave real antes de valer em produção.
  */
-export const versao = "1.10.0";
+/**
+ * 1.11.0 (onda 1 de texto, 25/11/2026, `R-COPY-26`): o sistema estável pede título e descrição diretos, sem as fórmulas de texto de máquina (negar para afirmar, anunciar a virada, abrir preparando o assunto,
+ * "cada vez mais", "descubra"). O código confere a mesma lista (`ia/formulas-de-maquina.ts`): tema com fórmula é barrado na 1ª passada com o motivo e fica, só com aviso, na 2ª. A entrada e o schema não mudam.
+ */
+export const versao = "1.11.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -121,6 +125,9 @@ ${textoRegras(REGRAS_SHORT)}
 ${textoRegras(REGRAS_STORY)}
 
 Sem travessão, sem emoji, sem jargão em título nem em descrição.
+
+Título e descrição diretos, com o fato da evidência, sem as fórmulas de texto de máquina: nada de negar uma coisa para afirmar outra ("não é A, é B"), nada de anunciar a virada
+("e isso muda tudo"), nada de abrir preparando o assunto ("neste vídeo", "hoje vamos falar"), nada de "cada vez mais" nem "nos dias de hoje", nem "descubra" ou "o que ninguém te conta".
 
 Modelo do nicho:
 ${dados.modeloNicho}

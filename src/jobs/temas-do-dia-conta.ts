@@ -34,7 +34,7 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 /** O que o job do setor empresta a este: gerar com conferência de id (com o sistema estável do setor, o mesmo dos temas do setor, para o cache de prompt valer) e conferir a prova por código. */
 export type FerramentasDosTemas = {
   tentarGerar: (dados: { entrada: string; idsValidos: Set<number>; subindoCount: number; clienteId: number; focoHash: string }) => Promise<{ valido: boolean; temas: TemaDoDia[] }>;
-  filtrarProva: (temas: TemaDoDia[]) => Promise<{ temasComProva: TemaDoDia[]; barrados: { titulo: string; motivo: string }[] }>;
+  filtrarProva: (temas: TemaDoDia[], tentativa?: 1 | 2) => Promise<{ temasComProva: TemaDoDia[]; barrados: { titulo: string; motivo: string }[] }>;
   /** Há quantos dias, no máximo, sem abrir o aplicativo a conta ainda ganha tema de madrugada (o mesmo critério do setor, agora por conta). */
   diasDeUso: number;
 };
@@ -170,12 +170,12 @@ export async function gerarTemasDasContas(dados: {
           // Uma segunda chance só quando a prova barrou TODOS os temas (o dia da conta ficaria sem nenhum do foco): o modelo recebe o motivo de cada um. Com pelo menos um tema do foco, o resto vem do setor.
           if (proprios.length === 0 && primeira.barrados.length > 0) {
             const ajuste = [
-              "Segunda tentativa. Na primeira, estes temas foram descartados por não cumprirem a regra da prova:",
+              "Segunda tentativa. Na primeira, estes temas foram descartados por não cumprirem a regra da prova ou a regra de texto (sem fórmula de texto de máquina):",
               ...primeira.barrados.map((b) => `- "${b.titulo}": ${b.motivo}.`),
               "Proponha os temas de novo, cada um apoiado num grupo de vídeos da lista que cumpra a regra da prova. Confira conta e origem de cada id antes de citar.",
             ].join("\n");
             const segunda = await gerar(ajuste);
-            if (segunda.valido) proprios = (await dados.ferramentas.filtrarProva(segunda.temas)).temasComProva.slice(0, TEMAS_POR_DIA_DA_CONTA);
+            if (segunda.valido) proprios = (await dados.ferramentas.filtrarProva(segunda.temas, 2)).temasComProva.slice(0, TEMAS_POR_DIA_DA_CONTA);
           }
         }
       }

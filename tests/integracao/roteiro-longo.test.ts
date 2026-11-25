@@ -10,6 +10,7 @@ import { db, getPool } from "@/db";
 import { briefings, clientes, contas, geracoesIA, modelosNicho, nichos, roteiros, user, videos, type AnaliseVideoLonga, type ModeloNicho } from "@/db/schema";
 import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
+import { versao as versaoLongo } from "@/ia/prompts/roteiroLongo";
 import * as verificador from "@/ia/verificador";
 import { lerCapitulosDaDescricao } from "@/lib/capitulos-da-descricao";
 import { capitulosParaCopiar, iniciosDosCapitulos, somaDosCapitulos } from "@/lib/capitulos-do-roteiro";
@@ -266,7 +267,7 @@ describe("o roteiro longo escrito", () => {
 
     const geracoes = await geracoesDa("roteiroLongo");
     expect(geracoes).toHaveLength(1);
-    expect(geracoes[0].versaoPrompt).toBe("1.6.0");
+    expect(geracoes[0].versaoPrompt).toBe(versaoLongo);
     expect(roteiro.geracaoId).toBe(geracoes[0].id);
 
     const capitulos = roteiro.conteudo.capitulos!;

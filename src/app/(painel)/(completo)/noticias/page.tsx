@@ -2,10 +2,11 @@ import { Newspaper } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
+import { recenciaDaNoticia, saiuAgora } from "@/lib/recencia-da-noticia";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { pedirFiltroDeNoticias } from "@/servicos/filtro-de-noticias";
-import { capaDoDia, type CapaDoDia, type NoticiaDaCapa } from "@/servicos/noticias-do-dia";
+import { capaDoDia, DIAS_DA_CAPA, type CapaDoDia, type NoticiaDaCapa } from "@/servicos/noticias-do-dia";
 import { assuntosEmAltaParaAcompanhar, type AssuntoEmAltaParaAcompanhar } from "@/servicos/palavras-do-assunto";
 import { listaDeTendenciasDeAgora } from "@/servicos/tendencias";
 import { textosNoticias } from "@/textos/noticias";
@@ -17,18 +18,11 @@ import { NoticiasTela } from "./NoticiasTela";
 /** Com menos notícias que isto nos últimos dias, abrir a tela pede o filtro do ramo. */
 const NOTICIAS_PARA_TELA_CHEIA = 6;
 const FUSO = "America/Sao_Paulo";
-const DIA_MS = 24 * 60 * 60 * 1000;
+/** A janela ampliada ("Ver a última semana"): é também o máximo que a notícia vale (`DIAS_MAXIMOS_DA_NOTICIA`). */
+const DIAS_DA_JANELA_AMPLIADA = 7;
 
 function dataPorExtenso(agora: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: FUSO }).format(agora);
-}
-
-/** "07:40" para as de hoje; "ontem" ou "anteontem" para as outras. */
-function quando(n: NoticiaDaCapa, agora: Date): string {
-  if (!n.publicadoEm) return "";
-  const dia = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: FUSO }).format(d);
-  if (dia(n.publicadoEm) === dia(agora)) return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: FUSO }).format(n.publicadoEm);
-  return dia(n.publicadoEm) === dia(new Date(agora.getTime() - DIA_MS)) ? "ontem" : "anteontem";
 }
 
 function paraATela(n: NoticiaDaCapa, agora: Date): NoticiaNaTela {
@@ -40,7 +34,8 @@ function paraATela(n: NoticiaDaCapa, agora: Date): NoticiaNaTela {
     origemRotulo: n.origemRotulo,
     titulo: n.titulo,
     veiculo: n.veiculo,
-    quando: quando(n, agora),
+    quando: recenciaDaNoticia(n.publicadoEm, agora),
+    saiuAgora: saiuAgora(n.publicadoEm, agora),
     resumo: n.resumo,
     url: n.url,
     imagemUrl: n.imagemUrl,
@@ -53,7 +48,9 @@ function paraATela(n: NoticiaDaCapa, agora: Date): NoticiaNaTela {
  * `/noticias` (E53, passo 20): a capa do dia, o blog que a pessoa abre todo dia. Só leitura; os assuntos mudam por Server Actions (`acoes.ts`) que o "ver como" recusa. Falha ao ler não
  * derruba a tela: sem notícia, o aviso e o "Tentar de novo".
  */
-export default async function Noticias() {
+export default async function Noticias({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+  const { ver } = await searchParams;
+  const dias = ver === "semana" ? DIAS_DA_JANELA_AMPLIADA : DIAS_DA_CAPA;
   const sessao = await sessaoDoPainel();
   if (!sessao) redirect("/entrar");
 
@@ -65,10 +62,10 @@ export default async function Noticias() {
   }
 
   const agora = new Date();
-  let capa: CapaDoDia = { nomeDoSetor: "", deHoje: [], deOntem: [], assuntos: [], novasDesdeOntem: 0 };
+  let capa: CapaDoDia = { nomeDoSetor: "", deHoje: [], deOntem: [], assuntos: [], novasDesdeOntem: 0, dias };
   let falha = false;
   try {
-    capa = await capaDoDia(cliente, agora);
+    capa = await capaDoDia(cliente, agora, dias);
   } catch {
     falha = true;
   }
@@ -94,6 +91,7 @@ export default async function Noticias() {
       emAlta={emAlta}
       novasDesdeOntem={capa.novasDesdeOntem}
       falha={falha}
+      dias={dias}
       somenteLeitura={sessao.verComo !== null}
     />
   );

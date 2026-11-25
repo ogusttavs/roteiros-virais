@@ -1,0 +1,102 @@
+/* E65 PR 1: a página provisória do carrossel. Só tokens do produto; o desenho final vem no PR 2. */
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+  max-width: 720px;
+}
+
+.ajuda {
+  color: var(--cor-texto-suave);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.temas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.tema,
+.temaAtivo,
+.principal {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.temaAtivo,
+.principal {
+  background: var(--cor-texto);
+  color: var(--cor-superficie);
+}
+
+.principal:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.rotulo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+}
+
+.rotulo textarea,
+.rotulo input {
+  padding: var(--espaco-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.erro {
+  color: var(--cor-erro);
+}
+
+.lista {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: 12px;
+  background: var(--cor-superficie);
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.imagem {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  border-radius: 8px;
+}
+
+.legenda {
+  white-space: pre-wrap;
+}

@@ -99,6 +99,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockAvaliarTema(entrada);
     case "roteiro":
       return mockRoteiro(entrada, sistemaEstavel);
+    case "carrossel":
+      return mockCarrossel(entrada);
     case "roteiroLongo":
       return mockRoteiroLongo(entrada);
     case "verificarTexto":
@@ -522,6 +524,9 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
     ? [...blocoDaPesquisa[1].matchAll(/^dado (\d+) \| ([^|]*)\| ([^|]*)\| ([^|]*)\| trecho: (.*)$/gm)].map((m) => ({ id: Number(m[1]), fonte: m[2].trim(), data: m[3].trim(), texto: m[4].trim() }))
     : [];
   const segundaTentativa = entrada.includes("A tentativa anterior foi reprovada.");
+  // Onda 1 de texto: `[mock:formula]` põe uma fórmula de máquina no gancho (só na 1ª tentativa; `-sempre` em todas) e `[mock:qualquer-ramo]` põe o marcador que o verificador mock lê como "serve para qualquer ramo".
+  const marcadoOnda1 = (nome: string) => entrada.includes(`[mock:${nome}-sempre]`) || (entrada.includes(`[mock:${nome}]`) && !segundaTentativa);
+  const sufixoDoGancho = `${marcadoOnda1("formula") ? " Não é sorte, é método." : ""}${marcadoOnda1("qualquer-ramo") ? " {mock:qualquer-ramo}" : ""}`;
   const citacaoDaPesquisa = dadosDaPesquisa[0]
     ? ` Segundo ${dadosDaPesquisa[0].fonte}${/\d{4}/.exec(dadosDaPesquisa[0].data) ? `, em ${/\d{4}/.exec(dadosDaPesquisa[0].data)![0]}` : ""}, ${dadosDaPesquisa[0].texto.replace(/\.$/, "")}.`
     : "";
@@ -541,7 +546,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
       : {
           gancho: reprovado
             ? `${primeiraPalavra}, um jeito diferente de mostrar ${tema}`
-            : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}`,
+            : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}${sufixoDoGancho}`,
           // E49 PR 1: na ficha "que guardem para depois" o mock devolve passo a passo, como o verificador local exige.
           corpo: entrada.includes("Ficha do vídeo: Que guardem para depois")
             ? `Passo 1: separe o que precisa. Passo 2: faça na ordem certa sobre ${tema}. Passo 3: confira o resultado.`
@@ -610,6 +615,39 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
  * não cita nada do momento descrito), `[mock:gancho-curto]` (o gancho do segundo capítulo vem como rótulo), `[mock:nome-com-tempo]` (um nome que começa com um tempo, que a lista da
  * descrição lê errado) e `[mock:nome-com-colchete]` (um espaço marcado dentro do nome).
  */
+/**
+ * E65 PR 1: o carrossel simulado, determinístico: a quantidade vem da entrada, a capa abre (capa-foto só se a entrada diz que há foto), a chamada fecha e o meio alterna passo e item (nunca três iguais). Marcadores de teste no tema:
+ * "[mock:carrossel-longo]" estoura o limite de palavras de um slide, "[mock:carrossel-tres-iguais]" repete o tipo três vezes, "[mock:carrossel-dado-sem-fonte]" tira a fonte do dado,
+ * "[mock:carrossel-prova-resultado]" põe um slide de resultado com foto, "[mock:carrossel-prova-fala-outro]" e "[mock:carrossel-prova-fala-cliente]" põem uma fala que só está no tema (nunca do cliente) e uma do perfil, "[mock:carrossel-numero-solto]" escreve um número que a entrada não traz. Os marcadores valem só na primeira tentativa (a segunda corrige, como um modelo corrigiria).
+ */
+function mockCarrossel(entrada: string) {
+  const tema = extrairCampo(entrada, "Tema escolhido:").replace(/\[mock:[^\]]*\]/g, "").trim() || "tema simulado";
+  const quantidade = Number(extrairCampo(entrada, "Quantidade de slides:")) || 5;
+  const segunda = entrada.includes("A tentativa anterior foi reprovada.");
+  const marcado = (nome: string) => entrada.includes(`[mock:${nome}]`) && !segunda;
+  const ids = extrairIds(entrada);
+  const meio = ["passo", "item", "passo", "item", "passo", "item", "passo"] as const;
+  const slides: { tipo: string; titulo: string; corpo: string; fonte: string | null }[] = [{ tipo: entrada.includes("O cliente enviou") ? "capa-foto" : "capa-texto", titulo: `${quantidade - 2} dicas sobre ${tema}`.split(" ").slice(0, 10).join(" "), corpo: "Para você salvar e usar hoje", fonte: null }];
+  for (let i = 0; i < quantidade - 2; i += 1) {
+    const tipo = marcado("carrossel-tres-iguais") ? "item" : meio[i % meio.length];
+    slides.push({ tipo, titulo: `Dica ${i + 1} para você`, corpo: `Olhe com calma o que importa no ponto ${i + 1} e faça um passo de cada vez.`, fonte: null });
+  }
+  slides.push({ tipo: "chamada", titulo: "Salve este post", corpo: "Mande para quem precisa ver isso.", fonte: null });
+  if (marcado("carrossel-longo")) slides[1].corpo = Array.from({ length: 60 }, () => "palavra").join(" ");
+  if (marcado("carrossel-dado-sem-fonte")) slides[1] = { tipo: "dado", titulo: "30%", corpo: "É o que a pesquisa diz.", fonte: null };
+  if (marcado("carrossel-antes-depois")) slides[1] = { tipo: "antes-depois", titulo: "Como ficou", corpo: "Antes: manchado. Depois: limpo.", fonte: null };
+  if (marcado("carrossel-prova-resultado")) slides[1] = { tipo: "prova-resultado", titulo: "Resultado de verdade", corpo: "", fonte: null };
+  if (marcado("carrossel-prova-fala-outro")) slides[1] = { tipo: "prova-fala", titulo: "Ana", corpo: tema, fonte: null };
+  if (marcado("carrossel-prova-fala-cliente")) slides[1] = { tipo: "prova-fala", titulo: "Ana", corpo: "relaxa que sai sim", fonte: null };
+  if (marcado("carrossel-numero-solto")) slides[1].corpo = "Nove em cada dez pessoas, 87% delas, erram isso todo mês.";
+  return {
+    slides,
+    legenda: `Salve este carrossel sobre ${tema} e mande para quem precisa. Comenta qual dica você já usa.`,
+    hashtags: ["#dicas", "#negocio", "#pequenonegocio"],
+    evidencias: ids.slice(0, 1),
+  };
+}
+
 function mockRoteiroLongo(entrada: string) {
   const ehMomento = entrada.includes("O momento que a pessoa descreveu agora:");
   // Os marcadores de teste podem vir no tema; o que o simulador escreve (título, nomes, ganchos) nunca os leva, como um modelo não levaria.
@@ -753,6 +791,9 @@ function mockVerificarTexto(entrada: string, sistemaEstavel = "") {
   if (texto.includes("[mock:ataque]") && sistemaEstavel.includes("atacar ou ofender")) {
     return { aprovado: false, motivo: "o texto ataca uma pessoa", fatoEspecifico: null, fonteMaisProxima: null };
   }
+  // 1.10.0 (`R-COPY-27`): o teste do ramo. Com o critério no sistema e fontes na entrada, o marcador faz o simulador reprovar o título ou o gancho que serve para qualquer ramo.
+  const qualquerRamo = sistemaEstavel.includes("serve para qualquer ramo") && entrada.includes("FONTES (") && textoSemInstrucoes(entrada).includes("{mock:qualquer-ramo}");
+  if (qualquerRamo) return { aprovado: false, motivo: "o gancho serve para qualquer ramo: falta o serviço, o lugar, o público ou um fato da marca", fatoEspecifico: null, fonteMaisProxima: null };
   const gritando = /!{2,}/.test(texto) || texto === texto.toUpperCase();
   // O roteiro não inventa fato: com fontes na entrada, o marcador de teste faz o verificador reprovar o fato fora delas (só o mock; a prova de verdade é a chave real).
   // 1.9.0: o que vem depois de "INSTRUÇÕES PARA A PESSOA" (gravação e edição) é ordem à pessoa e nunca conta como fato, como no critério do verificador de verdade.
@@ -949,6 +990,7 @@ function mockTemasDoDia(entrada: string) {
   const puxaPara = ["alcance", "engajamento", "conversao"] as const;
   // E28: com o bloco das vozes do público, o primeiro tema responde à primeira pergunta da lista; o marcador manda um número que não existe.
   const numerosDasVozes = [...entrada.matchAll(/^(?:pergunta|reclamação|pedido) (\d+) \|/gm)].map((m) => Number(m[1]));
+  const formulaNoTema = entrada.includes("[mock:formula-tema-sempre]") || (entrada.includes("[mock:formula-tema]") && !entrada.includes("Segunda tentativa."));
   const perguntaDoPrimeiro = entrada.includes("[mock:numero-inexistente]") ? 99 : (numerosDasVozes[0] ?? null);
 
   // Hotfix de 23/10/2026: o modo "completar com notícias" (`MARCADOR_COMPLETAR_COM_NOTICIAS`, `prompts/temasDoDia.ts`): um tema por notícia da lista (até três), sem vídeo, com título que não colide com o dos temas de vídeo.
@@ -1002,7 +1044,8 @@ function mockTemasDoDia(entrada: string) {
     // teste cria video suficiente (3+ de 2+ contas); sem isso, nenhum tema
     // simulado passaria na checagem de prova por codigo.
     temas: [0, 1, 2].map((i) => ({
-      titulo: `tema simulado ${i + 1}`,
+      // Onda 1 de texto: `[mock:formula-tema]` (num assunto da lista) faz o primeiro pedido trazer títulos com fórmula de máquina; `-sempre` também na segunda tentativa.
+      titulo: formulaNoTema ? `Descubra o tema simulado ${["um", "dois", "tres"][i % 3]}` : `tema simulado ${i + 1}`,
       descricao: "tema derivado dos videos que estao subindo hoje",
       porQue: "esta subindo mais rapido que o normal da conta",
       evidencias: ids,

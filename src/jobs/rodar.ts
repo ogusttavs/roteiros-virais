@@ -17,6 +17,7 @@ import { rodarAprenderCliente } from "./aprender-cliente";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
+import { rodarColetaNoticiasQuentes } from "./coleta-noticias-quentes";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarComentariosSemana } from "./comentarios-semana";
 import { rodarContasBase } from "./contas-base";
@@ -74,6 +75,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.coletaApify]: (execucaoId) => rodarColetaApify(undefined, execucaoId),
   [FILAS.coletaMeioDia]: (execucaoId) => rodarColetaMeioDia(execucaoId),
   [FILAS.coletaNoticias]: () => rodarColetaNoticias(),
+  [FILAS.coletaNoticiasQuentes]: () => rodarColetaNoticiasQuentes(),
   /** Fix de 22/10/2026: com um número na linha de comando, só aquele ramo; sem, todo ramo com marca ativa. */
   [FILAS.filtrarNoticias]: () => {
     const nichoIdArg = process.argv[3];

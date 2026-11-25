@@ -1,0 +1,1 @@
+ALTER TABLE "edicoes" ADD COLUMN "conferencia_do_video" jsonb;

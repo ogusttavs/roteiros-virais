@@ -19,11 +19,14 @@
  * resultado para o `verificarExtra` e para os avisos de `gerarComVerificacao`.
  */
 
+import { acharFormulasDeMaquina, avisosDeFormaDaFala, motivosDasFormulas } from "./formulas-de-maquina";
 import { acharNomePolitico } from "./nomes-politicos";
 
 export type EntradaCopyRoteiro = {
   /** Reels falado tem gancho, corpo, fechamento e chamada; Story e sem fala só têm o texto dos cartões (as regras de estrutura não valem lá). */
   estrutura: "reels_falado" | "cartoes";
+  /** O título do roteiro (a fórmula de máquina também vale nele, R-COPY-26). */
+  titulo?: string;
   gancho: string;
   corpo: string;
   fechamento: string;
@@ -146,10 +149,21 @@ const PALAVRAS_DE_SAUDE = COM_FRONTEIRA([
   "diagnostico (a distancia|online|por (whatsapp|zap|direct|mensagem|video|foto|chat)|pelo (whatsapp|zap|direct|celular|video|chat)|pela (foto|internet))",
 ]);
 
-/** R-CONF-07 (gancho, corpo, chamada), só nos ramos de saúde. */
+/** Preço em reais: "R$ 150", "150 reais", "150,00 reais". Desconto em porcentagem não entra. */
+const PRECO_EM_REAIS = /(^|[^a-z0-9])(r\$ ?[0-9]|[0-9][0-9.,]* reais)/;
+
+/** Serviço grátis em saúde: as palavras da R-CONF-03 mais "de graça". */
+const GRATIS_EM_SAUDE = COM_FRONTEIRA(["gratis", "gratuito", "gratuita", "gratuitos", "gratuitas", "sem custo", "de graca"]);
+
+/** R-CONF-07 (gancho, corpo, chamada), só nos ramos de saúde: cura e garantia, preço em reais e serviço grátis (conselho de odontologia, 25/11/2026). */
 function confSaude(e: EntradaCopyRoteiro): string | null {
   if (!e.ramoSaude) return null;
-  const achado = achar(`${e.gancho} ${e.corpo} ${e.chamadaFinal}`, PALAVRAS_DE_SAUDE);
+  const texto = `${e.gancho} ${e.corpo} ${e.chamadaFinal}`;
+  const preco = achar(texto, PRECO_EM_REAIS);
+  if (preco) return `R-CONF-07: em ramo de saúde o conselho de odontologia e saúde proíbe preço no anúncio; tire "${preco.replace(/^[^a-z0-9]+/, "")}" (desconto pode)`;
+  const gratis = achar(texto, GRATIS_EM_SAUDE);
+  if (gratis) return `R-CONF-07: em ramo de saúde o conselho de odontologia e saúde proíbe serviço grátis; tire "${gratis.replace(/^[^a-z]+/, "")}" (agendar uma avaliação pode)`;
+  const achado = achar(texto, PALAVRAS_DE_SAUDE);
   if (!achado) return null;
   return `R-CONF-07: em ramo de saúde o roteiro não promete cura, resultado garantido nem diagnóstico à distância; tire "${achado.replace(/^[^a-z0-9]+/, "")}"`;
 }
@@ -428,6 +442,14 @@ function copyChamada(e: EntradaCopyRoteiro): string | null {
   return null;
 }
 
+/** R-COPY-26 (título, gancho, corpo, fechamento, chamada): nenhuma fórmula de texto de máquina (lista fechada em `formulas-de-maquina.ts`). Reprova na 1ª tentativa e vira aviso na 2ª. */
+function copyFormulaDeMaquina(e: EntradaCopyRoteiro): string | null {
+  const achados = acharFormulasDeMaquina({ titulo: e.titulo, gancho: e.gancho, corpo: e.corpo, fechamento: e.fechamento, chamada: e.chamadaFinal }, { fontes: e.fontes });
+  if (achados.length === 0) return null;
+  // Um motivo só, com até três achados: a segunda tentativa lê tudo de uma vez.
+  return motivosDasFormulas(achados.slice(0, 3)).join("; ");
+}
+
 /** R-ROTEIRO-01 (todos, só Reels falado): gancho, corpo e fechamento preenchidos. */
 function roteiroPreenchido(e: EntradaCopyRoteiro): string | null {
   if (e.estrutura !== "reels_falado") return null;
@@ -538,6 +560,7 @@ const DEMAIS: Conferencia[] = [
   { regra: "R-COPY-08", roda: copyFatoEspecifico },
   { regra: "R-COPY-23", roda: copyAtaque },
   { regra: "R-COPY-25", roda: copyChamada },
+  { regra: "R-COPY-26", roda: copyFormulaDeMaquina },
   { regra: "R-ROTEIRO-01", roda: roteiroPreenchido },
   { regra: "R-ROTEIRO-14", roda: roteiroUltimoBloco },
   { regra: "R-ROTEIRO-15", roda: roteiroFechamentoCurto },
@@ -594,11 +617,14 @@ export function verificarRegrasCopyRoteiro(entrada: EntradaCopyRoteiro): Resulta
     (entrada.tentativa === 1 ? reprovam : avisos).push(motivo);
   }
   avisos.push(...avisosSomente(entrada));
+  // R-COPY-28 e R-COPY-29 (indício): só a fala; no Story e no sem fala o texto é o do cartão, curto de propósito.
+  if (entrada.estrutura === "reels_falado") avisos.push(...avisosDeFormaDaFala({ gancho: entrada.gancho, corpo: entrada.corpo, fechamento: entrada.fechamento, chamada: entrada.chamadaFinal }));
   return { reprovam, avisos };
 }
 
 /** O que a saída do roteiro precisa ter para virar `EntradaCopyRoteiro` (o schema do prompt tem de sobra). */
 export type SaidaParaCopyRoteiro = {
+  titulo?: string | null;
   gancho: string | null;
   corpo: string | null;
   fechamento: string | null;
@@ -628,6 +654,7 @@ export function montarEntradaCopyRoteiro(
     return {
       ...contexto,
       estrutura: "cartoes",
+      titulo: saida.titulo ?? undefined,
       gancho: textos[0],
       corpo: textos.slice(1, textos.length > 1 ? -1 : undefined).join(". "),
       fechamento: "",
@@ -645,6 +672,7 @@ export function montarEntradaCopyRoteiro(
   return {
     ...contexto,
     estrutura: "reels_falado",
+    titulo: saida.titulo ?? undefined,
     gancho,
     corpo,
     fechamento,

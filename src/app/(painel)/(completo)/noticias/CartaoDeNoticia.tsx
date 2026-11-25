@@ -18,8 +18,10 @@ export type NoticiaNaTela = {
   origemRotulo: string;
   titulo: string;
   veiculo: string;
-  /** "07:40" no fuso de São Paulo, ou "ontem" / "anteontem" nas que não são de hoje. */
+  /** Há quanto tempo saiu: "há 40 min", "há 3 h", "ontem". */
   quando: string;
+  /** Saiu há menos de 2 horas: ganha o selo "saiu agora". */
+  saiuAgora?: boolean;
   resumo: string | null;
   url: string | null;
   imagemUrl: string | null;
@@ -100,6 +102,7 @@ export function CartaoDeNoticia({ noticia, destaque = false, aoAbrir, aoCriarRot
         <span className={[styles.origem, noticia.tipo === "assunto" ? styles.origemAssunto : styles.origemSetor].join(" ")}>{noticia.origemRotulo}</span>
         <span className={styles.veiculo}>{noticia.veiculo || textosNoticias.veiculoDesconhecido}</span>
         <span className={styles.hora}>{noticia.quando}</span>
+        {noticia.saiuAgora ? <span className={[styles.origem, styles.origemAssunto].join(" ")}>{textosNoticias.saiuAgora}</span> : null}
       </span>
       {destaque ? <h2>{titulo}</h2> : <h3>{titulo}</h3>}
       {noticia.resumo ? <p className={styles.resumo}>{noticia.resumo}</p> : null}

@@ -18,6 +18,11 @@ export const FONTE_DA_LEGENDA = "Montserrat";
 const LETRAS_POR_LINHA_DO_TITULO = 20;
 const LINHAS_DO_TITULO_NO_MAXIMO = 3;
 
+/** As medidas dos estilos do arquivo (também lidas pela conferência do vídeo montado, para saber se o texto cabe no quadro). */
+export const ESTILO_DA_LEGENDA = { tamanho: 72, caixa: 14, margemLateral: 60 } as const;
+export const ESTILO_DO_TITULO = { tamanho: 62, caixa: 16, margemLateral: 60 } as const;
+export { LETRAS_POR_LINHA_DO_TITULO };
+
 /** `H:MM:SS.cc`, o tempo que o ASS usa (centésimos de segundo). */
 export function tempoDoAss(segundos: number): string {
   const total = Math.max(0, Math.round(segundos * 100));
@@ -70,7 +75,7 @@ const BRANCO = "&H00FFFFFF";
 
 /** Um estilo de caixa (BorderStyle 3: a cor da caixa é a cor do contorno, e o contorno é o respiro da caixa em volta do texto). */
 function estilo(nome: string, tamanho: number, caixa: number, alinhamento: number, margemVertical: number): string {
-  return `Style: ${nome},${FONTE_DA_LEGENDA},${tamanho},${PRETO},${PRETO},${BRANCO},${PRETO},-1,0,0,0,100,100,0,0,3,${caixa},0,${alinhamento},60,60,${margemVertical},1`;
+  return `Style: ${nome},${FONTE_DA_LEGENDA},${tamanho},${PRETO},${PRETO},${BRANCO},${PRETO},-1,0,0,0,100,100,0,0,3,${caixa},0,${alinhamento},${ESTILO_DA_LEGENDA.margemLateral},${ESTILO_DA_LEGENDA.margemLateral},${margemVertical},1`;
 }
 
 /** O arquivo ASS completo. */
@@ -87,9 +92,9 @@ export function montarAss(entrada: EntradaDoAss): string {
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
     // Legenda: embaixo, a um quarto da altura do chão (acima da interface do Reels).
-    estilo("Legenda", 72, 14, 2, 480),
+    estilo("Legenda", ESTILO_DA_LEGENDA.tamanho, ESTILO_DA_LEGENDA.caixa, 2, 480),
     // Título: no alto, abaixo da barra de cima.
-    estilo("Titulo", 62, 16, 8, 330),
+    estilo("Titulo", ESTILO_DO_TITULO.tamanho, ESTILO_DO_TITULO.caixa, 8, 330),
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",

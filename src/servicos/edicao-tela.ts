@@ -200,6 +200,7 @@ export async function refazerEdicao(clienteId: number, edicaoId: number, motivo:
       refeitas: linha.refeitas + 1,
       decisao: null,
       resultado: null,
+      conferenciaDoVideo: null,
       caminhoPrevia: null,
       progressoDoRender: null,
       tentativasDaDecisao: 0,

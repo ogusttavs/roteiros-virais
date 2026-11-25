@@ -64,7 +64,9 @@ import {
  * 1.6.0 (E61 PR 1, 28/10/2026, o foco da conta): o mesmo do roteiro curto (2.24.0). A camada exclusiva ganha a linha "Foco desta conta" quando a pessoa confirmou um foco, e o título do bloco diz
  * que ela manda no assunto e no público. O schema de saída não muda.
  */
-export const versao = "1.6.0";
+/** 1.7.0 (onda 1 de texto, 25/11/2026): o bloco de regras de texto do roteiro longo traz `R-COPY-26` e `R-COPY-27` e a `R-COPY-19` nova (seção 11 das rubricas 1.3.0). O schema não muda. */
+/** 1.8.0 (25/11/2026, decisão do Gustavo): a regra dura 9 ganha a cena que prova em ramo de saúde e proíbe sugerir gravar o procedimento em andamento; `R-CONF-07` 1.4.0 proíbe preço e grátis em saúde. O schema não muda. */
+export const versao = "1.8.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -203,7 +205,9 @@ próximo. Regras duras:
    vídeo não cumpre: os primeiros 30 segundos entregam o que o título prometeu (R-YT-VIDEO-01) e o
    momento mais forte vem cedo (R-YT-VIDEO-02).
 9. Todo vídeo diz onde gravar e o que mostrar, usando as cenas que o cliente disse que a câmera
-   pode ver; cada capítulo diz o que a câmera mostra (naImagem) e como editar aquele capítulo
+   pode ver (em ramo de saúde, a cena que prova é o consultório, a equipe, o equipamento, a
+   explicação e o resultado final com a autorização do paciente; nunca o procedimento em
+   andamento num paciente, R-CONF-07); cada capítulo diz o que a câmera mostra (naImagem) e como editar aquele capítulo
    (comoEditar). O "quando" de cada texto na tela (edicao.textoNaTela) é em segundos desde o
    início do vídeo, como "95 segundos". A referência (edicao.referencia) é UM dos vídeos de
    referência que você de fato usou como modelo de estrutura (videoId, segundo 0, e uma frase do

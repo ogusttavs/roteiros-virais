@@ -69,6 +69,7 @@
  * (04:00), o video do dia sempre entra no lote de extracao do mesmo dia (antes, as 04:20, havia um
  * caso raro em que a cadeia chegava em `extrair` antes dele gravar).
  */
+import { CRON_DA_COLETA_QUENTE, noticiasQuentesAtivo } from "@/config/noticias-quentes";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 
@@ -83,6 +84,8 @@ export type Agendamento = {
   chave?: string;
   /** So agenda quando isso devolve true (ex: metaContas, so com config.coleta.metaAtivo). Sem isso, sempre agenda. */
   condicao?: () => boolean;
+  /** Opções do pg-boss para o disparo agendado (ex.: `singletonKey`, para nunca haver duas rodadas ao mesmo tempo). */
+  opcoes?: { singletonKey?: string; singletonSeconds?: number };
 };
 
 export const AGENDAMENTOS: Agendamento[] = [
@@ -113,6 +116,13 @@ export const AGENDAMENTOS: Agendamento[] = [
     cron: "0 14 * * *",
     descricao: "noticias do nicho, todo dia as 14:00",
     chave: "tarde",
+  },
+  {
+    fila: FILAS.coletaNoticiasQuentes,
+    cron: CRON_DA_COLETA_QUENTE,
+    descricao: "coleta quente de notícias, a cada 2 horas das 08:00 às 20:00, só dos ramos em uso (só com NOTICIAS_QUENTES_ATIVO)",
+    condicao: () => noticiasQuentesAtivo(),
+    opcoes: { singletonKey: "coleta-noticias-quentes", singletonSeconds: 5400 },
   },
   {
     fila: FILAS.tendenciasBrasil,
@@ -316,6 +326,7 @@ export async function agendarTudo(): Promise<void> {
     await b.schedule(agendamento.fila, agendamento.cron, null, {
       tz: FUSO,
       key: agendamento.chave,
+      ...agendamento.opcoes,
     });
   }
 }

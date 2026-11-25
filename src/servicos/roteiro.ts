@@ -202,7 +202,7 @@ export function validarData(valor: string | undefined): string | undefined {
   return valor;
 }
 
-const LIMITE_EVIDENCIA = 8;
+export const LIMITE_EVIDENCIA = 8;
 const DIAS_HISTORICO = 10;
 /** V4, item 3 e item 5: quantos roteiros recentes contam para nao repetir tipo de abertura nem primeira palavra do gancho. */
 const ULTIMOS_ROTEIROS_PARA_ABERTURA = 5;
@@ -609,7 +609,7 @@ function validarReferenciaDoModelo(
  * filtro, o roteiro sai como antes desta etapa (evidência sem o encaixe de marca conferido),
  * nunca sem roteiro nenhum, mesmo raciocínio de `marcaCitadaPorId`.
  */
-async function filtrarEvidenciaPelaMarca(
+export async function filtrarEvidenciaPelaMarca(
   evidencias: VideoEvidenciaRoteiro[],
   perfilCompilado: string,
   clienteId: number,
@@ -752,7 +752,7 @@ function preferirSemFala(itens: VideoEvidenciaRoteiro[]): VideoEvidenciaRoteiro[
   return [...preferidos, ...outros];
 }
 
-function combinarEvidencias(
+export function combinarEvidencias(
   prevista: VideoEvidenciaRoteiro[],
   daBusca: VideoEvidenciaRoteiro[],
   limite: number,

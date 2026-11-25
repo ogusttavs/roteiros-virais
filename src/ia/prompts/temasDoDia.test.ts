@@ -135,7 +135,7 @@ describe("montarEntrada, modo completarComNoticias (1.9.0)", () => {
   ];
 
   it("a versão do prompt subiu", () => {
-    expect(versao).toBe("1.10.0");
+    expect(versao).toBe("1.11.0");
   });
 
   it("lista as notícias com o id, pede um tema por notícia sem vídeo de prova e não traz a regra da prova nem lista de vídeos", () => {

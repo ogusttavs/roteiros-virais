@@ -16,6 +16,7 @@ const CHAVE_TETO = "teto_diario_brl";
 export const ROTULO_DA_TAREFA: Record<string, string> = {
   roteiro: "IA: escrever os roteiros",
   roteiroLongo: "IA: escrever os roteiros longos",
+  carrossel: "IA: escrever os carrosséis",
   verificarTexto: "IA: conferir o que foi escrito",
   temasDoDia: "IA: temas do dia",
   avaliarTema: "IA: notas dos temas",

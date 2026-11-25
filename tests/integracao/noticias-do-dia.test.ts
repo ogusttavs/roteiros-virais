@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, getPool } from "@/db";
 import { assuntosDaMarca, clientes, nichos, noticias, noticiasDoAssunto } from "@/db/schema";
 import { adicionarAssunto } from "@/servicos/assuntos";
-import { capaDoDia, inicioDoDiaEmSaoPaulo } from "@/servicos/noticias-do-dia";
+import { capaDoDia, DIAS_DA_CAPA, inicioDoDiaEmSaoPaulo } from "@/servicos/noticias-do-dia";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -109,6 +109,6 @@ describe("a capa do dia", () => {
 
   it("marca sem setor e sem assunto: a capa vem vazia, sem erro", async () => {
     const [sem] = await db().insert(clientes).values({ nome: "sem setor", nichoId: null }).returning({ id: clientes.id });
-    expect(await capaDoDia({ id: sem.id, nichoId: null }, AGORA)).toEqual({ nomeDoSetor: "", deHoje: [], deOntem: [], assuntos: [], novasDesdeOntem: 0 });
+    expect(await capaDoDia({ id: sem.id, nichoId: null }, AGORA)).toEqual({ nomeDoSetor: "", deHoje: [], deOntem: [], assuntos: [], novasDesdeOntem: 0, dias: DIAS_DA_CAPA });
   });
 });

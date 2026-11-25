@@ -103,8 +103,12 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * não são fato inventado; número, resultado prometido, cliente, nome ou ingrediente e prática ou diferencial do negócio continuam sendo; (5) no gênero tema, recomendar o fechamento com chamada
  * para comprar (citando o preço) e falar em segunda pessoa de direção ("grave", "abra com") é o trabalho da recomendação, nunca tom errado: só reprova se o texto tentar vender algo ao dono.
  * O que continua reprovando: o caso inventado ("um cliente meu, na semana passada"), o número ou resultado que as fontes não trazem e a prática do negócio não dita. Versão 1.9.0.
+ *
+ * 1.10.0 (onda 1 de texto, 25/11/2026, `R-COPY-27`): no gênero roteiro, com fontes, o verificador faz o teste "serve para qualquer ramo?" no título e no gancho (`CRITERIO_RAMO`): se os dois continuam
+ * verdadeiros trocando o ramo, sem nenhum elemento que só existe nesta marca ou neste ramo (o serviço, o lugar, o público, um fato da ficha ou da evidência), o roteiro volta uma vez para refazer. Na dúvida,
+ * aprova (o mesmo princípio do critério de fato). Precisa de prova com chave real antes de valer em produção.
  */
-export const versao = "1.9.0";
+export const versao = "1.10.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -203,6 +207,17 @@ export const CRITERIO_FATOS =
   "porque a feira repetia o que vejo no Brasil\"; \"uma parada ganhou dois dias a mais por causa da fábrica\"; \"testo antes de entrar no kit\" ou \"na nossa loja\" (prática ou loja que o " +
   "perfil não traz); com o mesmo medo no perfil, \"um cliente meu, na semana passada, mandou lavar em outro lugar e o sofá voltou manchado\" (caso específico contado como acontecido); \"eu já mandei lavar o sofá e ele voltou manchado, por isso criei o meu método\" ou \"ontem uma cliente me contou\" (caso da própria pessoa ou de um cliente que o perfil não traz); \"o produto tira 100% da mancha em dez minutos\" e \"damos 30 dias de garantia\" quando as fontes não trazem esse número, esse resultado nem essa garantia (número, resultado e prática do negócio que o perfil não traz);"
 
+/**
+ * 1.10.0 (`R-COPY-27`): o teste "serve para qualquer ramo?". Só no gênero roteiro e só com fontes (sem elas não há como saber o que é específico desta marca). Exportado para o teste conferir o texto.
+ */
+export const CRITERIO_RAMO =
+  "\n- o título e o gancho têm pelo menos UM elemento que só existe nesta marca ou neste ramo: o serviço, o lugar, o público, um fato ou um nome que as FONTES trazem. Teste: troque o ramo " +
+  "(dentista por pizzaria, loja de roupa por oficina) e leia de novo; se o título e o gancho continuam verdadeiros e fazem sentido sem mudar mais nada, servem para qualquer página e REPROVAM, " +
+  "com o motivo \"serve para qualquer ramo\" e o que faltou (o serviço, o lugar, o público ou o fato). NA DÚVIDA, APROVE: um título curto que cita o assunto do tema, o produto, o serviço ou o bairro " +
+  "já passa. Só reprove quando tiver certeza de que nada ali é desta marca nem deste ramo.\n" +
+  "  Exemplo que REPROVA: \"Você não vai acreditar no que acontece quando você começa a cuidar de si\" (serve para qualquer ramo). Exemplos que APROVAM: \"Mancha de vinho no sofá de linho: o que não fazer\" " +
+  "(o serviço e o material), \"Clareamento em Campinas: quanto custa de verdade\" (o serviço e o lugar).";
+
 /** O que o verificador lê no lugar do que está entre colchetes (1.8.2). */
 export const MARCADOR_DE_ESPACO = "[espaço para a pessoa completar]";
 
@@ -264,7 +279,7 @@ export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes =
   return `Você confere um texto que vai para a tela de um dono de pequeno negócio. Aprove só
 se:
 - o tom é direto, calmo e de parceiro, sem exclamação e sem entusiasmo forçado;
-- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}
+- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}${genero === "roteiro" && comFontes ? CRITERIO_RAMO : ""}
 - ${proibicaoEhAviso ? CRITERIO_PROIBICAO_COMO_AVISO : CRITERIO_PROIBICAO}
 ${CONTEXTO_GENERO[genero] ?? ""}
 Reprove e diga o motivo em uma frase, sem travessão, quando alguma dessas coisas falhar.
