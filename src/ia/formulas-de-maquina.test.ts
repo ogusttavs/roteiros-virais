@@ -59,6 +59,18 @@ describe("formulas-de-maquina: o que NÃO pode pegar", () => {
     ["gancho direto e específico", { gancho: "O sofá da cliente de ontem tinha mancha de vinho de 3 dias." }],
     ["despedida com ação concreta", { chamada: "Manda a foto do sofá no direct e eu te passo o valor." }],
     ["intensificador fora da lista", { corpo: "A mancha saiu em dez minutos." }],
+    // Falsos positivos achados pela Central em 25/11 (revisão do PR #267): texto normal de dono de negócio.
+    ["conjunção 'e' não é o verbo 'é' (1)", { corpo: "O produto não é caro, e dá para parcelar em três vezes sem juros no cartão." }],
+    ["conjunção 'e' não é o verbo 'é' (2)", { corpo: "Não é difícil, e você faz em casa com o que já tem." }],
+    ["'antes de começar' com objeto, no gancho", { gancho: "Antes de começar a reforma do banheiro, confira o registro." }],
+    ["'antes de começar' com objeto, no título", { titulo: "O que perguntar antes de começar o clareamento" }],
+    ["'até a próxima' com prazo", { chamada: "A promoção vale até a próxima sexta, me chama no WhatsApp." }],
+    ["'até o próximo' com substantivo", { fechamento: "Não espere até o próximo vazamento para trocar a borracha." }],
+    ["'beijo' no meio de uma frase", { fechamento: "Ninguém quer mau hálito na hora do beijo." }],
+    ["'número de likes' não é pedir like", { fechamento: "O que traz cliente é a prova, e não o número de likes." }],
+    ["'mais A, mais B' descreve o produto", { corpo: "Esse pano é mais grosso, mais fácil de torcer e seca rápido." }],
+    ["'sem A, sem B e sem C' com o fato nas fontes", { corpo: "A fórmula é sem cloro, sem álcool e sem perfume." }, "produto sem cloro, sem alcool e sem perfume"],
+    ["revelação com algarismo", { gancho: "Você sabia que 7 em cada 10 manchas de sofá vêm de bebida?" }],
   ];
   it.each(naoPega)("%s", (_nome, texto, fontes) => {
     expect(familias(texto, fontes)).toEqual([]);
@@ -66,6 +78,22 @@ describe("formulas-de-maquina: o que NÃO pode pegar", () => {
 
   it("a mesma frase pega quando a ficha não traz as duas metades (a fonte é o que salva)", () => {
     expect(familias({ gancho: "Não é cárie, é erosão." }, "Clínica no bairro Vila Sorriso.")).toContain("contraste-negado");
+  });
+
+  it("os 'pega' vizinhos dos ajustes continuam pegando", () => {
+    expect(familias({ gancho: "Não é sobre preço, é sobre confiança." })).toContain("contraste-negado");
+    expect(familias({ gancho: "Antes de começar, um aviso." })).toContain("abertura-de-preparacao");
+    expect(familias({ gancho: "Antes de começar" })).toContain("abertura-de-preparacao");
+    expect(familias({ fechamento: "Até a próxima!" })).toContain("despedida-cordial");
+    expect(familias({ fechamento: "Até o próximo vídeo, pessoal." })).toContain("despedida-cordial");
+    expect(familias({ fechamento: "Valeu, até o próximo post" })).toContain("despedida-cordial");
+    expect(familias({ fechamento: "Um beijo." })).toContain("despedida-cordial");
+    expect(familias({ fechamento: "Gostou? Abraço!" })).toContain("despedida-cordial");
+    expect(familias({ fechamento: "Deixe seu like e compartilhe." })).toContain("despedida-cordial");
+    expect(familias({ fechamento: "Dê um like." })).toContain("despedida-cordial");
+    expect(familias({ corpo: "Mais tempo, menos custo." })).toContain("paralelismo-de-slogan");
+    expect(familias({ corpo: "Sem cloro, sem álcool e sem perfume." }, "ficha da clínica")).toContain("paralelismo-de-slogan");
+    expect(familias({ gancho: "Você sabia que o sofá guarda ácaro?" })).toContain("revelacao-vazia");
   });
 
   it("família de abertura só olha gancho, título e tema; despedida só fechamento e chamada", () => {

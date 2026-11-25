@@ -54,6 +54,18 @@ function normalizar(texto: string): string {
     .toLowerCase();
 }
 
+/**
+ * Igual a `normalizar`, mas mantém o "é" (verbo) com acento, para o contraste não confundir "é" com "e" (conjunção).
+ * Só o contraste usa esta forma; as outras famílias leem a forma sem acento.
+ */
+function normalizarMantendoVerbo(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .toLowerCase()
+    .replace(/é/g, "é")
+    .replace(/[̀-ͯ]/g, "");
+}
+
 /** Texto em uma linha só e com espaços simples, para as expressões não tratarem quebra de linha. */
 function emUmaLinha(texto: string): string {
   return texto.split(String.fromCharCode(10)).join(" ").split(String.fromCharCode(13)).join(" ").replace(/[ ]+/g, " ").trim();
@@ -77,16 +89,17 @@ type Familia = {
   /** O que fazer no lugar, em uma frase para o modelo (e para o motivo). */
   conselho: string;
   blocos: BlocoDoTexto[];
-  /** Devolve o trecho que casou ou null. Recebe o bloco inteiro normalizado, em uma linha. */
-  achar: (texto: string, opcoes: OpcoesDoDetector) => string | null;
+  /** Devolve o trecho que casou ou null. Recebe o bloco inteiro normalizado, em uma linha, e a forma que mantém o "é". */
+  achar: (texto: string, opcoes: OpcoesDoDetector, comVerbo: string) => string | null;
 };
 
 const TODOS: BlocoDoTexto[] = ["titulo", "tema", "gancho", "corpo", "fechamento", "chamada"];
 
 // --- 1. Contraste em duas metades ("não é A, é B") ---------------------------------------------
 
-const NEGA = "(?:nao (?:e|foi|era|eh|sao|eram|esta|estao|se trata|tem a ver|vem)|nunca foi|nunca e)";
-const AFIRMA = "(?:e|foi|era|eh|sao|eram|esta|estao|se trata|tem a ver|vem|mas sim|na verdade e|e sim)";
+const NEGA = "(?:nao (?:é|foi|era|eh|sao|eram|esta|estao|se trata|tem a ver|vem)|nunca foi|nunca é)";
+// O "é" aqui é o verbo com acento: a conjunção "e" ("não é caro, e dá para parcelar") não afirma nada.
+const AFIRMA = "(?:é|foi|era|eh|sao|eram|esta|estao|se trata|tem a ver|vem|mas sim|na verdade é|e sim)";
 const LIGA = "(?: so| apenas| somente| sobre| de| do| da| dos| das| com)?";
 const CONTRASTE = new RegExp(
   `(?:^|[^a-z])${NEGA}${LIGA}[ ]+([^,.;:!?]{2,40}?)[ ]*[,;:.!][ ]*(?:mas |e |na verdade,? )?${AFIRMA}${LIGA}[ ]+([^,.;:!?]{2,40})`,
@@ -96,21 +109,22 @@ const PALAVRAS_FRACAS = new Set(["problema", "questao", "coisa", "sobre", "apena
 /** A metade tem base nas fontes quando alguma palavra de conteúdo (5 letras ou mais, fora a lista fraca) está lá. */
 function metadeTemBaseNasFontes(metade: string, fontes: string): boolean {
   return metade
+    .replace(/é/g, "e")
     .split(/[^a-z0-9]+/)
     .filter((p) => p.length >= 5 && !PALAVRAS_FRACAS.has(p))
     .some((p) => fontes.includes(p));
 }
 
-function acharContraste(texto: string, opcoes: OpcoesDoDetector): string | null {
+function acharContraste(_texto: string, opcoes: OpcoesDoDetector, comVerbo: string): string | null {
   const fontes = normalizar(emUmaLinha(opcoes.fontes ?? ""));
-  const m = CONTRASTE.exec(texto);
+  const m = CONTRASTE.exec(comVerbo);
   if (!m) return null;
   const [trecho, a, b] = m;
   // Número é fato: "não é 30 dias, é 45" não é fórmula, é conta.
   if (TEM_ALGARISMO.test(a) || TEM_ALGARISMO.test(b)) return null;
   // As duas metades vêm das fontes (ficha, momento, evidência): é o fato do ramo, não o molde.
   if (fontes && metadeTemBaseNasFontes(a, fontes) && metadeTemBaseNasFontes(b, fontes)) return null;
-  return trecho.replace(/^[^a-z]+/, "").trim();
+  return trecho.replace(/é/g, "e").replace(/^[^a-z]+/, "").trim();
 }
 
 // --- 2. Frase de virada de efeito --------------------------------------------------------------
@@ -142,7 +156,8 @@ const PREPARACAO = new RegExp(
     "(?:^|[^a-z])(?:hoje|agora) (?:eu )?(?:vou|vamos|quero|venho) (?:te |lhe |vos )?(?:falar|contar|mostrar|explicar|ensinar|trazer|compartilhar|apresentar|dividir)",
     "(?:^|[^a-z])(?:neste|nesse) (?:video|conteudo|reels|post)",
     "(?:^|[^a-z])no video de hoje",
-    "(?:^|[^a-z])antes de comecar",
+    // Só como abertura solta ("antes de começar, um aviso"); com objeto ("antes de começar a reforma") é frase normal.
+    "(?:^|[^a-z])antes de comecar(?=[ ]*(?:[,.;:!?]|$))",
     "(?:^|[^a-z])(?:fica|fique|assista|assiste|presta atencao) ate (?:o )?(?:final|fim)",
     "(?:^|[^a-z])bora la",
     "(?:^|[^a-z])(?:o tema|o assunto) de hoje",
@@ -160,18 +175,25 @@ const DESPEDIDA = new RegExp(
     "(?:^|[^a-z])espero que (?:voce |vc )?(?:tenha |tenham )?(?:gostado|ajudado|curtido|aproveitado)",
     "(?:^|[^a-z])espero ter ajudado",
     "(?:^|[^a-z])(?:muito )?obrigad[oa] (?:por (?:assistir|ver|acompanhar|ter assistido|chegar ate aqui)|pela (?:atencao|audiencia|paciencia))",
-    "(?:^|[^a-z])ate (?:o |a )?(?:proximo|proxima|breve)(?: video)?(?:[^a-z]|$)",
-    "(?:^|[^a-z])(?:um |um grande )?abracos?(?:[,.!]|$)",
-    "(?:^|[^a-z])beijos?(?:[,.!]|$)",
+    // "até a próxima" só no fim do bloco ou com "vídeo"/"post"; "até a próxima sexta" é prazo.
+    "(?:^|[^a-z])ate (?:o |a )?(?:proximo|proxima)(?:[ ]*(?:[,.;:!?]|$)|[ ](?:video|post)(?![a-z]))",
+    "(?:^|[^a-z])ate (?:o |a )?breve(?![a-z])",
     "(?:^|[^a-z])(?:fico|ficamos|estou|estamos) a (?:sua |nossa )?disposicao",
-    "(?:^|[^a-z])(?:deixe|deixa|de|dê) (?:o |seu |um )?like",
+    // "dê" perde o acento na normalização e viraria "de" ("número de likes"): só o verbo inteiro, ou "de" com artigo.
+    "(?:^|[^a-z])(?:deixe|deixa) (?:o |seu |um )?like",
+    "(?:^|[^a-z])de (?:o |seu |um )like",
     "(?:^|[^a-z])(?:se inscreva|inscreva-se|se inscreve)",
     "(?:^|[^a-z])curt[ae] e compartilh[ae]",
   ].join("|"),
 );
 const DUVIDA_GENERICA = /(?:^|[^a-z])(?:qualquer|se tiver) duvidas?,? (?:e so|me chama|me chame|fico|estou|estamos|conte comigo|conta comigo)[^.!?;]*/;
 
+/** "Um beijo.", "Abraço!": só como despedida, a última frase do bloco e sozinha, nunca no meio de uma frase. */
+const BEIJO_OU_ABRACO_SOZINHO = /^(?:(?:um|um grande|um forte|muitos) )?(?:abracos?|beijos?)(?:, [a-z ]{1,25})?$/;
+
 function acharDespedida(texto: string): string | null {
+  const ultima = frasesDe(texto).at(-1);
+  if (ultima && BEIJO_OU_ABRACO_SOZINHO.test(ultima)) return ultima;
   const direto = DESPEDIDA.exec(texto)?.[0];
   if (direto) return direto.replace(/^[^a-z]+/, "").trim();
   // "Qualquer dúvida, me chama" sem dizer onde é cortesia; com o canal (zap, direct, link) é o pedido final, que o projeto quer.
@@ -220,14 +242,20 @@ function acharCadaVezMais(texto: string): string | null {
 
 // --- 7. Paralelismo de slogan ------------------------------------------------------------------
 
-const SLOGAN_MAIS_MENOS = /(?:^|[^a-z])(?<!quanto )(menos|mais) (?!que |do que |de )([a-z]+(?: [a-z]+){0,2}), (?:mais|menos) (?!que |do que )([a-z]+)/;
+// Só o par que se opõe ("menos A, mais B" ou "mais A, menos B"); "mais grosso, mais fácil" descreve o produto.
+const SLOGAN_MENOS_MAIS = /(?:^|[^a-z])(?<!quanto )menos (?!que |do que |de )([a-z]+(?: [a-z]+){0,2}), mais (?!que |do que )([a-z]+)/;
+const SLOGAN_MAIS_MENOS = /(?:^|[^a-z])(?<!quanto )mais (?!que |do que |de )([a-z]+(?: [a-z]+){0,2}), menos (?!que |do que )([a-z]+)/;
 const SLOGAN_SEM_SEM_SEM = /(?:^|[^a-z])sem ([a-z]+(?: [a-z]+){0,2}), sem ([a-z]+(?: [a-z]+){0,2})(?:,| e) sem ([a-z]+)/;
 
-function acharSlogan(texto: string): string | null {
+function acharSlogan(texto: string, opcoes: OpcoesDoDetector): string | null {
+  const fontes = normalizar(emUmaLinha(opcoes.fontes ?? ""));
   for (const frase of frasesDe(texto)) {
     if (TEM_ALGARISMO.test(frase)) continue;
-    const m = SLOGAN_MAIS_MENOS.exec(frase) ?? SLOGAN_SEM_SEM_SEM.exec(frase);
-    if (m) return m[0].replace(/^[^a-z]+/, "").trim();
+    const m = SLOGAN_MENOS_MAIS.exec(frase) ?? SLOGAN_MAIS_MENOS.exec(frase) ?? SLOGAN_SEM_SEM_SEM.exec(frase);
+    if (!m) continue;
+    // "sem A, sem B e sem C" com algum item nas fontes é a ficha do produto, não o ritmo.
+    if (m[0].includes("sem ") && fontes && m.slice(1).some((item) => metadeTemBaseNasFontes(item, fontes))) continue;
+    return m[0].replace(/^[^a-z]+/, "").trim();
   }
   return null;
 }
@@ -245,7 +273,12 @@ const REVELACAO = new RegExp(
 );
 
 function acharRevelacao(texto: string): string | null {
-  return REVELACAO.exec(texto)?.[0].replace(/^[^a-z]+/, "").trim() ?? null;
+  const trecho = REVELACAO.exec(texto)?.[0].replace(/^[^a-z]+/, "").trim();
+  if (!trecho) return null;
+  // Com algarismo na mesma frase ("7 em cada 10 manchas...") a pergunta tem fato, e na dúvida não pega.
+  const frase = frasesDe(texto).find((f) => f.includes(trecho));
+  if (frase && TEM_ALGARISMO.test(frase)) return null;
+  return trecho;
 }
 
 // --- A lista fechada ---------------------------------------------------------------------------
@@ -330,10 +363,12 @@ export function acharFormulasDeMaquina(texto: TextoParaConferir, opcoes: OpcoesD
   for (const bloco of Object.keys(texto) as BlocoDoTexto[]) {
     const bruto = texto[bloco];
     if (!bruto || !bruto.trim()) continue;
-    const normalizado = normalizar(emUmaLinha(bruto));
+    const linha = emUmaLinha(bruto);
+    const normalizado = normalizar(linha);
+    const comVerbo = normalizarMantendoVerbo(linha);
     for (const familia of FAMILIAS) {
       if (!familia.blocos.includes(bloco)) continue;
-      const trecho = familia.achar(normalizado, opcoes);
+      const trecho = familia.achar(normalizado, opcoes, comVerbo);
       if (!trecho) continue;
       achados.push({
         familia: familia.id,
