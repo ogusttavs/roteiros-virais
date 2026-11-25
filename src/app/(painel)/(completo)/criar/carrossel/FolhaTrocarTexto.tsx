@@ -46,7 +46,7 @@ type Props = {
 
 /** "Passo 2 de 4", "Causa 2 de 3" ou o nome do tipo: de qual slide se trata (como no desenho). */
 function rotuloDoSlide(slide: SlideDoCarrossel, nomeDoTipo: string): string {
-  if (slide.tipo === "passo" && slide.numero && slide.de)
+  if (slide.tipo === "passo" && slide.numero && slide.de && slide.de > 1)
     return `Passo ${slide.numero} de ${slide.de}`;
   if (slide.rotulo && slide.tipo === "item") return slide.rotulo;
   return nomeDoTipo.charAt(0).toUpperCase() + nomeDoTipo.slice(1);

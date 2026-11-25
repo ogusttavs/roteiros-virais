@@ -67,7 +67,7 @@ export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolea
         return { tipo: s.tipo, titulo: limpo(s.titulo), ...opcional(s.rotulo, "rotulo"), ...opcional(s.texto, "sub") };
       case "passo":
         passo += 1;
-        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), numero: passo, de: totalDePassos };
+        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), numero: passo, ...(totalDePassos > 1 ? { de: totalDePassos } : {}) };
       case "item":
         return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), ...opcional(s.rotulo, "rotulo") };
       case "antes-depois":

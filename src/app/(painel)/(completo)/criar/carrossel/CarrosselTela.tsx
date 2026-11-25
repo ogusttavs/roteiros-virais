@@ -15,6 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { slidesComColchete, temColchete } from "@/carrossel/colchetes";
 import {
   TAMANHOS_DO_CARROSSEL,
   TETO_DA_FOTO_BYTES,
@@ -29,6 +30,7 @@ import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 import estilos from "./CarrosselTela.module.css";
 import { FolhaTrocarFoto } from "./FolhaTrocarFoto";
 import { FolhaTrocarTexto } from "./FolhaTrocarTexto";
+import { TextoComColchetes } from "./TextoComColchetes";
 import {
   ErroDaRota,
   pedir,
@@ -129,6 +131,8 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
   const [copiada, setCopiada] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [erroDoBaixar, setErroDoBaixar] = useState<string | null>(null);
+  /** O espaço para completar (trecho entre colchetes) ainda está na legenda ou nos slides: antes de copiar ou baixar, a tela pergunta. */
+  const [confirmando, setConfirmando] = useState<"copiar" | "baixar" | null>(null);
   const [arquivosParaCompartilhar, setArquivosParaCompartilhar] = useState<File[] | null>(null);
   const [corNova, setCorNova] = useState<string | null>(null);
   const entradaDeFoto = useRef<HTMLInputElement>(null);
@@ -379,8 +383,23 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
     }
   }
 
+  /** Os trechos entre colchetes que a IA deixou no lugar de um fato que não pode inventar: nos slides e na legenda. */
+  const slidesParaCompletar = carrossel ? slidesComColchete(carrossel.slides) : [];
+  const legendaParaCompletar = carrossel ? temColchete(`${carrossel.legenda}\n${carrossel.hashtags.join(" ")}`) : false;
+
+  function pedirCopiarLegenda() {
+    if (legendaParaCompletar) setConfirmando("copiar");
+    else void copiarLegenda();
+  }
+
+  function pedirBaixar() {
+    if (slidesParaCompletar.length > 0 && !arquivosParaCompartilhar) setConfirmando("baixar");
+    else void baixar();
+  }
+
   async function copiarLegenda() {
     if (!carrossel) return;
+    setConfirmando(null);
     try {
       await navigator.clipboard.writeText(
         `${carrossel.legenda}\n\n${carrossel.hashtags.join(" ")}`,
@@ -422,6 +441,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
 
   async function baixar() {
     if (!carrossel) return;
+    setConfirmando(null);
     setErroDoBaixar(null);
     if (arquivosParaCompartilhar) {
       try {
@@ -809,6 +829,11 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
               {t.precisaEncurtarAviso(quantosPrecisamEncurtar)}
             </p>
           ) : null}
+          {slidesParaCompletar.length > 0 ? (
+            <p className={estilos.avisoColchete} role="alert" data-testid="aviso-colchetes">
+              <b>{t.completarSlides(slidesParaCompletar.map((x) => x.n))}</b>
+            </p>
+          ) : null}
 
           <div className={estilos.faixa} role="group" aria-label={t.faixaAria(total)}>
             {carrossel.slides.map((s, i) => {
@@ -829,6 +854,9 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                         <span className={estilos.marcaDeAviso}>{t.precisaEncurtarCurto}</span>
                       ) : previa.semFoto ? (
                         <span className={estilos.marcaDeAviso}>{t.precisaDeFotoCurto}</span>
+                      ) : null}
+                      {slidesParaCompletar.some((x) => x.n === i + 1) ? (
+                        <span className={estilos.marcaDeColchete}>{t.completarCurto}</span>
                       ) : null}
                     </button>
                   ) : (
@@ -870,6 +898,18 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
               {previas[escolhido + 1]?.semFoto ? (
                 <p className={estilos.alerta}>{t.precisaDeFoto}</p>
               ) : null}
+              {slidesParaCompletar.find((x) => x.n === escolhido + 1) ? (
+                <p className={estilos.avisoColchete} role="note" data-testid="colchetes-do-slide">
+                  <span>{t.completarSlide}</span>
+                  <span>
+                    {slidesParaCompletar.find((x) => x.n === escolhido + 1)!.trechos.map((trecho, k) => (
+                      <mark key={k} className={estilos.colchete}>
+                        {trecho}
+                      </mark>
+                    ))}
+                  </span>
+                </p>
+              ) : null}
               {slideAtual.rodape ? <p className={estilos.ajuda}>{t.linhaFixaNaoEdita}</p> : null}
               {t.metodo.dicasDeFoto[slideAtual.tipo] && !(ramoSaude && slideAtual.tipo === "passo") ? <p className={estilos.ajuda}>{t.metodo.dicasDeFoto[slideAtual.tipo]}</p> : null}
               <div className={estilos.acoesSlide}>
@@ -904,20 +944,36 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
               <span className={estilos.rotulo} id="t-legenda">
                 {t.legendaRotulo}
               </span>
+              {legendaParaCompletar ? (
+                <p className={estilos.avisoColchete} role="note" data-testid="colchetes-da-legenda">
+                  <b>{t.completarLegenda}</b>
+                </p>
+              ) : null}
               <p className={estilos.legendaTexto}>
-                {carrossel.legenda}
-                {"\n\n"}
-                {carrossel.hashtags.join(" ")}
+                <TextoComColchetes texto={`${carrossel.legenda}\n\n${carrossel.hashtags.join(" ")}`} />
               </p>
               <Botao
                 type="button"
                 variante="secundario"
-                onClick={() => void copiarLegenda()}
+                onClick={pedirCopiarLegenda}
                 style={{ justifySelf: "start" }}
               >
                 <Copy className={estilos.icone} size={18} strokeWidth={1.75} aria-hidden="true" />
                 {copiada ? t.legendaCopiada : t.copiarLegenda}
               </Botao>
+              {confirmando === "copiar" ? (
+                <div className={estilos.confirmaColchete} role="alertdialog" aria-label={t.confirmarCopiar} data-testid="confirma-copiar">
+                  <b>{t.confirmarCopiar}</b>
+                  <div className={estilos.acoesSlide}>
+                    <Botao type="button" onClick={() => void copiarLegenda()}>
+                      {t.copiarAssimMesmo}
+                    </Botao>
+                    <Botao type="button" variante="secundario" onClick={() => setConfirmando(null)}>
+                      {t.voltarECompletar}
+                    </Botao>
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             <section className={`${estilos.cartao} ${estilos.baixar}`} aria-labelledby="t-baixar">
@@ -927,7 +983,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
               <Botao
                 type="button"
                 className={estilos.botaoCheio}
-                onClick={() => void baixar()}
+                onClick={pedirBaixar}
                 carregando={baixando}
                 disabled={baixando}
               >
@@ -946,6 +1002,19 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                       : t.baixar(total)}
               </Botao>
               <p className={estilos.miudo}>{t.baixarAjuda(total)}</p>
+              {confirmando === "baixar" ? (
+                <div className={estilos.confirmaColchete} role="alertdialog" aria-label={t.confirmarBaixar} data-testid="confirma-baixar">
+                  <b>{t.confirmarBaixar}</b>
+                  <div className={estilos.acoesSlide}>
+                    <Botao type="button" onClick={() => void baixar()}>
+                      {t.baixarAssimMesmo}
+                    </Botao>
+                    <Botao type="button" variante="secundario" onClick={() => setConfirmando(null)}>
+                      {t.voltarECompletar}
+                    </Botao>
+                  </div>
+                </div>
+              ) : null}
               {erroDoBaixar ? (
                 <p className={estilos.erroCampo} role="alert">
                   <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />

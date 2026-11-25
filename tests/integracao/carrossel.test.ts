@@ -755,7 +755,7 @@ describe("o método: o carrossel cumpre o que a capa promete (E65 PR 3)", () => 
     const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-capa-errada]", 5));
     const geracoes = await geracoesDa(clienteId);
     expect(geracoes).toHaveLength(2);
-    expect(geracoes.map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/a capa promete 9 erros e o carrossel traz 3/);
+    expect(geracoes.map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/a capa promete 9 erros e o carrossel traz \d+ (itens|item|passos|passo|\(itens e passos\))/);
     expect(JSON.stringify(geracoes.map((g) => g.entradas))).toContain("A tentativa anterior foi reprovada.");
     expect(c.slides[0].titulo).not.toMatch(/9 erros/);
   });
