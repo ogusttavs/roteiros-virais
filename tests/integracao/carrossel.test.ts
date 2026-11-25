@@ -755,6 +755,19 @@ describe("o método: o carrossel cumpre o que a capa promete (E65 PR 3)", () => 
     expect(fraca.avisos.join()).toMatch(/pouco texto|número, pergunta/);
   });
 
+  it("fórmula de máquina reprova na 1ª tentativa (o roteiro faz igual) e a 2ª sai certa; se persistir na 2ª, só avisa e não derruba", async () => {
+    const clienteId = await criarCliente();
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-formula]", 5));
+    const geracoes = await geracoesDa(clienteId);
+    expect(geracoes).toHaveLength(2);
+    expect(geracoes.map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/R-COPY-26: o gancho usa a fórmula/);
+    expect(JSON.stringify(c.slides)).not.toMatch(/sorte, é método/);
+    const outra = await criarCliente();
+    const teimosa = await gerarCarrossel(outra, pedidoLivre("mancha de vinho no estofado [mock:carrossel-formula-sempre]", 5));
+    expect(teimosa.slides[0].sub).toBe("Não é sorte, é método.");
+    expect(teimosa.avisos.join()).toMatch(/R-COPY-26/);
+  });
+
   it("trocar a cor mantém os avisos do método e só troca o da cor", async () => {
     const clienteId = await criarCliente();
     const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-capa-sem-promessa]", 5));

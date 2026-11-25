@@ -644,6 +644,8 @@ function mockCarrossel(entrada: string) {
   if (marcado("carrossel-prova-fala-outro")) slides[1] = { ...vazio, tipo: "prova-fala", texto: tema, quem: "Ana", contexto: "Cliente" };
   if (marcado("carrossel-prova-fala-cliente")) slides[1] = { ...vazio, tipo: "prova-fala", texto: "relaxa que sai sim", quem: "Ana", contexto: "Cliente" };
   if (marcado("carrossel-numero-solto")) slides[1].texto = "Nove em cada dez pessoas, 87% delas, erram isso todo mês.";
+  // Texto com cara de máquina na linha de apoio da capa: `[mock:carrossel-formula]` só na 1ª tentativa, `[mock:carrossel-formula-sempre]` nas duas.
+  if (entrada.includes("[mock:carrossel-formula-sempre]") || marcado("carrossel-formula")) slides[0].texto = "Não é sorte, é método.";
   if (marcado("carrossel-capa-errada")) slides[0].titulo = `9 erros que estragam ${tema}`.split(" ").slice(0, 10).join(" ");
   if (marcado("carrossel-capa-vaga")) slides[0].titulo = `Tudo sobre ${tema}`.split(" ").slice(0, 10).join(" ");
   if (marcado("carrossel-capa-sem-promessa")) slides[0].titulo = `Estofado bonito`;

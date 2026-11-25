@@ -9,7 +9,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { larguraDaImagem } from "@/carrossel/fotos";
 import { avisosDoMetodo, verificarCapaVaga, verificarPromessaDaCapa } from "@/carrossel/metodo";
 import { corValida, garantirLeitura } from "@/carrossel/modelos";
-import { motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFoto, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
+import { formulasDeMaquinaDosSlides, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFoto, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
 import {
   CAMPOS_DO_TIPO,
   COR_NEUTRA,
@@ -239,7 +239,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     .filter(Boolean)
     .join(String.fromCharCode(10, 10));
 
-  const { dados: saida, geracaoId } = await gerarComVerificacao({
+  const { dados: saida, geracaoId, avisos: avisosDaIA } = await gerarComVerificacao({
     tarefa: "carrossel",
     nivel: carrosselIA.nivel,
     effort: carrosselIA.esforco,
@@ -298,7 +298,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       campos.legenda = d.legenda;
       return campos;
     },
-    verificarExtra: (d) => {
+    verificarExtra: (d, tentativa) => {
       const slidesDeTexto = slidesDaSaida(d.slides, { ramoSaude });
       return [
         ...verificarOrdemDosSlides(slidesDeTexto, quantidade),
@@ -306,9 +306,12 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
         ...verificarLegenda(d.legenda, d.hashtags),
         ...verificarPromessaDaCapa(slidesDeTexto),
         ...verificarCapaVaga(slidesDeTexto),
+        // R-COPY-26: fórmula de texto de máquina reprova na 1ª tentativa e só avisa na 2ª (como o roteiro); o aviso sai em `avisarExtra`.
+        ...(tentativa === 1 ? formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos) : []),
         ...conformidadeDoCarrossel(slidesDeTexto, { fontes: fontesDosFatos, ramoSaude }),
       ];
     },
+    avisarExtra: (d, tentativa) => (tentativa === 2 ? formulasDeMaquinaDosSlides(slidesDaSaida(d.slides, { ramoSaude }), fontesDosFatos) : []),
   });
 
   const slides: SlideDoCarrossel[] = slidesDaSaida(saida.slides, { ramoSaude });
@@ -321,7 +324,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       tema: origem.tema,
       quantidade,
       cor: leitura.cor,
-      avisos: [...avisosDoCarrossel, ...avisosDoMetodo(slides, saida.legenda)],
+      avisos: [...avisosDoCarrossel, ...avisosDaIA, ...avisosDoMetodo(slides, saida.legenda)],
       slides,
       legenda: saida.legenda.trim(),
       hashtags: normalizarHashtags(saida.hashtags),

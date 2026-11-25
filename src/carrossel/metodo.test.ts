@@ -4,6 +4,7 @@ import type { SlideDoCarrossel } from "@/config/carrossel";
 
 import { larguraDaImagem } from "./fotos";
 import { avisosDoMetodo, capaTemPromessaConcreta, moldeVagoDaCapa, promessaDeContagem, rotularItens, verificarCapaVaga, verificarPromessaDaCapa } from "./metodo";
+import { formulasDeMaquinaDosSlides } from "./regras";
 
 const capa = (titulo: string, sub?: string): SlideDoCarrossel => ({ tipo: "capa-texto", titulo, ...(sub ? { sub } : {}) });
 const item = (texto = "Um texto de explicação com mais de oito palavras para ensinar"): SlideDoCarrossel => ({ tipo: "item", titulo: "Um item", texto });
@@ -110,5 +111,16 @@ describe("larguraDaImagem", () => {
     webp.writeUIntLE(1079, 24, 3);
     expect(larguraDaImagem(webp)).toBe(1080);
     expect(larguraDaImagem(Buffer.from("isso não é imagem de jeito nenhum, é só texto qualquer"))).toBeNull();
+  });
+});
+
+describe("fórmulas com cara de máquina (o detector do roteiro, sem lista própria)", () => {
+  it("acha a fórmula na capa, no meio e na chamada, e não pega texto de gente", () => {
+    const limpo = [capa("3 erros no estofado", "Veja o que fazer em cada um."), item("Deixe o produto agir por dez minutos antes de esfregar o tecido com a escova"), chamada];
+    expect(formulasDeMaquinaDosSlides(limpo, "")).toEqual([]);
+    const comFormula = [capa("3 erros no estofado", "Não é sorte, é método."), item(), chamada];
+    expect(formulasDeMaquinaDosSlides(comFormula, "").join()).toMatch(/R-COPY-26: o gancho usa a fórmula/);
+    const noMeio = [capa("3 erros no estofado"), { ...item(), texto: "Você deixa o produto agir. E isso muda tudo." }, chamada];
+    expect(formulasDeMaquinaDosSlides(noMeio, "").join()).toMatch(/R-COPY-26: o corpo usa a fórmula/);
   });
 });
