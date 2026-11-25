@@ -3,8 +3,18 @@
 import { CircleAlert } from "lucide-react";
 import { useId, useState } from "react";
 
-import { camposEditaveis, contarPalavras, excessoDoCampo, promessaEmSaude } from "@/carrossel/regras";
-import { LISTAS_DO_TIPO, limiteDoCampo, type ChaveDeCampo, type SlideDoCarrossel } from "@/config/carrossel";
+import {
+  camposEditaveis,
+  contarPalavras,
+  excessoDoCampo,
+  promessaEmSaude,
+} from "@/carrossel/regras";
+import {
+  LISTAS_DO_TIPO,
+  limiteDoCampo,
+  type ChaveDeCampo,
+  type SlideDoCarrossel,
+} from "@/config/carrossel";
 import { textosCarrossel as t } from "@/textos/carrossel";
 import { Botao } from "@/ui/componentes/Botao";
 import { Folha } from "@/ui/componentes/Folha";
@@ -13,7 +23,14 @@ import estilos from "./CarrosselTela.module.css";
 import { ErroDaRota, pedir, type CarrosselDaTela } from "./tipos";
 
 /** Os campos que pedem uma caixa maior (texto corrido); os outros são uma linha. */
-const CAMPOS_LONGOS = new Set<ChaveDeCampo>(["sub", "texto", "antes", "depois", "frase", "citacao"]);
+const CAMPOS_LONGOS = new Set<ChaveDeCampo>([
+  "sub",
+  "texto",
+  "antes",
+  "depois",
+  "frase",
+  "citacao",
+]);
 
 type Props = {
   aoFechar: () => void;
@@ -29,7 +46,8 @@ type Props = {
 
 /** "Passo 2 de 4", "Causa 2 de 3" ou o nome do tipo: de qual slide se trata (como no desenho). */
 function rotuloDoSlide(slide: SlideDoCarrossel, nomeDoTipo: string): string {
-  if (slide.tipo === "passo" && slide.numero && slide.de) return `Passo ${slide.numero} de ${slide.de}`;
+  if (slide.tipo === "passo" && slide.numero && slide.de)
+    return `Passo ${slide.numero} de ${slide.de}`;
   if (slide.rotulo && slide.tipo === "item") return slide.rotulo;
   return nomeDoTipo.charAt(0).toUpperCase() + nomeDoTipo.slice(1);
 }
@@ -39,13 +57,40 @@ function valorInicial(slide: SlideDoCarrossel, chave: ChaveDeCampo): string {
   return typeof v === "string" ? v : "";
 }
 
-function CampoDeTexto({ chave, valor, erro, contagem, aoMudar }: { chave: ChaveDeCampo; valor: string; erro: string | null; contagem: string; aoMudar: (v: string) => void }) {
+function CampoDeTexto({
+  chave,
+  valor,
+  erro,
+  contagem,
+  aoMudar,
+}: {
+  chave: ChaveDeCampo;
+  valor: string;
+  erro: string | null;
+  contagem: string;
+  aoMudar: (v: string) => void;
+}) {
   const id = useId();
   const longo = CAMPOS_LONGOS.has(chave);
   return (
     <div className={`${estilos.campoLinha} ${erro ? estilos.comErro : ""}`}>
       <label htmlFor={id}>{t.campos[chave]}</label>
-      {longo ? <textarea id={id} value={valor} aria-invalid={Boolean(erro)} onChange={(e) => aoMudar(e.target.value)} /> : <input id={id} type="text" value={valor} aria-invalid={Boolean(erro)} onChange={(e) => aoMudar(e.target.value)} />}
+      {longo ? (
+        <textarea
+          id={id}
+          value={valor}
+          aria-invalid={Boolean(erro)}
+          onChange={(e) => aoMudar(e.target.value)}
+        />
+      ) : (
+        <input
+          id={id}
+          type="text"
+          value={valor}
+          aria-invalid={Boolean(erro)}
+          onChange={(e) => aoMudar(e.target.value)}
+        />
+      )}
       <span className={estilos.contagem}>
         {erro ? (
           <span className={estilos.erroCampo} role="alert">
@@ -65,11 +110,28 @@ function CampoDeTexto({ chave, valor, erro, contagem, aoMudar }: { chave: ChaveD
  * A folha "Trocar o texto do slide N": um campo por pedaço do slide (os do tipo, na ordem do desenho), cada um com a conta de palavras e o limite. Passou do limite, o campo mostra quanto passou e o
  * botão fica parado até caber (o servidor confere de novo). Salvar refaz o slide.
  */
-export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto, ramoSaude, aoSalvar }: Props) {
+export function FolhaTrocarTexto({
+  aoFechar,
+  carrosselId,
+  indice,
+  slide,
+  comFoto,
+  ramoSaude,
+  aoSalvar,
+}: Props) {
   const chaves = camposEditaveis(slide.tipo);
   const lista = LISTAS_DO_TIPO[slide.tipo];
-  const [valores, setValores] = useState<Record<string, string>>(() => Object.fromEntries(chaves.map((c) => [c, valorInicial(slide, c)])));
-  const [itens, setItens] = useState<string[]>(() => (lista ? Array.from({ length: Math.max(lista.minimo, (slide[lista.chave] ?? []).length) }, (_, i) => (slide[lista.chave] ?? [])[i] ?? "") : []));
+  const [valores, setValores] = useState<Record<string, string>>(() =>
+    Object.fromEntries(chaves.map((c) => [c, valorInicial(slide, c)])),
+  );
+  const [itens, setItens] = useState<string[]>(() =>
+    lista
+      ? Array.from(
+          { length: Math.max(lista.minimo, (slide[lista.chave] ?? []).length) },
+          (_, i) => (slide[lista.chave] ?? [])[i] ?? "",
+        )
+      : [],
+  );
   const [salvando, setSalvando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
 
@@ -78,13 +140,18 @@ export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto
     const valor = valores[chave] ?? "";
     const excesso = excessoDoCampo(slide.tipo, chave, valor, comFoto);
     const porPalavras = (limite?.palavras ?? 0) > 1;
-    const contagem = porPalavras ? t.contagem(contarPalavras(valor), limite?.palavras ?? 0) : t.contagemCaracteres(valor.trim().length, limite?.caracteres ?? 0);
+    const contagem = porPalavras
+      ? t.contagem(contarPalavras(valor), limite?.palavras ?? 0)
+      : t.contagemCaracteres(valor.trim().length, limite?.caracteres ?? 0);
     if (!excesso) {
       const promessa = ramoSaude ? promessaEmSaude(valor) : null;
       return { erro: promessa ? t.promessaEmSaude(promessa) : null, contagem };
     }
     if (excesso.tipo === "vazio") return { erro: t.campoVazio, contagem };
-    return { erro: excesso.tipo === "palavras" ? t.passou(excesso.n) : t.passouCaracteres(excesso.n), contagem };
+    return {
+      erro: excesso.tipo === "palavras" ? t.passou(excesso.n) : t.passouCaracteres(excesso.n),
+      contagem,
+    };
   }
 
   const erroDaLista = (k: number): string | null => {
@@ -95,7 +162,8 @@ export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto
     if (palavras > lista.palavras) return t.passou(palavras - lista.palavras);
     const promessa = ramoSaude ? promessaEmSaude(v) : null;
     if (promessa) return t.promessaEmSaude(promessa);
-    if (v.trim().length > lista.caracteres) return t.passouCaracteres(v.trim().length - lista.caracteres);
+    if (v.trim().length > lista.caracteres)
+      return t.passouCaracteres(v.trim().length - lista.caracteres);
     return null;
   };
 
@@ -108,7 +176,15 @@ export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto
     try {
       const { carrossel } = await pedir<{ carrossel: CarrosselDaTela }>(
         `/api/carrossel/${carrosselId}`,
-        { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ indice, campos: valores, ...(lista ? { listas: { [lista.chave]: itens } } : {}) }) },
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            indice,
+            campos: valores,
+            ...(lista ? { listas: { [lista.chave]: itens } } : {}),
+          }),
+        },
         t.falhouAoSalvar,
       );
       aoSalvar(carrossel);
@@ -125,10 +201,20 @@ export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto
       aoFechar={aoFechar}
       rodape={
         <div className={estilos.folhaPe}>
-          <Botao type="button" onClick={() => void salvar()} disabled={temErro || salvando} carregando={salvando}>
+          <Botao
+            type="button"
+            onClick={() => void salvar()}
+            disabled={temErro || salvando}
+            carregando={salvando}
+          >
             {salvando ? t.refazendo : t.refazer}
           </Botao>
-          <button type="button" className={estilos.textoBotao} style={{ justifySelf: "center", marginLeft: 0 }} onClick={aoFechar}>
+          <button
+            type="button"
+            className={estilos.textoBotao}
+            style={{ justifySelf: "center", marginLeft: 0 }}
+            onClick={aoFechar}
+          >
             {t.cancelar}
           </button>
         </div>
@@ -138,7 +224,16 @@ export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto
         <p>{t.trocarTextoAjuda(rotuloDoSlide(slide, t.nomeDoTipo[slide.tipo] ?? slide.tipo))}</p>
         {chaves.map((chave) => {
           const { erro, contagem } = avisoDoCampo(chave);
-          return <CampoDeTexto key={chave} chave={chave} valor={valores[chave] ?? ""} erro={erro} contagem={contagem} aoMudar={(v) => setValores((a) => ({ ...a, [chave]: v }))} />;
+          return (
+            <CampoDeTexto
+              key={chave}
+              chave={chave}
+              valor={valores[chave] ?? ""}
+              erro={erro}
+              contagem={contagem}
+              aoMudar={(v) => setValores((a) => ({ ...a, [chave]: v }))}
+            />
+          );
         })}
         {lista
           ? itens.map((item, k) => {
@@ -146,8 +241,18 @@ export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto
               const palavras = contarPalavras(item);
               return (
                 <div key={k} className={`${estilos.campoLinha} ${erro ? estilos.comErro : ""}`}>
-                  <label htmlFor={`lista-${k}`}>{lista.chave === "linhas" ? t.linhaN(k + 1) : t.acaoN(k + 1)}</label>
-                  <input id={`lista-${k}`} type="text" value={item} aria-invalid={Boolean(erro)} onChange={(e) => setItens((a) => a.map((x, i) => (i === k ? e.target.value : x)))} />
+                  <label htmlFor={`lista-${k}`}>
+                    {lista.chave === "linhas" ? t.linhaN(k + 1) : t.acaoN(k + 1)}
+                  </label>
+                  <input
+                    id={`lista-${k}`}
+                    type="text"
+                    value={item}
+                    aria-invalid={Boolean(erro)}
+                    onChange={(e) =>
+                      setItens((a) => a.map((x, i) => (i === k ? e.target.value : x)))
+                    }
+                  />
                   <span className={estilos.contagem}>
                     {erro ? (
                       <span className={estilos.erroCampo} role="alert">

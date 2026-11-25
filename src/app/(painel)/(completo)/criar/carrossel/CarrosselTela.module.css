@@ -868,3 +868,9 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* O ícone dentro de um botão: o Botao guarda o conteúdo num span só, então o respiro vem daqui. */
+.icone {
+  margin-right: var(--espaco-2);
+  vertical-align: -3px;
+}
