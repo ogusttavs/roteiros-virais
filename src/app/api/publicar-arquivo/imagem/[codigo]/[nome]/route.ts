@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { publicarImagensAtivo } from "@/config/post-pronto";
 import { db } from "@/db";
 import { postsProntos } from "@/db/schema";
-import { publicarImagensAtivo } from "@/config/post-pronto";
 import { caminhoDaImagem, lerCodigoDaImagem, tamanhoDaImagemGuardada } from "@/lib/imagens-do-post";
 import { responderArquivo } from "@/lib/intervalo-http";
 
