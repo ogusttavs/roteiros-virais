@@ -187,7 +187,10 @@ async function main(): Promise<void> {
             return [...fora, ...pequenos];
           });
           if (problemas.length > 0) console.log(`ATENCAO ${arquivo}: ${problemas.join("; ")}`);
-          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.evaluate(() => {
+            window.scrollTo(0, 0);
+            document.querySelectorAll("nextjs-portal, [data-next-badge-root], [data-nextjs-dev-tools-button], #devtools-indicator").forEach((el) => el.remove());
+          });
           await page.screenshot({ path: path.join(pasta, arquivo) });
           gravados.push(arquivo);
           if (comRolagem) {
