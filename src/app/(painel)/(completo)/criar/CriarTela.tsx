@@ -209,6 +209,7 @@ export function CriarTela({
     <div className={styles.pagina}>
       <BarraTopo
         titulo={textosCriar.titulo}
+        tituloAoRolar
         direita={<SeletorMarcaCelular marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />}
       />
 

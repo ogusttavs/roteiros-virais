@@ -274,8 +274,11 @@ export const textosHoje = {
     criarStoryHoje: "Criar um Story para hoje",
     abrirRoteiro: "Abrir o roteiro",
     briefingPodeRenderMais: "O seu briefing pode render mais",
+    /** Sem nenhuma resposta avaliada a nota chega como "0,0": isso é "ainda sem nota", não uma nota zero (refino de 25/11). */
     briefingNotaEMeta: (nota: string, meta: string) =>
-      `Nota ${nota}, meta ${meta}. Complete para os roteiros saírem mais com a sua cara.`,
+      Number(nota.replace(",", ".")) > 0
+        ? `Nota ${nota}, meta ${meta}. Complete para os roteiros saírem mais com a sua cara.`
+        : "Ainda sem nota. Complete para os roteiros saírem mais com a sua cara.",
     abrirBriefing: "Abrir o briefing",
 
     /**

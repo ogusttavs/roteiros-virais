@@ -76,7 +76,8 @@
 
 .rotuloGrupo {
   font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
+  font-size: var(--tamanho-rodape);
+  letter-spacing: var(--espacamento-rotulo);
   text-transform: uppercase;
   color: var(--cor-texto-suave);
 }

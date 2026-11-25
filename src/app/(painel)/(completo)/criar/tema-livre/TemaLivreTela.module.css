@@ -50,7 +50,7 @@
 }
 
 .miolo {
-  padding: var(--espaco-5) var(--margem-celular) calc(var(--espaco-8) + env(safe-area-inset-bottom, 0px));
+  padding: var(--espaco-5) var(--margem-celular) calc(64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px));
   max-width: var(--largura-leitura);
   margin: 0 auto;
   display: grid;
