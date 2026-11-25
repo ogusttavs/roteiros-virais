@@ -147,6 +147,8 @@ export async function renderizarAnimacao(entrada: EntradaDaAnimacao): Promise<Re
         "--num-raster-threads=1",
         "--disable-skia-runtime-opts",
         "--font-render-hinting=none",
+        // O /dev/shm do Docker tem 64 MB por padrao e o Chromium precisa de mais: usa /tmp.
+        "--disable-dev-shm-usage",
       ];
       if (config.animacao.semSandbox) args.push("--no-sandbox");
       navegador = await chromium.launch({ args, chromiumSandbox: !config.animacao.semSandbox });

@@ -130,7 +130,8 @@ services:
       # E68 A2: o video de animacao de texto (so na conta da lista). Desligado por padrao: sem estas tres no `.env` nada muda. `ANIMACAO_SEM_SANDBOX=1` e para o Chromium subir neste conteiner (sem capacidades,
       # so de leitura); `ANIMACAO_CONTAS` (ids de marca separados por virgula) e lida pelo aplicativo, mas vem aqui tambem para as tres variaveis andarem juntas.
       ANIMACAO_ATIVA: ${ANIMACAO_ATIVA:-0}
-      ANIMACAO_SEM_SANDBOX: ${ANIMACAO_SEM_SANDBOX:-0}
+      # Padrao 1 aqui: este conteiner roda sem capacidades e so de leitura, e o sandbox do Chromium nao sobe assim.
+      ANIMACAO_SEM_SANDBOX: ${ANIMACAO_SEM_SANDBOX:-1}
       ANIMACAO_CONTAS: ${ANIMACAO_CONTAS:-}
     volumes:
       - roteiros_edicao:/var/edicao
