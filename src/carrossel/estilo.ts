@@ -188,8 +188,9 @@ export const ESTILO_DOS_SLIDES = `
 /* ---------- Tipo: item de lista ----------
    O traço grosso de acento segura o título; o índice fica no rótulo. */
 .slide[data-tipo="item"] .s-corpo { justify-content: center; gap: 40px; }
-.s-com-traco { padding-left: 44px; border-left: 14px solid var(--s-acento); }
+.slide .s-com-traco { padding-left: 44px; border-left: 14px solid var(--s-acento); }
 .slide[data-tipo="item"] .s-titulo { font-size: 76px; }
+.slide[data-tipo="item"] .s-texto { padding-left: 58px; }
 .slide[data-tipo="item"].ajustado .s-titulo { font-size: var(--s-titulo-min); }
 .s-indice { font: 800 44px/1 "JetBrains Mono", Consolas, monospace; color: var(--s-acento); letter-spacing: -0.02em; }
 

@@ -78,7 +78,7 @@
   font-size: var(--tamanho-rodape);
   color: var(--cor-texto-suave);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--espacamento-legenda);
 }
 
 .bloco {
@@ -106,8 +106,8 @@
 .cartao {
   display: grid;
   gap: var(--espaco-3);
-  padding: var(--espaco-4);
-  border-radius: var(--raio-md);
+  padding: var(--espaco-5);
+  border-radius: var(--raio-lg);
   background: var(--cor-superficie);
   border: var(--largura-borda) solid var(--cor-borda);
 }
@@ -121,7 +121,7 @@
   font-size: var(--tamanho-rodape);
   color: var(--cor-texto-suave);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--espacamento-legenda);
 }
 
 .tema {
@@ -162,7 +162,7 @@
 }
 
 .textoBotao:disabled {
-  opacity: 0.5;
+  opacity: var(--opacidade-desabilitado);
   cursor: not-allowed;
 }
 
@@ -196,8 +196,8 @@
 .segmentado {
   display: inline-grid;
   grid-auto-flow: column;
-  gap: 2px;
-  padding: 3px;
+  gap: var(--espaco-1);
+  padding: var(--espaco-1);
   border-radius: var(--raio-pill);
   background: var(--cor-superficie-recuada);
   justify-self: start;
@@ -509,10 +509,10 @@
   position: absolute;
   left: var(--espaco-2);
   bottom: var(--espaco-2);
-  padding: 2px var(--espaco-3);
+  padding: var(--espaco-1) var(--espaco-3);
   border-radius: var(--raio-pill);
   background: var(--cor-erro);
-  color: var(--cor-fundo);
+  color: var(--cor-superficie);
   font-size: var(--tamanho-rodape);
   font-weight: var(--peso-semibold);
 }
@@ -524,7 +524,7 @@
   border-radius: var(--raio-md);
   background: linear-gradient(90deg, var(--cor-esqueleto-base) 0, var(--cor-esqueleto-luz) 50%, var(--cor-esqueleto-base) 100%);
   background-size: 200% 100%;
-  animation: brilho 1.4s linear infinite;
+  animation: brilho var(--duracao-skeleton) linear infinite;
 }
 
 @keyframes brilho {
@@ -609,7 +609,7 @@
   font-size: var(--tamanho-secundario);
   color: var(--cor-texto);
   padding: var(--espaco-4);
-  border-radius: var(--raio-md);
+  border-radius: var(--raio-sm);
   background: var(--cor-superficie-recuada);
 }
 
@@ -802,10 +802,6 @@
   white-space: nowrap;
 }
 
-.comErro .contagem b {
-  color: var(--cor-erro);
-}
-
 .escolherFoto {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -841,7 +837,7 @@
   position: absolute;
   left: var(--espaco-2);
   bottom: var(--espaco-2);
-  padding: 2px var(--espaco-2);
+  padding: var(--espaco-1) var(--espaco-2);
   border-radius: var(--raio-pill);
   background: var(--cor-acao);
   color: var(--cor-acao-texto);
@@ -852,8 +848,8 @@
 .ladoDoPar {
   display: inline-grid;
   grid-auto-flow: column;
-  gap: 2px;
-  padding: 3px;
+  gap: var(--espaco-1);
+  padding: var(--espaco-1);
   border-radius: var(--raio-pill);
   background: var(--cor-superficie-recuada);
   justify-self: start;
@@ -865,7 +861,7 @@
 }
 
 .adicionar:disabled {
-  opacity: 0.5;
+  opacity: var(--opacidade-desabilitado);
   cursor: not-allowed;
 }
 
