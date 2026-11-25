@@ -60,7 +60,7 @@ async function entrar(page: Page, baseUrl: string): Promise<void> {
   await page.getByLabel("E-mail").fill(EMAIL);
   await page.getByLabel("Senha").fill(SENHA);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
-  await page.waitForURL(/\/hoje\//);
+  await page.waitForURL(/\/hoje/);
   await page.waitForLoadState("networkidle");
 }
 
@@ -82,7 +82,10 @@ async function main(): Promise<void> {
     await page.getByRole("heading", { name: "As suas fotos" }).scrollIntoViewIfNeeded();
     await page.waitForTimeout(800);
     await page.screenshot({ path: path.join(pasta, `Escolher-fotos-saude.${t.rotulo}.Claro.png`) });
-    await page.locator("#t-fotos").screenshot({ path: path.join(pasta, `Escolher-fotos-saude-secao.${t.rotulo}.Claro.png`) });
+    await page.getByTestId("area-de-paciente").scrollIntoViewIfNeeded();
+    await page.mouse.wheel(0, 120);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(pasta, `Escolher-fotos-saude-paciente.${t.rotulo}.Claro.png`) });
     await page.goto(`${baseUrl}/criar/carrossel?id=${id}`);
     await page.waitForLoadState("networkidle");
     await page.getByRole("heading", { name: /pronto/i }).first().waitFor();
