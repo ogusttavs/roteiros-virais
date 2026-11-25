@@ -56,9 +56,8 @@ jobs:
 
       - run: npm run typecheck
 
-      # O Chromium do Playwright serve ao e2e e tambem aos testes de integracao (PNG do carrossel, motor da animacao): instala uma vez, antes de `npm run test`.
+      # E65: os testes de integracao do carrossel renderizam os slides no Chromium de verdade; ele precisa estar instalado antes de `npm run test` (o e2e, mais abaixo, usa o mesmo).
       - run: npx playwright install --with-deps chromium
-
       - run: npm run test
 
       # e2e roda contra o build de producao (next start), nao o next dev
@@ -66,6 +65,8 @@ jobs:
       # e PLAYWRIGHT_SEM_BUILD faz o webServer do playwright.config.ts so
       # iniciar o servidor com o que ja foi construido, sem buildar de novo.
       - run: npm run build
+
+      - run: npx playwright install --with-deps chromium
 
       - run: npm run test:e2e
         env:

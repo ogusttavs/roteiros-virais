@@ -11,29 +11,58 @@ export function carrosselAtivo(): boolean {
 export const TAMANHOS_DO_CARROSSEL = [5, 7, 9] as const;
 export type TamanhoDoCarrossel = (typeof TAMANHOS_DO_CARROSSEL)[number];
 
-/** A lista fechada de tipos de slide: a saída da IA só pode ter estes. */
-export const TIPOS_DE_SLIDE = ["capa-foto", "capa-texto", "passo", "item", "antes-depois", "dado", "prova-fala", "prova-resultado", "resumo", "chamada"] as const;
+/** Os tipos que a IA escreve (a lista fechada do schema). O `noticia` não está aqui: a capa de notícia (E66) é montada por código, não escrita no meio de um carrossel. */
+export const TIPOS_GERADOS = ["capa-foto", "capa-texto", "passo", "item", "antes-depois", "dado", "prova-fala", "prova-resultado", "resumo", "chamada"] as const;
+/** Todos os tipos que o render sabe desenhar: os onze do desenho (E65 PR 2). */
+export const TIPOS_DE_SLIDE = [...TIPOS_GERADOS, "noticia"] as const;
 export type TipoDeSlide = (typeof TIPOS_DE_SLIDE)[number];
 
-/** O limite de palavras de cada tipo de slide: o título e o corpo, contados em separado. Estourou, o verificador reprova e o render corta. */
-export const LIMITE_DE_PALAVRAS: Record<TipoDeSlide, { titulo: number; corpo: number }> = {
-  "capa-foto": { titulo: 12, corpo: 14 },
-  "capa-texto": { titulo: 12, corpo: 14 },
-  passo: { titulo: 8, corpo: 30 },
-  item: { titulo: 8, corpo: 30 },
-  // o corpo leva os dois lados ("Antes: ... Depois: ..."), até 16 palavras cada
-  "antes-depois": { titulo: 8, corpo: 34 },
-  // o título é o valor com a unidade ("42%"), o corpo é a frase
-  dado: { titulo: 3, corpo: 18 },
-  // o título é quem disse (sem sobrenome), o corpo é a citação, dita de verdade
-  "prova-fala": { titulo: 3, corpo: 28 },
-  "prova-resultado": { titulo: 12, corpo: 14 },
-  resumo: { titulo: 6, corpo: 35 },
-  chamada: { titulo: 10, corpo: 20 },
+/** Os campos de texto de um slide (as chaves do desenho, `entregaveis/design-v2/entrega/carrossel/README.md`, "Os campos de cada tipo"). */
+export type ChaveDeCampo = "rotulo" | "titulo" | "sub" | "texto" | "antes" | "depois" | "valor" | "unidade" | "frase" | "fonte" | "referencia" | "citacao" | "quem" | "contexto" | "veiculo" | "data";
+/** Os campos que são listas: as linhas do resumo e as ações da chamada. */
+export type ChaveDeLista = "linhas" | "acoes";
+
+/** O limite de um campo: palavras e caracteres (o teto duro), e se ele é obrigatório. */
+export type LimiteDeCampo = { palavras: number; caracteres: number; obrigatorio: boolean };
+const campo = (palavras: number, caracteres: number, obrigatorio = true): LimiteDeCampo => ({ palavras, caracteres, obrigatorio });
+
+/**
+ * Os campos de cada tipo e o limite de cada um (README do desenho, tabela "Os campos de cada tipo"). É a tabela que o código inteiro lê: o que a IA pode escrever, o que o código reprova,
+ * o que a pessoa pode trocar e o que o campo da tela mostra. Os limites "com foto" estão em `LIMITES_COM_FOTO`.
+ */
+export const CAMPOS_DO_TIPO: Record<TipoDeSlide, Partial<Record<ChaveDeCampo, LimiteDeCampo>>> = {
+  "capa-foto": { rotulo: campo(3, 24, false), titulo: campo(12, 70), sub: campo(14, 90, false) },
+  "capa-texto": { rotulo: campo(3, 24, false), titulo: campo(12, 70), sub: campo(14, 90, false) },
+  passo: { titulo: campo(8, 48), texto: campo(30, 180) },
+  item: { rotulo: campo(4, 30, false), titulo: campo(8, 48), texto: campo(30, 180) },
+  "antes-depois": { titulo: campo(8, 48), antes: campo(16, 90), depois: campo(16, 90) },
+  dado: { valor: campo(1, 6), unidade: campo(1, 5, false), frase: campo(18, 110), fonte: campo(12, 60), referencia: campo(14, 70) },
+  "prova-fala": { citacao: campo(28, 170), quem: campo(6, 40), contexto: campo(14, 80) },
+  "prova-resultado": { titulo: campo(12, 70) },
+  resumo: { titulo: campo(6, 36) },
+  chamada: { titulo: campo(10, 60), texto: campo(20, 120) },
+  noticia: { titulo: campo(14, 90), veiculo: campo(10, 60), data: campo(5, 20) },
 };
 
+/** Os limites das listas: o resumo leva de 3 a 5 linhas de até 7 palavras; a chamada leva 2 ações de até 4 palavras. */
+export const LISTAS_DO_TIPO: Partial<Record<TipoDeSlide, { chave: ChaveDeLista; minimo: number; maximo: number; palavras: number; caracteres: number }>> = {
+  resumo: { chave: "linhas", minimo: 3, maximo: 5, palavras: 7, caracteres: 45 },
+  chamada: { chave: "acoes", minimo: 2, maximo: 2, palavras: 4, caracteres: 30 },
+};
+
+/** Com foto no slide o texto tem menos lugar: o passo e o antes e depois ficam com limites menores (README do desenho). */
+export const LIMITES_COM_FOTO: Partial<Record<TipoDeSlide, Partial<Record<ChaveDeCampo, LimiteDeCampo>>>> = {
+  passo: { titulo: campo(6, 36), texto: campo(18, 110) },
+  "antes-depois": { antes: campo(7, 45), depois: campo(7, 45) },
+};
+
+/** O limite de um campo de um tipo, considerando se o slide leva foto. Ausente: o campo não existe nesse tipo. */
+export function limiteDoCampo(tipo: TipoDeSlide, chave: ChaveDeCampo, comFoto: boolean): LimiteDeCampo | undefined {
+  return (comFoto ? LIMITES_COM_FOTO[tipo]?.[chave] : undefined) ?? CAMPOS_DO_TIPO[tipo][chave];
+}
+
 /** Tipos que exigem uma foto do cliente (sem foto, não podem ser gerados). */
-export const TIPOS_COM_FOTO_OBRIGATORIA: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "prova-resultado"]);
+export const TIPOS_COM_FOTO_OBRIGATORIA: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "prova-resultado", "noticia"]);
 /** Tipos que não valem em ramo de saúde: o depoimento (fala de cliente) fica de fora até o Gustavo decidir outra coisa. Antes e depois e resultado valem, com a autorização do paciente (ver abaixo). */
 export const TIPOS_PROIBIDOS_NA_SAUDE: ReadonlySet<TipoDeSlide> = new Set(["prova-fala"]);
 /** Tipos cuja foto é de paciente: em ramo de saúde, pôr foto neles exige a confirmação de que a pessoa tem a autorização escrita do paciente (Resolução CFO 196/2019 para odontologia). */
@@ -42,8 +71,6 @@ export const TIPOS_COM_FOTO_DE_PACIENTE: ReadonlySet<TipoDeSlide> = new Set(["an
 export const LINHA_FIXA_ANTES_DEPOIS_SAUDE = "Imagens publicadas com autorização do paciente. O resultado varia de pessoa para pessoa.";
 /** A frase da recusa quando falta a autorização. */
 export const FRASE_SEM_AUTORIZACAO_DO_PACIENTE = "Para usar foto de paciente, confirme que você tem a autorização dele por escrito.";
-/** Tipos em que o corpo pode ficar vazio. */
-export const TIPOS_SEM_CORPO_OBRIGATORIO: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "capa-texto", "chamada", "prova-resultado"]);
 
 export const ehCapa = (tipo: TipoDeSlide): boolean => tipo === "capa-foto" || tipo === "capa-texto";
 
@@ -59,7 +86,7 @@ export const HASHTAGS = { min: 3, max: 5 } as const;
 export const MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO = 2;
 
 /** Quais tipos aceitam foto do cliente: o antes e depois aceita duas (a do antes e a do depois). */
-export const TIPOS_COM_FOTO: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "passo", "antes-depois", "prova-resultado"]);
+export const TIPOS_COM_FOTO: ReadonlySet<TipoDeSlide> = new Set(["capa-foto", "passo", "antes-depois", "prova-resultado", "noticia"]);
 
 /** As fotos do cliente: até 9 por carrossel, só estes tipos, com teto de tamanho. Nunca imagem gerada. */
 export const MAXIMO_DE_FOTOS = 9;
@@ -76,15 +103,53 @@ export type OrigemDoCarrossel = (typeof ORIGENS_DO_CARROSSEL)[number];
 export const ESTADOS_DO_CARROSSEL = ["gerado", "editado"] as const;
 export type EstadoDoCarrossel = (typeof ESTADOS_DO_CARROSSEL)[number];
 
-/** O que um slide guarda no banco. `fotoId` e `fotoDepoisId` apontam para `carrossel_fotos`; ausentes, as fotos do carrossel são distribuídas na ordem em que foram enviadas. */
+/**
+ * O que um slide guarda no banco: os campos do desenho (README, "Os campos de cada tipo"), só os que o tipo usa. `fotoId` e `fotoDepoisId` apontam para `carrossel_fotos`; ausentes, as fotos do carrossel são
+ * distribuídas na ordem em que foram enviadas. `numero` e `de` do passo, o `rodape` e o rótulo do passo são escritos por código, nunca pela IA.
+ */
 export type SlideDoCarrossel = {
   tipo: TipoDeSlide;
+  rotulo?: string;
   titulo: string;
-  corpo: string;
-  /** Só no tipo `dado`: a fonte com o ano ("Sebrae, 2025"). Nulo nos outros. */
-  fonte: string | null;
+  /** A linha de apoio das capas. */
+  sub?: string;
+  /** O texto do passo, do item e da chamada. */
+  texto?: string;
+  /** O passo: qual é e quantos são (por código). */
+  numero?: number;
+  de?: number;
+  antes?: string;
+  depois?: string;
+  /** O dado: o valor ("42"), a unidade ("%"), a frase que explica, quem publicou e o que é com o ano. Sem fonte e ano o slide não existe. */
+  valor?: string;
+  unidade?: string;
+  frase?: string;
+  fonte?: string | null;
+  referencia?: string;
+  /** A fala de um cliente: a frase dita de verdade, quem disse (sem sobrenome) e o contexto. */
+  citacao?: string;
+  quem?: string;
+  contexto?: string;
+  /** O resumo (3 a 5 linhas) e a chamada (2 ações). */
+  linhas?: string[];
+  acoes?: string[];
+  /** A capa de notícia (E66). */
+  veiculo?: string;
+  data?: string;
+  /** Só na chamada de ramo de saúde: o lugar de uma linha opcional "Responsável técnica" (CRO). Sem campo nem tela por enquanto (falta o sim do Gustavo); o modelo só desenha se vier preenchida. */
+  responsavel?: string;
+  /** O ponto da foto que fica no centro do recorte (`object-position`, por exemplo "50% 30%"). */
+  foco?: string;
   fotoId?: number | null;
   fotoDepoisId?: number | null;
-  /** Só em antes-depois de ramo de saúde: a linha fixa escrita por código (`LINHA_FIXA_ANTES_DEPOIS_SAUDE`), que o render desenha pequena no rodapé. */
+  /** Só em antes-depois e resultado de ramo de saúde: a linha fixa escrita por código (`LINHA_FIXA_ANTES_DEPOIS_SAUDE`), que o render desenha pequena no rodapé. */
   rodape?: string;
 };
+
+/** `fotoId` ou `fotoDepoisId` com este valor: a pessoa deixou o slide SEM foto de propósito (nulo é "receba as que sobraram, na ordem"). */
+export const SEM_FOTO = 0;
+
+/** A linha fixa do slide de resultado de paciente: escrita por código. */
+export const TEXTO_FIXO_DA_AUTORIZACAO = "Foto enviada pelo cliente e publicada com autorização.";
+/** O fim do contexto da fala de um cliente: escrito por código, para a fala nunca sair sem a autorização dita. */
+export const TEXTO_FIXO_DO_CONTEXTO_DA_FALA = "Publicado com autorização.";
