@@ -26,6 +26,8 @@ export type DadosDoModelo = {
   modo: ModoDoSlide;
   foto?: FotoParaOModelo | null;
   fotoDepois?: FotoParaOModelo | null;
+  /** Os seis fundos abstratos (JPEG em base64), na ordem; o slide leva um deles quando `fundoDoSlide` diz. Ausente, sem fundo. */
+  fundos?: string[] | null;
   /** As letras em base64 (woff2), ou nulas: sem elas, a letra do sistema. */
   fontes: { mona: string | null; mono: string | null };
 };
@@ -131,8 +133,8 @@ export function coresDoModo(marca: string, modo: ModoDoSlide): { fundo: string; 
 
 /** O piso do apoio (letra a partir de 26 px, "letra grande" para a acessibilidade) sobre a cor cheia. O desenho pede 4,5; com 4,0 o laranja do próprio exemplo dele (4,2) não é repintado. */
 export const CONTRASTE_MINIMO_DO_APOIO = 4;
-/** O piso do acento no claro, que só aparece em letra de 64 px ou mais ou como forma (desenho, "As variáveis"). */
-export const CONTRASTE_MINIMO_DO_ACENTO = 3;
+/** O piso do acento no claro, que só aparece em letra de 64 px ou mais ou como forma (desenho, "As variáveis": 3). Com 3,3 sobra folga para o fundo abstrato, que escurece um pouco o pano de trás. */
+export const CONTRASTE_MINIMO_DO_ACENTO = 3.3;
 
 function leBem(cor: string): boolean {
   const claro = coresDoModo(cor, "claro");
@@ -159,6 +161,24 @@ export function garantirLeitura(cor: string): { cor: string; escureceu: boolean 
   return { cor: atual, escureceu };
 }
 
+/** Quanto do fundo do modo cobre a imagem de fundo (o véu). Com 0,85 o texto passa de 4,5:1 mesmo no pior pixel que as imagens têm de verdade (medidos nos seis arquivos, ver abaixo): o teste confere. */
+export const VEU_DO_FUNDO = 0.85;
+
+/** O pixel mais escuro dos três fundos claros (medido em 25/11/2026: o mínimo é 171 de 255) e o mais claro dos três escuros (o máximo é 106), arredondados para o lado ruim para o texto. O tingimento da cor da marca mantém a luminosidade. */
+export const PIXEL_MAIS_ESCURO_DOS_FUNDOS_CLAROS = "#aaaaaa";
+export const PIXEL_MAIS_CLARO_DOS_FUNDOS_ESCUROS = "#6e6e6e";
+
+/** A cor de um pixel de fundo atrás do texto: o véu do modo por cima de um pixel qualquer da imagem (mistura simples em sRGB, como o navegador faz com cor e transparência). */
+export function fundoComVeu(fundoDoModo: string, pixel: string, veu = VEU_DO_FUNDO): string {
+  const [a, b] = [rgb(fundoDoModo), rgb(pixel)];
+  return paraHex(a.map((v, i) => v * veu + b[i] * (1 - veu)));
+}
+
+/** O pior fundo que o texto pode ter com a imagem: o pixel mais escuro sob o véu no modo claro (texto escuro), o mais claro sob o véu no escuro (texto claro). */
+export function piorFundoComImagem(marca: string, modo: "claro" | "escuro"): string {
+  return fundoComVeu(coresDoModo(marca, modo).fundo, modo === "claro" ? PIXEL_MAIS_ESCURO_DOS_FUNDOS_CLAROS : PIXEL_MAIS_CLARO_DOS_FUNDOS_ESCUROS);
+}
+
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // A ordem dos modos
 
@@ -180,6 +200,22 @@ export function modosDosSlides(slides: { tipo: TipoDeSlide; comFoto?: boolean }[
     modos.push(modo);
   });
   return modos;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Os fundos abstratos
+
+/** Os seis fundos (três claros, 1 a 3, e três escuros, 4 a 6). */
+export const NUMERO_DE_FUNDOS = 6;
+const TIPOS_COM_FUNDO: ReadonlySet<TipoDeSlide> = new Set(["item", "passo", "resumo", "prova-fala", "dado"]);
+
+/**
+ * Qual fundo (0 a 5) vai atrás do slide, ou nulo. Só os slides de texto, nos modos claro e escuro: nunca na cor cheia, nunca no antes e depois (as fotos mandam), nunca na capa, na chamada nem no passo com foto.
+ * Os claros pedem fundo claro e os escuros, fundo escuro; entre os três de cada lado a escolha anda com a posição do slide, para dois slides seguidos não repetirem.
+ */
+export function fundoDoSlide(tipo: TipoDeSlide, modo: ModoDoSlide, numero: number, temFoto: boolean): number | null {
+  if (modo === "marca" || !TIPOS_COM_FUNDO.has(tipo) || (tipo === "passo" && temFoto)) return null;
+  return (modo === "claro" ? 0 : 3) + (numero % 3);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -242,7 +278,7 @@ function miolo(d: DadosDoModelo, tipo: TipoDeSlide, fotoTopo: boolean): string {
         { k: "antes", texto: s.antes ?? "", foto: d.foto },
         { k: "depois", texto: s.depois ?? "", foto: d.fotoDepois },
       ];
-      const rodape = s.rodape ? `<p class="s-autorizado">${esc(s.rodape)}</p>` : "";
+      const rodape = s.rodape ? `<p class="s-autorizacao">${esc(s.rodape)}</p>` : "";
       const comFotos = Boolean(d.foto && d.fotoDepois);
       return (
         topo("Antes e depois") +
@@ -269,7 +305,7 @@ function miolo(d: DadosDoModelo, tipo: TipoDeSlide, fotoTopo: boolean): string {
     case "prova-resultado":
       return (
         topo("Resultado") +
-        `<div class="s-corpo">${bloco("", d.foto, s.foco)}<h2 class="s-titulo">${esc(s.titulo)}</h2><p class="s-autorizado">${esc(s.rodape ?? TEXTO_FIXO_DA_AUTORIZACAO)}</p></div>`
+        `<div class="s-corpo">${bloco("", d.foto, s.foco)}<h2 class="s-titulo">${esc(s.titulo)}</h2><p class="s-autorizacao">${esc(s.rodape ?? TEXTO_FIXO_DA_AUTORIZACAO)}</p></div>`
       );
     case "resumo":
       return (
@@ -282,7 +318,7 @@ function miolo(d: DadosDoModelo, tipo: TipoDeSlide, fotoTopo: boolean): string {
       return (
         topo("Agora é com você") +
         `<div class="s-corpo"><h2 class="s-titulo-capa">${esc(s.titulo)}</h2><p class="s-texto">${esc(s.texto ?? "")}</p>${d.arroba ? `<span class="s-arroba-grande">${esc(d.arroba)}</span>` : ""}` +
-        `<div class="s-acoes">${(s.acoes ?? []).map((a, i) => `<span class="s-acao"><span>${i === 0 ? ICONES.salvar : ICONES.mandar}</span>${esc(a)}</span>`).join("")}</div></div>`
+        `<div class="s-acoes">${(s.acoes ?? []).map((a, i) => `<span class="s-acao"><span>${i === 0 ? ICONES.salvar : ICONES.mandar}</span>${esc(a)}</span>`).join("")}</div>${s.responsavel ? `<p class="s-resp">${esc(s.responsavel)}</p>` : ""}</div>`
       );
     case "noticia": {
       const alto = topo("Notícia", `<span class="s-data">${esc(s.data ?? "")}</span>`);
@@ -305,10 +341,12 @@ export function slideHTML(d: DadosDoModelo): string {
   const modo: ModoDoSlide = tipo === "capa-texto" && d.slide.tipo === "capa-foto" ? "marca" : d.modo;
   const comFotoNoTopo = (tipo === "capa-foto" || tipo === "noticia") && temFoto;
   const fotoTopo = comFotoNoTopo && modo === "claro";
-  const classes = ["slide", comFotoNoTopo && !fotoTopo ? "foto-cheia" : "", fotoTopo ? "foto-topo" : "", tipo === "passo" && temFoto ? "com-foto" : ""].filter(Boolean).join(" ");
+  const qual = fundoDoSlide(tipo, modo, d.numero, temFoto);
+  const fundo = d.fundos && qual !== null ? (d.fundos[qual] ?? null) : null;
+  const classes = ["slide", fundo ? "fundo" : "", comFotoNoTopo && !fotoTopo ? "foto-cheia" : "", fotoTopo ? "foto-topo" : "", tipo === "passo" && temFoto ? "com-foto" : ""].filter(Boolean).join(" ");
   const pe = tipo === "chamada" ? `<footer class="s-pe"><span></span>${progresso(d.numero, d.total)}</footer>` : `<footer class="s-pe"><span class="s-arroba">${esc(d.arroba)}</span>${progresso(d.numero, d.total)}</footer>`;
   const sobre = tintaSobre(d.cor);
-  return `<article class="${classes}" data-tipo="${tipo}" data-modo="${modo}" data-pos="${d.numero}" data-total="${d.total}" style="--marca:${d.cor};--sobre-marca:${sobre}">${miolo(d, tipo, fotoTopo)}${pe}</article>`;
+  return `<article class="${classes}" data-tipo="${tipo}" data-modo="${modo}" data-pos="${d.numero}" data-total="${d.total}" style="--marca:${d.cor};--sobre-marca:${sobre}${fundo ? `;background-image:linear-gradient(color-mix(in srgb,var(--s-fundo) ${Math.round(VEU_DO_FUNDO * 100)}%,transparent),color-mix(in srgb,var(--s-fundo) ${Math.round(VEU_DO_FUNDO * 100)}%,transparent)),linear-gradient(color-mix(in srgb,var(--marca) 55%,transparent),color-mix(in srgb,var(--marca) 55%,transparent)),url(data:image/jpeg;base64,${fundo});background-blend-mode:normal,color,normal` : ""}">${miolo(d, tipo, fotoTopo)}${pe}</article>`;
 }
 
 function letras(fontes: DadosDoModelo["fontes"]): string {

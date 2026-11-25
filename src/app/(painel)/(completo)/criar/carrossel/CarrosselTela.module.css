@@ -858,3 +858,13 @@
   background: var(--cor-superficie-recuada);
   justify-self: start;
 }
+
+.subtitulo {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+}
+
+.adicionar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

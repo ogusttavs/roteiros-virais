@@ -19,6 +19,21 @@ export { distribuirFotos } from "./fotos";
 
 export type FotoDoCarrossel = { id: number; tipo: string; bytes: Buffer };
 
+let fundosEmBase64: string[] | undefined;
+
+/** Os seis fundos abstratos, lidos uma vez de `src/carrossel/fundos` (a imagem de produção os copia); se faltam, os slides saem com o fundo liso. */
+function fundosDoProjeto(): string[] | null {
+  if (fundosEmBase64 === undefined) {
+    try {
+      fundosEmBase64 = Array.from({ length: 6 }, (_, i) => readFileSync(path.join(process.cwd(), "src", "carrossel", "fundos", `fundo-0${i + 1}.jpg`)).toString("base64"));
+    } catch {
+      logger.warn("carrossel: os fundos abstratos nao foram achados, os slides saem com o fundo liso");
+      fundosEmBase64 = [];
+    }
+  }
+  return fundosEmBase64.length === 6 ? fundosEmBase64 : null;
+}
+
 const fontesEmBase64: Record<string, string | null> = {};
 
 /** Uma letra do projeto, lida uma vez; se o arquivo não está onde se espera (a imagem de produção copia `src/ui/fontes`), o render segue com a letra do sistema. */
@@ -55,6 +70,7 @@ export async function renderizarSlides(entrada: {
   const escolhidas = distribuirFotos(entrada.slides, entrada.fotos);
   const modos = modosDosSlides(entrada.slides.map((s, i) => ({ tipo: s.tipo, comFoto: escolhidas[i].foto !== null })));
   const fontes = { mona: letraDoProjeto("monasans-latin.woff2"), mono: letraDoProjeto("jetbrainsmono-latin.woff2") };
+  const fundos = fundosDoProjeto();
   const escala = Math.min(1, Math.max(0.1, entrada.escala ?? 1));
 
   const slides = await comLimiteDeChromium(async () => {
@@ -75,6 +91,7 @@ export async function renderizarSlides(entrada: {
           modo: modos[i],
           foto,
           fotoDepois: paraModelo(escolhidas[i].fotoDepois),
+          fundos,
           fontes,
         });
         await comTempoLimite(pagina.setContent(html, { waitUntil: "load" }), "tempo esgotado montando o slide");

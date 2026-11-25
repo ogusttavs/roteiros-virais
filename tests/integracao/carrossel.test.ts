@@ -531,6 +531,37 @@ describe("saúde: toda foto exige a autorização do paciente (E65 PR 2)", () =>
   });
 });
 
+describe("saúde: o texto não promete resultado nem prazo", () => {
+  it("a geração reprova a promessa e refaz; a troca de texto pela pessoa é barrada com a frase do desenho; fora da saúde passa", async () => {
+    const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude-promessa", nome: "Veterinaria promessa", termos: [], ramoCatalogo: "veterinaria-e-pet" }).returning();
+    const saude = await criarCliente(nichoSaude.id);
+    const comum = await criarCliente();
+    const c = await gerarCarrossel(saude, pedidoLivre("cuidados com o pelo [mock:carrossel-promessa]", 5));
+    const geracoes = await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, saude)));
+    expect(geracoes).toHaveLength(2);
+    expect(geracoes.map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/não pode prometer resultado, cura, garantia nem prazo/);
+    expect(JSON.stringify(c.slides)).not.toMatch(/volta ao branco/);
+    await expect(trocarSlide(saude, c.id, 1, { campos: { texto: "O dente volta ao branco em uma sessão" } })).rejects.toThrow(/Em saúde, o slide não pode prometer resultado nem prazo\. Tire “volta ao branco”\./);
+    expect((await carrosselDaMarca(saude, c.id))!.slides[1].texto).toBe(c.slides[1].texto);
+    const outro = await gerarCarrossel(comum, pedidoLivre("mancha de vinho no estofado", 5));
+    const livre = await trocarSlide(comum, outro.id, 1, { campos: { texto: "O sofá volta ao branco em uma sessão" } });
+    expect(livre.slides[1].texto).toMatch(/uma sessão/);
+  });
+
+  it("a chamada tem o lugar da linha de responsável técnica: some se vazia e aparece se preenchida, sem campo na troca de texto", async () => {
+    const { renderizarSlides } = await import("@/carrossel/render");
+    const chamada = { tipo: "chamada" as const, titulo: "Quer saber mais?", texto: "Traga a sua dúvida", acoes: ["Salve", "Mande"] };
+    const sem = await renderizarSlides({ slides: [chamada], fotos: [], cor: "#0e5a6a", arroba: "@clinica.exemplo", escala: 0.3 });
+    const com = await renderizarSlides({ slides: [{ ...chamada, responsavel: "Responsável técnica: Dra. [nome] · CRO-[UF] [número]" }], fotos: [], cor: "#0e5a6a", arroba: "@clinica.exemplo", escala: 0.3 });
+    expect(sem.slides[0].precisaEncurtar).toBe(false);
+    expect(com.slides[0].precisaEncurtar).toBe(false);
+    expect(Buffer.compare(sem.png[0], com.png[0])).not.toBe(0);
+    const clienteId = await criarCliente();
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado", 5));
+    await expect(trocarSlide(clienteId, c.id, c.slides.length - 1, { campos: { responsavel: "x" } as never })).rejects.toThrow(/não tem esse campo/);
+  }, 60_000);
+});
+
 describe("a cor da marca", () => {
   it("trocar a cor grava na marca certa, escurece a clara demais com o aviso e nunca toca a de outra marca", async () => {
     const dona = await criarCliente();

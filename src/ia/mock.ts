@@ -644,6 +644,7 @@ function mockCarrossel(entrada: string) {
   if (marcado("carrossel-prova-fala-outro")) slides[1] = { ...vazio, tipo: "prova-fala", texto: tema, quem: "Ana", contexto: "Cliente" };
   if (marcado("carrossel-prova-fala-cliente")) slides[1] = { ...vazio, tipo: "prova-fala", texto: "relaxa que sai sim", quem: "Ana", contexto: "Cliente" };
   if (marcado("carrossel-numero-solto")) slides[1].texto = "Nove em cada dez pessoas, 87% delas, erram isso todo mês.";
+  if (marcado("carrossel-promessa")) slides[1].texto = "Com o clareamento, o dente volta ao branco em uma sessão.";
   if (marcado("carrossel-resumo")) slides[1] = { ...vazio, tipo: "resumo", titulo: "Para guardar", linhas: ["Deixe agir antes", "Um produto por vez", "Banheiro aberto"] };
   return {
     slides,

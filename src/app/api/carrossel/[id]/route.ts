@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { idDoParametro, marcaDoCarrossel, respostaDeErro, respostaDoErroDoCarrossel, SEM_CACHE } from "@/lib/porta-do-carrossel";
-import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { distribuirFotos } from "@/carrossel/fotos";
 import { slidesComFoto } from "@/carrossel/regras";
+import { idDoParametro, marcaDoCarrossel, respostaDeErro, respostaDoErroDoCarrossel, SEM_CACHE } from "@/lib/porta-do-carrossel";
+import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { carrosselDaMarca, fotosDoCarrossel, trocarCor, trocarSlide } from "@/servicos/carrossel";
 import { textosCarrossel } from "@/textos/carrossel";
 

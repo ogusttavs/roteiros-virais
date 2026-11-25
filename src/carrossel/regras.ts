@@ -195,6 +195,12 @@ export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: { 
       if (!TEM_ANO.test(`${s.referencia ?? ""} ${s.fonte ?? ""}`)) motivos.push(`slide ${n} (dado): a referência precisa ter o ano ("O que é, 2026")`);
       if (!/\d/.test(s.valor ?? "")) motivos.push(`slide ${n} (dado): um dado tem número, e este não tem`);
     }
+    if (opcoes.ramoSaude) {
+      for (const texto of textoDoSlide(s)) {
+        const promessa = promessaEmSaude(texto);
+        if (promessa) motivos.push(`slide ${n}: em saúde o slide não pode prometer resultado, cura, garantia nem prazo; tire "${promessa}"`);
+      }
+    }
     if (opcoes.ramoSaude && TIPOS_PROIBIDOS_NA_SAUDE.has(s.tipo)) motivos.push(`slide ${n}: o tipo "${s.tipo}" não vale num ramo de saúde`);
     if (s.tipo === "prova-fala" && falasNormalizadas !== null) {
       const citacao = semAcentoMinusculo(s.citacao ?? "");
@@ -204,6 +210,36 @@ export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: { 
     }
   });
   return motivos;
+}
+
+/** Letra sem acento e em minúscula, uma por uma (o texto fica com o mesmo tamanho, para o trecho achado voltar como a pessoa escreveu). */
+const semAcentoLetraPorLetra = (t: string): string => Array.from(t, (c) => c.normalize("NFD")[0].toLowerCase()).join("");
+
+/**
+ * O que um slide de ramo de saúde não pode prometer: resultado, cura, garantia nem PRAZO ("em uma sessão", "em 7 dias"). O conselho da profissão proíbe (R-CONF-07). Devolve o primeiro trecho achado,
+ * como a pessoa escreveu, ou nulo. A tela barra a troca de texto e o código reprova a geração com isto.
+ */
+const PROMESSAS_DE_SAUDE: RegExp[] = [
+  /\bem (?:apenas |so |ate |somente )?(?:uma?|duas?|tres|quatro|cinco|\d+) (?:sessao|sessoes|consulta|consultas|dia|dias|semana|semanas|hora|horas|mes|meses)\b/,
+  /\bgarant(?:ido|ida|idos|idas|imos|ir|ia|o|e)\b/,
+  /\bresultados? (?:garantid|imediat|certo|rapid|definitiv)\w*/,
+  /\bvolta ao branco/,
+  /\bficam? branc[oa]s?\b/,
+  /\b(?:cura|curar|curamos|curado|curada)\b/,
+  /100 ?%/,
+  /\b(?:para sempre|definitivamente|definitiv[oa]s?)\b/,
+  /\bsem dor\b/,
+  /\bsem riscos?\b/,
+];
+
+export function promessaEmSaude(texto: string): string | null {
+  const baixo = semAcentoLetraPorLetra(texto);
+  let primeiro: { inicio: number; fim: number } | null = null;
+  for (const padrao of PROMESSAS_DE_SAUDE) {
+    const m = padrao.exec(baixo);
+    if (m && (primeiro === null || m.index < primeiro.inicio)) primeiro = { inicio: m.index, fim: m.index + m[0].length };
+  }
+  return primeiro ? texto.slice(primeiro.inicio, primeiro.fim).trim() : null;
 }
 
 /** A legenda e as hashtags. */

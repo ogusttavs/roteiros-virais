@@ -231,7 +231,7 @@ export const ESTILO_DOS_SLIDES = `
 .s-quem b { font-weight: 700; color: var(--s-texto); }
 .slide[data-tipo="prova-resultado"] .s-corpo { gap: 32px; }
 .slide[data-tipo="prova-resultado"] .s-foto { flex: 1 1 auto; min-height: 0; }
-.s-autorizado { font: 500 26px/1.3 "JetBrains Mono", Consolas, monospace; color: var(--s-suave); }
+.s-autorizacao { font: 500 26px/1.3 "JetBrains Mono", Consolas, monospace; color: var(--s-suave); }
 
 /* ---------- Tipo: resumo ---------- */
 .slide[data-tipo="resumo"] .s-corpo { justify-content: center; gap: 44px; }
@@ -270,4 +270,15 @@ export const ESTILO_DOS_SLIDES = `
 .slide.foto-topo.ajustado .s-titulo-capa { font-size: 72px; }
 .s-de-onde { font: 500 var(--s-fonte)/1.35 "JetBrains Mono", Consolas, monospace; color: var(--s-suave); }
 .s-de-onde b { font-weight: 700; color: var(--s-texto); }
+
+/* ---------- Os fundos abstratos (canvas de sexta, 25/11/2026) ----------
+   So nos slides de texto, nunca no lugar de foto: o desenho abstrato tingido pela cor da marca (modo de mistura "cor") e, POR CIMA, um veu da cor do fundo do modo, que segura o contraste do texto
+   no pior pixel que o fundo pode ter (o teste confere). A imagem entra inline em cada slide (modelos.ts, fundoDoSlide). */
+.slide.fundo {
+  background-size: cover;
+  background-position: center;
+}
+
+/* ---------- Responsavel tecnica (so o lugar: sem campo nem tela por enquanto) ---------- */
+.s-resp { font: 500 24px/1.3 "JetBrains Mono", Consolas, monospace; color: var(--s-suave); }
 `;

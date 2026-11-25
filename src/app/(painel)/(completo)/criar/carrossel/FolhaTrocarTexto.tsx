@@ -3,8 +3,8 @@
 import { CircleAlert } from "lucide-react";
 import { useId, useState } from "react";
 
+import { camposEditaveis, contarPalavras, excessoDoCampo, promessaEmSaude } from "@/carrossel/regras";
 import { LISTAS_DO_TIPO, limiteDoCampo, type ChaveDeCampo, type SlideDoCarrossel } from "@/config/carrossel";
-import { camposEditaveis, contarPalavras, excessoDoCampo } from "@/carrossel/regras";
 import { textosCarrossel as t } from "@/textos/carrossel";
 import { Botao } from "@/ui/componentes/Botao";
 import { Folha } from "@/ui/componentes/Folha";
@@ -22,8 +22,17 @@ type Props = {
   slide: SlideDoCarrossel;
   /** O slide leva foto: os limites de passo e de antes e depois são os menores. */
   comFoto: boolean;
+  /** Marca de saúde: o texto também não pode prometer resultado nem prazo (a mesma regra do servidor). */
+  ramoSaude: boolean;
   aoSalvar: (carrossel: CarrosselDaTela) => void;
 };
+
+/** "Passo 2 de 4", "Causa 2 de 3" ou o nome do tipo: de qual slide se trata (como no desenho). */
+function rotuloDoSlide(slide: SlideDoCarrossel, nomeDoTipo: string): string {
+  if (slide.tipo === "passo" && slide.numero && slide.de) return `Passo ${slide.numero} de ${slide.de}`;
+  if (slide.rotulo && slide.tipo === "item") return slide.rotulo;
+  return nomeDoTipo.charAt(0).toUpperCase() + nomeDoTipo.slice(1);
+}
 
 function valorInicial(slide: SlideDoCarrossel, chave: ChaveDeCampo): string {
   const v = slide[chave as keyof SlideDoCarrossel];
@@ -56,7 +65,7 @@ function CampoDeTexto({ chave, valor, erro, contagem, aoMudar }: { chave: ChaveD
  * A folha "Trocar o texto do slide N": um campo por pedaço do slide (os do tipo, na ordem do desenho), cada um com a conta de palavras e o limite. Passou do limite, o campo mostra quanto passou e o
  * botão fica parado até caber (o servidor confere de novo). Salvar refaz o slide.
  */
-export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto, aoSalvar }: Props) {
+export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto, ramoSaude, aoSalvar }: Props) {
   const chaves = camposEditaveis(slide.tipo);
   const lista = LISTAS_DO_TIPO[slide.tipo];
   const [valores, setValores] = useState<Record<string, string>>(() => Object.fromEntries(chaves.map((c) => [c, valorInicial(slide, c)])));
@@ -70,7 +79,10 @@ export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto
     const excesso = excessoDoCampo(slide.tipo, chave, valor, comFoto);
     const porPalavras = (limite?.palavras ?? 0) > 1;
     const contagem = porPalavras ? t.contagem(contarPalavras(valor), limite?.palavras ?? 0) : t.contagemCaracteres(valor.trim().length, limite?.caracteres ?? 0);
-    if (!excesso) return { erro: null, contagem };
+    if (!excesso) {
+      const promessa = ramoSaude ? promessaEmSaude(valor) : null;
+      return { erro: promessa ? t.promessaEmSaude(promessa) : null, contagem };
+    }
     if (excesso.tipo === "vazio") return { erro: t.campoVazio, contagem };
     return { erro: excesso.tipo === "palavras" ? t.passou(excesso.n) : t.passouCaracteres(excesso.n), contagem };
   }
@@ -81,6 +93,8 @@ export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto
     if (!v.trim()) return t.campoVazio;
     const palavras = contarPalavras(v);
     if (palavras > lista.palavras) return t.passou(palavras - lista.palavras);
+    const promessa = ramoSaude ? promessaEmSaude(v) : null;
+    if (promessa) return t.promessaEmSaude(promessa);
     if (v.trim().length > lista.caracteres) return t.passouCaracteres(v.trim().length - lista.caracteres);
     return null;
   };
@@ -121,7 +135,7 @@ export function FolhaTrocarTexto({ aoFechar, carrosselId, indice, slide, comFoto
       }
     >
       <div className={estilos.folhaCorpo}>
-        <p>{t.trocarTextoAjuda(t.nomeDoTipo[slide.tipo] ?? slide.tipo)}</p>
+        <p>{t.trocarTextoAjuda(rotuloDoSlide(slide, t.nomeDoTipo[slide.tipo] ?? slide.tipo))}</p>
         {chaves.map((chave) => {
           const { erro, contagem } = avisoDoCampo(chave);
           return <CampoDeTexto key={chave} chave={chave} valor={valores[chave] ?? ""} erro={erro} contagem={contagem} aoMudar={(v) => setValores((a) => ({ ...a, [chave]: v }))} />;

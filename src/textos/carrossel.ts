@@ -1,3 +1,5 @@
+import { LINHA_FIXA_ANTES_DEPOIS_SAUDE } from "@/config/carrossel";
+
 /**
  * Os textos da tela "Criar carrossel" (E65 PR 2, `/criar/carrossel`, só com `CARROSSEL_ATIVO` ligada). Vêm da seção "Os textos da tela" do desenho (`entregaveis/design-v2/entrega/carrossel/README.md`),
  * com as trocas que a verdade do código pede: sem a contagem "neste mês" (o limite por mês é a E64, ainda não existe), sem "ele fica em Hoje" (o carrossel não aparece em Hoje), e o estado do limite
@@ -31,7 +33,7 @@ export const textosCarrossel = {
 
   // As fotos
   fotosTitulo: "As suas fotos",
-  fotosAjuda: "O lugar, o seu trabalho, o resultado. De 1 a 9 fotos: a gente escolhe onde cada uma entra, e você troca depois.",
+  fotosAjuda: "O lugar, a equipe, o seu trabalho. A gente escolhe onde cada uma entra, e você troca depois.",
   mandarFotos: "Mandar fotos",
   fotoN: (n: number) => `foto ${n}`,
   tirarFoto: (n: number) => `Tirar a foto ${n}`,
@@ -39,10 +41,15 @@ export const textosCarrossel = {
   fotoGrandeDemais: "Essa foto passa de 6 MB. Mande uma menor.",
   fotoNaoValida: "Mande fotos em jpg, png ou webp.",
 
-  // Foto de paciente (marca de saúde)
+  // Foto de paciente (marca de saúde; canvas de sexta, E65-Tela-Autorizacao)
+  pacienteTitulo: "Fotos de paciente, para o antes e depois",
+  pacienteAjuda: "Em saúde, foto de paciente só entra com a autorização dele por escrito. E só o antes e o depois: nada do procedimento acontecendo.",
   autorizacaoPaciente: "Tenho a autorização por escrito do paciente",
-  autorizacaoPacienteAjuda: "Na saúde, foto de paciente só com o termo assinado por ele, como pede o conselho da sua profissão. O slide leva uma linha avisando isso.",
-  autorizacaoPrecisa: "Marque que você tem a autorização do paciente para mandar a foto.",
+  autorizacaoPacienteAjuda: "Guarde a autorização assinada com você. Ela vale para estas fotos, neste carrossel.",
+  autorizacaoPrecisa: "Marque a autorização acima para mandar as fotos.",
+  linhaFixaNoSlide: `No slide de antes e depois sai sempre a linha: “${LINHA_FIXA_ANTES_DEPOIS_SAUDE}”`,
+  linhaFixaNaoEdita: "Este slide leva a linha da autorização do paciente. Ela sempre sai, do mesmo tamanho, e não dá para editar.",
+  promessaEmSaude: (trecho: string) => `Em saúde, o slide não pode prometer resultado nem prazo. Tire “${trecho}”.`,
 
   // Como vai sair
   comoSai: "Como vai sair",
@@ -66,13 +73,16 @@ export const textosCarrossel = {
   etapaTexto: (n: number) => `Escrevendo o texto dos ${n} slides`,
   etapaConferindo: "Conferindo os dados e as fontes",
   etapaConferindoDica: "Número só entra com de onde veio e o ano.",
+  etapaConferindoSaude: "Conferindo o texto com as regras de saúde",
+  etapaConferindoSaudeDica: "Sem preço, sem promessa de resultado, sem prazo. Número só entra com de onde veio e o ano.",
+  etapaFotosSaude: "Encaixando as fotos, a autorização do paciente e a cor da marca",
   etapaFotos: (fotos: number) => (fotos > 0 ? `Encaixando as suas ${fotos} ${fotos === 1 ? "foto" : "fotos"} e a cor da marca` : "Encaixando a cor da marca"),
   feito: ", feito",
 
   // Pronto
   prontoData: (n: number) => `Pronto · ${n} slides`,
   prontoTitulo: "O seu carrossel está pronto",
-  prontoAjuda: "Arraste para ver todos. Toque num slide para trocar o texto ou a foto.",
+  prontoAjuda: "Arraste para ver todos. Toque num slide para trocar o texto ou as fotos.",
   faixaAria: (n: number) => `Os ${n} slides`,
   slideAria: (n: number, total: number) => `Slide ${n} de ${total}`,
   slideDe: (n: number, total: number) => `Slide ${n} de ${total}`,
@@ -92,6 +102,7 @@ export const textosCarrossel = {
   nomeCurtoDoTipo: { "capa-foto": "Capa", "capa-texto": "Capa", passo: "Passo", item: "Dica", "antes-depois": "Antes e depois", dado: "Dado", "prova-fala": "Fala", "prova-resultado": "Resultado", resumo: "Resumo", chamada: "Chamada", noticia: "Notícia" } as Record<string, string>,
   trocarTexto: "Trocar o texto",
   trocarFoto: "Trocar a foto",
+  trocarFotos: "Trocar as fotos",
   porFoto: "Pôr uma foto",
   precisaEncurtar: "O texto deste slide não coube. Toque em Trocar o texto e encurte.",
   precisaEncurtarAviso: (n: number) => (n === 1 ? "Um slide tem texto grande demais e precisa ser encurtado antes de postar." : `${n} slides têm texto grande demais e precisam ser encurtados antes de postar.`),
@@ -115,7 +126,7 @@ export const textosCarrossel = {
 
   // Trocar o texto
   trocarTextoTitulo: (n: number) => `Trocar o texto do slide ${n}`,
-  trocarTextoAjuda: (tipo: string) => `Tipo do slide: ${tipo}. O limite de palavras é o que cabe no slide sem a letra ficar pequena no celular.`,
+  trocarTextoAjuda: (rotulo: string) => `${rotulo}. O limite de palavras é o que cabe no slide sem a letra ficar pequena no celular.`,
   contagem: (usadas: number, limite: number) => `${usadas} de ${limite} palavras`,
   contagemCaracteres: (usados: number, limite: number) => `${usados} de ${limite} caracteres`,
   passou: (n: number) => `Passou ${n} ${n === 1 ? "palavra" : "palavras"}. Encurte para caber.`,
@@ -164,6 +175,7 @@ export const textosCarrossel = {
   erroRotulo: "Não deu certo",
   erroTitulo: "O carrossel não ficou pronto",
   erroAjuda: "Tivemos um problema ao montar os slides. As suas fotos e as suas escolhas continuam aqui.",
+  erroAjudaSaude: "Tivemos um problema ao montar os slides. As suas fotos, a autorização do paciente e as suas escolhas continuam aqui.",
 
   // Limite (o teto do teste ou a assinatura)
   limiteTitulo: "Não dá para criar mais carrosséis agora",

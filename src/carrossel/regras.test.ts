@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { LINHA_FIXA_ANTES_DEPOIS_SAUDE, type SlideDoCarrossel } from "@/config/carrossel";
 
-import { excessoDoCampo, motivoDoCampo, normalizarHashtags, slidesComFoto, slidesDaSaida, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides, type SlideDaSaida } from "./regras";
+import { excessoDoCampo, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFoto, slidesDaSaida, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides, type SlideDaSaida } from "./regras";
 
 const s = (tipo: SlideDoCarrossel["tipo"], extra: Partial<SlideDoCarrossel> = {}): SlideDoCarrossel => {
   const base: Record<string, Partial<SlideDoCarrossel>> = {
@@ -147,5 +147,28 @@ describe("legenda e hashtags", () => {
   });
   it("normaliza: põe o #, tira espaço e repetição", () => {
     expect(normalizarHashtags(["dicas", "#Dicas", " # nova ", "##x"])).toEqual(["#dicas", "#nova", "#x"]);
+  });
+});
+
+describe("promessaEmSaude", () => {
+  it("acha resultado, cura, garantia e prazo, devolvendo o trecho como a pessoa escreveu", () => {
+    expect(promessaEmSaude("Com o clareamento, o dente volta ao branco em uma sessão.")).toBe("volta ao branco");
+    expect(promessaEmSaude("O resultado sai Em 7 dias")).toBe("Em 7 dias");
+    expect(promessaEmSaude("Tratamento com resultado garantido")).toBe("resultado garantido");
+    expect(promessaEmSaude("A gente cura a sua dor")).toBe("cura");
+    expect(promessaEmSaude("Fica 100% limpo")).toBe("100%");
+    expect(promessaEmSaude("Clareamento definitivo")).toBe("definitivo");
+    expect(promessaEmSaude("Sem dor nenhuma")).toBe("Sem dor");
+  });
+  it("não pega texto comum de saúde (avaliação, cuidado, passos, curativo)", () => {
+    expect(promessaEmSaude("Na consulta, a dentista avalia se a limpeza resolve antes de falar em clarear.")).toBeNull();
+    expect(promessaEmSaude("Escove por 2 minutos, duas vezes por dia")).toBeNull();
+    expect(promessaEmSaude("Passe o curativo e espere")).toBeNull();
+    expect(promessaEmSaude("O resultado varia de pessoa para pessoa.")).toBeNull();
+  });
+  it("a geração de saúde reprova o slide que promete; fora da saúde a mesma frase passa", () => {
+    const slide = s("item", { texto: "Volta ao branco em uma sessão" });
+    expect(verificarLimitesDosSlides([slide], { ramoSaude: true }).join()).toMatch(/não pode prometer resultado, cura, garantia nem prazo; tire "Volta ao branco"/);
+    expect(verificarLimitesDosSlides([slide], { ramoSaude: false })).toEqual([]);
   });
 });

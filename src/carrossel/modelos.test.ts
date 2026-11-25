@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { carrosselAtivo, SEM_FOTO, TIPOS_DE_SLIDE, type SlideDoCarrossel, type TipoDeSlide } from "@/config/carrossel";
 
-import { contraste, coresDoModo, corValida, garantirLeitura, misturarOklab, modosDosSlides, slideHTML, tintaSobre, type DadosDoModelo, type ModoDoSlide } from "./modelos";
+import { contraste, coresDoModo, corValida, fundoDoSlide, garantirLeitura, misturarOklab, modosDosSlides, piorFundoComImagem, slideHTML, tintaSobre, VEU_DO_FUNDO, type DadosDoModelo, type ModoDoSlide } from "./modelos";
 import { distribuirFotos } from "./render";
 import { crc32, montarZip } from "./zip";
 
@@ -166,6 +166,49 @@ describe("slideHTML", () => {
     const html = slideHTML(dados("capa-foto", "escuro", { slide: { ...SLIDE["capa-foto"], foco: 'x" onerror="alert(1)' } }));
     expect(html).toContain("object-position:50% 50%");
     expect(html).not.toContain("onerror");
+  });
+});
+
+describe("os fundos abstratos", () => {
+  it("só os slides de texto nos modos claro e escuro levem fundo; nunca a cor cheia, o antes e depois, a capa, a chamada nem o passo com foto", () => {
+    expect(fundoDoSlide("item", "claro", 2, false)).toBe(2);
+    expect(fundoDoSlide("item", "escuro", 3, false)).toBe(3);
+    expect(fundoDoSlide("resumo", "claro", 6, false)).toBe(0);
+    expect(fundoDoSlide("item", "marca", 2, false)).toBeNull();
+    expect(fundoDoSlide("antes-depois", "claro", 4, false)).toBeNull();
+    expect(fundoDoSlide("capa-texto", "claro", 1, false)).toBeNull();
+    expect(fundoDoSlide("chamada", "escuro", 7, false)).toBeNull();
+    expect(fundoDoSlide("passo", "claro", 2, true)).toBeNull();
+    expect(fundoDoSlide("passo", "claro", 2, false)).not.toBeNull();
+    // claros pedem os fundos 1 a 3 e escuros, 4 a 6
+    for (let n = 1; n <= 9; n += 1) {
+      expect(fundoDoSlide("item", "claro", n, false)!).toBeLessThan(3);
+      expect(fundoDoSlide("item", "escuro", n, false)!).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("o fundo entra no slide de texto com o véu da cor do modo por cima, e o antes e depois fica liso", () => {
+    const fundos = ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"];
+    const item = slideHTML(dados("item", "claro", { fundos }));
+    expect(item).toContain("url(data:image/jpeg;base64,CCC)");
+    expect(item).toContain("background-blend-mode:normal,color,normal");
+    expect(item).toContain(`${Math.round(VEU_DO_FUNDO * 100)}%`);
+    expect(slideHTML(dados("antes-depois", "claro", { fundos }))).not.toContain("base64,");
+    expect(slideHTML(dados("item", "marca", { fundos }))).not.toContain("jpeg");
+    expect(slideHTML(dados("item", "claro"))).not.toContain("jpeg");
+  });
+
+  it("o contraste continua passando no PIOR pixel que as imagens têm de verdade (o mais escuro dos claros, o mais claro dos escuros), com cores escura, laranja e a amarela já escurecida", () => {
+    for (const cor of ["#0e5a6a", "#e8641c", garantirLeitura("#f5d90a").cor, "#c2185b", "#1f5c3a"]) {
+      for (const modo of ["claro", "escuro"] as const) {
+        const c = coresDoModo(cor, modo);
+        const pior = piorFundoComImagem(cor, modo);
+        expect(contraste(c.titulo, pior), `${cor} ${modo} título`).toBeGreaterThanOrEqual(4.5);
+        expect(contraste(c.texto, pior), `${cor} ${modo} texto`).toBeGreaterThanOrEqual(4.5);
+        expect(contraste(c.suave, pior), `${cor} ${modo} apoio (letra de 26 px ou mais: o piso da letra grande é 3, aqui 3,5)`).toBeGreaterThanOrEqual(3.5);
+        expect(contraste(c.acento, pior), `${cor} ${modo} acento`).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 });
 

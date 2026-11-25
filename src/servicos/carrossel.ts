@@ -7,7 +7,7 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import { corValida, garantirLeitura } from "@/carrossel/modelos";
-import { motivoDoCampo, normalizarHashtags, slidesComFoto, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
+import { motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFoto, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
 import {
   CAMPOS_DO_TIPO,
   COR_NEUTRA,
@@ -36,6 +36,7 @@ import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
+import { textosCarrossel } from "@/textos/carrossel";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
@@ -401,6 +402,14 @@ export async function trocarSlide(clienteId: number, carrosselId: number, indice
   const depoisDaFoto = atual.slides.map((s, i) => (i === indice ? { ...s, fotoId: mudanca.fotoId === undefined ? s.fotoId : mudanca.fotoId, fotoDepoisId: mudanca.fotoDepoisId === undefined ? s.fotoDepoisId : mudanca.fotoDepoisId } : s));
   const comFoto = slidesComFoto(depoisDaFoto, fotos.length)[indice];
   const motivos = motivosDaMudanca(slideAntes, mudanca, comFoto, nomesDosCampos);
+  // Em ramo de saúde o texto trocado pela pessoa também não pode prometer resultado, cura, garantia nem prazo (R-CONF-07, o mesmo que reprova a geração).
+  const textosNovos = [...Object.values(mudanca.campos ?? {}), ...(mudanca.listas?.linhas ?? []), ...(mudanca.listas?.acoes ?? [])];
+  if (motivos.length === 0 && textosNovos.length > 0 && (await marcaEhDeSaude(clienteId))) {
+    for (const texto of textosNovos) {
+      const promessa = promessaEmSaude(texto);
+      if (promessa) motivos.push(textosCarrossel.promessaEmSaude(promessa));
+    }
+  }
   if (motivos.length > 0) throw new ErroCarrossel(motivos.join(" "), "pedido-invalido");
   const slides = atual.slides.map((s, i) => {
     if (i !== indice) return s;

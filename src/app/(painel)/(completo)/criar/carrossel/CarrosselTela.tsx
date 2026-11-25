@@ -281,7 +281,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
                 {t.erroRotulo}
               </p>
               <h3>{t.erroTitulo}</h3>
-              <p>{mensagem && mensagem !== t.erroAjuda ? `${mensagem} ` : ""}{t.erroAjuda}</p>
+              <p>{mensagem && mensagem !== t.erroAjuda && mensagem !== t.erroAjudaSaude ? `${mensagem} ` : ""}{ramoSaude ? t.erroAjudaSaude : t.erroAjuda}</p>
               <Botao type="button" onClick={() => void criar()}>
                 {t.tentarDeNovo}
               </Botao>
@@ -338,6 +338,19 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
           <section className={estilos.bloco} aria-labelledby="t-fotos">
             <h2 id="t-fotos">{t.fotosTitulo}</h2>
             <p className={estilos.ajuda}>{t.fotosAjuda}</p>
+            {ramoSaude ? (
+              <div className={estilos.bloco}>
+                <h3 className={estilos.subtitulo}>{t.pacienteTitulo}</h3>
+                <p className={estilos.ajuda}>{t.pacienteAjuda}</p>
+                <label className={estilos.autorizacao}>
+                  <input type="checkbox" checked={autorizado} onChange={(e) => setAutorizado(e.target.checked)} />
+                  <span>
+                    <strong>{t.autorizacaoPaciente}</strong>
+                    <span>{t.autorizacaoPacienteAjuda}</span>
+                  </span>
+                </label>
+              </div>
+            ) : null}
             <div className={estilos.fotos}>
               {fotos.map((f, i) => (
                 <div key={f.url} className={estilos.fotoMini}>
@@ -351,7 +364,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
                 </div>
               ))}
               {fotos.length < MAXIMO_DE_FOTOS ? (
-                <button type="button" className={estilos.adicionar} onClick={() => entradaDeFoto.current?.click()}>
+                <button type="button" className={estilos.adicionar} disabled={ramoSaude && !autorizado} onClick={() => entradaDeFoto.current?.click()}>
                   <Plus size={22} strokeWidth={1.75} aria-hidden="true" />
                   {t.mandarFotos}
                 </button>
@@ -370,15 +383,8 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
                 e.target.value = "";
               }}
             />
-            {ramoSaude && fotos.length > 0 ? (
-              <label className={estilos.autorizacao}>
-                <input type="checkbox" checked={autorizado} onChange={(e) => setAutorizado(e.target.checked)} />
-                <span>
-                  <strong>{t.autorizacaoPaciente}</strong>
-                  <span>{t.autorizacaoPacienteAjuda}</span>
-                </span>
-              </label>
-            ) : null}
+            {ramoSaude && !autorizado ? <p className={estilos.miudo}>{t.autorizacaoPrecisa}</p> : null}
+            {ramoSaude ? <p className={estilos.miudo}>{t.linhaFixaNoSlide}</p> : null}
             {avisoDeFoto ? (
               <p className={estilos.erroCampo} role="alert">
                 <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
@@ -409,7 +415,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
             <Botao type="button" onClick={() => void criar()} disabled={!temaEscolhido || (precisaDeCor && !corValida) || (ramoSaude && fotos.length > 0 && !autorizado)}>
               {t.criar}
             </Botao>
-            {ramoSaude && fotos.length > 0 && !autorizado ? <p className={estilos.miudo}>{t.autorizacaoPrecisa}</p> : <p className={estilos.miudo}>{t.criarAjuda}</p>}
+            <p className={estilos.miudo}>{t.criarAjuda}</p>
           </div>
         </div>
       ) : null}
@@ -422,7 +428,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
             <p>{t.gerandoAjuda}</p>
           </div>
           <ol className={estilos.etapas} aria-live="polite">
-            {[t.etapaTexto(quantidade), t.etapaConferindo, t.etapaFotos(fotos.length)].map((texto, i) => (
+            {[t.etapaTexto(quantidade), ramoSaude ? t.etapaConferindoSaude : t.etapaConferindo, ramoSaude ? t.etapaFotosSaude : t.etapaFotos(fotos.length)].map((texto, i) => (
               <li key={texto} className={`${estilos.etapa} ${i < etapa ? estilos.feita : i === etapa ? estilos.agora : ""}`}>
                 <span className={estilos.marcaEtapa} aria-hidden={i >= etapa || undefined}>
                   {i < etapa ? <Check size={16} strokeWidth={2.5} aria-hidden="true" /> : null}
@@ -430,7 +436,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
                 <span>
                   {texto}
                   {i < etapa ? <span className={estilos.escondido}>{t.feito}</span> : null}
-                  {i === 1 && etapa === 1 ? <small>{t.etapaConferindoDica}</small> : null}
+                  {i === 1 && etapa === 1 ? <small>{ramoSaude ? t.etapaConferindoSaudeDica : t.etapaConferindoDica}</small> : null}
                 </span>
               </li>
             ))}
@@ -505,6 +511,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
               </p>
               {previas[escolhido + 1]?.precisaEncurtar ? <p className={estilos.alerta}>{t.precisaEncurtar}</p> : null}
               {previas[escolhido + 1]?.semFoto ? <p className={estilos.alerta}>{t.precisaDeFoto}</p> : null}
+              {slideAtual.rodape ? <p className={estilos.ajuda}>{t.linhaFixaNaoEdita}</p> : null}
               <div className={estilos.acoesSlide}>
                 <Botao type="button" variante="secundario" onClick={() => setFolhaTexto(true)}>
                   <Pencil size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -513,7 +520,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
                 {TIPOS_COM_FOTO.has(slideAtual.tipo) && slideAtual.tipo !== "noticia" ? (
                   <Botao type="button" variante="secundario" onClick={() => setFolhaFoto(true)}>
                     <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />
-                    {dados?.fotosDosSlides[escolhido]?.foto ? t.trocarFoto : t.porFoto}
+                    {dados?.fotosDosSlides[escolhido]?.foto ? (slideAtual.tipo === "antes-depois" ? t.trocarFotos : t.trocarFoto) : t.porFoto}
                   </Botao>
                 ) : null}
               </div>
@@ -594,6 +601,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
           indice={escolhido}
           slide={slideAtual}
           comFoto={Boolean(dados?.slidesComFoto[escolhido])}
+          ramoSaude={ramoSaude}
           aoSalvar={(novo) => void depoisDeTrocar(novo, escolhido + 1, "texto")}
         />
       ) : null}
