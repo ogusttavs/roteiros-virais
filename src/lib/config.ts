@@ -63,6 +63,14 @@ export const config = {
    * `playwright.config.ts` e nunca pode valer na VPS de verdade.
    */
   modoE2E: env("MODO_E2E") === "1",
+  /**
+   * E68 A1: o vídeo de animação de texto (sem ninguém na tela). Desligado por padrão: sem `ANIMACAO_ATIVA=1` nada daqui é chamado. `semSandbox` (`ANIMACAO_SEM_SANDBOX=1`) é para o contêiner de render
+   * (sem capacidades, sem segredos, só de leitura), onde o sandbox do Chromium pode não subir; fora dele fica ligado.
+   */
+  animacao: {
+    ativa: env("ANIMACAO_ATIVA") === "1",
+    semSandbox: env("ANIMACAO_SEM_SANDBOX") === "1",
+  },
   ia: {
     provedor: provedorIA(),
     modeloForte: env("AI_MODEL_FORTE", "claude-opus-5"),
