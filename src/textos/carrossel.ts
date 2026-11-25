@@ -95,6 +95,8 @@ export const textosCarrossel = {
   porFoto: "Pôr uma foto",
   precisaEncurtar: "O texto deste slide não coube. Toque em Trocar o texto e encurte.",
   precisaEncurtarAviso: (n: number) => (n === 1 ? "Um slide tem texto grande demais e precisa ser encurtado antes de postar." : `${n} slides têm texto grande demais e precisam ser encurtados antes de postar.`),
+  precisaEncurtarCurto: "Encurtar",
+  precisaDeFotoCurto: "Falta a foto",
   precisaDeFoto: "Este slide precisa de uma foto. Toque em Pôr uma foto.",
   montandoPrevia: "Montando os slides",
   previaFalhou: "Não deu para montar os slides agora.",
@@ -108,10 +110,12 @@ export const textosCarrossel = {
   baixarAjuda: (n: number) => `No celular, elas vão para a sua galeria, na ordem. No Instagram, escolha as ${n} de uma vez para postar como carrossel. A gente não posta nada sem você.`,
   baixarFalhou: "Não deu para baixar agora. Tente de novo em instantes.",
   fazerOutro: "Fazer outro com este tema",
+  prepararParaCelular: "Preparar as imagens para o celular",
+  salvarNoCelular: (n: number) => `Salvar as ${n} imagens no celular`,
 
   // Trocar o texto
   trocarTextoTitulo: (n: number) => `Trocar o texto do slide ${n}`,
-  trocarTextoAjuda: (resumo: string) => `${resumo} O limite de palavras é o que cabe no slide sem a letra ficar pequena no celular.`,
+  trocarTextoAjuda: (tipo: string) => `Tipo do slide: ${tipo}. O limite de palavras é o que cabe no slide sem a letra ficar pequena no celular.`,
   contagem: (usadas: number, limite: number) => `${usadas} de ${limite} palavras`,
   contagemCaracteres: (usados: number, limite: number) => `${usados} de ${limite} caracteres`,
   passou: (n: number) => `Passou ${n} ${n === 1 ? "palavra" : "palavras"}. Encurte para caber.`,

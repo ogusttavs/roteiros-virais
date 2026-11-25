@@ -51,7 +51,7 @@ import { ramosAlternativosDaMarca } from "./ramos-da-conta";
 import { combinarEvidencias, ErroRoteiro, filtrarEvidenciaPelaMarca, formatarCamadaExclusiva, LIMITE_EVIDENCIA, resolverTemaDoPedido, roteiroPorId } from "./roteiro";
 
 /** Saúde vale quando o ramo principal OU qualquer ramo alternativo da marca é de saúde. `ramoPrincipal` é o slug já lido; sem ele, lê da marca. */
-async function marcaEhDeSaude(clienteId: number, ramoPrincipal?: string | null): Promise<boolean> {
+export async function marcaEhDeSaude(clienteId: number, ramoPrincipal?: string | null): Promise<boolean> {
   let principal = ramoPrincipal;
   if (principal === undefined) {
     const cliente = await clientePorId(clienteId);
@@ -367,6 +367,7 @@ export function motivosDaMudanca(slide: SlideDoCarrossel, mudanca: Pick<MudancaD
   }
   const lista = LISTAS_DO_TIPO[slide.tipo];
   for (const [chave, itens] of Object.entries(mudanca.listas ?? {})) {
+    if (itens === undefined) continue;
     if (!lista || lista.chave !== chave) {
       motivos.push(`${chave}: este slide não tem essa lista.`);
       continue;

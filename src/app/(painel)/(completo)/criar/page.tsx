@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { carrosselAtivo } from "@/config/carrossel";
 import { hojeISO } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
@@ -109,6 +110,7 @@ export default async function Criar({ searchParams }: Props) {
       pesquisaEmAberto={pesquisaDeixadaParaDepois}
       longo={longo}
       temaLivreAvaliado={rascunhoDoAssunto?.nota ? { texto: rascunhoDoAssunto.texto, nota: rascunhoDoAssunto.nota.nota } : null}
+      carrosselAtivo={carrosselAtivo()}
     />
   );
 }

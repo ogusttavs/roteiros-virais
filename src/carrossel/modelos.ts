@@ -327,16 +327,16 @@ ${ESTILO_DOS_SLIDES}</style></head><body>${slideHTML(d)}</body></html>`;
 
 /**
  * O script que roda no navegador antes da foto (desenho, regra 4 do README): se o corpo do slide passa da caixa, desce UM passo na letra (a classe `ajustado`, o mínimo da tabela do CSS); se ainda
- * passa, NUNCA corta o texto: marca o slide (`data-estourou`) e devolve que precisa encurtar. A conferência olha a altura do corpo e a largura do valor do dado (que não quebra linha). É texto de script,
+ * passa, NUNCA corta o texto: marca o slide (`data-estourou`) e devolve que precisa encurtar. Uma folga de 6 px não conta (o corpo da capa com foto mede 2 px a mais no navegador sem que nada passe). A conferência olha a altura do corpo e a largura do valor do dado (que não quebra linha). É texto de script,
  * não função do servidor: roda dentro da página.
  */
 export const CONFERIR_TEXTO = `(() => {
   const s = document.querySelector('.slide');
   const passou = () => {
     const corpo = s.querySelector('.s-corpo');
-    if (corpo && corpo.scrollHeight > corpo.clientHeight + 1) return true;
+    if (corpo && corpo.scrollHeight > corpo.clientHeight + 6) return true;
     const valor = s.querySelector('.s-valor');
-    return Boolean(valor && valor.scrollWidth > valor.clientWidth + 1);
+    return Boolean(valor && valor.scrollWidth > valor.clientWidth + 6);
   };
   let ajustou = false;
   if (passou()) { s.classList.add('ajustado'); ajustou = true; }
