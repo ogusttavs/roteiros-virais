@@ -49,6 +49,7 @@ import { rodarPesquisaDoFoco } from "./pesquisa-do-foco";
 import { rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
 import { rodarPublicarInstagram } from "./publicar-instagram";
+import { rodarRenderizarAnimacao } from "./renderizar-animacao";
 import { rodarRenderizarEdicao } from "./renderizar-edicao";
 import { rodarRenovarContasLigadas } from "./renovar-contas-ligadas";
 import { rodarTemasDoDia } from "./temas-do-dia";
@@ -165,6 +166,8 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.decidirEdicao]: () => rodarDecidirEdicao(Number(process.argv[3])),
   /** Por evento (E47 PR 4): `npm run job -- renderizar-edicao <edicaoId> <previa|final>` monta a prévia ou o vídeo final de uma edição já verificada (precisa de ffmpeg; em produção roda no contêiner de render). */
   [FILAS.renderizarEdicao]: () => rodarRenderizarEdicao(Number(process.argv[3]), process.argv[4] === "final" ? "final" : "previa"),
+  /** Por evento (E68 A2): `npm run job -- renderizar-animacao <animacaoId> <previa|final>` monta a prévia ou o vídeo final de uma animação de texto já pedida (precisa de Chromium e ffmpeg; em produção roda no contêiner de render). */
+  [FILAS.renderizarAnimacao]: () => rodarRenderizarAnimacao(Number(process.argv[3]), process.argv[4] === "final" ? "final" : "previa"),
   /** E47 PR 2: apaga o que passou do prazo de guarda e o que não tem dono no volume de edição. */
   [FILAS.limparEdicoes]: () => rodarLimparEdicoes(),
   /** Alarme do disco do servidor: mede agora e avisa se passou do limite. */

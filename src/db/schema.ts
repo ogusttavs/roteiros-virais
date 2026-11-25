@@ -24,6 +24,8 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
+import type { CenaDeEntrada } from "@/animacao/tipos";
+import type { EstadoDaAnimacao } from "@/config/animacao-fila";
 import type { EstadoDoCarrossel, OrigemDoCarrossel, SlideDoCarrossel } from "@/config/carrossel";
 import type { Edl, Legendas, PalavraFalada } from "@/edicao/tipos";
 import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
@@ -3251,3 +3253,45 @@ export const carrosselFotos = pgTable(
   (t) => [index("carrossel_fotos_carrossel").on(t.carrosselId, t.ordem)],
 );
 export type CarrosselFoto = typeof carrosselFotos.$inferSelect;
+
+/**
+ * E68 A2: o vídeo de animação de texto de um roteiro (sem ninguém na tela), o plano B do dia em que a pessoa não consegue gravar. Sempre preso a uma marca (`cliente_id`): nenhuma consulta lê uma
+ * animação sem filtrar pela marca da sessão. Estados em `config/animacao-fila.ts`. `cenas` é o texto do roteiro (já passou pelo verificador) cortado em blocos curtos; `progresso` nulo quer dizer
+ * "esperando a vez na fila", um número é "sendo montado agora". `codigoDoErro` é só um código curto (o erro técnico vai para o log), `motivo` é a frase para a pessoa. Os arquivos são relativos ao
+ * volume de edição (`animacao/an-<id>-previa.mp4` e `animacao/an-<id>-final.mp4`). Uma animação por marca fora de um estado final (índice único parcial).
+ */
+export const animacoes = pgTable(
+  "animacoes",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    roteiroId: integer("roteiro_id")
+      .notNull()
+      .references(() => roteiros.id, { onDelete: "cascade" }),
+    estado: text("estado").$type<EstadoDaAnimacao>().notNull().default("pedida"),
+    molde: text("molde").notNull(),
+    cenas: jsonb("cenas").$type<CenaDeEntrada[]>().notNull(),
+    /** A duração do vídeo, em segundos, como o montador calculou ao pedir (para a tela dizer quanto tempo costuma levar). */
+    duracaoS: numeric("duracao_s", { precision: 8, scale: 3 }).notNull(),
+    caminhoPrevia: text("caminho_previa"),
+    caminhoFinal: text("caminho_final"),
+    progresso: integer("progresso"),
+    tentativas: integer("tentativas").notNull().default(0),
+    motivo: text("motivo"),
+    codigoDoErro: text("codigo_do_erro"),
+    criadaPor: text("criada_por").references(() => user.id, { onDelete: "set null" }),
+    criadaEm: criadoEm(),
+    atualizadaEm: timestamp("atualizada_em", { withTimezone: true }).notNull().defaultNow(),
+    /** Quando o vídeo final fica pronto + 7 dias: depois disso o arquivo e a linha saem na limpeza. */
+    finalExpiraEm: timestamp("final_expira_em", { withTimezone: true }),
+  },
+  (t) => [
+    index("animacoes_marca_roteiro").on(t.clienteId, t.roteiroId),
+    uniqueIndex("animacoes_uma_em_andamento_por_marca")
+      .on(t.clienteId)
+      .where(sql`${t.estado} in ('pedida', 'fazendo_previa', 'previa_pronta', 'fazendo_final')`),
+  ],
+);
+export type Animacao = typeof animacoes.$inferSelect;
