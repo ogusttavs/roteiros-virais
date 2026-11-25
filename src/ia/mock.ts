@@ -1045,7 +1045,7 @@ function mockTemasDoDia(entrada: string) {
     // simulado passaria na checagem de prova por codigo.
     temas: [0, 1, 2].map((i) => ({
       // Onda 1 de texto: `[mock:formula-tema]` (num assunto da lista) faz o primeiro pedido trazer títulos com fórmula de máquina; `-sempre` também na segunda tentativa.
-      titulo: formulaNoTema ? `Descubra o tema simulado ${i + 1}` : `tema simulado ${i + 1}`,
+      titulo: formulaNoTema ? `Descubra o tema simulado ${["um", "dois", "tres"][i % 3]}` : `tema simulado ${i + 1}`,
       descricao: "tema derivado dos videos que estao subindo hoje",
       porQue: "esta subindo mais rapido que o normal da conta",
       evidencias: ids,

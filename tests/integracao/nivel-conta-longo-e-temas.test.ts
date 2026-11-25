@@ -25,6 +25,7 @@ import {
   type Objetivo,
 } from "@/db/schema";
 import * as clienteIA from "@/ia/cliente";
+import { versao as versaoLongo } from "@/ia/prompts/roteiroLongo";
 import * as verificador from "@/ia/verificador";
 import { rodarTemasDoDia } from "@/jobs/temas-do-dia";
 import { hojeISO } from "@/lib/config";
@@ -252,7 +253,7 @@ describe("o roteiro longo recebe o que funcionou na própria conta", () => {
     expect(roteiro.duracaoDoVideo).toBe("longo");
     expect(roteiro.conteudo.capitulos?.length).toBeGreaterThanOrEqual(3);
     const [geracao] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, roteiro.geracaoId!));
-    expect(geracao.versaoPrompt).toBe("1.7.0");
+    expect(geracao.versaoPrompt).toBe(versaoLongo);
   });
 });
 

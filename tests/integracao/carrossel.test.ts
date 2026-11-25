@@ -168,7 +168,9 @@ describe("gerarCarrossel", () => {
     expect(texto).toMatch(/procedimento em andamento/);
     expect(texto).toMatch(/preço do serviço nem ofereça serviço grátis/);
     expect(texto).toMatch(/prazo ou garantia/);
-    expect(montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", ramoSaude: false })).not.toMatch(/procedimento em andamento/);
+    expect(montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", ramoSaude: false })).not.toMatch(/Este ramo é de saúde/);
+    // A regra R-CONF-07 do banco de regras entra nos dois, mas condicionada ("Nos ramos de saúde"); o bloco próprio do carrossel é só da saúde.
+    expect(texto).toMatch(/nunca com foto ou texto do procedimento em andamento/);
     expect(versao).toBe("1.1.0");
   });
 
