@@ -6,6 +6,7 @@
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 
 import { DIAS_SEM_ABRIR_PARA_EXPIRAR } from "@/config/fontes-noticias";
+import { pesoDoVeiculo } from "@/config/veiculos-conhecidos";
 import { db } from "@/db";
 import { nichos, noticiasDoAssunto } from "@/db/schema";
 
@@ -68,7 +69,22 @@ export type CapaDoDia = {
   assuntos: AssuntoNaCapa[];
   /** Quantas entraram nas últimas 24 horas. */
   novasDesdeOntem: number;
+  /** Quantos dias para trás a capa olhou (3 de padrão, 7 quando a pessoa pediu a semana). */
+  dias: number;
 };
+
+/** Duas matérias de até 30 minutos de diferença contam como empate de data: nesse caso a de veículo conhecido vem primeiro. */
+const BLOCO_DE_EMPATE_MS = 30 * 60 * 1000;
+
+/** Mais nova primeiro; dentro do mesmo bloco de 30 minutos, o veículo conhecido; depois a hora exata. Transitiva (compara o bloco, não a diferença). */
+export function compararParaACapa(a: { noticia: { veiculo: string }; quando: Date }, b: { noticia: { veiculo: string }; quando: Date }): number {
+  const blocoA = Math.floor(a.quando.getTime() / BLOCO_DE_EMPATE_MS);
+  const blocoB = Math.floor(b.quando.getTime() / BLOCO_DE_EMPATE_MS);
+  if (blocoA !== blocoB) return blocoB - blocoA;
+  const peso = pesoDoVeiculo(b.noticia.veiculo) - pesoDoVeiculo(a.noticia.veiculo);
+  if (peso !== 0) return peso;
+  return b.quando.getTime() - a.quando.getTime();
+}
 
 /** Meia-noite de hoje no fuso de São Paulo, como instante. */
 export function inicioDoDiaEmSaoPaulo(agora: Date): Date {
@@ -77,8 +93,8 @@ export function inicioDoDiaEmSaoPaulo(agora: Date): Date {
   return new Date(`${partes}T00:00:00-03:00`);
 }
 
-export async function capaDoDia(cliente: { id: number; nichoId: number | null }, agora: Date = new Date()): Promise<CapaDoDia> {
-  const desde = new Date(agora.getTime() - DIAS_DA_CAPA * DIA_MS);
+export async function capaDoDia(cliente: { id: number; nichoId: number | null }, agora: Date = new Date(), dias: number = DIAS_DA_CAPA): Promise<CapaDoDia> {
+  const desde = new Date(agora.getTime() - dias * DIA_MS);
   const itens: { noticia: NoticiaDaCapa; quando: Date }[] = [];
   let nomeDoSetor = "";
 
@@ -146,7 +162,7 @@ export async function capaDoDia(cliente: { id: number; nichoId: number | null },
   }
 
   // Mais novas primeiro; a mesma manchete (de dois assuntos, ou do setor e de um assunto) entra uma vez só, ficando a que tem foto.
-  itens.sort((a, b) => b.quando.getTime() - a.quando.getTime());
+  itens.sort(compararParaACapa);
   const porManchete = new Map<string, NoticiaDaCapa>();
   const unicas: { noticia: NoticiaDaCapa; quando: Date }[] = [];
   for (const item of itens) {
@@ -180,5 +196,5 @@ export async function capaDoDia(cliente: { id: number; nichoId: number | null },
     };
   });
 
-  return { nomeDoSetor, deHoje, deOntem, assuntos, novasDesdeOntem };
+  return { nomeDoSetor, deHoje, deOntem, assuntos, novasDesdeOntem, dias };
 }

@@ -25,7 +25,8 @@ export const NOTICIAS_POR_LOTE = 60;
 /** Quantas chamadas, no máximo, um ramo faz por rodada (a mais recente primeiro; o resto fica para a rodada seguinte). Segura o custo de um ramo que chega com a semana inteira para filtrar. */
 export const LOTES_POR_RODADA = 4;
 
-export type NoticiaCandidata = { id: number; titulo: string; resumo: string | null };
+/** `fonte`: o veículo, texto livre do feed (nulo se não veio). */
+export type NoticiaCandidata = { id: number; titulo: string; resumo: string | null; fonte?: string | null };
 export type RamoParaOFiltro = { id: number; nome: string; termos: string[] };
 
 /** As candidatas ainda sem veredito do ramo, as mais recentes primeiro. `coletadasDesde` é a janela de coleta do `temas-do-dia` (as últimas 24 horas); o job de filtro não usa. */
@@ -42,7 +43,7 @@ export async function candidatasDoRamo(
   ];
   if (opcoes.coletadasDesde) condicoes.push(gte(noticias.coletadoEm, opcoes.coletadasDesde));
   return db()
-    .select({ id: noticias.id, titulo: noticias.titulo, resumo: noticias.resumo })
+    .select({ id: noticias.id, titulo: noticias.titulo, resumo: noticias.resumo, fonte: noticias.fonte })
     .from(noticias)
     .where(and(...condicoes))
     .orderBy(desc(noticias.publicadoEm), desc(noticias.id))
@@ -65,7 +66,7 @@ export async function filtrarLoteDeNoticias(ramo: RamoParaOFiltro, candidatas: N
     entrada: filtrarNoticiasIA.montarEntrada({
       nomeNicho: ramo.nome,
       termosNicho: ramo.termos,
-      noticias: candidatas.map((n) => ({ titulo: n.titulo, resumo: n.resumo })),
+      noticias: candidatas.map((n) => ({ titulo: n.titulo, resumo: n.resumo, veiculo: n.fonte })),
     }),
   });
 

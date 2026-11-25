@@ -36,6 +36,18 @@ export const textosNoticias = {
   nadaNovoFrase: "A coleta roda às 06:00 e às 14:00. Enquanto isso, as de ontem continuam aqui.",
   nadaNovoSemOntem: "A coleta roda às 06:00 e às 14:00. As notícias aparecem aqui assim que chegarem.",
   deOntem: "De ontem",
+  /** Quando a janela é a da semana, o bloco de baixo junta os dias anteriores. */
+  dosDiasAnteriores: "Dos dias anteriores",
+
+  // Pouca notícia na janela (25/11/2026): dizer quantas achou, em vez de parecer vazia, e oferecer ampliar.
+  achamosSo: (quantas: number, dias: number) =>
+    quantas === 0
+      ? `Não achamos notícia do seu ramo nos últimos ${dias} dias.`
+      : `Achamos só ${quantas} ${quantas === 1 ? "notícia" : "notícias"} do seu ramo nos últimos ${dias} dias.`,
+  quererVerSemana: "Quer ver as da última semana?",
+  verDaSemana: "Ver a última semana",
+  naoTemMais: "Isso é tudo o que chegou até agora. As novas aparecem aqui assim que saírem.",
+  saiuAgora: "saiu agora",
   deHoje: "De hoje",
 
   // Assunto recém-acrescentado: `quando` vem pronto ("hoje às 14:00", "amanhã às 06:00").

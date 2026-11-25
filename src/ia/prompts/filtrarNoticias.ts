@@ -8,7 +8,8 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * chamada forte: reduz até 60 notícias brutas do dia para no máximo 8
  * relevantes, cada uma já com um ângulo pronto para virar tema.
  */
-export const versao = "1.0.0";
+// 1.1.0 (25/11/2026): a lista traz o veiculo de cada noticia e o filtro prefere o veiculo conhecido; blog e agregador so entram se o titulo trouxer dado verificavel.
+export const versao = "1.1.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -24,7 +25,8 @@ importam para o dono de um pequeno negócio do nicho recebido, entre os termos d
 
 Para cada notícia relevante, devolva o índice dela na lista (o número antes do título) e uma
 frase de ângulo pronta para virar tema de vídeo, no formato "saiu hoje que X, explique o que
-muda para o seu cliente". Descarte notícia genérica, de outro assunto, ou sem relação nenhuma
+muda para o seu cliente". Antes da lista vem o veículo de cada notícia (mesmo número). Prefira a notícia de veículo
+conhecido do Brasil; a de blog, agregador ou veículo desconhecido só entra se o título trouxer um dado verificável (número, data, norma). Descarte notícia genérica, de outro assunto, ou sem relação nenhuma
 com quem toca esse negócio. No máximo 8 notícias, mesmo que mais de 8 pareçam relevantes:
 escolha as mais importantes. Sem notícia relevante nenhuma, devolva a lista vazia.
 
@@ -36,12 +38,15 @@ Escreva em português do Brasil, com acentuação correta.`;
 export function montarEntrada(dados: {
   nomeNicho: string;
   termosNicho: string[];
-  noticias: { titulo: string; resumo: string | null }[];
+  noticias: { titulo: string; resumo: string | null; veiculo?: string | null }[];
 }): string {
   const listaNoticias =
     dados.noticias.length > 0
       ? dados.noticias.map((n, i) => `${i + 1}. ${n.titulo}${n.resumo ? `: ${n.resumo}` : ""}`).join("\n")
       : "nenhuma noticia nas ultimas 24 horas";
 
-  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\nNoticias:\n${listaNoticias}`;
+  const comVeiculo = dados.noticias.some((n) => n.veiculo);
+  const listaVeiculos = comVeiculo ? `Veiculos (mesmo numero das noticias):\n${dados.noticias.map((n, i) => `${i + 1}. ${n.veiculo || "desconhecido"}`).join("\n")}\n\n` : "";
+
+  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\n${listaVeiculos}Noticias:\n${listaNoticias}`;
 }
