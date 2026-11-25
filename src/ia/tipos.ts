@@ -41,6 +41,8 @@ export type TarefaIA =
   | "roteiro"
   /** E52 (PR 3): o roteiro longo do YouTube, por capítulos (a duração-alvo vem da medida dos longos do ramo). */
   | "roteiroLongo"
+  /** E65 PR 1: o carrossel de Instagram (5, 7 ou 9 slides que ensinam), modelo forte. */
+  | "carrossel"
   | "verificarTexto"
   | "aprenderCliente"
   | "classificarAbertura"
