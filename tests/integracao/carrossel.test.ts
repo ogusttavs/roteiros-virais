@@ -7,7 +7,7 @@ import path from "node:path";
 import { deflateSync } from "node:zlib";
 
 import { and, eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { pngDoCarrossel } from "@/carrossel/entrega";
 import { crc32, montarZip } from "@/carrossel/zip";
@@ -15,6 +15,7 @@ import { TETO_DO_TESTE } from "@/config/cadastro";
 import { LINHA_FIXA_ANTES_DEPOIS_SAUDE, SEM_FOTO } from "@/config/carrossel";
 import { db, getPool } from "@/db";
 import { briefings, cadastrosProprios, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, ramosDaConta, user, videos, type PerfilCompilado } from "@/db/schema";
+import { logger } from "@/lib/log";
 import { lerCorpoComTeto } from "@/lib/porta-do-carrossel";
 import { barreiraDoCadastro } from "@/servicos/cadastro-travas";
 import { ErroCarrossel, arrobaDaMarca, trocarCor, apagarFoto, carrosselDaMarca, carrosseisDaMarca, enviarFoto, fotoDaMarca, fotosDoCarrossel, gerarCarrossel, gerarCarrosselComTrava, tipoPelosBytes, trocarSlide } from "@/servicos/carrossel";
@@ -665,6 +666,28 @@ describe("o fluxo da tela contra as rotas", () => {
     expect((await db().select({ c: clientes.corMarca }).from(clientes).where(eq(clientes.id, outra)))[0].c).toBeNull();
   }, 120_000);
 
+  it("recarregar a página: o carrossel abre pelo id e a lista dos recentes traz só os da marca da sessão, do mais novo para o mais antigo", async () => {
+    const dona = await criarCliente();
+    const outra = await criarCliente();
+    const raiz = await import("@/app/api/carrossel/route");
+    const item = await import("@/app/api/carrossel/[id]/route");
+    como(dona);
+    const primeiro = ((await (await raiz.POST(json("/api/carrossel", "POST", { quantidade: 5, cor: "#0e5a6a", de: { origem: "tema", texto: "mancha de vinho" } }))).json()) as { id: number }).id;
+    const segundo = ((await (await raiz.POST(json("/api/carrossel", "POST", { quantidade: 7, cor: "#0e5a6a", de: { origem: "tema", texto: "mofo no box" } }))).json()) as { id: number }).id;
+    como(outra);
+    const deOutra = ((await (await raiz.POST(json("/api/carrossel", "POST", { quantidade: 5, cor: "#0e5a6a", de: { origem: "tema", texto: "tema da outra marca" } }))).json()) as { id: number }).id;
+
+    como(dona);
+    const lista = (await (await raiz.GET()).json()) as { carrosseis: { id: number; tema: string; quantidade: number; criadoEm: string }[] };
+    expect(lista.carrosseis.map((c) => c.id)).toEqual([segundo, primeiro]);
+    expect(lista.carrosseis.map((c) => c.id)).not.toContain(deOutra);
+    expect(lista.carrosseis[0]).toMatchObject({ quantidade: 7 });
+    // abrir pelo id depois de recarregar traz o mesmo carrossel; o de outra marca responde como se não existisse
+    const lido = await item.GET(json(`/api/carrossel/${primeiro}`, "GET"), id(primeiro));
+    expect(((await lido.json()) as { carrossel: { id: number } }).carrossel.id).toBe(primeiro);
+    expect((await item.GET(json(`/api/carrossel/${deOutra}`, "GET"), id(deOutra))).status).toBe(404);
+  });
+
   it("o teto do teste ou a assinatura (402) chega à tela como o estado limite, com a frase do servidor, sem gerar nada", async () => {
     const marca = await criarCliente();
     const raiz = await import("@/app/api/carrossel/route");
@@ -724,6 +747,8 @@ describe("a chave desligada", () => {
 
 describe("o método: o carrossel cumpre o que a capa promete (E65 PR 3)", () => {
   const geracoesDa = async (clienteId: number) => db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, clienteId)));
+  const logInfo = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+  beforeEach(() => logInfo.mockClear());
 
   it("a capa que promete mais do que o carrossel traz é reprovada com o motivo e a segunda tentativa sai certa", async () => {
     const clienteId = await criarCliente();
@@ -765,7 +790,18 @@ describe("o método: o carrossel cumpre o que a capa promete (E65 PR 3)", () => 
     const outra = await criarCliente();
     const teimosa = await gerarCarrossel(outra, pedidoLivre("mancha de vinho no estofado [mock:carrossel-formula-sempre]", 5));
     expect(teimosa.slides[0].sub).toBe("Não é sorte, é método.");
-    expect(teimosa.avisos.join()).toMatch(/R-COPY-26/);
+    // O motivo escrito para o modelo (com o código da regra) fica só no log; `avisos` é o que a pessoa lê.
+    expect(teimosa.avisos.join()).not.toMatch(/R-COPY/);
+    expect(JSON.stringify(logInfo.mock.calls)).toMatch(/R-COPY-26/);
+  });
+
+  it("a promessa da capa que persiste na 2ª tentativa só avisa no log (reprova só na 1ª) e o carrossel sai com os avisos para a pessoa limpos", async () => {
+    const clienteId = await criarCliente();
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-capa-errada-sempre]", 5));
+    expect(await geracoesDa(clienteId)).toHaveLength(2);
+    expect(c.slides[0].titulo).toMatch(/^9 erros/);
+    expect(c.avisos.join()).not.toMatch(/a capa promete/);
+    expect(JSON.stringify(logInfo.mock.calls)).toMatch(/a capa promete 9 erros/);
   });
 
   it("trocar a cor mantém os avisos do método e só troca o da cor", async () => {

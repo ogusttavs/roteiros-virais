@@ -647,6 +647,8 @@ function mockCarrossel(entrada: string) {
   // Texto com cara de máquina na linha de apoio da capa: `[mock:carrossel-formula]` só na 1ª tentativa, `[mock:carrossel-formula-sempre]` nas duas.
   if (entrada.includes("[mock:carrossel-formula-sempre]") || marcado("carrossel-formula")) slides[0].texto = "Não é sorte, é método.";
   if (marcado("carrossel-capa-errada")) slides[0].titulo = `9 erros que estragam ${tema}`.split(" ").slice(0, 10).join(" ");
+  // A mesma promessa errada nas DUAS tentativas (E65 PR 4): na 2ª ela só vira aviso de log e o carrossel sai.
+  if (entrada.includes("[mock:carrossel-capa-errada-sempre]")) slides[0].titulo = `9 erros que estragam ${tema}`.split(" ").slice(0, 10).join(" ");
   if (marcado("carrossel-capa-vaga")) slides[0].titulo = `Tudo sobre ${tema}`.split(" ").slice(0, 10).join(" ");
   if (marcado("carrossel-capa-sem-promessa")) slides[0].titulo = `Estofado bonito`;
   if (marcado("carrossel-promessa")) slides[1].texto = "Com o clareamento, o dente volta ao branco em uma sessão.";

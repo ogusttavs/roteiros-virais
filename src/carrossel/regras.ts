@@ -222,15 +222,23 @@ const semAcentoLetraPorLetra = (t: string): string => Array.from(t, (c) => c.nor
  * como a pessoa escreveu, ou nulo. A tela barra a troca de texto e o código reprova a geração com isto.
  */
 const PROMESSAS_DE_SAUDE: RegExp[] = [
-  /\bem (?:apenas |so |ate |somente )?(?:uma?|duas?|tres|quatro|cinco|\d+) (?:sessao|sessoes|consulta|consultas|dia|dias|semana|semanas|hora|horas|mes|meses)\b/,
-  /\bgarant(?:ido|ida|idos|idas|imos|ir|ia|o|e)\b/,
+  // Prazo de RESULTADO: a palavra do resultado perto do prazo ("resultado em 7 dias", "dentes brancos em uma semana"). "Volte em 6 meses" e "troque a escova em 3 meses" são orientação, não promessa.
+  /\b(?:resultados?|dentes? branc\w+|sorriso \w+|branque\w+|fica(?:m|r|ra|rao)?|resolv\w+|elimin\w+|transform\w+|alinh\w+) (?:[a-z]+ ){0,3}em (?:apenas |so |ate |somente )?(?:uma?|duas?|tres|quatro|cinco|\d+) (?:sessao|sessoes|dia|dias|semana|semanas|hora|horas|mes|meses)\b/,
+  /\bem (?:apenas |so |somente )(?:uma?|duas?|tres|quatro|cinco|\d+) (?:sessao|sessoes|dia|dias|semana|semanas|hora|horas)\b/,
+  /\bem (?:uma?|1) sessao\b/,
+  // Garantia como promessa. "Nenhum dentista garante" (a frase que desmente a promessa) passa.
+  /\bgarant(?:ido|ida|idos|idas|imos|iremos|o)\b/,
+  /\bgarantia de (?:resultado|sucesso|cura|eficacia)/,
   /\bresultados? (?:garantid|imediat|certo|rapid|definitiv)\w*/,
   /\bvolta ao branco/,
   /\bficam? branc[oa]s?\b/,
   /\b(?:cura|curar|curamos|curado|curada)\b/,
   /100 ?%/,
-  /\b(?:para sempre|definitivamente|definitiv[oa]s?)\b/,
-  /\bsem dor\b/,
+  // "Definitivo" só como promessa de resultado; "dente definitivo" e "prótese definitiva" são o nome da peça.
+  /\b(?:para sempre|definitivamente|solucao definitiva|cura definitiva|tratamento definitivo|clareamento definitivo|resultado definitivo)\b/,
+  // "Mesmo sem dor, vá ao dentista" é conselho; a promessa é "sem dor nenhuma", "indolor", "procedimento sem dor".
+  /\bsem dor (?:nenhuma|alguma)\b/,
+  /\b(?:totalmente|completamente) sem dor\b|\b(?:procedimento|tratamento|atendimento|clareamento) sem dor\b|\bindolor\w*/,
   /\bsem riscos?\b/,
 ];
 

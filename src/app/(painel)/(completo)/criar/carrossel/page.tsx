@@ -14,8 +14,10 @@ import { CarrosselTela } from "./CarrosselTela";
  * `/criar/carrossel` (E65 PR 2, desenho `entregaveis/design-v2/entrega/carrossel/CriarCarrossel.dc.html`): só existe com `CARROSSEL_ATIVO` ligada (desligada, a página não responde). Os temas do dia entram
  * como atalho; o resto é a tela `CarrosselTela`, que fala com as rotas `/api/carrossel`.
  */
-export default async function CriarCarrossel() {
+export default async function CriarCarrossel({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
   if (!carrosselAtivo()) notFound();
+  const { id } = await searchParams;
+  const idInicial = id && /^\d{1,9}$/.test(id) ? Number(id) : null;
   const sessao = await sessaoDoPainel();
   if (!sessao) redirect("/entrar");
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
@@ -23,5 +25,5 @@ export default async function CriarCarrossel() {
   await exigirAssinaturaValida();
   const [temas, ramoSaude] = await Promise.all([temasParaCliente(cliente).catch(() => null), marcaEhDeSaude(cliente.id)]);
   const titulos = temas && temas.status === "ok" ? temas.temas.filter((t) => !t.doMomento).map((t) => t.titulo) : [];
-  return <CarrosselTela temasDeHoje={titulos} corMarca={cliente.corMarca} arroba={arrobaDaMarca(cliente.perfis?.instagram)} ramoSaude={ramoSaude} />;
+  return <CarrosselTela temasDeHoje={titulos} corMarca={cliente.corMarca} arroba={arrobaDaMarca(cliente.perfis?.instagram)} ramoSaude={ramoSaude} idInicial={idInicial} />;
 }
