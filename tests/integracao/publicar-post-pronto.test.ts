@@ -536,7 +536,7 @@ describe("quem pode e o isolamento entre marcas", () => {
     estado.verComo = true;
     entrar("pp-dono-a");
     const form = new FormData();
-    form.append("imagens", new File([await gerarImagem(1080, 1350)], "a.png", { type: "image/png" }));
+    form.append("imagens", new File([new Uint8Array(await gerarImagem(1080, 1350))], "a.png", { type: "image/png" }));
     form.append("modo", "fila");
     const rota = await montarRota(new Request("https://x.teste/api/posts-prontos", { method: "POST", body: form }));
     expect(rota.status).toBe(403);
@@ -549,8 +549,8 @@ describe("quem pode e o isolamento entre marcas", () => {
   it("a rota monta com a sessão do dono; recusa quem não entrou e a assinatura vencida", async () => {
     const montar = async () => {
       const form = new FormData();
-      form.append("imagens", new File([await gerarImagem(1080, 1350)], "a.png", { type: "image/png" }));
-      form.append("imagens", new File([await gerarImagem(1080, 1350, "png", "red")], "b.png", { type: "image/png" }));
+      form.append("imagens", new File([new Uint8Array(await gerarImagem(1080, 1350))], "a.png", { type: "image/png" }));
+      form.append("imagens", new File([new Uint8Array(await gerarImagem(1080, 1350, "png", "red"))], "b.png", { type: "image/png" }));
       form.append("legenda", "Pela rota #teste");
       form.append("modo", "fila");
       return montarRota(new Request("https://x.teste/api/posts-prontos", { method: "POST", body: form }));
