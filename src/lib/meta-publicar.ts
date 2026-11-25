@@ -52,6 +52,28 @@ export async function criarContainerDeVideo(entrada: { igId: string; token: stri
   return { containerId: corpo.id };
 }
 
+/**
+ * E56 PR 2, post pronto: o contêiner de UMA imagem. `image_url` é o endereço PÚBLICO do JPEG (`publicacao-de-conteudo.md`: "defina como o caminho da imagem... que deve estar em um servidor público").
+ * Como item de carrossel leva `is_carousel_item=true` e nunca legenda (a legenda é do contêiner do carrossel); como post único leva a legenda.
+ */
+export async function criarContainerDeImagem(entrada: { igId: string; token: string; imageUrl: string; legenda?: string; itemDeCarrossel?: boolean; via?: ViaDaLigacao }): Promise<{ containerId: string }> {
+  const parametros: Record<string, string> = { image_url: entrada.imageUrl };
+  if (entrada.itemDeCarrossel) parametros.is_carousel_item = "true";
+  else if (entrada.legenda?.trim()) parametros.caption = entrada.legenda;
+  const corpo = await pedirGraph<{ id?: unknown }>(`${entrada.igId}/media`, parametros, entrada.token, "POST", entrada.via ?? "facebook");
+  if (typeof corpo.id !== "string" || corpo.id === "") throw new ErroMetaLogin("A Meta nao devolveu o conteiner da imagem.");
+  return { containerId: corpo.id };
+}
+
+/** E56 PR 2: o contêiner do carrossel, com os contêineres das imagens na ordem (`media_type=CAROUSEL`, `children` separados por vírgula) e a legenda. */
+export async function criarContainerDeCarrossel(entrada: { igId: string; token: string; filhos: string[]; legenda: string; via?: ViaDaLigacao }): Promise<{ containerId: string }> {
+  const parametros: Record<string, string> = { media_type: "CAROUSEL", children: entrada.filhos.join(",") };
+  if (entrada.legenda.trim()) parametros.caption = entrada.legenda;
+  const corpo = await pedirGraph<{ id?: unknown }>(`${entrada.igId}/media`, parametros, entrada.token, "POST", entrada.via ?? "facebook");
+  if (typeof corpo.id !== "string" || corpo.id === "") throw new ErroMetaLogin("A Meta nao devolveu o conteiner do carrossel.");
+  return { containerId: corpo.id };
+}
+
 function codigoDentroDoDebug(mensagem: string | undefined): number | undefined {
   if (!mensagem) return undefined;
   const achado = /"code"\s*:\s*(\d+)/.exec(mensagem);

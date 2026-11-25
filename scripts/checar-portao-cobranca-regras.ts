@@ -48,6 +48,7 @@ export const ROTAS_LIVRES: Record<string, string> = {
   "src/app/api/meta/retorno/route.ts": "E19: a volta do diálogo da Meta termina uma ligação que o /api/meta/conectar (com o portão) começou; a conferência é o state assinado mais o cookie mais a sessão, e o retorno em si só grava o acesso, sem gasto",
   "src/app/api/meta/exclusao/route.ts": "E19: é o aviso de exclusão de dados da Meta (assinatura do signed_request conferida), nunca de um cliente logado; apagar dado a pedido da Meta não pode depender de pagamento",
   "src/app/api/publicar-arquivo/[codigo]/[nome]/route.ts": "E19b: é a Meta baixando o vídeo de uma publicação que o /api/publicar/[id]/video (com o portão) já aceitou; a conferência é o código assinado do endereço mais o prazo mais a publicação estar viva, e servir o arquivo não gasta nada",
+  "src/app/api/publicar-arquivo/imagem/[codigo]/[nome]/route.ts": "E56 PR 2: é a Meta baixando a imagem de um post pronto que o /api/posts-prontos (com o portão) já aceitou; a conferência é o código assinado do endereço mais o prazo mais o post estar sendo publicado, e servir o arquivo não gasta nada",
   "src/app/api/jobs/[nome]/route.ts": "autenticação própria por chave (cron e admin), não é do cliente",
   "src/app/api/momento/transcrever/route.ts": "só reexporta o POST de /api/transcrever, que tem o portão",
   "src/app/api/push/chave/route.ts": "chave pública do aviso, sem gasto",

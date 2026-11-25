@@ -1,0 +1,35 @@
+.cartao {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto-suave);
+  text-wrap: pretty;
+}
+
+/* Um link com a cara do botão primário (a mesma de `SeuInstagram.module.css`, `.ligar`). */
+.link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--altura-toque);
+  padding: 0 var(--espaco-5);
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.link:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}

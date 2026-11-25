@@ -101,6 +101,13 @@ export const FILAS = {
    */
   publicarInstagram: "publicar-instagram",
   /**
+   * E56 PR 2, publicar post pronto (imagem ou carrossel): por evento ("Publicar agora"), `{ postId }`. Publica aquele post na hora (o intervalo da fila não vale), se a marca não estiver publicando outro. Sem
+   * repetição da fila: publicar é uma vez só (a reserva `na_fila` para `publicando` é condicional), e uma resposta perdida nunca é tentada de novo.
+   */
+  publicarPostPronto: "publicar-post-pronto",
+  /** E56 PR 2: a fila dos posts prontos, de minuto em minuto (só com `PUBLICAR_IMAGENS_ATIVO`): publica o próximo de cada marca se já passou o intervalo e o limite das 24 horas da Meta deixa. */
+  filaDePosts: "fila-de-posts",
+  /**
    * E47 PR 2, a edição de vídeo: por evento (o vídeo bruto terminou de chegar), `{ edicaoId }`. O worker extrai o áudio, transcreve na Groq com o tempo de cada palavra e guarda as palavras e a
    * curva de energia. Job curto (segundos), com as 2 repetições da fila para uma falha de rede da Groq; a edição conta as tentativas e desiste na terceira.
    */
@@ -139,7 +146,7 @@ export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
  * `clienteId`, que só `reprovarERescrever` sabe qual é; disparada sem isso,
  * o worker chama o job com `clienteId` indefinido e ele sempre quebra.
  */
-export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram, FILAS.transcreverEdicao, FILAS.decidirEdicao, FILAS.renderizarEdicao, FILAS.renderizarAnimacao]);
+export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora, FILAS.publicarInstagram, FILAS.publicarPostPronto, FILAS.transcreverEdicao, FILAS.decidirEdicao, FILAS.renderizarEdicao, FILAS.renderizarAnimacao]);
 
 /**
  * As filas que aceitam rodar só para um ramo (`{ nichoId }` no disparo) e gravam o ramo em
