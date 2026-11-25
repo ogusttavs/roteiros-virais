@@ -68,8 +68,8 @@ import {
   reprovarERescreverAction,
   salvarEdicaoAction,
 } from "./acoes";
-import { ChamadoAnimacao } from "./ChamadoAnimacao";
 import { CartaoDaLegenda } from "./CartaoDaLegenda";
+import { ChamadoAnimacao } from "./ChamadoAnimacao";
 import { ChamadoEditarMeuVideo } from "./ChamadoEditarMeuVideo";
 import { EditarMeuVideo } from "./EditarMeuVideo";
 import { HashtagsParaColar } from "./HashtagsParaColar";
