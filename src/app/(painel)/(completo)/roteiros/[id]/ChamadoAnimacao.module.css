@@ -15,14 +15,17 @@
   margin-top: 2px;
 }
 
+.iconeFalha {
+  color: var(--cor-erro);
+}
+
 .frases {
   display: grid;
   gap: var(--espaco-1);
 }
 
 .titulo,
-.estado,
-.falha {
+.estado {
   margin: 0;
   font-size: var(--tamanho-corpo);
   color: var(--cor-texto);
@@ -87,7 +90,7 @@
   width: 100%;
   max-height: 60dvh;
   aspect-ratio: 9 / 16;
-  background: var(--cor-titulo);
+  background: var(--cor-video);
   border-radius: var(--raio-md);
   object-fit: contain;
 }
@@ -109,16 +112,26 @@
   align-items: center;
   justify-content: center;
   gap: var(--espaco-2);
-  min-height: var(--altura-toque-lg);
-  padding: 0 var(--espaco-6);
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-5);
   border-radius: var(--raio-pill);
   font-family: var(--fonte-texto);
-  font-size: var(--tamanho-corpo);
-  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
   text-decoration: none;
   background: var(--cor-acao);
   color: var(--cor-acao-texto);
   border: var(--largura-borda) solid transparent;
+  transition: background var(--duracao-rapida) var(--curva-padrao), transform var(--duracao-soltar) var(--curva-mola);
+}
+
+.botaoLink:hover {
+  background: var(--cor-acao-hover);
+}
+
+.botaoLink:active {
+  background: var(--cor-acao-pressionada);
+  transform: scale(var(--escala-toque));
 }
 
 .botaoLink:focus-visible {

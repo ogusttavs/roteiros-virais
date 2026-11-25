@@ -38,7 +38,8 @@
   gap: var(--espaco-3);
   color: var(--cor-texto-dica);
   font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rotulo);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
   text-transform: uppercase;
   letter-spacing: var(--espacamento-rotulo);
 }
@@ -62,7 +63,8 @@
 
 .oQueDisseRotulo {
   font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rotulo);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
   letter-spacing: var(--espacamento-rotulo);
   text-transform: uppercase;
   color: var(--cor-texto-suave);

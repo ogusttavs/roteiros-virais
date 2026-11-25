@@ -174,7 +174,7 @@
   padding: var(--espaco-2) var(--espaco-3) 0;
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-rotulo);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--espacamento-legenda);
   text-transform: uppercase;
   color: var(--cor-texto-dica);
 }

@@ -432,6 +432,7 @@
 .linkReprovar {
   display: inline-flex;
   align-items: center;
+  gap: var(--espaco-2);
   min-height: var(--altura-toque);
   border: 0;
   background: transparent;
