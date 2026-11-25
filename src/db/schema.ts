@@ -24,6 +24,7 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
+import type { EstadoDoCarrossel, OrigemDoCarrossel, SlideDoCarrossel } from "@/config/carrossel";
 import type { Edl, Legendas, PalavraFalada } from "@/edicao/tipos";
 import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
 
@@ -239,6 +240,8 @@ export const clientes = pgTable("clientes", {
   usuarioId: text("usuario_id").references(() => user.id, { onDelete: "cascade" }),
   nome: text("nome").notNull(),
   nichoId: integer("nicho_id").references(() => nichos.id),
+  /** E65: a cor da marca ("#rrggbb"), escolhida no primeiro carrossel e trocável depois; nula usa o neutro escuro do produto. */
+  corMarca: text("cor_marca"),
   /** V12c, item 1: ficam no banco, sem uso na tela desde que `alcance` existe. */
   cidade: text("cidade"),
   bairro: text("bairro"),
@@ -3178,3 +3181,59 @@ export type ContextoMarcaItem = typeof contextoMarcaItens.$inferSelect;
 export type PedidoDeRamo = typeof pedidosDeRamo.$inferSelect;
 export type Interessado = typeof interessados.$inferSelect;
 export type CadastroProprio = typeof cadastrosProprios.$inferSelect;
+
+/**
+ * E65 PR 1: o carrossel (um formato novo, ao lado do roteiro: 5, 7 ou 9 slides que ensinam, uma imagem 1080 por 1350 por slide, mais a legenda). Sempre preso a uma marca (`cliente_id`);
+ * nenhuma consulta lê um carrossel sem filtrar pela marca da sessão. `origem` diz de onde o tema veio (`tema` do dia ou livre, `roteiro` já escrito, `noticia` do setor) e `origem_ref` guarda a
+ * cópia do que o aplicativo viu (o id do roteiro ou da notícia, o título do tema), para o "De onde veio" não sumir depois. `slides` é a lista de `SlideDoCarrossel` (`config/carrossel.ts`).
+ */
+export const carrosseis = pgTable(
+  "carrosseis",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    origem: text("origem").$type<OrigemDoCarrossel>().notNull(),
+    origemRef: jsonb("origem_ref").$type<Record<string, unknown>>(),
+    tema: text("tema").notNull(),
+    quantidade: integer("quantidade").notNull(),
+    /** A cor de destaque, "#rrggbb": derivada da marca ou escolhida pela pessoa. */
+    cor: text("cor").notNull(),
+    slides: jsonb("slides").$type<SlideDoCarrossel[]>().notNull(),
+    legenda: text("legenda").notNull(),
+    hashtags: jsonb("hashtags").$type<string[]>().notNull(),
+    estado: text("estado").$type<EstadoDoCarrossel>().notNull().default("gerado"),
+    geracaoId: integer("geracao_id").references(() => geracoesIA.id, { onDelete: "set null" }),
+    /** O que o código registrou ao gerar (por exemplo, um texto que teve de ser cortado para caber). */
+    avisos: jsonb("avisos").$type<string[]>().notNull().default([]),
+    criadoEm: criadoEm(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("carrosseis_marca").on(t.clienteId, t.criadoEm)],
+);
+export type Carrossel = typeof carrosseis.$inferSelect;
+
+/**
+ * As fotos do cliente num carrossel (até 9, jpg, png ou webp): os bytes como vieram, guardados no banco como as capas de vídeo (`capas_video`). Presas à marca duas vezes (`cliente_id` e o
+ * carrossel), para uma foto nunca servir a outra marca. Nunca imagem gerada.
+ */
+export const carrosselFotos = pgTable(
+  "carrossel_fotos",
+  {
+    id: id(),
+    carrosselId: integer("carrossel_id")
+      .notNull()
+      .references(() => carrosseis.id, { onDelete: "cascade" }),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    ordem: integer("ordem").notNull(),
+    tipo: text("tipo").notNull(),
+    bytes: bytea("bytes").notNull(),
+    tamanho: integer("tamanho").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [index("carrossel_fotos_carrossel").on(t.carrosselId, t.ordem)],
+);
+export type CarrosselFoto = typeof carrosselFotos.$inferSelect;

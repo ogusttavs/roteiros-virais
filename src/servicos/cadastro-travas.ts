@@ -11,7 +11,7 @@ import { and, count, eq, gt, sql } from "drizzle-orm";
 
 import { LIMITES_DO_CADASTRO, TETO_DO_TESTE } from "@/config/cadastro";
 import { db } from "@/db";
-import { cadastrosProprios, edicoes, geracoesIA, roteiros, setoresDeCadastro, user } from "@/db/schema";
+import { cadastrosProprios, carrosseis, edicoes, geracoesIA, roteiros, setoresDeCadastro, user } from "@/db/schema";
 
 import { assinaturaVale, assinaturasDaMarca } from "./assinatura";
 
@@ -56,8 +56,10 @@ export async function barreiraDoCadastro(entrada: { clienteId: number; cortesia:
   if (assinaturas.some((a) => a.status === "active" && assinaturaVale(a, agora))) return null;
 
   if (entrada.gasto === "roteiro") {
-    const [{ total }] = await db().select({ total: count() }).from(roteiros).where(eq(roteiros.clienteId, entrada.clienteId));
-    if (total >= TETO_DO_TESTE.roteiros) return { tipo: "teto", qual: "roteiros" };
+    const [{ total: dosRoteiros }] = await db().select({ total: count() }).from(roteiros).where(eq(roteiros.clienteId, entrada.clienteId));
+    // E65: um carrossel conta como um roteiro no teto do teste.
+    const [{ total: dosCarrosseis }] = await db().select({ total: count() }).from(carrosseis).where(eq(carrosseis.clienteId, entrada.clienteId));
+    if (dosRoteiros + dosCarrosseis >= TETO_DO_TESTE.roteiros) return { tipo: "teto", qual: "roteiros" };
   }
   if (entrada.gasto === "edicao") {
     const [{ total }] = await db()
