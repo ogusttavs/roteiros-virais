@@ -28,6 +28,10 @@ export function promessaDeContagem(textoDaCapa: string): { quantidade: number; c
   return quantidade >= 2 ? { quantidade, coisa: m[2] } : null;
 }
 
+/** As coisas que a capa conta e que são itens (causa, erro, sinal) ou passos (passo, etapa, jeito): decide qual contagem vale quando o carrossel tem os dois tipos. */
+const PALAVRAS_DE_ITEM = new Set(["erros", "causas", "sinais", "mitos", "motivos", "coisas", "sintomas", "razoes", "alertas", "verdades"]);
+const PALAVRAS_DE_PASSO = new Set(["passos", "etapas", "jeitos"]);
+
 /** Os slides que contam como "a lista" da capa: os itens e os passos. */
 const contaComoLista = (s: SlideDoCarrossel): boolean => s.tipo === "item" || s.tipo === "passo";
 
@@ -40,11 +44,17 @@ export function verificarPromessaDaCapa(slides: SlideDoCarrossel[]): string[] {
   if (!capa || !ehCapa(capa.tipo)) return [];
   const promessa = promessaDeContagem(`${capa.titulo}. ${capa.sub ?? ""}`);
   if (!promessa) return [];
-  const lista = slides.filter(contaComoLista).length;
+  const itens = slides.filter((s) => s.tipo === "item").length;
+  const passos = slides.filter((s) => s.tipo === "passo").length;
   const conteudo = slides.slice(1, -1).filter((s) => s.tipo !== "resumo").length;
-  if (promessa.quantidade === lista || promessa.quantidade === conteudo) return [];
+  // Com item e passo juntos, a promessa conta só a coisa de que a capa fala: "2 causas" são os itens, "3 passos" são os passos. Na dúvida (dicas, formas), qualquer uma das duas contagens vale.
+  const quantos = itens > 0 && passos > 0 ? (PALAVRAS_DE_ITEM.has(promessa.coisa) ? itens : PALAVRAS_DE_PASSO.has(promessa.coisa) ? passos : null) : itens + passos;
+  const bate = quantos === null ? promessa.quantidade === itens || promessa.quantidade === passos : promessa.quantidade === quantos;
+  if (bate || promessa.quantidade === conteudo) return [];
+  const misturado = itens > 0 && passos > 0;
+  const traz = quantos === null ? `${itens} itens e ${passos} passos` : misturado ? `${quantos} ${PALAVRAS_DE_ITEM.has(promessa.coisa) ? (quantos === 1 ? "item" : "itens") : quantos === 1 ? "passo" : "passos"}` : `${quantos} (itens e passos)`;
   return [
-    `slide 1: a capa promete ${promessa.quantidade} ${promessa.coisa} e o carrossel traz ${lista} (itens e passos); faça o número da capa e a quantidade de itens ou passos serem a mesma coisa, e nunca prometa mais do que entrega`,
+    `slide 1: a capa promete ${promessa.quantidade} ${promessa.coisa} e o carrossel traz ${traz}; faça o número da capa e a quantidade de itens ou passos serem a mesma coisa, e nunca prometa mais do que entrega`,
   ];
 }
 
@@ -109,16 +119,28 @@ export function avisosDoMetodo(slides: SlideDoCarrossel[], legenda: string): str
   return avisos;
 }
 
+/** A palavra da série de um rótulo ("Erro 2 de 3" vira "Erro"): pula artigo e palavra de até 2 letras ("A 4 de 4" não tem palavra e dá nulo). */
+function palavraDoRotulo(rotulo: string | undefined): string | null {
+  const palavras = (rotulo ?? "").replace(/\s*\d.*$/, "").trim().split(/\s+/).filter(Boolean);
+  return palavras.find((p) => p.length > 2 && !/\d/.test(p)) ?? null;
+}
+
+const SERIES_DA_CAPA: [RegExp, string][] = [[/\bcausas?\b/, "Causa"], [/\berros?\b/, "Erro"], [/\bsinais\b|\bsinal\b/, "Sinal"], [/\bmitos?\b/, "Mito"]];
+
 /**
- * O rótulo "N de M" dos itens, escrito por código como o do passo: a palavra que a IA escolheu ("Erro", "Dica", "Sinal") fica, os números são nossos. Sem palavra, "Dica". Devolve os slides com o rótulo certo.
+ * O rótulo "N de M" dos itens, escrito por código como o do passo: os números são nossos e a palavra é a mesma em todos os itens (a do primeiro item que tem uma, ou a da capa se ela diz "causas", "erros",
+ * "sinais" ou "mitos"), para a série não sair misturada ("Causa 1 de 3, Erro 3 de 3"). Sem palavra, "Dica". Com um item só, sem contagem. Devolve os slides com o rótulo certo.
  */
 export function rotularItens(slides: SlideDoCarrossel[]): SlideDoCarrossel[] {
-  const total = slides.filter((s) => s.tipo === "item").length;
+  const itens = slides.filter((s) => s.tipo === "item");
+  const total = itens.length;
+  const capa = slides[0];
+  const daCapa = capa && ehCapa(capa.tipo) ? SERIES_DA_CAPA.find(([r]) => r.test(semAcento(`${capa.titulo}. ${capa.sub ?? ""}`)))?.[1] : undefined;
+  const palavra = daCapa ?? itens.map((s) => palavraDoRotulo(s.rotulo)).find((p) => p !== null) ?? "Dica";
   let n = 0;
   return slides.map((s) => {
     if (s.tipo !== "item") return s;
     n += 1;
-    const palavra = (s.rotulo ?? "").replace(/\s*\d.*$/, "").trim().split(/\s+/).slice(0, 1).join(" ");
-    return { ...s, rotulo: `${palavra || "Dica"} ${n} de ${total}` };
+    return { ...s, rotulo: total > 1 ? `${palavra} ${n} de ${total}` : palavra };
   });
 }

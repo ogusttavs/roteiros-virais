@@ -1,6 +1,6 @@
 {
-  "id": "226c7cf8-d030-40ac-af5b-ffbc7a964a5f",
-  "prevId": "8c893293-77d6-42fc-9ec4-0dee5b2369bf",
+  "id": "d4b1e061-2f2e-4f72-bad4-0295c811fbab",
+  "prevId": "6bb3a3aa-ccea-4b7f-bdb9-c0fea96ad9d8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1492,6 +1492,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
+        },
+        "de_paciente": {
+          "name": "de_paciente",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "criado_em": {
           "name": "criado_em",

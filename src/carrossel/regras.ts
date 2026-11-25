@@ -10,6 +10,7 @@ import {
   LISTAS_DO_TIPO,
   MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO,
   TEXTO_FIXO_DO_CONTEXTO_DA_FALA,
+  TIPOS_COM_FOTO_DE_PACIENTE,
   TIPOS_COM_FOTO_OBRIGATORIA,
   TIPOS_PROIBIDOS_NA_SAUDE,
   ehCapa,
@@ -67,7 +68,7 @@ export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolea
         return { tipo: s.tipo, titulo: limpo(s.titulo), ...opcional(s.rotulo, "rotulo"), ...opcional(s.texto, "sub") };
       case "passo":
         passo += 1;
-        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), numero: passo, de: totalDePassos };
+        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), numero: passo, ...(totalDePassos > 1 ? { de: totalDePassos } : {}) };
       case "item":
         return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), ...opcional(s.rotulo, "rotulo") };
       case "antes-depois":
@@ -118,10 +119,19 @@ export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide }[], quantid
 
 const semAcentoMinusculo = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-/** Quais slides recebem foto, na ordem em que as fotos são distribuídas (a conta é a mesma do render): o passo e o antes e depois com foto têm limites menores. */
-export function slidesComFoto(slides: SlideDoCarrossel[], quantidadeDeFotos: number): boolean[] {
-  const ids = Array.from({ length: quantidadeDeFotos }, (_, i) => ({ id: i + 1 }));
-  return distribuirFotos(slides, ids).map((d, i) => (slides[i].tipo === "antes-depois" ? d.foto !== null && d.fotoDepois !== null : d.foto !== null));
+/**
+ * Quais slides recebem foto, na ordem em que as fotos são distribuídas (a conta é a mesma do render): o passo e o antes e depois com foto têm limites menores. Com `quantidadeDePaciente` (marca de saúde), as
+ * fotos de paciente são contadas à parte e só entram em antes e depois e em resultado.
+ */
+export function slidesComFoto(slides: SlideDoCarrossel[], quantidadeDeFotos: number, quantidadeDePaciente?: number): boolean[] {
+  const comuns = Array.from({ length: quantidadeDeFotos }, (_, i) => ({ id: i + 1, dePaciente: false }));
+  const pacientes = Array.from({ length: quantidadeDePaciente ?? 0 }, (_, i) => ({ id: quantidadeDeFotos + i + 1, dePaciente: true }));
+  return slidesComFotoDasFotos(slides, [...comuns, ...pacientes], quantidadeDePaciente !== undefined);
+}
+
+/** O mesmo, com as fotos de verdade (as que o carrossel guarda). */
+export function slidesComFotoDasFotos(slides: SlideDoCarrossel[], fotos: { id: number; dePaciente?: boolean }[], separarPaciente: boolean): boolean[] {
+  return distribuirFotos(slides, fotos, separarPaciente).map((d, i) => (slides[i].tipo === "antes-depois" ? d.foto !== null && d.fotoDepois !== null : d.foto !== null));
 }
 
 /** O que está errado num valor de campo: vazio (obrigatório), palavras ou caracteres a mais; nulo se cabe. Palavras só contam nos campos de mais de uma palavra (o valor e a unidade do dado contam caracteres). */
@@ -166,14 +176,21 @@ const NOME_DO_CAMPO: Record<ChaveDeCampo, string> = {
  * Os limites de cada campo de cada tipo, a fonte e o ano do `dado`, os tipos que o ramo de saúde não aceita, as fotos que o pedido prometeu (capa-foto e prova-resultado só existem com foto) e a citação do
  * `prova-fala`, que só vale se for uma frase que a própria pessoa disse (está nas falas DELA, nunca nas de outros criadores, na notícia ou no tema) e tiver ao menos `MINIMO_DE_PALAVRAS_DA_CITACAO` palavras.
  */
-export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: { ramoSaude: boolean; fotosPrometidas?: number; falasDoCliente?: string }): string[] {
+export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: { ramoSaude: boolean; fotosPrometidas?: number; fotosDePacientePrometidas?: number; falasDoCliente?: string }): string[] {
   const motivos: string[] = [];
   const falasNormalizadas = opcoes.falasDoCliente === undefined ? null : semAcentoMinusculo(opcoes.falasDoCliente);
   const comFotoObrigatoria = slides.filter((s) => TIPOS_COM_FOTO_OBRIGATORIA.has(s.tipo)).length;
-  if (opcoes.fotosPrometidas !== undefined && comFotoObrigatoria > opcoes.fotosPrometidas) {
+  if (opcoes.ramoSaude && opcoes.fotosPrometidas !== undefined) {
+    // Saúde: foto comum (o lugar, a equipe) e foto de paciente nunca se misturam. Capa com foto e notícia usam a comum; antes e depois (duas fotos) e resultado (uma) só usam a de paciente.
+    const comuns = slides.filter((s) => TIPOS_COM_FOTO_OBRIGATORIA.has(s.tipo) && !TIPOS_COM_FOTO_DE_PACIENTE.has(s.tipo)).length;
+    const dePaciente = slides.reduce((n, s) => n + (s.tipo === "prova-resultado" ? 1 : s.tipo === "antes-depois" ? 2 : 0), 0);
+    const temPaciente = opcoes.fotosDePacientePrometidas ?? 0;
+    if (comuns > opcoes.fotosPrometidas) motivos.push(`carrossel: ${comuns} slides pedem foto (capa-foto) e o cliente tem ${opcoes.fotosPrometidas}; sem foto use capa-texto`);
+    if (dePaciente > temPaciente) motivos.push(`carrossel: antes-depois e prova-resultado só usam foto de paciente (o cliente tem ${temPaciente}, e o antes e depois leva duas); sem foto de paciente não use antes-depois nem prova-resultado`);
+  } else if (opcoes.fotosPrometidas !== undefined && comFotoObrigatoria > opcoes.fotosPrometidas) {
     motivos.push(`carrossel: ${comFotoObrigatoria} slides pedem foto (capa-foto e prova-resultado) e o cliente tem ${opcoes.fotosPrometidas}; sem foto use capa-texto e não use prova-resultado`);
   }
-  const comFoto = slidesComFoto(slides, opcoes.fotosPrometidas ?? 0);
+  const comFoto = opcoes.ramoSaude ? slidesComFoto(slides, opcoes.fotosPrometidas ?? 0, opcoes.fotosDePacientePrometidas ?? 0) : slidesComFoto(slides, opcoes.fotosPrometidas ?? 0);
   slides.forEach((s, i) => {
     const n = i + 1;
     const campos = CAMPOS_DO_TIPO[s.tipo];

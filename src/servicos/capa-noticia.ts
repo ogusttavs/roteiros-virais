@@ -130,7 +130,7 @@ export type PedidoDeCapa = { noticiaId: number; titulo: string; cor?: string };
 
 /**
  * Cria a capa: UM slide do tipo `noticia` com o título que a pessoa escolheu (ou escreveu), o veículo e a data da notícia. Sem IA. O título passa pelo limite do tipo e, em ramo de saúde, pela regra de promessa.
- * A foto vem depois, pela rota de fotos do carrossel (que em saúde exige a autorização do paciente).
+ * A foto vem depois, pela rota de fotos do carrossel (em saúde, a foto comum entra sem autorização; a de paciente exige).
  */
 export async function criarCapa(clienteId: number, pedido: PedidoDeCapa, agora: Date = new Date()): Promise<Carrossel> {
   if (pedido.cor !== undefined && !corValida(pedido.cor)) throw new ErroCarrossel("A cor precisa ser no formato #rrggbb.");
