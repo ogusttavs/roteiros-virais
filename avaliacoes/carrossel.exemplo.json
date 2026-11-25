@@ -1,0 +1,510 @@
+[
+  {
+    "id": "odonto-escovacao",
+    "nome": "Escovação certa: como escovar sem machucar a gengiva",
+    "marca": {
+      "nome": "Clínica Odonto Jacarandá Mirim",
+      "ramo": "odontologia",
+      "cidade": "Maringá",
+      "bairro": "Zona 7",
+      "instagram": "@odonto.jacaranda.mirim",
+      "corMarca": "#0e5a6a",
+      "servicos": [
+        "avaliação",
+        "limpeza",
+        "restauração",
+        "clareamento",
+        "aparelho ortodôntico"
+      ],
+      "tom": "acolhedor e direto, sem termo técnico",
+      "resumo": "Clínica odontológica de bairro com a dra. responsável e equipe pequena, atendendo adultos e crianças.",
+      "fatos": {
+        "oQueVende": "consultas e tratamentos odontológicos: avaliação, limpeza, restauração, clareamento e aparelho ortodôntico",
+        "preco": "avaliação inicial a combinar com a recepção",
+        "clienteIdeal": "famílias do bairro e adultos que adiaram a ida ao dentista por medo ou falta de tempo",
+        "medos": [
+          "dor no tratamento",
+          "achar que vai ficar caro",
+          "ser julgado por ter ficado anos sem ir ao dentista"
+        ],
+        "frasesDaFala": [
+          "vamos com calma, a gente explica cada passo"
+        ],
+        "proibicoes": [
+          "garantia de resultado",
+          "promessa de prazo",
+          "antes e depois de paciente sem autorização"
+        ],
+        "cenasFilmaveis": [
+          "a recepção da clínica",
+          "a escovação ensinada num modelo de gesso",
+          "a sala de espera com brinquedos para criança"
+        ]
+      }
+    },
+    "quantidade": 5,
+    "tema": "Escovação certa: como escovar sem machucar a gengiva",
+    "objetivo": "que mais gente me conheça"
+  },
+  {
+    "id": "odonto-fio-dental",
+    "nome": "Fio dental: o erro que quase todo mundo comete",
+    "marca": {
+      "nome": "Sorriso de Bairro Odontologia Pedrinhas",
+      "ramo": "odontologia",
+      "cidade": "Uberlândia",
+      "bairro": "Tibery",
+      "instagram": "@sorrisodebairro.pedrinhas",
+      "corMarca": "#7a3b2e",
+      "servicos": [
+        "odontopediatria",
+        "limpeza",
+        "canal",
+        "extração",
+        "prótese"
+      ],
+      "tom": "bem-humorado e popular, fala como vizinho",
+      "resumo": "Consultório de bairro, dois dentistas e uma auxiliar, atendimento por convênio popular e particular, muito paciente idoso e criança.",
+      "fatos": {
+        "oQueVende": "odontopediatria, limpeza, tratamento de canal, extração e prótese, com horário flexível",
+        "preco": "limpeza a partir de um valor combinado na recepção, parcelado",
+        "clienteIdeal": "pais de criança pequena e idosos do bairro",
+        "medos": [
+          "a criança chorar na cadeira",
+          "perder o dente de vez",
+          "o preço do canal"
+        ],
+        "frasesDaFala": [
+          "dente de leite também precisa de cuidado"
+        ],
+        "proibicoes": [
+          "prometer que não vai doer",
+          "preço fechado sem avaliação"
+        ],
+        "cenasFilmaveis": [
+          "a cadeira infantil com a decoração",
+          "o dentista conversando com a criança antes do exame",
+          "a auxiliar mostrando a escova"
+        ]
+      }
+    },
+    "quantidade": 7,
+    "tema": "Fio dental: o erro que quase todo mundo comete",
+    "objetivo": "que lembrem de mim"
+  },
+  {
+    "id": "odonto-trocar-escova",
+    "nome": "Quando trocar a escova de dentes",
+    "marca": {
+      "nome": "Dra. Nilce Garcez Odontologia",
+      "ramo": "odontologia",
+      "cidade": "Ribeirão Preto",
+      "bairro": "Jardim Sumaré",
+      "instagram": "@dranilcegarcez",
+      "corMarca": "#2f4f3a",
+      "servicos": [
+        "clareamento",
+        "lentes",
+        "ortodontia invisível",
+        "avaliação estética"
+      ],
+      "tom": "elegante e calmo, explica com exemplo do dia a dia",
+      "resumo": "Consultório particular de uma dentista só, foco em estética do sorriso, agenda curta e atendimento sem pressa.",
+      "fatos": {
+        "oQueVende": "clareamento dental, lentes de porcelana e ortodontia com alinhadores, depois de uma avaliação estética",
+        "preco": "valor depende da avaliação, sem tabela pública",
+        "clienteIdeal": "adultos de 25 a 50 anos que querem melhorar o sorriso sem exagero",
+        "medos": [
+          "ficar com o dente artificial demais",
+          "sensibilidade depois do clareamento",
+          "gastar e não gostar do resultado"
+        ],
+        "frasesDaFala": [
+          "o sorriso bonito é o que parece com você"
+        ],
+        "proibicoes": [
+          "garantia de resultado",
+          "comparar com outra clínica",
+          "foto de paciente sem autorização"
+        ],
+        "cenasFilmaveis": [
+          "a sala de avaliação com o espelho",
+          "a dentista mostrando o tom de cor numa escala",
+          "a bancada com os moldes"
+        ]
+      }
+    },
+    "quantidade": 5,
+    "tema": "Quando trocar a escova de dentes",
+    "objetivo": "que mais gente me conheça"
+  },
+  {
+    "id": "odonto-sensibilidade",
+    "nome": "Sensibilidade nos dentes: por que acontece e o que fazer",
+    "marca": {
+      "nome": "Odontoclínica Praça do Relógio Azul",
+      "ramo": "odontologia",
+      "cidade": "Campina Grande",
+      "bairro": "Centro",
+      "instagram": "@odonto.relogioazul",
+      "corMarca": "#1f3c88",
+      "servicos": [
+        "aparelho",
+        "manutenção de aparelho",
+        "limpeza",
+        "implante",
+        "urgência"
+      ],
+      "tom": "profissional e tranquilo, frases curtas",
+      "resumo": "Clínica de centro de cidade com três consultórios, forte em ortodontia e atendimento de urgência no mesmo dia.",
+      "fatos": {
+        "oQueVende": "aparelho ortodôntico e manutenção mensal, limpeza, implante e atendimento de urgência no mesmo dia",
+        "preco": "manutenção do aparelho mensal, valor informado na recepção",
+        "clienteIdeal": "adolescentes com os pais e adultos que usam aparelho",
+        "medos": [
+          "o aparelho machucar a boca",
+          "demorar muito para terminar o tratamento",
+          "deixar os dentes manchados"
+        ],
+        "frasesDaFala": [
+          "quem usa aparelho precisa de limpeza também"
+        ],
+        "proibicoes": [
+          "prometer prazo de tratamento",
+          "garantia de resultado"
+        ],
+        "cenasFilmaveis": [
+          "a manutenção do aparelho na cadeira",
+          "a bancada com os kits de higiene para quem usa aparelho",
+          "a recepção com o relógio azul na parede"
+        ]
+      }
+    },
+    "quantidade": 9,
+    "tema": "Sensibilidade nos dentes: por que acontece e o que fazer",
+    "objetivo": "que me chamem para marcar uma avaliação"
+  },
+  {
+    "id": "odonto-mau-halito",
+    "nome": "Mau hálito: as causas mais comuns",
+    "marca": {
+      "nome": "Clínica Odonto Jacarandá Mirim",
+      "ramo": "odontologia",
+      "cidade": "Maringá",
+      "bairro": "Zona 7",
+      "instagram": "@odonto.jacaranda.mirim",
+      "corMarca": "#0e5a6a",
+      "servicos": [
+        "avaliação",
+        "limpeza",
+        "restauração",
+        "clareamento",
+        "aparelho ortodôntico"
+      ],
+      "tom": "acolhedor e direto, sem termo técnico",
+      "resumo": "Clínica odontológica de bairro com a dra. responsável e equipe pequena, atendendo adultos e crianças.",
+      "fatos": {
+        "oQueVende": "consultas e tratamentos odontológicos: avaliação, limpeza, restauração, clareamento e aparelho ortodôntico",
+        "preco": "avaliação inicial a combinar com a recepção",
+        "clienteIdeal": "famílias do bairro e adultos que adiaram a ida ao dentista por medo ou falta de tempo",
+        "medos": [
+          "dor no tratamento",
+          "achar que vai ficar caro",
+          "ser julgado por ter ficado anos sem ir ao dentista"
+        ],
+        "frasesDaFala": [
+          "vamos com calma, a gente explica cada passo"
+        ],
+        "proibicoes": [
+          "garantia de resultado",
+          "promessa de prazo",
+          "antes e depois de paciente sem autorização"
+        ],
+        "cenasFilmaveis": [
+          "a recepção da clínica",
+          "a escovação ensinada num modelo de gesso",
+          "a sala de espera com brinquedos para criança"
+        ]
+      }
+    },
+    "quantidade": 7,
+    "tema": "Mau hálito: as causas mais comuns",
+    "objetivo": "que lembrem de mim"
+  },
+  {
+    "id": "odonto-clareamento",
+    "nome": "Clareamento dental: o que é verdade e o que é mito",
+    "marca": {
+      "nome": "Dra. Nilce Garcez Odontologia",
+      "ramo": "odontologia",
+      "cidade": "Ribeirão Preto",
+      "bairro": "Jardim Sumaré",
+      "instagram": "@dranilcegarcez",
+      "corMarca": "#2f4f3a",
+      "servicos": [
+        "clareamento",
+        "lentes",
+        "ortodontia invisível",
+        "avaliação estética"
+      ],
+      "tom": "elegante e calmo, explica com exemplo do dia a dia",
+      "resumo": "Consultório particular de uma dentista só, foco em estética do sorriso, agenda curta e atendimento sem pressa.",
+      "fatos": {
+        "oQueVende": "clareamento dental, lentes de porcelana e ortodontia com alinhadores, depois de uma avaliação estética",
+        "preco": "valor depende da avaliação, sem tabela pública",
+        "clienteIdeal": "adultos de 25 a 50 anos que querem melhorar o sorriso sem exagero",
+        "medos": [
+          "ficar com o dente artificial demais",
+          "sensibilidade depois do clareamento",
+          "gastar e não gostar do resultado"
+        ],
+        "frasesDaFala": [
+          "o sorriso bonito é o que parece com você"
+        ],
+        "proibicoes": [
+          "garantia de resultado",
+          "comparar com outra clínica",
+          "foto de paciente sem autorização"
+        ],
+        "cenasFilmaveis": [
+          "a sala de avaliação com o espelho",
+          "a dentista mostrando o tom de cor numa escala",
+          "a bancada com os moldes"
+        ]
+      }
+    },
+    "quantidade": 9,
+    "tema": "Clareamento dental: o que é verdade e o que é mito",
+    "objetivo": "que me chamem para marcar uma avaliação",
+    "fotos": 2
+  },
+  {
+    "id": "odonto-primeira-consulta",
+    "nome": "quero falar pros pais quando levar o filho pela primeira ...",
+    "marca": {
+      "nome": "Sorriso de Bairro Odontologia Pedrinhas",
+      "ramo": "odontologia",
+      "cidade": "Uberlândia",
+      "bairro": "Tibery",
+      "instagram": "@sorrisodebairro.pedrinhas",
+      "corMarca": "#7a3b2e",
+      "servicos": [
+        "odontopediatria",
+        "limpeza",
+        "canal",
+        "extração",
+        "prótese"
+      ],
+      "tom": "bem-humorado e popular, fala como vizinho",
+      "resumo": "Consultório de bairro, dois dentistas e uma auxiliar, atendimento por convênio popular e particular, muito paciente idoso e criança.",
+      "fatos": {
+        "oQueVende": "odontopediatria, limpeza, tratamento de canal, extração e prótese, com horário flexível",
+        "preco": "limpeza a partir de um valor combinado na recepção, parcelado",
+        "clienteIdeal": "pais de criança pequena e idosos do bairro",
+        "medos": [
+          "a criança chorar na cadeira",
+          "perder o dente de vez",
+          "o preço do canal"
+        ],
+        "frasesDaFala": [
+          "dente de leite também precisa de cuidado"
+        ],
+        "proibicoes": [
+          "prometer que não vai doer",
+          "preço fechado sem avaliação"
+        ],
+        "cenasFilmaveis": [
+          "a cadeira infantil com a decoração",
+          "o dentista conversando com a criança antes do exame",
+          "a auxiliar mostrando a escova"
+        ]
+      }
+    },
+    "quantidade": 7,
+    "tema": "quero falar pros pais quando levar o filho pela primeira vez no dentista, muita mãe acha que só precisa quando o dente dói",
+    "objetivo": "que me chamem para marcar uma avaliação"
+  },
+  {
+    "id": "odonto-aparelho-limpeza",
+    "nome": "tá cheio de gente de aparelho que acha que não precisa fa...",
+    "marca": {
+      "nome": "Odontoclínica Praça do Relógio Azul",
+      "ramo": "odontologia",
+      "cidade": "Campina Grande",
+      "bairro": "Centro",
+      "instagram": "@odonto.relogioazul",
+      "corMarca": "#1f3c88",
+      "servicos": [
+        "aparelho",
+        "manutenção de aparelho",
+        "limpeza",
+        "implante",
+        "urgência"
+      ],
+      "tom": "profissional e tranquilo, frases curtas",
+      "resumo": "Clínica de centro de cidade com três consultórios, forte em ortodontia e atendimento de urgência no mesmo dia.",
+      "fatos": {
+        "oQueVende": "aparelho ortodôntico e manutenção mensal, limpeza, implante e atendimento de urgência no mesmo dia",
+        "preco": "manutenção do aparelho mensal, valor informado na recepção",
+        "clienteIdeal": "adolescentes com os pais e adultos que usam aparelho",
+        "medos": [
+          "o aparelho machucar a boca",
+          "demorar muito para terminar o tratamento",
+          "deixar os dentes manchados"
+        ],
+        "frasesDaFala": [
+          "quem usa aparelho precisa de limpeza também"
+        ],
+        "proibicoes": [
+          "prometer prazo de tratamento",
+          "garantia de resultado"
+        ],
+        "cenasFilmaveis": [
+          "a manutenção do aparelho na cadeira",
+          "a bancada com os kits de higiene para quem usa aparelho",
+          "a recepção com o relógio azul na parede"
+        ]
+      }
+    },
+    "quantidade": 5,
+    "tema": "tá cheio de gente de aparelho que acha que não precisa fazer limpeza, preciso explicar que precisa sim",
+    "objetivo": "que lembrem de mim"
+  },
+  {
+    "id": "limpeza-mancha-estofado",
+    "nome": "Mancha no sofá: o que fazer nos primeiros minutos antes d...",
+    "marca": {
+      "nome": "Reluz Garimpeira Limpeza Profissional",
+      "ramo": "limpeza-e-organizacao-da-casa",
+      "cidade": "Goiânia",
+      "bairro": "Setor Bueno",
+      "instagram": "@reluzgarimpeira",
+      "corMarca": "#0b7a75",
+      "servicos": [
+        "produtos concentrados de limpeza pesada",
+        "tira-manchas",
+        "limpeza de estofado",
+        "kit para faxina"
+      ],
+      "tom": "prático e direto, de quem já limpou muita casa",
+      "resumo": "Marca pequena de produtos de limpeza concentrados, vendidos por Instagram e feiras, com receita de uso em cada embalagem.",
+      "fatos": {
+        "oQueVende": "produtos de limpeza concentrados: desengordurante, tira-manchas, limpa-estofado e kit de faxina pesada",
+        "preco": "kits de faxina a partir de um valor fixo informado no direct",
+        "clienteIdeal": "donas de casa e diaristas que querem limpeza pesada sem gastar muito produto",
+        "medos": [
+          "estragar o tecido com produto forte",
+          "a mancha voltar depois de secar",
+          "gastar à toa com produto que não funciona"
+        ],
+        "frasesDaFala": [
+          "um pouquinho rende o mês inteiro"
+        ],
+        "proibicoes": [
+          "dizer que remove qualquer mancha",
+          "comparar com marca concorrente pelo nome"
+        ],
+        "cenasFilmaveis": [
+          "o produto agindo na mancha do sofá",
+          "a diluição na medida certa",
+          "a bancada com os frascos"
+        ]
+      }
+    },
+    "quantidade": 7,
+    "tema": "Mancha no sofá: o que fazer nos primeiros minutos antes de secar",
+    "objetivo": "que me chamem para comprar o kit"
+  },
+  {
+    "id": "limpeza-cheiro-duradouro",
+    "nome": "Por que o cheiro de limpeza some em uma hora e como fazer...",
+    "marca": {
+      "nome": "Brisa do Ribeirão Casa Limpa",
+      "ramo": "limpeza-e-organizacao-da-casa",
+      "cidade": "Juiz de Fora",
+      "bairro": "São Mateus",
+      "instagram": "@brisadoribeirao.casalimpa",
+      "corMarca": "#3a6ea5",
+      "servicos": [
+        "limpa-pisos",
+        "amaciante concentrado",
+        "desinfetante de cheiro duradouro",
+        "refil econômico"
+      ],
+      "tom": "leve, caseiro, fala como amiga que dá dica",
+      "resumo": "Pequena fábrica local de produtos de limpeza e perfumaria de casa, com refil em galão para economizar.",
+      "fatos": {
+        "oQueVende": "limpa-pisos, amaciante, desinfetante com cheiro duradouro e refil em galão econômico",
+        "preco": "refil de galão com preço de atacado para quem compra em maior quantidade",
+        "clienteIdeal": "famílias que gostam da casa cheirosa e pequenos comércios que limpam todo dia",
+        "medos": [
+          "o cheiro sumir em uma hora",
+          "produto que agride a pele",
+          "o piso ficar grudento"
+        ],
+        "frasesDaFala": [
+          "casa limpa é casa que cheira bem o dia todo"
+        ],
+        "proibicoes": [
+          "prometer que mata todos os germes",
+          "dizer que o produto é natural ou ecológico sem comprovação"
+        ],
+        "cenasFilmaveis": [
+          "o piso sendo passado com o produto",
+          "o refil sendo colocado no frasco",
+          "a prateleira da loja com os cheiros"
+        ]
+      }
+    },
+    "quantidade": 9,
+    "tema": "Por que o cheiro de limpeza some em uma hora e como fazer durar o dia todo",
+    "objetivo": "que mais gente me conheça"
+  },
+  {
+    "id": "auto-polimento-vitrificacao",
+    "nome": "Polimento e vitrificação: qual a diferença e quando cada ...",
+    "marca": {
+      "nome": "Lustre do Ipiranguinha Estética Automotiva",
+      "ramo": "estetica-automotiva",
+      "cidade": "São Bernardo do Campo",
+      "bairro": "Rudge Ramos",
+      "instagram": "@lustre.ipiranguinha",
+      "corMarca": "#222a35",
+      "servicos": [
+        "polimento",
+        "vitrificação",
+        "higienização interna",
+        "lavagem detalhada",
+        "película"
+      ],
+      "tom": "direto e técnico sem exagero, de quem vive em oficina",
+      "resumo": "Estética automotiva de bairro com dois profissionais, trabalha com carro de passeio e moto, por agendamento.",
+      "fatos": {
+        "oQueVende": "polimento, vitrificação da pintura, higienização interna, lavagem detalhada e película",
+        "preco": "orçamento depende do tamanho do carro e do estado da pintura, feito pessoalmente",
+        "clienteIdeal": "donos de carro seminovo e de uso diário que querem a pintura protegida",
+        "medos": [
+          "a pintura ficar com marca de polimento",
+          "pagar por proteção que não dura",
+          "deixar o carro e voltar com risco"
+        ],
+        "frasesDaFala": [
+          "o carro bonito é o carro cuidado todo mês"
+        ],
+        "proibicoes": [
+          "garantia de durabilidade em anos",
+          "falar mal de outra estética",
+          "prometer remover risco fundo"
+        ],
+        "cenasFilmaveis": [
+          "a politriz agindo na pintura",
+          "o antes e depois de um farol",
+          "a lavagem com a espuma"
+        ]
+      }
+    },
+    "quantidade": 5,
+    "tema": "Polimento e vitrificação: qual a diferença e quando cada um vale a pena",
+    "objetivo": "que me chamem para pedir um orçamento"
+  }
+]

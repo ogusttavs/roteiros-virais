@@ -58,6 +58,8 @@
     "avaliar:roteiros-longos": "tsx scripts/avaliar-roteiros-longos.ts",
     "avaliar:entender-marca": "tsx scripts/avaliar-entender-marca.ts",
     "avaliar:edicao": "tsx scripts/avaliar-edicao.ts",
+    "avaliar:carrossel": "tsx scripts/avaliar-carrossel.ts",
+    "avaliar:carrossel:comparar": "tsx scripts/avaliar-carrossel-comparar.ts",
     "avaliar:tudo": "tsx scripts/avaliar-tudo.ts",
     "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts",
     "capturas:e60": "AI_PROVIDER=mock tsx scripts/capturas-e60.ts",
