@@ -649,6 +649,7 @@ function mockCarrossel(entrada: string) {
   if (marcado("carrossel-capa-sem-promessa")) slides[0].titulo = `Estofado bonito`;
   if (marcado("carrossel-promessa")) slides[1].texto = "Com o clareamento, o dente volta ao branco em uma sessão.";
   if (marcado("carrossel-resumo")) slides[1] = { ...vazio, tipo: "resumo", titulo: "Para guardar", linhas: ["Deixe agir antes", "Um produto por vez", "Banheiro aberto"] };
+  if (marcado("carrossel-resumo")) slides[0].titulo = `${quantidade - 3} dicas sobre ${tema}`.split(" ").slice(0, 10).join(" ");
   return {
     slides,
     legenda: `Salve este carrossel sobre ${tema} e mande para quem precisa. Comenta qual dica você já usa.`,
