@@ -8,7 +8,7 @@
  * que a tela mostrará por código (PR 3), nunca escrita pelo modelo.
  */
 
-export const versao = "1.3.0";
+export const versao = "1.4.0";
 
 export type RegraCopyRoteiro = {
   numero: string;
@@ -691,14 +691,14 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
   {
     "numero": "R-CONF-07",
     "grupo": "CONF",
-    "texto": "Nos ramos de saúde (dentista, médico, estética clínica, veterinário), o roteiro nunca promete cura, resultado garantido nem diagnóstico à distância; descreve o procedimento com clareza; não usa depoimento de leigo sobre tratamento; deixa em \"Atenção\" a conferência com a norma do conselho profissional. Ver a pendência do conselho de odontologia acima.",
-    "porQue": "Em saúde, não prometa cura nem resultado garantido.",
+    "texto": "Nos ramos de saúde (dentista, médico, estética clínica, veterinário), o roteiro segue o conselho. Pode: antes e depois com o termo de autorização assinado pelo paciente, oferta de desconto e chamar para agendar uma avaliação. Não pode: preço no anúncio, serviço grátis (\"avaliação gratuita\", \"primeira consulta sem custo\"), imagem do procedimento em andamento (só diagnóstico e resultado final), promessa de cura, resultado, prazo ou garantia, diagnóstico à distância nem depoimento de leigo sobre tratamento. Aqui isso vale por cima de `R-CONF-01` e `R-CONF-03`; nos outros ramos elas seguem como estão.",
+    "porQue": "Em saúde o conselho proíbe preço, grátis, procedimento em andamento e promessa de resultado.",
     "bloco": "gancho, corpo, chamada",
     "forca": "forte",
-    "forcaNoDocumento": "forte (CONAR)",
+    "forcaNoDocumento": "forte (conselho)",
     "conferePorCodigo": "sim",
-    "confereNoDocumento": "sim, só nos ramos de saúde (lista: cura, garantido, 100%, sem risco, diagnóstico)",
-    "fonte": "F26-14 (A, n19: Anexo G, itens 1 a 4); F25-2 (A, n18: art. 31, riscos à saúde)"
+    "confereNoDocumento": "sim, só nos ramos de saúde (cura, garantido, 100%, sem risco, diagnóstico, preço em reais, grátis); a gravação do procedimento é regra do prompt",
+    "fonte": "Resolução CFO 196/2019 (antes e depois com termo); Resolução CFO 271/2025 (desconto); decisão do Gustavo de 25/11/2026 (\"faz o que o conselho falou\"); F26-14 (A, n19: Anexo G, itens 1 a 4); F25-2 (A, n18: art. 31, riscos à saúde)"
   },
   {
     "numero": "R-CONF-08",

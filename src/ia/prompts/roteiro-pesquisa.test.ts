@@ -144,6 +144,6 @@ describe("a pesquisa na hora presa ao roteiro (E54, parte 2)", () => {
   });
 
   it("a versão do prompt subiu", () => {
-    expect(versao).toBe("2.25.0");
+    expect(versao).toBe("2.26.0");
   });
 });

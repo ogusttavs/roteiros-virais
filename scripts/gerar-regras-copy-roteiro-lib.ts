@@ -9,8 +9,8 @@ const QUEBRA = String.fromCharCode(10);
 const RETORNO = String.fromCharCode(13);
 const PADRAO_LINHA = /^[|][ ]*(R-(?:COPY|ROTEIRO|CONF)-[0-9]{2})[ ]*[|]/;
 
-/** A versão das regras (o `checar-versao-prompt` exige versão nova quando um arquivo de `src/ia/prompts/` muda). Subir junto com qualquer mudança da seção 11. 1.0.0: as 53 regras (PR 1); 1.1.0: R-COPY-21 como indício (PR 2); 1.2.0: R-ROTEIRO-20 e R-CONF-10 (E59, 22/10/2026); 1.3.0: R-COPY-26 a 29 e R-COPY-19 reescrita (onda 1 de texto, 25/11/2026). */
-export const VERSAO_DAS_REGRAS = "1.3.0";
+/** A versão das regras (o `checar-versao-prompt` exige versão nova quando um arquivo de `src/ia/prompts/` muda). Subir junto com qualquer mudança da seção 11. 1.0.0: as 53 regras (PR 1); 1.1.0: R-COPY-21 como indício (PR 2); 1.2.0: R-ROTEIRO-20 e R-CONF-10 (E59, 22/10/2026); 1.3.0: R-COPY-26 a 29 e R-COPY-19 reescrita (onda 1 de texto, 25/11/2026); 1.4.0: R-CONF-07 reescrita com o conselho de odontologia (saúde sem preço, sem grátis, sem procedimento em andamento, 25/11/2026). */
+export const VERSAO_DAS_REGRAS = "1.4.0";
 
 export const TOTAL_ESPERADO = { COPY: 29, ROTEIRO: 20, CONF: 10 } as const;
 
