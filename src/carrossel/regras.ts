@@ -1,28 +1,28 @@
 /**
- * E65 PR 1: as regras do carrossel que o código confere depois da IA (o prompt só pede). Funções puras, sem banco nem IA, para o teste unitário provar cada uma.
- * Cada motivo é uma frase que a segunda tentativa recebe para corrigir.
+ * E65 PR 1 e 2: as regras do carrossel que o código confere depois da IA (o prompt só pede) e na troca de texto pela pessoa. Funções puras, sem banco nem IA, para o teste unitário provar cada uma. Cada
+ * motivo é uma frase que a segunda tentativa recebe para corrigir. Os limites de cada campo vêm da tabela do desenho (`CAMPOS_DO_TIPO` em `config/carrossel.ts`).
  */
 import {
+  CAMPOS_DO_TIPO,
   HASHTAGS,
   LIMITE_DA_LEGENDA_PALAVRAS,
-  LIMITE_DE_PALAVRAS,
+  LINHA_FIXA_ANTES_DEPOIS_SAUDE,
+  LISTAS_DO_TIPO,
   MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO,
+  TEXTO_FIXO_DO_CONTEXTO_DA_FALA,
   TIPOS_COM_FOTO_OBRIGATORIA,
   TIPOS_PROIBIDOS_NA_SAUDE,
-  TIPOS_SEM_CORPO_OBRIGATORIO,
   ehCapa,
+  limiteDoCampo,
+  type ChaveDeCampo,
   type SlideDoCarrossel,
   type TipoDeSlide,
 } from "@/config/carrossel";
 
+import { distribuirFotos } from "./fotos";
+
 export function contarPalavras(texto: string): number {
   return texto.trim() === "" ? 0 : texto.trim().split(/\s+/).length;
-}
-
-/** Corta um texto nas primeiras `limite` palavras (o render usa quando o texto passaria do limite do tipo). */
-export function cortarPalavras(texto: string, limite: number): string {
-  const palavras = texto.trim().split(/\s+/);
-  return palavras.length <= limite ? texto.trim() : palavras.slice(0, limite).join(" ");
 }
 
 /** Uma citação mais curta que isso está contida em qualquer texto e não prova que o cliente falou. */
@@ -30,10 +30,71 @@ export const MINIMO_DE_PALAVRAS_DA_CITACAO = 4;
 
 const TEM_ANO = /(?:^|\D)(?:19|20)\d{2}(?:\D|$)/;
 
-export type SlideDaIA = { tipo: TipoDeSlide; titulo: string; corpo: string; fonte: string | null };
+/** O slide como a IA escreve: todos os campos, vazios quando o tipo não usa (sem opcionais nem nulos, para a gramática da saída ficar pequena). */
+export type SlideDaSaida = {
+  tipo: TipoDeSlide;
+  rotulo: string;
+  titulo: string;
+  /** A linha de apoio da capa, o texto do passo, do item e da chamada, a frase do dado e a fala do cliente. */
+  texto: string;
+  antes: string;
+  depois: string;
+  valor: string;
+  unidade: string;
+  fonte: string;
+  referencia: string;
+  quem: string;
+  contexto: string;
+  linhas: string[];
+  acoes: string[];
+};
+
+const limpo = (v: string | undefined): string => (v ?? "").trim();
+
+/**
+ * Da saída da IA para o que o slide guarda: cada tipo fica só com os campos que usa, com os nomes do desenho; o número e o total dos passos, o rodapé de saúde e o fim do contexto da fala são escritos por código.
+ */
+export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolean }): SlideDoCarrossel[] {
+  const totalDePassos = saida.filter((s) => s.tipo === "passo").length;
+  let passo = 0;
+  return saida.map((s): SlideDoCarrossel => {
+    const opcional = (valor: string, chave: ChaveDeCampo) => (limpo(valor) ? { [chave]: limpo(valor) } : {});
+    switch (s.tipo) {
+      case "capa-foto":
+      case "capa-texto":
+        return { tipo: s.tipo, titulo: limpo(s.titulo), ...opcional(s.rotulo, "rotulo"), ...opcional(s.texto, "sub") };
+      case "passo":
+        passo += 1;
+        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), numero: passo, de: totalDePassos };
+      case "item":
+        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), ...opcional(s.rotulo, "rotulo") };
+      case "antes-depois":
+        return { tipo: s.tipo, titulo: limpo(s.titulo), antes: limpo(s.antes), depois: limpo(s.depois), ...(opcoes.ramoSaude ? { rodape: LINHA_FIXA_ANTES_DEPOIS_SAUDE } : {}) };
+      case "dado":
+        return { tipo: s.tipo, titulo: "", valor: limpo(s.valor), ...opcional(s.unidade, "unidade"), frase: limpo(s.texto), fonte: limpo(s.fonte) || null, referencia: limpo(s.referencia) };
+      case "prova-fala": {
+        const contexto = limpo(s.contexto).replace(/\.?\s*Publicado com autoriza[cç][aã]o\.?$/i, "").trim();
+        return { tipo: s.tipo, titulo: "", citacao: limpo(s.texto), quem: limpo(s.quem), contexto: `${contexto ? `${contexto.replace(/\.$/, "")}. ` : ""}${TEXTO_FIXO_DO_CONTEXTO_DA_FALA}` };
+      }
+      case "prova-resultado":
+        return { tipo: s.tipo, titulo: limpo(s.titulo), ...(opcoes.ramoSaude ? { rodape: LINHA_FIXA_ANTES_DEPOIS_SAUDE } : {}) };
+      case "resumo":
+        return { tipo: s.tipo, titulo: limpo(s.titulo), linhas: s.linhas.map(limpo).filter(Boolean) };
+      case "chamada":
+        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), acoes: s.acoes.map(limpo).filter(Boolean) };
+      case "noticia":
+        return { tipo: s.tipo, titulo: limpo(s.titulo), veiculo: limpo(s.fonte), data: limpo(s.referencia) };
+    }
+  });
+}
+
+/** Todo o texto de um slide, na ordem em que aparece, para o verificador de fatos e a conformidade lerem. */
+export function textoDoSlide(s: SlideDoCarrossel): string[] {
+  return [s.rotulo, s.titulo, s.sub, s.texto, s.antes, s.depois, s.valor && `${s.valor}${s.unidade ?? ""}`, s.frase, s.fonte, s.citacao, s.quem, s.contexto, ...(s.linhas ?? []), ...(s.acoes ?? [])].filter((t): t is string => Boolean(t && t.trim()));
+}
 
 /** A ordem e a forma da lista: quantidade, capa primeiro, chamada por último, nunca três do mesmo tipo seguidos. */
-export function verificarOrdemDosSlides(slides: SlideDaIA[], quantidade: number): string[] {
+export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide }[], quantidade: number): string[] {
   const motivos: string[] = [];
   if (slides.length !== quantidade) motivos.push(`carrossel: ${slides.length} slides, o pedido era de exatamente ${quantidade}`);
   if (slides.length > 0 && !ehCapa(slides[0].tipo)) motivos.push('carrossel: o primeiro slide precisa ser uma capa (capa-foto ou capa-texto)');
@@ -55,35 +116,88 @@ export function verificarOrdemDosSlides(slides: SlideDaIA[], quantidade: number)
 
 const semAcentoMinusculo = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
+/** Quais slides recebem foto, na ordem em que as fotos são distribuídas (a conta é a mesma do render): o passo e o antes e depois com foto têm limites menores. */
+export function slidesComFoto(slides: SlideDoCarrossel[], quantidadeDeFotos: number): boolean[] {
+  const ids = Array.from({ length: quantidadeDeFotos }, (_, i) => ({ id: i + 1 }));
+  return distribuirFotos(slides, ids).map((d, i) => (slides[i].tipo === "antes-depois" ? d.foto !== null && d.fotoDepois !== null : d.foto !== null));
+}
+
+/** O que está errado num valor de campo: vazio (obrigatório), palavras ou caracteres a mais; nulo se cabe. Palavras só contam nos campos de mais de uma palavra (o valor e a unidade do dado contam caracteres). */
+export function excessoDoCampo(tipo: TipoDeSlide, chave: ChaveDeCampo, valor: string, comFoto: boolean): { tipo: "vazio" | "palavras" | "caracteres"; n: number; limite: number } | null {
+  const limite = limiteDoCampo(tipo, chave, comFoto);
+  if (!limite) return null;
+  const palavras = contarPalavras(valor);
+  if (palavras === 0) return limite.obrigatorio ? { tipo: "vazio", n: 0, limite: limite.palavras } : null;
+  if (limite.palavras > 1 && palavras > limite.palavras) return { tipo: "palavras", n: palavras - limite.palavras, limite: limite.palavras };
+  if (valor.trim().length > limite.caracteres) return { tipo: "caracteres", n: valor.trim().length - limite.caracteres, limite: limite.caracteres };
+  return null;
+}
+
+/** O motivo (frase para a pessoa ou para a IA) de um valor passar do limite do campo, ou nulo se cabe. */
+export function motivoDoCampo(tipo: TipoDeSlide, chave: ChaveDeCampo, valor: string, comFoto: boolean): string | null {
+  const e = excessoDoCampo(tipo, chave, valor, comFoto);
+  if (!e) return null;
+  if (e.tipo === "vazio") return "vazio";
+  return e.tipo === "palavras" ? `passou ${e.n} ${e.n === 1 ? "palavra" : "palavras"} (o limite é ${e.limite})` : `passou ${e.n} caracteres (o limite é ${e.limite})`;
+}
+
+const NOME_DO_CAMPO: Record<ChaveDeCampo, string> = {
+  rotulo: "rótulo",
+  titulo: "título",
+  sub: "linha de apoio",
+  texto: "texto",
+  antes: "antes",
+  depois: "depois",
+  valor: "valor",
+  unidade: "unidade",
+  frase: "frase",
+  fonte: "fonte",
+  referencia: "referência",
+  citacao: "fala",
+  quem: "quem falou",
+  contexto: "contexto",
+  veiculo: "veículo",
+  data: "data",
+};
+
 /**
- * O limite de palavras de cada tipo, a fonte do `dado`, o título que não pode ficar vazio, os tipos que o ramo de saúde não aceita, as fotos que o pedido prometeu (capa-foto e
- * prova-resultado só existem com foto) e a citação do `prova-fala`, que só vale se for uma frase que a própria pessoa disse (está nas falas DELA, nunca nas de outros criadores, na notícia ou no tema) e tiver ao menos `MINIMO_DE_PALAVRAS_DA_CITACAO` palavras (uma citação curta cabe em qualquer texto).
+ * Os limites de cada campo de cada tipo, a fonte e o ano do `dado`, os tipos que o ramo de saúde não aceita, as fotos que o pedido prometeu (capa-foto e prova-resultado só existem com foto) e a citação do
+ * `prova-fala`, que só vale se for uma frase que a própria pessoa disse (está nas falas DELA, nunca nas de outros criadores, na notícia ou no tema) e tiver ao menos `MINIMO_DE_PALAVRAS_DA_CITACAO` palavras.
  */
-export function verificarLimitesDosSlides(slides: SlideDaIA[], opcoes: { ramoSaude: boolean; fotosPrometidas?: number; falasDoCliente?: string }): string[] {
+export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: { ramoSaude: boolean; fotosPrometidas?: number; falasDoCliente?: string }): string[] {
   const motivos: string[] = [];
   const falasNormalizadas = opcoes.falasDoCliente === undefined ? null : semAcentoMinusculo(opcoes.falasDoCliente);
   const comFotoObrigatoria = slides.filter((s) => TIPOS_COM_FOTO_OBRIGATORIA.has(s.tipo)).length;
   if (opcoes.fotosPrometidas !== undefined && comFotoObrigatoria > opcoes.fotosPrometidas) {
     motivos.push(`carrossel: ${comFotoObrigatoria} slides pedem foto (capa-foto e prova-resultado) e o cliente tem ${opcoes.fotosPrometidas}; sem foto use capa-texto e não use prova-resultado`);
   }
+  const comFoto = slidesComFoto(slides, opcoes.fotosPrometidas ?? 0);
   slides.forEach((s, i) => {
     const n = i + 1;
-    const limite = LIMITE_DE_PALAVRAS[s.tipo];
-    if (!limite) return;
-    if (contarPalavras(s.titulo) === 0) motivos.push(`slide ${n}: sem título`);
-    if (contarPalavras(s.titulo) > limite.titulo) motivos.push(`slide ${n} (${s.tipo}): título com ${contarPalavras(s.titulo)} palavras, o limite é ${limite.titulo}`);
-    if (contarPalavras(s.corpo) > limite.corpo) motivos.push(`slide ${n} (${s.tipo}): texto com ${contarPalavras(s.corpo)} palavras, o limite é ${limite.corpo}`);
-    if (!TIPOS_SEM_CORPO_OBRIGATORIO.has(s.tipo) && contarPalavras(s.corpo) === 0) motivos.push(`slide ${n} (${s.tipo}): sem texto`);
+    const campos = CAMPOS_DO_TIPO[s.tipo];
+    for (const chave of Object.keys(campos) as ChaveDeCampo[]) {
+      const valor = chave === "fonte" ? (s.fonte ?? "") : ((s[chave as keyof SlideDoCarrossel] as string | undefined) ?? "");
+      const motivo = motivoDoCampo(s.tipo, chave, valor, comFoto[i]);
+      if (motivo) motivos.push(motivo === "vazio" ? `slide ${n} (${s.tipo}): sem ${NOME_DO_CAMPO[chave]}` : `slide ${n} (${s.tipo}): ${NOME_DO_CAMPO[chave]}, ${motivo}`);
+    }
+    const lista = LISTAS_DO_TIPO[s.tipo];
+    if (lista) {
+      const itens = ((s[lista.chave] as string[] | undefined) ?? []).filter((l) => l.trim());
+      if (itens.length < lista.minimo || itens.length > lista.maximo) {
+        motivos.push(`slide ${n} (${s.tipo}): ${lista.chave} tem ${itens.length} itens, o pedido é ${lista.minimo === lista.maximo ? `de ${lista.minimo}` : `de ${lista.minimo} a ${lista.maximo}`}`);
+      }
+      itens.forEach((l, k) => {
+        if (contarPalavras(l) > lista.palavras || l.trim().length > lista.caracteres) motivos.push(`slide ${n} (${s.tipo}): ${lista.chave} ${k + 1} passa de ${lista.palavras} palavras ou ${lista.caracteres} caracteres`);
+      });
+    }
     if (s.tipo === "dado") {
       if (!s.fonte || !s.fonte.trim()) motivos.push(`slide ${n} (dado): sem a fonte`);
-      else if (!TEM_ANO.test(s.fonte)) motivos.push(`slide ${n} (dado): a fonte precisa ter o ano ("Nome da fonte, 2026")`);
-      if (!/\d/.test(`${s.titulo} ${s.corpo}`)) motivos.push(`slide ${n} (dado): um dado tem número, e este não tem`);
-    } else if (s.fonte && s.fonte.trim()) {
-      motivos.push(`slide ${n} (${s.tipo}): só o tipo "dado" leva fonte`);
+      if (!TEM_ANO.test(`${s.referencia ?? ""} ${s.fonte ?? ""}`)) motivos.push(`slide ${n} (dado): a referência precisa ter o ano ("O que é, 2026")`);
+      if (!/\d/.test(s.valor ?? "")) motivos.push(`slide ${n} (dado): um dado tem número, e este não tem`);
     }
     if (opcoes.ramoSaude && TIPOS_PROIBIDOS_NA_SAUDE.has(s.tipo)) motivos.push(`slide ${n}: o tipo "${s.tipo}" não vale num ramo de saúde`);
     if (s.tipo === "prova-fala" && falasNormalizadas !== null) {
-      const citacao = semAcentoMinusculo(s.corpo);
+      const citacao = semAcentoMinusculo(s.citacao ?? "");
       if (!citacao || contarPalavras(citacao) < MINIMO_DE_PALAVRAS_DA_CITACAO || !falasNormalizadas.includes(citacao)) {
         motivos.push(`slide ${n} (prova-fala): a citação precisa ser uma frase que o cliente disse de verdade (que está no perfil), escrita igual, com pelo menos ${MINIMO_DE_PALAVRAS_DA_CITACAO} palavras; sem uma frase assim, não use este tipo`);
       }
@@ -116,18 +230,7 @@ export function normalizarHashtags(hashtags: string[]): string[] {
   return saida;
 }
 
-/** O que o render faz com um texto que passaria do limite do tipo: corta e diz o que cortou. */
-export function ajustarAosLimites(slide: SlideDoCarrossel): { slide: SlideDoCarrossel; cortou: string[] } {
-  const limite = LIMITE_DE_PALAVRAS[slide.tipo];
-  const cortou: string[] = [];
-  let { titulo, corpo } = slide;
-  if (contarPalavras(titulo) > limite.titulo) {
-    cortou.push(`título de "${slide.tipo}" cortado em ${limite.titulo} palavras`);
-    titulo = cortarPalavras(titulo, limite.titulo);
-  }
-  if (contarPalavras(corpo) > limite.corpo) {
-    cortou.push(`texto de "${slide.tipo}" cortado em ${limite.corpo} palavras`);
-    corpo = cortarPalavras(corpo, limite.corpo);
-  }
-  return { slide: { ...slide, titulo, corpo }, cortou };
+/** Os campos que a pessoa pode trocar num slide, na ordem em que a tela os mostra (o que o tipo tem; o número do passo, o rodapé e as linhas fixas são de código). */
+export function camposEditaveis(tipo: TipoDeSlide): ChaveDeCampo[] {
+  return Object.keys(CAMPOS_DO_TIPO[tipo]) as ChaveDeCampo[];
 }
