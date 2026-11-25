@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { publicarImagensAtivo } from "@/config/post-pronto";
 import { db } from "@/db";
 import { postsProntos } from "@/db/schema";
 import { caminhoDaImagem, lerCodigoDaImagem, tamanhoDaImagemGuardada } from "@/lib/imagens-do-post";
@@ -19,6 +20,7 @@ function recusa(status: number): NextResponse {
  * publicado agora (`publicando`) no banco. `GET` e `HEAD`.
  */
 async function servir(request: Request, contexto: { params: Promise<{ codigo: string; nome: string }> }, soCabecalhos: boolean): Promise<Response> {
+  if (!publicarImagensAtivo()) return recusa(404);
   const { codigo } = await contexto.params;
   const lido = lerCodigoDaImagem(codigo);
   if (!lido) return recusa(404);

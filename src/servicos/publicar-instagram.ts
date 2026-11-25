@@ -85,6 +85,16 @@ export function classificarFalha(erro: unknown): Falha {
   return { ...base, codigo: codigo === undefined ? "sem-resposta" : "nao-preparou" };
 }
 
+/**
+ * Depois de pedir para publicar: a resposta da Meta não prova que NÃO saiu? Sem código (rede, prazo), código 1 ou 2 (erro interno, indisponível) ou 5xx (a Meta sem JSON devolve o status HTTP como
+ * código): ela pode ter publicado e a resposta se perdeu. Repetir publicaria duas vezes.
+ */
+export function publicacaoIncerta(falha: Falha): boolean {
+  if (falha.codigo === "acesso-perdido") return false;
+  const c = falha.codigoMeta;
+  return c === undefined || c === 1 || c === 2 || c >= 500;
+}
+
 const RECUSA_POR_CONTA: Record<RecusaDePublicar, CodigoDeRecusa> = {
   "nao-configurada": "nao-configurada",
   "sem-conta": "sem-conta",
@@ -621,8 +631,23 @@ export async function conferirPublicacao(publicacaoId: number, opcoes: DepsDaPub
       return maisUmaVez();
     }
     logger.warn({ publicacaoId, codigo: falha.codigoMeta, subcodigo: falha.subcodigoMeta }, "publicar: a Meta nao publicou");
-    // Sem código, a resposta se perdeu (rede, prazo): pode ter saído. Não tenta de novo.
-    await falhar(reservada, erro instanceof ErroMetaLogin && erro.codigo === undefined ? { codigo: "nao-confirmou" } : falha, agora);
+    if (publicacaoIncerta(falha)) {
+      // A resposta se perdeu ou veio como erro do servidor: pergunta uma vez ao contêiner. PUBLISHED é prova de que saiu; qualquer outra coisa, não tenta de novo (pode ter saído).
+      let depois: string | null = null;
+      try {
+        depois = await statusDoContainer(linha.containerId, conta.token, conta.via);
+      } catch {
+        depois = null;
+      }
+      if (depois === "PUBLISHED") {
+        await concluir(reservada, { midiaId: null, permalink: null }, conta.nome, agora);
+        return { vista: vista((await carregar(publicacaoId, opcoes.clienteId)) ?? linha), reconferirEmSeg: null };
+      }
+      await falhar(reservada, { codigo: "nao-confirmou" }, agora);
+      await registrarFalhaNaConta(conta.id, falha, agora);
+      return { vista: vista((await carregar(publicacaoId, opcoes.clienteId)) ?? linha), reconferirEmSeg: null };
+    }
+    await falhar(reservada, falha, agora);
     await registrarFalhaNaConta(conta.id, falha, agora);
     return { vista: vista((await carregar(publicacaoId, opcoes.clienteId)) ?? linha), reconferirEmSeg: null };
   }

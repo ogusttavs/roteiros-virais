@@ -81,7 +81,7 @@ type Cenario = {
   /** Erro da Graph API (ou `"rede"`) ao criar o contêiner, ao enviar o vídeo, ao publicar, ao ler o limite. */
   erroNoContainer?: { code: number; subcode?: number } | "rede";
   erroNoEnvio?: { code: number; retriable: boolean } | "rede";
-  erroAoPublicar?: { code: number; subcode?: number } | "rede";
+  erroAoPublicar?: { code: number; subcode?: number } | { http: number } | "rede";
   erroNoLimite?: { code: number } | "rede";
   limite?: { usadas: number; total: number | null };
   permalink?: string | null;
@@ -133,6 +133,7 @@ function instalarMeta(c: Cenario = {}): void {
       registro("publicar");
       if (c.demoraNoPublicar) await new Promise((r) => setTimeout(r, c.demoraNoPublicar));
       if (c.erroAoPublicar === "rede") throw new TypeError("fetch failed");
+      if (c.erroAoPublicar && typeof c.erroAoPublicar === "object" && "http" in c.erroAoPublicar) return new Response("<html>Bad Gateway</html>", { status: c.erroAoPublicar.http, headers: { "content-type": "text/html" } });
       if (c.erroAoPublicar) return json({ error: { message: "erro simulado", code: c.erroAoPublicar.code, error_subcode: c.erroAoPublicar.subcode } }, 400);
       return json({ id: `midia-${caminho.split("/")[0]}` });
     }
@@ -815,6 +816,21 @@ describe("conferirPublicacao", () => {
     const id = await iniciarEEnviar(roteiroA);
     const r = await conferirPublicacao(id, deps());
     expect(r.vista).toMatchObject({ estado: "falhou", motivo: fraseDeFalha("nao-confirmou") });
+    await conferirPublicacao(id, deps());
+    expect(dasChamadas("publicar")).toHaveLength(1);
+  });
+
+  it("502 ao publicar (a Meta sem JSON) com o contêiner já PUBLISHED: termina publicada", async () => {
+    instalarMeta({ erroAoPublicar: { http: 502 }, status: ["FINISHED", "PUBLISHED"] });
+    const id = await iniciarEEnviar(roteiroA);
+    expect((await conferirPublicacao(id, deps())).vista?.estado).toBe("publicada");
+    expect(dasChamadas("publicar")).toHaveLength(1);
+  });
+
+  it.each([{ http: 504 }, { code: 1 }, { code: 2 }])("erro %o ao publicar sem prova de que saiu: 'não confirmou', e nunca tenta de novo", async (erro) => {
+    instalarMeta({ erroAoPublicar: erro });
+    const id = await iniciarEEnviar(roteiroA);
+    expect((await conferirPublicacao(id, deps())).vista).toMatchObject({ estado: "falhou", motivo: fraseDeFalha("nao-confirmou") });
     await conferirPublicacao(id, deps());
     expect(dasChamadas("publicar")).toHaveLength(1);
   });
