@@ -11,6 +11,7 @@ import { promessaEmSaude } from "@/carrossel/regras";
 import { COR_NEUTRA, QUANTIDADE_DA_CAPA, type SlideDoCarrossel } from "@/config/carrossel";
 import { db } from "@/db";
 import { carrosseis, clientes, type Carrossel } from "@/db/schema";
+import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 import * as capaIA from "@/ia/prompts/capaNoticia";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
@@ -45,6 +46,11 @@ async function noticiaParaCapa(clienteId: number, noticiaId: number, agora: Date
     veiculo: veiculoDaCapa(linha.fonte),
     publicadoEm: linha.publicadoEm,
   };
+}
+
+/** As fórmulas de texto de máquina nos títulos (cada um conferido como o título de um roteiro), com o número do título no motivo. */
+function formulasDosTitulos(titulos: string[], fontes: string): string[] {
+  return titulos.flatMap((t, i) => motivosDasFormulas(acharFormulasDeMaquina({ titulo: t }, { fontes })).map((m) => `título ${i + 1}: ${m}`));
 }
 
 export type TitulosDaCapa = { titulos: string[]; veiculo: string; data: string; manchete: string };
@@ -94,7 +100,10 @@ export async function titulosDaCapa(clienteId: number, noticiaId: number, agora:
     generoTexto: "roteiro",
     extrairEvidencias: () => [],
     extrairCampos: (d) => Object.fromEntries(d.titulos.map((t, i) => [`titulo ${i + 1}`, t])),
-    verificarExtra: (d) => [
+    // R-COPY-26 (texto com cara de máquina): reprova na 1ª tentativa e só avisa na 2ª, como o roteiro; nunca derruba a geração.
+    avisarExtra: (d, tentativa) => (tentativa === 2 ? formulasDosTitulos(d.titulos, fontesDosFatos) : []),
+    verificarExtra: (d, tentativa) => [
+      ...(tentativa === 1 ? formulasDosTitulos(d.titulos, fontesDosFatos) : []),
       ...verificarTitulosDaCapa(d.titulos, noticia, { ramoSaude }),
       // R-CONF (preço, serviço grátis, promessa, fato inventado): os títulos fazem o papel do gancho.
       ...verificarConformidadeDoLongo({ gancho: d.titulos.join(". "), chamadaFinal: "", capitulos: [], edicao: { textoNaTela: [] } }, { fontes: fontesDosFatos, ramoSaude }),

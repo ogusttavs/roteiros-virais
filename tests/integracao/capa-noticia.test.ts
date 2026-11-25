@@ -140,6 +140,14 @@ describe("os títulos da capa", () => {
     expect(await geracoesDaCapa(clienteId)).toHaveLength(2);
   });
 
+  it("fórmula de texto de máquina num título reprova a primeira tentativa e a segunda corrige", async () => {
+    const clienteId = await criarCliente(nichoSaude);
+    const noticiaId = await criarNoticia(nichoSaude, { titulo: "Clareamento dental ganha nova regra [mock:capa-formula]" });
+    const r = await titulosDaCapa(clienteId, noticiaId);
+    expect(r.titulos.join(" ")).not.toMatch(/incrível/);
+    expect(await geracoesDaCapa(clienteId)).toHaveLength(2);
+  });
+
   it("notícia de mais de 7 dias, sem data ou sem veículo é recusada, e a IA não é chamada", async () => {
     const clienteId = await criarCliente(nichoSaude);
     const velha = await criarNoticia(nichoSaude, { publicadoEm: new Date(Date.now() - 10 * DIA) });

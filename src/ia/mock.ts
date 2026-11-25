@@ -619,7 +619,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
  */
 /**
  * E66: os títulos da capa de notícia simulados, determinísticos: quatro leituras da manchete (que vem na entrada). Marcadores de teste na manchete, que valem só na primeira tentativa (a segunda corrige):
- * "[mock:capa-numero-solto]" escreve um número que a notícia não traz, "[mock:capa-longo]" passa do limite de palavras, "[mock:capa-promessa]" promete resultado, "[mock:capa-igual]" copia a manchete.
+ * "[mock:capa-numero-solto]" escreve um número que a notícia não traz, "[mock:capa-longo]" passa do limite de palavras, "[mock:capa-promessa]" promete resultado, "[mock:capa-igual]" copia a manchete, "[mock:capa-formula]" usa uma fórmula de texto de máquina (R-COPY-26).
  */
 function mockCapaNoticia(entrada: string) {
   const manchete = extrairCampo(entrada, "Titulo:").replace(/\[mock:[^\]]*\]/g, "").trim() || "notícia simulada";
@@ -631,6 +631,7 @@ function mockCapaNoticia(entrada: string) {
   if (marcado("capa-longo")) titulos[1] = Array.from({ length: 20 }, () => "palavra").join(" ");
   if (marcado("capa-promessa")) titulos[2] = "Esta técnica garante o resultado em uma sessão";
   if (marcado("capa-igual")) titulos[3] = manchete;
+  if (marcado("capa-formula")) titulos[1] = "Um resultado incrível para o seu sorriso";
   return { titulos };
 }
 
