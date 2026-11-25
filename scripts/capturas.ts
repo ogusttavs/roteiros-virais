@@ -333,7 +333,7 @@ async function main(): Promise<void> {
         'Admiro @perfilexemplo pela didatica, com quem aprendi a testar antes de aplicar. Concorrente direto e a Clinica Exemplo, na Rua das Flores, 42.',
       );
       await page.getByRole("button", { name: "Avaliar esta resposta" }).click();
-      await page.getByRole("heading", { name: "Seu painel está aberto." }).waitFor({ state: "visible" });
+      await page.getByRole("heading", { name: "Seu painel está aberto" }).waitFor({ state: "visible" });
       const nomeArquivo = `Comecar.Liberado.${tamanho.rotulo}.${modo.rotulo}.png`;
       await page.screenshot({ path: path.join(pastaDestino, nomeArquivo) });
       arquivosGravados.push(path.relative(path.resolve(__dirname, "..", ".."), path.join(pastaDestino, nomeArquivo)));

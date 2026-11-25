@@ -102,7 +102,7 @@
 }
 
 .rotulo {
-  font-size: var(--tamanho-rotulo);
+  font-size: var(--tamanho-minusculo);
   line-height: 1;
   font-weight: var(--peso-medio);
   letter-spacing: 0.01em;

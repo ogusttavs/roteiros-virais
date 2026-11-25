@@ -191,7 +191,8 @@
 
 .rotuloCartao {
   font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rotulo);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
   letter-spacing: var(--espacamento-rotulo);
   text-transform: uppercase;
   color: var(--cor-texto-suave);

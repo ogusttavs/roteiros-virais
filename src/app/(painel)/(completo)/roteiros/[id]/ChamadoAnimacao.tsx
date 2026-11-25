@@ -18,6 +18,13 @@ const t = textosAnimacao;
 const ESPERA_DA_CONSULTA_MS = 3000;
 const ESTADOS_DE_ESPERA = new Set(["pedida", "fazendo_previa", "fazendo_final"]);
 
+/** A falha em duas partes: o que houve (em vermelho, com o ícone) e o próximo passo (na cor do texto, a última frase). */
+function separarFalha(linha: string): { erro: string; proximoPasso: string } {
+  const frases = linha.split(/(?<=[.?!])\s+/);
+  if (frases.length < 2) return { erro: linha, proximoPasso: "" };
+  return { erro: frases.slice(0, -1).join(" "), proximoPasso: frases[frases.length - 1] ?? "" };
+}
+
 type Props = {
   roteiroId: number;
   visao: VisaoDaAnimacao;
@@ -85,17 +92,27 @@ export function ChamadoAnimacao({ roteiroId, visao }: Props) {
   );
 
   const linha = linhaDoEstadoDaAnimacao(estado, animacao?.tempoDaPrevia ?? "", animacao?.tempoDoFinal ?? "", animacao?.motivo);
+  const frasesDaFalha = separarFalha(linha ?? "");
   const andamento = animacao?.progresso != null && ESTADOS_DE_ESPERA.has(animacao.estado) ? animacao.progresso : null;
   const mostrarBotoes = !visao.verComo;
 
   return (
     <Cartao variante="recuado" className={styles.chamado} data-chamado-animacao data-estado-da-animacao={estado ?? undefined}>
       <div className={styles.texto}>
-        <Film size={20} strokeWidth={1.5} className={styles.icone} aria-hidden="true" />
+        {estado === "falhou" ? (
+          <CircleAlert size={20} strokeWidth={1.5} className={`${styles.icone} ${styles.iconeFalha}`} aria-hidden="true" />
+        ) : (
+          <Film size={20} strokeWidth={1.5} className={styles.icone} aria-hidden="true" />
+        )}
         <div className={styles.frases}>
           <p className={styles.titulo}>{t.chamado.titulo}</p>
-          {linha ? (
-            <p className={estado === "falhou" ? styles.falha : styles.estado} role="status">
+          {linha && estado === "falhou" ? (
+            <p className={styles.estado} role="status">
+              <span className={styles.falha}>{frasesDaFalha.erro}</span>
+              {frasesDaFalha.proximoPasso ? ` ${frasesDaFalha.proximoPasso}` : null}
+            </p>
+          ) : linha ? (
+            <p className={styles.estado} role="status">
               {linha}
             </p>
           ) : (
@@ -123,7 +140,7 @@ export function ChamadoAnimacao({ roteiroId, visao }: Props) {
 
       {erro ? (
         <p className={styles.erro} role="alert">
-          <CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+          <CircleAlert size={18} strokeWidth={1.5} aria-hidden="true" />
           {erro}
         </p>
       ) : null}
@@ -152,7 +169,7 @@ export function ChamadoAnimacao({ roteiroId, visao }: Props) {
 
           {animacao && estado === "final_pronta" ? (
             <a className={styles.botaoLink} href={`/api/animacao/${animacao.id}/final?baixar=1`} download="video-em-animacao.mp4" data-baixar-animacao>
-              <Download size={18} strokeWidth={1.75} aria-hidden="true" />
+              <Download size={18} strokeWidth={1.5} aria-hidden="true" />
               {t.acoes.baixar}
             </a>
           ) : null}

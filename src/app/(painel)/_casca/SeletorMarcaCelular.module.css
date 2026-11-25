@@ -212,7 +212,7 @@
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-legenda);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: var(--espacamento-legenda);
   color: var(--cor-texto-suave);
 }
 

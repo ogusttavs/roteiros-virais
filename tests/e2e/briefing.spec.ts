@@ -48,7 +48,7 @@ async function entrar(page: Page, email: string) {
   await page.getByRole("button", { name: "entrar", exact: true }).click();
 }
 
-const TITULO_LIBERACAO = "Seu painel está aberto.";
+const TITULO_LIBERACAO = "Seu painel está aberto";
 
 /**
  * Preenche a area de texto (pelo enunciado, um trecho basta) e clica em
