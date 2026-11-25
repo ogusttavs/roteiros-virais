@@ -38,6 +38,12 @@ describe("montarHtmlDaAnimacao (sem navegador)", () => {
     expect(a[a.indexOf("-framerate") + 1]).toBe("30");
     expect(a[a.indexOf("-f", a.indexOf("-movflags")) + 1]).toBe("mp4");
   });
+  it("o MP4 toca no Safari do iPhone: H.264 em yuv420p e o índice (moov) no começo", () => {
+    const a = argumentosDoFfmpeg("final", "x.parte");
+    expect(a[a.indexOf("libx264") - 1]).toBe("-c:v");
+    expect(a.find((x) => x.includes("format=yuv420p"))).toBeDefined();
+    expect(a[a.indexOf("-movflags") + 1]).toBe("+faststart");
+  });
 });
 
 describe("renderizarAnimacao (Chromium e ffmpeg de verdade)", () => {
