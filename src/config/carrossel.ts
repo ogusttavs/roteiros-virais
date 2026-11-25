@@ -153,3 +153,7 @@ export const SEM_FOTO = 0;
 export const TEXTO_FIXO_DA_AUTORIZACAO = "Foto enviada pelo cliente e publicada com autorização.";
 /** O fim do contexto da fala de um cliente: escrito por código, para a fala nunca sair sem a autorização dita. */
 export const TEXTO_FIXO_DO_CONTEXTO_DA_FALA = "Publicado com autorização.";
+
+/** E66, a capa de notícia: a pessoa recebe de 3 a 5 títulos para escolher; a capa é UMA imagem (quantidade 1, um slide do tipo `noticia`). */
+export const TITULOS_DA_CAPA = { min: 3, max: 5 } as const;
+export const QUANTIDADE_DA_CAPA = 1;

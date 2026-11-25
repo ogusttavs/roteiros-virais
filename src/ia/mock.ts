@@ -101,6 +101,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockRoteiro(entrada, sistemaEstavel);
     case "carrossel":
       return mockCarrossel(entrada);
+    case "capaNoticia":
+      return mockCapaNoticia(entrada);
     case "roteiroLongo":
       return mockRoteiroLongo(entrada);
     case "verificarTexto":
@@ -615,6 +617,23 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
  * não cita nada do momento descrito), `[mock:gancho-curto]` (o gancho do segundo capítulo vem como rótulo), `[mock:nome-com-tempo]` (um nome que começa com um tempo, que a lista da
  * descrição lê errado) e `[mock:nome-com-colchete]` (um espaço marcado dentro do nome).
  */
+/**
+ * E66: os títulos da capa de notícia simulados, determinísticos: quatro leituras da manchete (que vem na entrada). Marcadores de teste na manchete, que valem só na primeira tentativa (a segunda corrige):
+ * "[mock:capa-numero-solto]" escreve um número que a notícia não traz, "[mock:capa-longo]" passa do limite de palavras, "[mock:capa-promessa]" promete resultado, "[mock:capa-igual]" copia a manchete.
+ */
+function mockCapaNoticia(entrada: string) {
+  const manchete = extrairCampo(entrada, "Titulo:").replace(/\[mock:[^\]]*\]/g, "").trim() || "notícia simulada";
+  const segunda = entrada.includes("A tentativa anterior foi reprovada.");
+  const marcado = (nome: string) => entrada.includes(`[mock:${nome}]`) && !segunda;
+  const curto = manchete.split(/\s+/).slice(0, 7).join(" ").slice(0, 60).trim();
+  const titulos = [`O que muda para você: ${curto}`, `Fique de olho: ${curto}`, `Você viu? ${curto}`, `Entenda: ${curto}`];
+  if (marcado("capa-numero-solto")) titulos[0] = "87% das pessoas ainda erram isso";
+  if (marcado("capa-longo")) titulos[1] = Array.from({ length: 20 }, () => "palavra").join(" ");
+  if (marcado("capa-promessa")) titulos[2] = "Esta técnica garante o resultado em uma sessão";
+  if (marcado("capa-igual")) titulos[3] = manchete;
+  return { titulos };
+}
+
 /**
  * E65 PR 1: o carrossel simulado, determinístico: a quantidade vem da entrada, a capa abre (capa-foto só se a entrada diz que há foto), a chamada fecha e o meio alterna passo e item (nunca três iguais). Marcadores de teste no tema:
  * "[mock:carrossel-longo]" estoura o limite de palavras de um slide, "[mock:carrossel-tres-iguais]" repete o tipo três vezes, "[mock:carrossel-dado-sem-fonte]" tira a fonte do dado,

@@ -1,6 +1,8 @@
 import { Newspaper } from "lucide-react";
 import { redirect } from "next/navigation";
 
+import { noticiaServeParaCapa } from "@/carrossel/capa-noticia";
+import { carrosselAtivo } from "@/config/carrossel";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { recenciaDaNoticia, saiuAgora } from "@/lib/recencia-da-noticia";
 import { sessaoDoPainel } from "@/lib/ver-como";
@@ -41,6 +43,7 @@ function paraATela(n: NoticiaDaCapa, agora: Date): NoticiaNaTela {
     imagemUrl: n.imagemUrl,
     imagemCredito: n.imagemCredito,
     roteiroId: n.roteiroId,
+    podeVirarCapa: carrosselAtivo() && n.tipo === "setor" && noticiaServeParaCapa({ publicadoEm: n.publicadoEm, fonte: n.veiculo }, agora),
   };
 }
 

@@ -64,3 +64,13 @@ describe("o nome do veículo no bloco de tipografia (cartão sem foto)", () => {
     expect(container.querySelector("[class*='semFoto']")?.textContent).toContain("G1");
   });
 });
+
+describe("o botão Criar capa com esta notícia (E66)", () => {
+  it("só aparece na notícia que pode virar capa, e leva para a tela da capa com o id dela", () => {
+    const { container, rerender } = render(<CartaoDeNoticia noticia={{ ...BASE, noticiaId: 42, podeVirarCapa: true }} aoAbrir={() => {}} aoCriarRoteiro={() => {}} />);
+    const link = container.querySelector("a[href='/criar/capa?noticia=42']");
+    expect(link?.textContent).toBe("Criar capa com esta notícia");
+    rerender(<CartaoDeNoticia noticia={BASE} aoAbrir={() => {}} aoCriarRoteiro={() => {}} />);
+    expect(container.textContent).not.toContain("Criar capa");
+  });
+});

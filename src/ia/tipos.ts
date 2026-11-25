@@ -43,6 +43,8 @@ export type TarefaIA =
   | "roteiroLongo"
   /** E65 PR 1: o carrossel de Instagram (5, 7 ou 9 slides que ensinam), modelo forte. */
   | "carrossel"
+  /** E66: de 3 a 5 títulos para a capa de notícia (uma imagem única), modelo forte. */
+  | "capaNoticia"
   | "verificarTexto"
   | "aprenderCliente"
   | "classificarAbertura"
