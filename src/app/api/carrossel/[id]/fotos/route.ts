@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
+import { LARGURA_MINIMA_DA_FOTO } from "@/carrossel/fotos";
 import { TETO_DA_FOTO_BYTES } from "@/config/carrossel";
 import { idDoParametro, lerCorpoComTeto, marcaDoCarrossel, respostaDeErro, respostaDoErroDoCarrossel, SEM_CACHE } from "@/lib/porta-do-carrossel";
 import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { enviarFoto } from "@/servicos/carrossel";
+import { textosCarrossel } from "@/textos/carrossel";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +33,10 @@ export async function POST(request: Request, contexto: { params: Promise<{ id: s
   if (!(arquivo instanceof File)) return respostaDeErro("mande a foto no campo foto", 400);
   try {
     const foto = await enviarFoto(marca.clienteId, id, { tipoDeclarado: arquivo.type, bytes: Buffer.from(await arquivo.arrayBuffer()), autorizacaoDoPaciente: formulario.get("autorizacaoDoPaciente") === "true" });
-    return NextResponse.json({ foto }, { headers: SEM_CACHE });
+    // Foto mais estreita que o slide (1080 px) entra, mas a pessoa é avisada de que pode sair borrada.
+    const { largura, ...semLargura } = foto;
+    const aviso = largura !== null && largura < LARGURA_MINIMA_DA_FOTO ? textosCarrossel.metodo.fotoEstreita(largura) : null;
+    return NextResponse.json({ foto: semLargura, aviso }, { headers: SEM_CACHE });
   } catch (erro) {
     const resposta = respostaDoErroDoCarrossel(erro);
     if (resposta) return resposta;

@@ -18,8 +18,10 @@ import {
   type SlideDoCarrossel,
   type TipoDeSlide,
 } from "@/config/carrossel";
+import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 
 import { distribuirFotos } from "./fotos";
+import { rotularItens } from "./metodo";
 
 export function contarPalavras(texto: string): number {
   return texto.trim() === "" ? 0 : texto.trim().split(/\s+/).length;
@@ -57,7 +59,7 @@ const limpo = (v: string | undefined): string => (v ?? "").trim();
 export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolean }): SlideDoCarrossel[] {
   const totalDePassos = saida.filter((s) => s.tipo === "passo").length;
   let passo = 0;
-  return saida.map((s): SlideDoCarrossel => {
+  return rotularItens(saida.map((s): SlideDoCarrossel => {
     const opcional = (valor: string, chave: ChaveDeCampo) => (limpo(valor) ? { [chave]: limpo(valor) } : {});
     switch (s.tipo) {
       case "capa-foto":
@@ -85,7 +87,7 @@ export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolea
       case "noticia":
         return { tipo: s.tipo, titulo: limpo(s.titulo), veiculo: limpo(s.fonte), data: limpo(s.referencia) };
     }
-  });
+  }));
 }
 
 /** Todo o texto de um slide, na ordem em que aparece, para o verificador de fatos e a conformidade lerem. */
@@ -240,6 +242,25 @@ export function promessaEmSaude(texto: string): string | null {
     if (m && (primeiro === null || m.index < primeiro.inicio)) primeiro = { inicio: m.index, fim: m.index + m[0].length };
   }
   return primeiro ? texto.slice(primeiro.inicio, primeiro.fim).trim() : null;
+}
+
+/**
+ * R-COPY-26 (texto com cara de máquina) nos slides: o detector é o MESMO do roteiro (`ia/formulas-de-maquina.ts`, lista fechada, sem lista própria). A capa faz o papel do gancho, os slides do meio do corpo e a
+ * chamada do último bloco. Quem chama decide o que fazer: reprova na 1ª tentativa e só avisa na 2ª, como o roteiro.
+ */
+export function formulasDeMaquinaDosSlides(slides: SlideDoCarrossel[], fontes: string): string[] {
+  const capa = slides[0];
+  const chamada = slides[slides.length - 1];
+  const meio = slides.slice(1, -1);
+  const achados = acharFormulasDeMaquina(
+    {
+      gancho: capa ? textoDoSlide(capa).join(". ") : "",
+      corpo: meio.map((m) => textoDoSlide(m).join(". ")).join(" "),
+      chamada: chamada && chamada !== capa ? textoDoSlide(chamada).join(". ") : "",
+    },
+    { fontes },
+  );
+  return motivosDasFormulas(achados.slice(0, 3));
 }
 
 /** A legenda e as hashtags. */

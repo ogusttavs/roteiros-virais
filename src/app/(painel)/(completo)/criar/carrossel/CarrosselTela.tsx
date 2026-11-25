@@ -200,11 +200,12 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
         corpo.append("foto", foto.arquivo);
         if (ramoSaude) corpo.append("autorizacaoDoPaciente", "true");
         try {
-          await pedir(
+          const { aviso: avisoDaFoto } = await pedir<{ aviso?: string | null }>(
             `/api/carrossel/${id}/fotos`,
             { method: "POST", body: corpo },
             t.fotoNaoValida,
           );
+          if (avisoDaFoto) setAviso(avisoDaFoto);
         } catch (e) {
           setAviso(e instanceof ErroDaRota ? e.message : t.fotoNaoValida);
         }
@@ -685,6 +686,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude }: Prop
                 <p className={estilos.alerta}>{t.precisaDeFoto}</p>
               ) : null}
               {slideAtual.rodape ? <p className={estilos.ajuda}>{t.linhaFixaNaoEdita}</p> : null}
+              {t.metodo.dicasDeFoto[slideAtual.tipo] ? <p className={estilos.ajuda}>{t.metodo.dicasDeFoto[slideAtual.tipo]}</p> : null}
               <div className={estilos.acoesSlide}>
                 <Botao type="button" variante="secundario" onClick={() => setFolhaTexto(true)}>
                   <Pencil

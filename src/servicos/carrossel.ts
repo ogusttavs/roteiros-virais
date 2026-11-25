@@ -6,8 +6,10 @@
  */
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 
+import { larguraDaImagem } from "@/carrossel/fotos";
+import { avisosDoMetodo, verificarCapaVaga, verificarPromessaDaCapa } from "@/carrossel/metodo";
 import { corValida, garantirLeitura } from "@/carrossel/modelos";
-import { motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFoto, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
+import { formulasDeMaquinaDosSlides, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFoto, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
 import {
   CAMPOS_DO_TIPO,
   COR_NEUTRA,
@@ -237,7 +239,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     .filter(Boolean)
     .join(String.fromCharCode(10, 10));
 
-  const { dados: saida, geracaoId } = await gerarComVerificacao({
+  const { dados: saida, geracaoId, avisos: avisosDaIA } = await gerarComVerificacao({
     tarefa: "carrossel",
     nivel: carrosselIA.nivel,
     effort: carrosselIA.esforco,
@@ -296,15 +298,20 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       campos.legenda = d.legenda;
       return campos;
     },
-    verificarExtra: (d) => {
+    verificarExtra: (d, tentativa) => {
       const slidesDeTexto = slidesDaSaida(d.slides, { ramoSaude });
       return [
         ...verificarOrdemDosSlides(slidesDeTexto, quantidade),
         ...verificarLimitesDosSlides(slidesDeTexto, { ramoSaude, fotosPrometidas, falasDoCliente }),
         ...verificarLegenda(d.legenda, d.hashtags),
+        ...verificarPromessaDaCapa(slidesDeTexto),
+        ...verificarCapaVaga(slidesDeTexto),
+        // R-COPY-26: fórmula de texto de máquina reprova na 1ª tentativa e só avisa na 2ª (como o roteiro); o aviso sai em `avisarExtra`.
+        ...(tentativa === 1 ? formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos) : []),
         ...conformidadeDoCarrossel(slidesDeTexto, { fontes: fontesDosFatos, ramoSaude }),
       ];
     },
+    avisarExtra: (d, tentativa) => (tentativa === 2 ? formulasDeMaquinaDosSlides(slidesDaSaida(d.slides, { ramoSaude }), fontesDosFatos) : []),
   });
 
   const slides: SlideDoCarrossel[] = slidesDaSaida(saida.slides, { ramoSaude });
@@ -317,7 +324,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       tema: origem.tema,
       quantidade,
       cor: leitura.cor,
-      avisos: avisosDoCarrossel,
+      avisos: [...avisosDoCarrossel, ...avisosDaIA, ...avisosDoMetodo(slides, saida.legenda)],
       slides,
       legenda: saida.legenda.trim(),
       hashtags: normalizarHashtags(saida.hashtags),
@@ -442,7 +449,7 @@ export async function trocarCor(clienteId: number, carrosselId: number, cor: str
   const leitura = garantirLeitura(cor);
   const [linha] = await db()
     .update(carrosseis)
-    .set({ cor: leitura.cor, avisos: leitura.escureceu ? [AVISO_DA_COR_CLARA] : [], atualizadoEm: new Date() })
+    .set({ cor: leitura.cor, avisos: [...atual.avisos.filter((a) => a !== AVISO_DA_COR_CLARA), ...(leitura.escureceu ? [AVISO_DA_COR_CLARA] : [])], atualizadoEm: new Date() })
     .where(and(eq(carrosseis.id, carrosselId), eq(carrosseis.clienteId, clienteId)))
     .returning();
   await db().update(clientes).set({ corMarca: cor }).where(eq(clientes.id, clienteId));
@@ -492,7 +499,7 @@ export function tipoPelosBytes(bytes: Buffer): (typeof TIPOS_DE_FOTO)[number] | 
   return null;
 }
 
-export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer; autorizacaoDoPaciente?: boolean }): Promise<FotoSemBytes> {
+export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer; autorizacaoDoPaciente?: boolean }): Promise<FotoSemBytes & { largura: number | null }> {
   const carrossel = await carrosselDaMarca(clienteId, carrosselId);
   if (!carrossel) throw new ErroCarrossel("Não achei esse carrossel.", "nao-achou");
   // Em marca de saúde, TODO envio de foto exige a confirmação da autorização escrita do paciente (decisão do Gustavo, E65 PR 2): uma foto mandada antes de o carrossel ter antes e depois ou resultado também vai ser posta num deles.
@@ -516,7 +523,7 @@ export async function enviarFoto(clienteId: number, carrosselId: number, arquivo
     return nova;
   });
   if (!linha) throw new ErroCarrossel(`Cada carrossel leva até ${MAXIMO_DE_FOTOS} fotos.`, "limite-de-fotos");
-  return linha;
+  return { ...linha, largura: larguraDaImagem(arquivo.bytes) };
 }
 
 export async function apagarFoto(clienteId: number, carrosselId: number, fotoId: number): Promise<boolean> {
