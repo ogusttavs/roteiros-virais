@@ -128,6 +128,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
   const [folhaFoto, setFolhaFoto] = useState(false);
   const [copiada, setCopiada] = useState(false);
   const [baixando, setBaixando] = useState(false);
+  const [erroDoBaixar, setErroDoBaixar] = useState<string | null>(null);
   const [arquivosParaCompartilhar, setArquivosParaCompartilhar] = useState<File[] | null>(null);
   const [corNova, setCorNova] = useState<string | null>(null);
   const entradaDeFoto = useRef<HTMLInputElement>(null);
@@ -413,7 +414,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
       ancora.remove();
       setTimeout(() => URL.revokeObjectURL(endereco), 10_000);
     } catch {
-      setAviso(t.baixarFalhou);
+      setErroDoBaixar(t.baixarFalhou);
     } finally {
       setBaixando(false);
     }
@@ -421,7 +422,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
 
   async function baixar() {
     if (!carrossel) return;
-    setAviso(null);
+    setErroDoBaixar(null);
     if (arquivosParaCompartilhar) {
       try {
         await navigator.share({ files: arquivosParaCompartilhar });
@@ -449,7 +450,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
           return;
         }
       } catch {
-        setAviso(t.baixarFalhou);
+        setErroDoBaixar(t.baixarFalhou);
         return;
       } finally {
         setBaixando(false);
@@ -945,6 +946,12 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                       : t.baixar(total)}
               </Botao>
               <p className={estilos.miudo}>{t.baixarAjuda(total)}</p>
+              {erroDoBaixar ? (
+                <p className={estilos.erroCampo} role="alert">
+                  <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
+                  {erroDoBaixar}
+                </p>
+              ) : null}
               <div className={estilos.corMarca}>
                 <label>
                   <input
