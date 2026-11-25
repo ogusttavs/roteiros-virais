@@ -301,6 +301,11 @@
   color: var(--cor-texto);
 }
 
+.referenciaVazia p.notaDasHashtags {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
 .versoesVazio {
   display: grid;
   gap: var(--espaco-2);

@@ -69,6 +69,7 @@ import {
 } from "./acoes";
 import { ChamadoEditarMeuVideo } from "./ChamadoEditarMeuVideo";
 import { EditarMeuVideo } from "./EditarMeuVideo";
+import { HashtagsParaColar } from "./HashtagsParaColar";
 import { PublicarNoInstagram } from "./PublicarNoInstagram";
 import { RoteiroLongo, type EdicaoDoCapitulo } from "./RoteiroLongo";
 import styles from "./RoteiroTela.module.css";
@@ -265,6 +266,8 @@ type Props = {
   publicar?: VisaoDePublicar | null;
   /** E47 PR 4: "Editar o meu vídeo" (a IA corta, legenda e põe o título; a pessoa aprova a prévia). Nulo quando a função não aparece: no vídeo longo e no estilo sem fala. */
   editar?: VisaoDeEditar | null;
+  /** E70: as até 5 hashtags para colar no post (`hashtagsDoPost`); vazio ou ausente: o bloco não aparece. */
+  hashtags?: string[];
 };
 
 /**
@@ -284,6 +287,7 @@ export function RoteiroTela({
   noticiaDeOrigem = null,
   pesquisa = null,
   fala,
+  hashtags = [],
   marcaAtiva,
   marcas,
   nomePessoa,
@@ -334,6 +338,7 @@ export function RoteiroTela({
   const [demorando, setDemorando] = useState(false);
   const [versoesDesatualizadas, setVersoesDesatualizadas] = useState(false);
   const [toast, setToast] = useState(false);
+  const [toastHashtags, setToastHashtags] = useState(false);
   /** V11, item 5: "Terminei de gravar" no modo gravação manda para cá com `?gravado=1` (o roteiro já vem gravado do servidor; isto é só o toast). */
   const [toastGravado, setToastGravado] = useState(false);
   /** O aviso logo depois de "Já gravei", com "Desfazer" (achado do uso real em 22/10/2026: tocou sem querer e não havia como voltar). */
@@ -1218,6 +1223,9 @@ export function RoteiroTela({
           </section>
         ) : null}
 
+        {/* E70: as hashtags para colar, em todo roteiro (Reels, Story, sem fala e longo), logo depois da legenda; sem dados o bloco não existe. */}
+        {!editando ? <HashtagsParaColar hashtags={hashtags} aoCopiar={() => setToastHashtags(true)} aoFalhar={() => setErroToast(textosRoteiro.erroCopiar)} /> : null}
+
         {/* V15, item 4: mesma posição de sempre (depois da legenda); sempre que a lista tiver
             item, em qualquer formato e estilo (Reels sem fala com cartões também pode ter). */}
         {corpo.porQueAssim.length > 0 && !comoEditarNoLado ? (
@@ -1714,6 +1722,7 @@ export function RoteiroTela({
       </PainelFlutuante>
 
       <Toast texto={textosRoteiro.textoCopiado} aberto={toast} onFechar={() => setToast(false)} />
+      <Toast texto={textosRoteiro.hashtags.copiadas} aberto={toastHashtags} onFechar={() => setToastHashtags(false)} />
       {/* E26 (passo 23): o PDF pronto, com "Abrir" (o iPad não mostra o download caindo), e a imagem guardada por download. */}
       <Toast
         texto={textosRoteiro.pdfPronto}
