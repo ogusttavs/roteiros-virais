@@ -133,11 +133,26 @@ describe("hashtagsDoPost", () => {
     expect(r).toContain("#manchadesofa");
   });
 
-  it("marca local: entra a hashtag da cidade quando há nos dados", async () => {
-    await par(principalId, "dica de limpeza para você #limpezadacasa #diaristacampinas");
+  it("marca local: entra a hashtag da cidade inteira (2 vídeos de 2 contas); pedaço e um vídeo só ficam de fora", async () => {
+    await par(principalId, "dica de limpeza para você #limpezadacasa #campinas #diaristacampinas");
+    await video(principalId, "dica de limpeza para você #campinasrj");
     const r = await hashtagsDoPost({ clienteId: marcaLocalId, tema: "limpeza" });
-    expect(r).toContain("#diaristacampinas");
-    expect(r[r.length - 1]).toBe("#diaristacampinas");
+    expect(r[r.length - 1]).toBe("#campinas");
+    expect(r).not.toContain("#campinasrj");
+  });
+
+  it("a hashtag que é nome ou usuário de uma conta do banco (marca concorrente) fica de fora", async () => {
+    await db().insert(contas).values([
+      { plataforma: "instagram", handle: "redelimpa", nichoId: principalId },
+      { plataforma: "instagram", handle: "x70", nome: "Casa Brilho", nichoId: principalId },
+    ]);
+    await par(principalId, "dica de limpeza para você #limpezadacasa #redelimpa #casabrilho");
+    expect(await hashtagsDoPost({ clienteId: marcaId, tema: "limpeza" })).toEqual(["#limpezadacasa"]);
+  });
+
+  it("promessa fica de fora também fora da saúde", async () => {
+    await par(principalId, "dica de limpeza para você #limpezadacasa #melhorlimpeza #gratis");
+    expect(await hashtagsDoPost({ clienteId: marcaId, tema: "limpeza" })).toEqual(["#limpezadacasa"]);
   });
 
   it("ramo de saúde: sem hashtag que prometa resultado", async () => {

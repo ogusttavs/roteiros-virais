@@ -18,52 +18,48 @@ async function quemPede() {
 
 type Resultado = ResultadoAcao<{ animacao: VistaDaAnimacao | null }>;
 
-/**
- * Todas as ações do vídeo de animação: o "ver como" nunca (primeira linha); o portão da cobrança; só a marca da sessão, e só se ela está na lista `ANIMACAO_CONTAS` (fora dela a ação responde
- * "não achamos", igual a um vídeo que não existe: o serviço devolve 404 e a tela mostra a frase).
- */
-async function comQuem(fazer: (quem: { usuarioId: string; clienteId: number }) => Promise<Resultado>): Promise<Resultado> {
+/** Todas as ações do vídeo de animação: o "ver como" nunca (primeira linha); o portão da cobrança; só a marca da sessão (fora da lista `ANIMACAO_CONTAS` o serviço devolve 404 e a tela mostra a frase). */
+export async function pedirAnimacaoAction(roteiroId: number): Promise<Resultado> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   await exigirAssinaturaValida();
   const quem = await quemPede();
-  if (!quem) return { ok: false, erro: fraseDaAnimacao("nao-achou") };
-  return fazer(quem);
-}
-
-export async function pedirAnimacaoAction(roteiroId: number): Promise<Resultado> {
-  return comQuem(async (quem) => {
-    const id = idDoBancoOuNulo(roteiroId);
-    if (id === null) return { ok: false, erro: fraseDaAnimacao("nao-achou") };
-    const r = await pedirAnimacao({ clienteId: quem.clienteId, usuarioId: quem.usuarioId, roteiroId: id });
-    return r.ok ? { ok: true, dado: { animacao: r.animacao } } : { ok: false, erro: r.frase };
-  });
+  const id = idDoBancoOuNulo(roteiroId);
+  if (!quem || id === null) return { ok: false, erro: fraseDaAnimacao("nao-achou") };
+  const r = await pedirAnimacao({ clienteId: quem.clienteId, usuarioId: quem.usuarioId, roteiroId: id });
+  return r.ok ? { ok: true, dado: { animacao: r.animacao } } : { ok: false, erro: r.frase };
 }
 
 export async function aprovarAnimacaoAction(animacaoId: number): Promise<Resultado> {
-  return comQuem(async (quem) => {
-    const id = idDoBancoOuNulo(animacaoId);
-    if (id === null) return { ok: false, erro: fraseDaAnimacao("nao-achou") };
-    const r = await aprovarAnimacao(quem.clienteId, id);
-    return r.ok ? { ok: true, dado: { animacao: r.animacao } } : { ok: false, erro: r.frase };
-  });
+  const recusaVerComo = await recusaDoVerComo();
+  if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
+  const quem = await quemPede();
+  const id = idDoBancoOuNulo(animacaoId);
+  if (!quem || id === null) return { ok: false, erro: fraseDaAnimacao("nao-achou") };
+  const r = await aprovarAnimacao(quem.clienteId, id);
+  return r.ok ? { ok: true, dado: { animacao: r.animacao } } : { ok: false, erro: r.frase };
 }
 
 /** "Agora não": a animação sai (a tela volta ao chamado). */
 export async function dispensarAnimacaoAction(animacaoId: number): Promise<Resultado> {
-  return comQuem(async (quem) => {
-    const id = idDoBancoOuNulo(animacaoId);
-    if (id === null) return { ok: false, erro: fraseDaAnimacao("nao-achou") };
-    const r = await dispensarAnimacao(quem.clienteId, id);
-    return r.ok ? { ok: true, dado: { animacao: null } } : { ok: false, erro: r.frase };
-  });
+  const recusaVerComo = await recusaDoVerComo();
+  if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
+  const quem = await quemPede();
+  const id = idDoBancoOuNulo(animacaoId);
+  if (!quem || id === null) return { ok: false, erro: fraseDaAnimacao("nao-achou") };
+  const r = await dispensarAnimacao(quem.clienteId, id);
+  return r.ok ? { ok: true, dado: { animacao: null } } : { ok: false, erro: r.frase };
 }
 
 export async function tentarAnimacaoDeNovoAction(animacaoId: number): Promise<Resultado> {
-  return comQuem(async (quem) => {
-    const id = idDoBancoOuNulo(animacaoId);
-    if (id === null) return { ok: false, erro: fraseDaAnimacao("nao-achou") };
-    const r = await tentarAnimacaoDeNovo(quem.clienteId, id);
-    return r.ok ? { ok: true, dado: { animacao: r.animacao } } : { ok: false, erro: r.frase };
-  });
+  const recusaVerComo = await recusaDoVerComo();
+  if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
+  const quem = await quemPede();
+  const id = idDoBancoOuNulo(animacaoId);
+  if (!quem || id === null) return { ok: false, erro: fraseDaAnimacao("nao-achou") };
+  const r = await tentarAnimacaoDeNovo(quem.clienteId, id);
+  return r.ok ? { ok: true, dado: { animacao: r.animacao } } : { ok: false, erro: r.frase };
 }

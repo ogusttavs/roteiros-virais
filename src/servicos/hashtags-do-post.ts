@@ -15,12 +15,12 @@
  *
  * O carrossel chama a mesma função: `hashtagsDoPost({ clienteId, tema })`.
  */
-import { and, desc, eq, gte, inArray, isNotNull, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, ne, or, sql, type SQL } from "drizzle-orm";
 
-import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
-import { clientes, nichos, videos } from "@/db/schema";
+import { clientes, contas, videos } from "@/db/schema";
 import { palavrasDeConteudo } from "@/ia/verificador";
+import { hojeISO } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
 import { pareceTextoEmPortugues } from "@/lib/idioma";
 import { logger } from "@/lib/log";
@@ -57,8 +57,14 @@ const EM_INGLES = new Set([
   "cleantok", "cleaningtiktok", "cleaningmotivation", "dentalcare", "dentistry", "oralhealth", "braces", "whitening", "smilemakeover", "cosmeticdentistry", "beforeandafter", "transformation",
 ]);
 
-/** Nos ramos de saúde: o que promete resultado ou cura. "antes e depois" pode (é do trabalho, não é promessa); estas não. Procuradas dentro da hashtag, sem acento. */
-const PROMESSA_DE_SAUDE = ["garantid", "garantia", "perfeit", "milagr", "cura", "curar", "curei", "curou", "definitiv", "semdor", "semrisco", "100porcento", "resultadoimediato", "emagreca", "eliminar", "tratamentoimediato", "efeitoimediato"];
+/**
+ * O que promete resultado ou cura, em TODOS os ramos (a pessoa cola a hashtag no post dela). "antes e depois" pode (é do trabalho, não é promessa); estas não. Procuradas dentro da hashtag, sem
+ * acento, por radical e de propósito largas: "melhor" barra #melhordentista; "cura" também barra #pedicura e #procura (perder uma hashtag é melhor que prometer o que não dá).
+ */
+const PROMESSA = [
+  "garantid", "garantia", "perfeit", "milagr", "cura", "curar", "curei", "curou", "definitiv", "semdor", "semrisco", "100porcento", "resultadoimediato", "emagrec", "eliminar", "tratamentoimediato", "efeitoimediato",
+  "melhor", "indolor", "semcirurgia", "promocao", "gratis", "gratuit", "desconto",
+];
 
 export type CandidatoDeHashtag = {
   /** A chave de comparação: minúsculas, sem acento (o que se compara). */
@@ -117,10 +123,12 @@ export function candidatasDosVideos(lista: VideoParaHashtags[], agora = new Date
   type Acumulo = { peso: number; videos: number; contas: Set<number | string>; grafias: Map<string, number> };
   const mapa = new Map<string, Acumulo>();
 
-  lista.forEach((v, indice) => {
+  lista.forEach((v) => {
     if (v.idioma && v.idioma !== "pt") return;
     const textos = [v.titulo, v.descricao].filter((t): t is string => !!t);
     const frase = legendaSemHashtag(textos.join(" "));
+    // Legenda só de hashtags: não há frase para conferir o idioma, então só vale o que o banco marcou como português.
+    if (!frase && v.idioma !== "pt") return;
     if (frase && !pareceTextoEmPortugues(frase)) return;
     const peso = pesoDoVideo(v, agora);
     if (peso <= 0) return;
@@ -134,7 +142,8 @@ export function candidatasDosVideos(lista: VideoParaHashtags[], agora = new Date
       const a = mapa.get(chave) ?? { peso: 0, videos: 0, contas: new Set(), grafias: new Map() };
       a.peso += peso;
       a.videos += 1;
-      a.contas.add(v.contaId ?? `video-${indice}`);
+      // Vídeo sem conta dona conta para o peso e para o mínimo de vídeos, mas não para o mínimo de contas.
+      if (v.contaId != null) a.contas.add(v.contaId);
       a.grafias.set(nome, (a.grafias.get(nome) ?? 0) + 1);
       mapa.set(chave, a);
     }
@@ -148,7 +157,21 @@ export function candidatasDosVideos(lista: VideoParaHashtags[], agora = new Date
 }
 
 function prometeResultado(chave: string): boolean {
-  return PROMESSA_DE_SAUDE.some((p) => chave.includes(p));
+  return PROMESSA.some((p) => chave.includes(p));
+}
+
+const SOBRAS_DA_REGIAO = new Set(["e", "de", "da", "do", "das", "dos", "regiao", "grande", "arredores", "cidade", "interior"]);
+
+/** As chaves que valem como "a cidade inteira": o nome todo e o nome sem "região"/"grande" e afins, sem acento nem espaço ("São Paulo" vira "saopaulo", "Campinas e região" vira "campinas"). */
+export function chavesDaCidade(nome: string | null | undefined): string[] {
+  const palavras = (nome ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const nucleo = palavras.filter((p) => !SOBRAS_DA_REGIAO.has(p)).join("");
+  return [...new Set([palavras.join(""), nucleo].filter((c) => c.length >= 4))];
+}
+
+/** Fora a hashtag que é o nome ou o usuário de uma conta do banco (marca de concorrente ou de rede de franquia): comparada sem acento e sem espaço. */
+export function tirarNomesDeConta(candidatas: CandidatoDeHashtag[], nomesDeConta: Set<string>): CandidatoDeHashtag[] {
+  return candidatas.filter((c) => !nomesDeConta.has(c.chave));
 }
 
 /** O pedaço da palavra do tema que a hashtag precisa conter ("dentes" acha #dente, "clareamento" acha #clareamentodental). */
@@ -161,6 +184,9 @@ export type OpcoesDeEscolha = {
   tema?: string;
   /** Uma marca que vende local, com a região ("Campinas e região") ou a cidade, para a hashtag da cidade. Vazio: sem hashtag de região. */
   regiao?: string | null;
+  /** O mesmo, em nomes separados (a cidade e a região da marca); vale no lugar de `regiao` quando vem. */
+  cidades?: (string | null | undefined)[];
+  /** Sem efeito desde 25/11/2026: o filtro de promessa vale em todos os ramos. Fica só para quem ainda passa o campo. */
   ramoSaude?: boolean;
   maximo?: number;
 };
@@ -172,21 +198,16 @@ export type OpcoesDeEscolha = {
  */
 export function escolherHashtags(candidatas: CandidatoDeHashtag[], opcoes: OpcoesDeEscolha = {}): string[] {
   const maximo = Math.min(opcoes.maximo ?? MAXIMO_DE_HASHTAGS, MAXIMO_DE_HASHTAGS);
-  const permitidas = candidatas.filter((c) => !(opcoes.ramoSaude && prometeResultado(c.chave)));
+  const permitidas = candidatas.filter((c) => !prometeResultado(c.chave));
   const porPeso = (a: CandidatoDeHashtag, b: CandidatoDeHashtag) => b.peso - a.peso || b.videos - a.videos || a.chave.localeCompare(b.chave);
   const solidas = permitidas.filter((c) => c.videos >= MINIMO_DE_VIDEOS && c.contas >= MINIMO_DE_CONTAS).sort(porPeso);
 
   const escolhidas: CandidatoDeHashtag[] = [];
   const jaTem = (c: CandidatoDeHashtag) => escolhidas.some((e) => e.chave === c.chave);
 
-  // A cidade: as palavras da região sem "regiao", "grande" e afins.
-  const palavrasDaRegiao = palavrasDeConteudo(opcoes.regiao ?? "").filter((p) => !["regiao", "grande", "arredores", "cidade", "interior"].includes(p));
-  let daRegiao: CandidatoDeHashtag | undefined;
-  if (palavrasDaRegiao.length > 0) {
-    daRegiao = permitidas
-      .filter((c) => c.videos >= 1 && palavrasDaRegiao.some((p) => p.length >= 4 && c.chave.includes(p)))
-      .sort(porPeso)[0];
-  }
+  // A cidade: só a hashtag que é o nome inteiro da cidade (ou da região), normalizado, e com a mesma régua das outras (2 vídeos de 2 contas). Nunca um pedaço: "natal" não casa com "natal2026".
+  const nomesDaCidade = new Set((opcoes.cidades ?? [opcoes.regiao]).flatMap((n) => chavesDaCidade(n)));
+  const daRegiao: CandidatoDeHashtag | undefined = nomesDaCidade.size > 0 ? solidas.filter((c) => nomesDaCidade.has(c.chave)).sort(porPeso)[0] : undefined;
 
   const palavrasDoTema = palavrasDeConteudo(opcoes.tema ?? "");
   const radicais = palavrasDoTema.map(radical);
@@ -223,7 +244,8 @@ export function limparCacheDeHashtags(): void {
 }
 
 function diaDeHoje(): string {
-  return new Date().toISOString().slice(0, 10);
+  // O dia de São Paulo (o servidor roda em UTC): a virada do cache é à meia-noite daqui.
+  return hojeISO();
 }
 
 async function candidatasDosSetores(setores: SetorDaBusca[]): Promise<CandidatoDeHashtag[]> {
@@ -251,7 +273,9 @@ async function candidatasDosSetores(setores: SetorDaBusca[]): Promise<CandidatoD
     .orderBy(desc(videos.foraDaCurva))
     .limit(LINHAS_POR_CONSULTA);
 
-  const candidatas = candidatasDosVideos(linhas.map((l) => ({ ...l, foraDaCurva: Number(l.foraDaCurva) })));
+  const donos = await db().select({ handle: contas.handle, nome: contas.nome }).from(contas);
+  const nomesDeConta = new Set(donos.flatMap((c) => [semAcentoNemSimbolo(c.handle), semAcentoNemSimbolo(c.nome ?? "")]).filter((n) => n.length >= 3));
+  const candidatas = tirarNomesDeConta(candidatasDosVideos(linhas.map((l) => ({ ...l, foraDaCurva: Number(l.foraDaCurva) }))), nomesDeConta);
   cache.set(chave, { dia, candidatas });
   return candidatas;
 }
@@ -272,13 +296,10 @@ export async function hashtagsDoPost(args: { clienteId: number; tema: string }):
     if (ids.length === 0) return [];
     const setores = await setoresComPiso(ids);
 
-    const donos = await db().select({ id: nichos.id, ramoCatalogo: nichos.ramoCatalogo }).from(nichos).where(inArray(nichos.id, ids));
-    const ramoSaude = donos.some((n) => ramoPorSlug(n.ramoCatalogo)?.grupo === "saude");
-
     const candidatas = await candidatasDosSetores(setores);
     if (candidatas.length === 0) return [];
-    const regiao = marca.alcance === "local" ? [marca.regiao, marca.cidade].filter(Boolean).join(" ") : null;
-    return escolherHashtags(candidatas, { tema: args.tema, regiao, ramoSaude });
+    const cidades = marca.alcance === "local" ? [marca.cidade, marca.regiao] : [];
+    return escolherHashtags(candidatas, { tema: args.tema, cidades });
   } catch (erro) {
     logger.warn({ err: erro, clienteId: args.clienteId }, "hashtags-do-post: nao foi possivel escolher as hashtags");
     return [];

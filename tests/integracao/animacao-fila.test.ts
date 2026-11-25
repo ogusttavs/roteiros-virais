@@ -352,6 +352,24 @@ describe("o ciclo: prévia, aprovar, final, baixar", () => {
     expect(await status.json()).toMatchObject({ id, estado: "final_pronta" });
   });
 
+  it("com a função desligada (chave geral ou marca fora da lista) o job pula sem reservar, sem gastar tentativa e sem chamar o motor", async () => {
+    const id = await pedir(marcaA, "an-dono-a", roteiroA);
+    let motorChamado = 0;
+    const motor = async (entrada: EntradaDaAnimacao) => {
+      motorChamado += 1;
+      return motorFalso()(entrada);
+    };
+    process.env.ANIMACAO_ATIVA = "0";
+    expect(await rodarRenderizarAnimacao(id, "previa", { renderizar: motor, ...semFila })).toMatchObject({ pulou: "desligada" });
+    liberar(marcaB);
+    expect(await rodarRenderizarAnimacao(id, "previa", { renderizar: motor, ...semFila })).toMatchObject({ pulou: "desligada" });
+    expect(motorChamado).toBe(0);
+    expect(await linha(id)).toMatchObject({ estado: "pedida", tentativas: 0 });
+    liberar(marcaA);
+    await rodarRenderizarAnimacao(id, "previa", { renderizar: motor, ...semFila });
+    expect(motorChamado).toBe(1);
+  });
+
   it("duas execuções do mesmo passo nunca montam o vídeo duas vezes", async () => {
     const id = await pedir(marcaA, "an-dono-a", roteiroA);
     let chamadas = 0;
@@ -382,8 +400,13 @@ describe("o ciclo: prévia, aprovar, final, baixar", () => {
     let visto: number | null = null;
     const motor = async (entrada: EntradaDaAnimacao) => {
       entrada.aoProgredir?.(40);
-      await new Promise((r) => setTimeout(r, 100));
+      // Espera pela condição (o andamento chegar à linha), com prazo, em vez de um tempo fixo que depende da máquina.
+      const prazo = Date.now() + 10_000;
       visto = (await linha(id)).progresso;
+      while (visto !== 40 && Date.now() < prazo) {
+        await new Promise((r) => setTimeout(r, 25));
+        visto = (await linha(id)).progresso;
+      }
       return motorFalso()(entrada);
     };
     await rodarRenderizarAnimacao(id, "previa", { renderizar: motor, ...semFila });
@@ -576,6 +599,22 @@ describe("a limpeza (a de hora em hora que já existe)", () => {
     expect((await linha(parada)).estado).toBe("pedida");
   });
 
+  it("com a função desligada a limpeza não devolve nem enfileira o que está parado ou esquecido, mas continua apagando o que venceu", async () => {
+    const agora = new Date("2026-12-10T12:00:00Z");
+    const velho = new Date(agora.getTime() - 41 * 60_000);
+    const parada = await criar(marcaA, roteiroA, "fazendo_previa", { progresso: 30, tentativas: 1, atualizadaEm: velho });
+    const esquecida = await criar(marcaB, roteiroB, "pedida", { atualizadaEm: velho });
+    const vencida = await criar(marcaC, roteiroA2, "final_pronta", { finalExpiraEm: new Date(agora.getTime() - 1000) });
+    const fila: number[] = [];
+    process.env.ANIMACAO_ATIVA = "0";
+    const resumo = await limparAnimacoes(agora, { enfileirar: (async (id: number) => void fila.push(id)) as never });
+    expect(resumo).toMatchObject({ animacoesApagadas: 1, animacoesDevolvidas: 0, animacoesReenfileiradas: 0 });
+    expect(fila).toEqual([]);
+    expect(await linha(parada)).toMatchObject({ estado: "fazendo_previa", progresso: 30 });
+    expect(await linha(esquecida)).toMatchObject({ estado: "pedida" });
+    expect(await linha(vencida)).toBeUndefined();
+  });
+
   it("varre a pasta: arquivo sem linha e .parte velho saem; o que tem dono e o que é novo ficam", async () => {
     const agora = new Date();
     const id = await criar(marcaA, roteiroA, "previa_pronta", { caminhoPrevia: nomeRelativoDaAnimacao(7777, "previa") });
@@ -612,6 +651,20 @@ describe("a limpeza (a de hora em hora que já existe)", () => {
       { id: previa, perfil: "previa" },
       { id: final, perfil: "final" },
     ]);
+  });
+});
+
+describe("a partida do contêiner de render com tentativas esgotadas", () => {
+  it("quem já gastou todas as tentativas e estava no meio vira falhou (não volta para a fila: laço de memória)", async () => {
+    const previa = await criar(marcaA, roteiroA, "fazendo_previa", { progresso: 10, tentativas: 2 });
+    const final = await criar(marcaB, roteiroB, "fazendo_final", { progresso: 10, tentativas: 2 });
+    const viva = await criar(marcaC, roteiroA2, "fazendo_previa", { progresso: 10, tentativas: 1 });
+    const fila: number[] = [];
+    expect(await recolherAnimacoesOrfas({ enfileirar: async (id) => void fila.push(id) })).toBe(1);
+    expect(await linha(previa)).toMatchObject({ estado: "falhou", progresso: null, motivo: fraseDaAnimacao("nao-montou"), codigoDoErro: "parou" });
+    expect(await linha(final)).toMatchObject({ estado: "falhou", progresso: null, motivo: fraseDaAnimacao("nao-montou") });
+    expect(await linha(viva)).toMatchObject({ estado: "pedida" });
+    expect(fila).toEqual([viva]);
   });
 });
 

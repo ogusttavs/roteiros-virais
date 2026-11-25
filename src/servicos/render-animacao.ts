@@ -11,8 +11,9 @@
  */
 import { rename, rm } from "node:fs/promises";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gte, or, sql } from "drizzle-orm";
 
+import { animacaoLiberadaParaMarca } from "@/animacao/acesso";
 import {
   caminhoDeSaidaDaAnimacao,
   caminhoDaAnimacaoNoVolume,
@@ -62,6 +63,10 @@ export async function rodarRenderizarAnimacao(animacaoId: number, perfil: Perfil
   const agora = deps.agora ? deps.agora() : new Date();
   const enfileirar = deps.enfileirar ?? ((id: number, p: PerfilDaAnimacao, s: number, t: number | string) => enfileirarRenderDaAnimacao(id, p, s, t));
   const { montando } = ESTADOS[perfil];
+
+  // Função desligada (chave geral ou marca fora da lista): o job pula antes de reservar, de gastar tentativa ou de abrir o Chromium. O pedido fica onde está e a limpeza o retoma se a função voltar.
+  const [dona] = await db().select({ clienteId: animacoes.clienteId }).from(animacoes).where(eq(animacoes.id, animacaoId));
+  if (dona && !animacaoLiberadaParaMarca(dona.clienteId)) return { animacaoId, perfil, pulou: "desligada" };
 
   // Com o disco do servidor em nível crítico nada novo é escrito: a animação fica onde está, sem gastar tentativa, e o job volta daqui a 10 minutos.
   if (await recusaPorDiscoCritico(deps.disco)) {
@@ -151,6 +156,12 @@ export async function rodarRenderizarAnimacao(animacaoId: number, perfil: Perfil
 export async function recolherAnimacoesOrfas(deps: Pick<DepsDoRenderDaAnimacao, "enfileirar"> = {}): Promise<number> {
   const enfileirar = deps.enfileirar ?? ((id: number, p: PerfilDaAnimacao, s: number, t: number | string) => enfileirarRenderDaAnimacao(id, p, s, t));
   const voltaram: { animacao: Pick<Animacao, "id" | "tentativas">; perfil: PerfilDaAnimacao }[] = [];
+  // Quem já gastou todas as tentativas e estava no meio quando o processo morreu (memória, por exemplo) não volta para a fila: senão entraria em laço e pararia a edição, que divide este contêiner.
+  const noMeio = or(eq(animacoes.estado, "fazendo_previa"), and(eq(animacoes.estado, "fazendo_final"), sql`${animacoes.progresso} is not null`));
+  await db()
+    .update(animacoes)
+    .set({ estado: "falhou", motivo: fraseDaAnimacao("nao-montou"), codigoDoErro: "parou", progresso: null, atualizadaEm: new Date() })
+    .where(and(noMeio, gte(animacoes.tentativas, TENTATIVAS_DA_ANIMACAO)));
   const previas = await db()
     .update(animacoes)
     .set({ estado: "pedida", progresso: null, atualizadaEm: new Date() })

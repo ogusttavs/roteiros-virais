@@ -48,7 +48,7 @@ export default async function Roteiro({ params }: Props) {
   }
 
   const preferencias = await preferenciasDoUsuario(sessao.user.id);
-  const [video, versoes, momento, grupoDeVersoes, publicar] = await Promise.all([
+  const [video, versoes, momento, grupoDeVersoes, publicar, hashtags] = await Promise.all([
     roteiro.referenciaVideoId ? videoPorId(roteiro.referenciaVideoId) : Promise.resolve(null),
     versoesDoRoteiro(roteiroId),
     // E55 PR 2b: o roteiro que nasceu de um assunto em alta diz se o assunto ainda está em alta (selo e linha de prazo) ou já passou (selo neutro e aviso). Uma falha aqui só tira o selo.
@@ -60,9 +60,9 @@ export default async function Roteiro({ params }: Props) {
     grupoDoRoteiro(cliente.id, roteiroId).then((g) => (g && g.total > 1 ? g : null)).catch(() => null),
     // E56 PR 1: "Publicar no Instagram". Uma falha aqui só tira a função da tela.
     visaoDePublicar({ usuarioId: sessao.user.id, clienteId: cliente.id, roteiro, verComo: sessao.verComo != null }).catch(() => null),
+    // E70: as até 5 hashtags para colar (do banco, sem IA). O vídeo longo é do YouTube e não leva o bloco. Uma falha aqui só tira o bloco.
+    roteiro.duracaoDoVideo === "longo" ? Promise.resolve([] as string[]) : hashtagsDoPost({ clienteId: cliente.id, tema: roteiro.tema }).catch(() => [] as string[]),
   ]);
-  // E70: as até 5 hashtags para colar (do banco, sem IA). Uma falha aqui só tira o bloco.
-  const hashtags = await hashtagsDoPost({ clienteId: cliente.id, tema: roteiro.tema }).catch(() => []);
 
   // E47 PR 4: "Editar o meu vídeo". Uma falha aqui só tira a função da tela. Publicar o vídeo editado só aparece se "Publicar no Instagram" também aparece (e o roteiro ainda não foi publicado).
   const editar = await visaoDeEditar({ clienteId: cliente.id, roteiro, verComo: sessao.verComo != null, podePublicar: publicar !== null && publicar.situacao.pode }).catch(() => null);

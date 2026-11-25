@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { candidatasDosVideos, escolherHashtags, hashtagsDoTexto, type VideoParaHashtags } from "./hashtags-do-post";
+import { candidatasDosVideos, chavesDaCidade, escolherHashtags, hashtagsDoTexto, tirarNomesDeConta, type VideoParaHashtags } from "./hashtags-do-post";
 
 const AGORA = new Date("2026-11-25T12:00:00Z");
 const diasAtras = (d: number) => new Date(AGORA.getTime() - d * 86_400_000);
@@ -76,6 +76,21 @@ function cand(chave: string, peso: number, videos = 3, contas = 3) {
   return { chave, grafia: `#${chave}`, peso, videos, contas };
 }
 
+describe("candidatasDosVideos: idioma e conta", () => {
+  it("legenda só de hashtags só conta se o banco marcou o idioma como pt", () => {
+    const so = (idioma: string | null) => candidatasDosVideos([v("#veneers #teethwhitening", { idioma })], AGORA).length;
+    expect(so(null)).toBe(0);
+    expect(so("en")).toBe(0);
+    expect(so("pt")).toBe(2);
+  });
+
+  it("vídeo sem conta não conta para o mínimo de contas", () => {
+    const r = candidatasDosVideos([v("Dica boa de hoje para você #clareamento", { contaId: null }), v("Outra dica boa para você #clareamento", { contaId: null })], AGORA);
+    expect(r).toEqual([expect.objectContaining({ chave: "clareamento", videos: 2, contas: 0 })]);
+    expect(escolherHashtags(r, {})).toEqual([]);
+  });
+});
+
 describe("escolherHashtags", () => {
   it("devolve no máximo 5, as de maior peso", () => {
     const lista = ["a1", "b2", "c3", "d4", "e5", "f6", "g7"].map((n, i) => cand(`hashtag${n}`, 100 - i));
@@ -99,27 +114,48 @@ describe("escolherHashtags", () => {
     expect(r).toEqual(["#boa"]);
   });
 
-  it("marca local: uma da cidade, mesmo com 1 vídeo, e só se houver nos dados", () => {
-    const lista = [cand("dentista", 90), cand("sorriso", 80), cand("dentistacampinas", 4, 1, 1), cand("dicas", 70)];
-    expect(escolherHashtags(lista, { regiao: "Campinas e região" })).toContain("#dentistacampinas");
-    expect(escolherHashtags(lista, { regiao: "Londrina" })).not.toContain("#dentistacampinas");
-    expect(escolherHashtags(lista, {})).not.toContain("#dentistacampinas");
-    expect(escolherHashtags(lista, { regiao: "Campinas" })).toHaveLength(4);
+  // Cinco do ramo mais pesadas: a cidade só entra pela vaga da região, nunca como "do ramo".
+  const ramo = [cand("ramo1x", 90), cand("ramo2x", 80), cand("ramo3x", 70), cand("ramo4x", 60), cand("ramo5x", 50)];
+
+  it("marca local: uma da cidade (nome inteiro, 2 vídeos de 2 contas), e só se houver nos dados", () => {
+    const lista = [...ramo, cand("campinas", 4)];
+    expect(escolherHashtags(lista, { regiao: "Campinas e região" })).toContain("#campinas");
+    expect(escolherHashtags(lista, { cidades: ["Campinas", null] })).toContain("#campinas");
+    expect(escolherHashtags(lista, { regiao: "Londrina" })).not.toContain("#campinas");
+    expect(escolherHashtags(lista, {})).not.toContain("#campinas");
+    expect(escolherHashtags(lista, { regiao: "Campinas" })).toHaveLength(5);
+  });
+
+  it("a cidade exige a mesma régua das outras e o nome inteiro: um vídeo só não vale, nem um pedaço", () => {
+    const com = (c: ReturnType<typeof cand>, regiao: string) => escolherHashtags([...ramo, c], { cidades: [regiao] });
+    expect(com(cand("campinas", 4, 1, 1), "Campinas")).not.toContain("#campinas");
+    expect(com(cand("campinas", 4, 3, 1), "Campinas")).not.toContain("#campinas");
+    expect(com(cand("natal2026", 4), "Natal")).not.toContain("#natal2026");
+    expect(com(cand("natal", 4), "Natal")).toContain("#natal");
+    expect(com(cand("paulo", 4), "São Paulo")).not.toContain("#paulo");
+    expect(com(cand("saopaulo", 4), "São Paulo")).toContain("#saopaulo");
+    expect(chavesDaCidade("Grande São Paulo")).toEqual(["grandesaopaulo", "saopaulo"]);
   });
 
   it("com região e assunto, o total continua em 5 e a região não tira o assunto", () => {
-    const lista = [cand("ramo1x", 90), cand("ramo2x", 80), cand("ramo3x", 70), cand("ramo4x", 60), cand("clareamento", 5), cand("clareamentocampinas", 3, 1, 1)];
+    const lista = [cand("ramo1x", 90), cand("ramo2x", 80), cand("ramo3x", 70), cand("ramo4x", 60), cand("clareamento", 5), cand("campinas", 3)];
     const r = escolherHashtags(lista, { tema: "clareamento dental", regiao: "Campinas" });
     expect(r).toHaveLength(5);
     expect(r).toContain("#clareamento");
-    expect(r).toContain("#clareamentocampinas");
+    expect(r).toContain("#campinas");
   });
 
-  it("ramo de saúde: nenhuma hashtag que prometa resultado; 'antes e depois' pode", () => {
+  it("a promessa fica de fora em todos os ramos; 'antes e depois' pode", () => {
     const lista = [cand("sorrisoperfeito", 99), cand("resultadogarantido", 98), cand("curadefinitiva", 97), cand("antesedepois", 50), cand("dentista", 40)];
-    const saude = escolherHashtags(lista, { ramoSaude: true });
-    expect(saude.sort()).toEqual(["#antesedepois", "#dentista"]);
-    expect(escolherHashtags(lista, { ramoSaude: false })).toHaveLength(5);
+    expect(escolherHashtags(lista, { ramoSaude: true }).sort()).toEqual(["#antesedepois", "#dentista"]);
+    expect(escolherHashtags(lista, { ramoSaude: false }).sort()).toEqual(["#antesedepois", "#dentista"]);
+    const outras = ["melhordentista", "avaliacaogratuita", "indolor", "semcirurgia", "emagrecimento", "promocaodomes", "gratis", "descontoespecial", "milagre"].map((c) => cand(c, 80));
+    expect(escolherHashtags([...outras, cand("dentista", 40)], {})).toEqual(["#dentista"]);
+  });
+
+  it("tira a hashtag que é nome ou usuário de uma conta do banco", () => {
+    const lista = [cand("clinicasorriso", 9), cand("dentista", 8)];
+    expect(tirarNomesDeConta(lista, new Set(["clinicasorriso"])).map((c) => c.chave)).toEqual(["dentista"]);
   });
 
   it("sem dados devolve vazio", () => {

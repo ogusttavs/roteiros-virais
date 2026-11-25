@@ -1207,8 +1207,8 @@ export function RoteiroTela({
 
         {!editando ? <CartaoDaLegenda legenda={corpo.legenda} aoCopiar={() => setToast(true)} aoFalhar={() => setErroToast(textosRoteiro.erroCopiar)} /> : null}
 
-        {/* E70: as hashtags para colar, em todo roteiro (Reels, Story, sem fala e longo), logo depois da legenda; sem dados o bloco não existe. */}
-        {!editando ? <HashtagsParaColar hashtags={hashtags} aoCopiar={() => setToastHashtags(true)} aoFalhar={() => setErroToast(textosRoteiro.erroCopiar)} /> : null}
+        {/* E70: as hashtags para colar (Reels, Story e sem fala), logo depois da legenda; sem dados o bloco não existe. Fora do vídeo longo: ele é do YouTube e a nota "Até 5 no Instagram" não vale para ele. */}
+        {!editando && !ehLongo ? <HashtagsParaColar hashtags={hashtags} aoCopiar={() => setToastHashtags(true)} aoFalhar={() => setErroToast(textosRoteiro.erroCopiar)} /> : null}
 
         {/* V15, item 4: mesma posição de sempre (depois da legenda); sempre que a lista tiver
             item, em qualquer formato e estilo (Reels sem fala com cartões também pode ter). */}

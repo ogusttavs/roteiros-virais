@@ -5,12 +5,14 @@
  *  2. Apaga a prévia que ninguém aprovou nem dispensou em 48 horas, e o pedido que falhou há mais de 7 dias.
  *  3. A montagem parada (sem sinal há 40 minutos: o contêiner caiu) volta para a vez, ou falha na segunda tentativa.
  *  4. O que espera a vez há mais de 10 minutos é enfileirado de novo (a fila perdeu o pedido).
+ *  Com a função desligada para a marca (chave geral ou lista), os passos 3 e 4 pulam essa animação; os de apagar (1, 2 e 5) continuam, para não deixar arquivo velho no disco.
  *  5. Varre `animacao/` no volume: arquivo sem linha e `.parte` velho saem.
  *
  * O resumo tem só números.
  */
 import { and, eq, inArray, isNotNull, lt, lte, or, sql } from "drizzle-orm";
 
+import { animacaoLiberadaParaMarca } from "@/animacao/acesso";
 import { apagarArquivoDaAnimacao, varrerSobrasDaAnimacao } from "@/animacao/arquivos";
 import {
   ANIMACAO_ESQUECIDA_APOS_MS,
@@ -52,12 +54,14 @@ export async function limparAnimacoes(agora: Date, deps: DepsDaLimpezaDeAnimacoe
 
   // 3. A montagem sem sinal: volta para a vez (ou falha na última tentativa).
   const paradas = await db()
-    .select({ id: animacoes.id, estado: animacoes.estado, tentativas: animacoes.tentativas })
+    .select({ id: animacoes.id, clienteId: animacoes.clienteId, estado: animacoes.estado, tentativas: animacoes.tentativas })
     .from(animacoes)
     .where(and(inArray(animacoes.estado, ["fazendo_previa", "fazendo_final"]), isNotNull(animacoes.progresso), lt(animacoes.atualizadaEm, antes(ANIMACAO_PARADA_APOS_MS))));
   let devolvidas = 0;
   let desistidas = 0;
   for (const p of paradas) {
+    // Função desligada para a marca: não devolve nem enfileira nada (nada abre o navegador).
+    if (!animacaoLiberadaParaMarca(p.clienteId)) continue;
     const perfil: PerfilDaAnimacao = p.estado === "fazendo_final" ? "final" : "previa";
     if (p.tentativas >= TENTATIVAS_DA_ANIMACAO) {
       const [f] = await db()
@@ -84,11 +88,12 @@ export async function limparAnimacoes(agora: Date, deps: DepsDaLimpezaDeAnimacoe
 
   // 4. Esperando a vez sem ninguém pegar: enfileira de novo (a reserva do render impede montar duas vezes).
   const esquecidas = await db()
-    .select({ id: animacoes.id, estado: animacoes.estado })
+    .select({ id: animacoes.id, clienteId: animacoes.clienteId, estado: animacoes.estado })
     .from(animacoes)
     .where(and(or(eq(animacoes.estado, "pedida"), and(eq(animacoes.estado, "fazendo_final"), sql`${animacoes.progresso} is null`)), lt(animacoes.atualizadaEm, antes(ANIMACAO_ESQUECIDA_APOS_MS))));
   let reenfileiradas = 0;
   for (const e of esquecidas) {
+    if (!animacaoLiberadaParaMarca(e.clienteId)) continue;
     try {
       await enfileirar(e.id, e.estado === "fazendo_final" ? "final" : "previa", 0, `esquecida-${Math.floor(agora.getTime() / 3_600_000)}`);
       reenfileiradas += 1;

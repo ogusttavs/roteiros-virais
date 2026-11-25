@@ -107,14 +107,14 @@ export function ChamadoAnimacao({ roteiroId, visao }: Props) {
       {estado && ESTADOS_DE_ESPERA.has(estado) ? <progress className={styles.barra} max={100} value={andamento ?? undefined} aria-label={linha ?? ""} data-progresso /> : null}
       {andamento !== null ? <p className={styles.nota}>{t.aviso.andamento(andamento)}</p> : null}
 
-      {animacao && estado === "previa_pronta" ? (
+      {animacao && estado === "previa_pronta" && !visao.verComo ? (
         <>
           <video className={styles.video} controls playsInline preload="metadata" src={`/api/animacao/${animacao.id}/previa`} onError={() => setVideoQuebrou(true)} data-previa-da-animacao />
           {videoQuebrou ? <p className={styles.erro}>{t.aviso.videoQuebrou}</p> : null}
         </>
       ) : null}
 
-      {animacao && estado === "final_pronta" ? (
+      {animacao && estado === "final_pronta" && !visao.verComo ? (
         <>
           <video className={styles.video} controls playsInline preload="metadata" src={`/api/animacao/${animacao.id}/final`} onError={() => setVideoQuebrou(true)} data-final-da-animacao />
           {videoQuebrou ? <p className={styles.erro}>{t.aviso.videoQuebrou}</p> : null}
