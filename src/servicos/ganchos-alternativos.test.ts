@@ -68,6 +68,10 @@ describe("problemasDosGanchos", () => {
     const promessa = [g("Garantimos o resultado do seu sorriso em uma sessão", "resultado"), BOA_LISTA[0], BOA_LISTA[2]];
     const saude = problemasDosGanchos(promessa, { ...CONTEXTO, ramoSaude: true });
     expect(saude.some((m) => m.startsWith("gancho 1:"))).toBe(true);
+    // A regra de saúde do conselho sozinha (a promessa que a conformidade geral não pega): "sem riscos".
+    const semRiscos = [g("Clareamento sem riscos, do jeito que eu faço", "contraste"), BOA_LISTA[0], BOA_LISTA[2]];
+    expect(problemasDosGanchos(semRiscos, { ...CONTEXTO, ramoSaude: true }).some((m) => m.startsWith("gancho 1:") && m.includes("conselho da profissão"))).toBe(true);
+    expect(problemasDosGanchos(semRiscos, { ...CONTEXTO, ramoSaude: false }).some((m) => m.includes("conselho da profissão"))).toBe(false);
     const forade = problemasDosGanchos(promessa, { ...CONTEXTO, ramoSaude: false });
     expect(forade.some((m) => m.includes("conselho da profissão"))).toBe(false);
   });

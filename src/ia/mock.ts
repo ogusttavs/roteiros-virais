@@ -57,6 +57,10 @@ ${params.sistemaVariavel ?? ""}`);
   if (params.tarefa === "sugerirPalavrasDoAssunto" && params.entrada.includes("[mock:sugerir-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
+  // Os ganchos alternativos: o modelo barato fora do ar (a tela diz que não deu e o roteiro segue como está).
+  if (params.tarefa === "ganchosAlternativos" && params.entrada.includes("[mock:ganchos-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
   // E61 PR 1: o modelo barato que sugere o foco da conta fora do ar; a tela diz que não deu e a pessoa escreve o foco.
   if (params.tarefa === "sugerirFoco" && params.entrada.includes("[mock:foco-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
@@ -645,6 +649,10 @@ function mockGanchosAlternativos(entrada: string) {
   if (marcado("ganchos-promessa")) ganchos[0].texto = "Garantimos o resultado em uma sessão";
   if (marcado("ganchos-igual")) ganchos[4].texto = atual;
   if (marcado("ganchos-poucos")) return { ganchos: ganchos.slice(0, 2) };
+  if (entrada.includes("[mock:ganchos-sempre-poucos]")) return { ganchos: ganchos.slice(0, 2) };
+  // Fórmula de máquina nas duas tentativas: a 2a só avisa, e o servidor tira da lista o gancho que a tem (três de cinco: sobram dois e não dá; um de cinco: sobram quatro).
+  const comFormula = entrada.includes("[mock:ganchos-sempre-formula-tres]") ? 3 : entrada.includes("[mock:ganchos-sempre-formula-um]") ? 1 : 0;
+  if (comFormula > 0) return { ganchos: ganchos.map((x, i) => (i < comFormula ? { ...x, texto: `Um resultado incrível para você ${["hoje", "amanhã", "agora"][i]}` } : x)) };
   return { ganchos };
 }
 

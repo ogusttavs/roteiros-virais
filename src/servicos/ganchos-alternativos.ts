@@ -17,8 +17,8 @@ import * as ganchosIA from "@/ia/prompts/ganchosAlternativos";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
-import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 import { logger } from "@/lib/log";
+import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";

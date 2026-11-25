@@ -25,10 +25,10 @@ import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/li
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { VisaoDaAnimacao } from "@/servicos/animacao";
-import type { VisaoDosGanchos } from "@/servicos/ganchos-alternativos";
 import type { VisaoDeEditar, VistaCompletaDaEdicao } from "@/servicos/edicao-tela";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { PesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
+import type { VisaoDosGanchos } from "@/servicos/ganchos-alternativos";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
 import type { VisaoDePublicar, VistaDaPublicacao } from "@/servicos/publicar-instagram";
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
@@ -70,11 +70,11 @@ import {
   salvarEdicaoAction,
 } from "./acoes";
 import { CartaoDaLegenda } from "./CartaoDaLegenda";
-import { OutrosGanchos } from "./OutrosGanchos";
 import { ChamadoAnimacao } from "./ChamadoAnimacao";
 import { ChamadoEditarMeuVideo } from "./ChamadoEditarMeuVideo";
 import { EditarMeuVideo } from "./EditarMeuVideo";
 import { HashtagsParaColar } from "./HashtagsParaColar";
+import { OutrosGanchos } from "./OutrosGanchos";
 import { PublicarNoInstagram } from "./PublicarNoInstagram";
 import { RoteiroLongo, type EdicaoDoCapitulo } from "./RoteiroLongo";
 import styles from "./RoteiroTela.module.css";

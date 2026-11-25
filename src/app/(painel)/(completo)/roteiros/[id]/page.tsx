@@ -10,8 +10,8 @@ import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@
 import { visaoDeEditar } from "@/servicos/edicao-tela";
 import { momentoDoRoteiro } from "@/servicos/em-alta";
 import { fontesDosParagrafos, pesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
-import { hashtagsDoPost } from "@/servicos/hashtags-do-post";
 import { visaoDosGanchos } from "@/servicos/ganchos-alternativos";
+import { hashtagsDoPost } from "@/servicos/hashtags-do-post";
 import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { diaPorExtenso, enderecoHttpsSeguro } from "@/servicos/noticias-assuntos";
