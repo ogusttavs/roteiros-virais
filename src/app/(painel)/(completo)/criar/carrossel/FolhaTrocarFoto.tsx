@@ -57,8 +57,10 @@ export function FolhaTrocarFoto({
   const [avisoDaFoto, setAvisoDaFoto] = useState<string | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
 
+  // Em saúde, os dois tipos de foto nunca se misturam: antes e depois e resultado mostram só as fotos de paciente (e a autorização vale só para elas); os outros slides, só as do lugar e do trabalho.
   const doPaciente = ramoSaude && TIPOS_COM_FOTO_DE_PACIENTE.has(slide.tipo);
-  const precisaMarcar = ramoSaude && !autorizado;
+  const precisaMarcar = doPaciente && !autorizado;
+  const fotosDoSlide = ramoSaude ? fotos.filter((f) => (f.dePaciente === true) === doPaciente) : fotos;
   const escolhidaAgora = escolhidas[ehPar ? lado : "antes"];
   const podeFicarSemFoto = slide.tipo === "passo" || slide.tipo === "antes-depois";
 
@@ -74,7 +76,10 @@ export function FolhaTrocarFoto({
       }
       const corpo = new FormData();
       corpo.append("foto", arquivo);
-      if (ramoSaude) corpo.append("autorizacaoDoPaciente", "true");
+      if (doPaciente) {
+        corpo.append("dePaciente", "true");
+        corpo.append("autorizacaoDoPaciente", "true");
+      }
       const { foto, aviso } = await pedir<{ foto: { id: number }; aviso?: string | null }>(
         `/api/carrossel/${carrosselId}/fotos`,
         { method: "POST", body: corpo },
@@ -102,7 +107,6 @@ export function FolhaTrocarFoto({
           body: JSON.stringify({
             indice,
             [ehPar && lado === "depois" ? "fotoDepoisId" : "fotoId"]: fotoId,
-            autorizacaoDoPaciente: autorizado,
           }),
         },
         t.falhouAoSalvar,
@@ -126,7 +130,7 @@ export function FolhaTrocarFoto({
           <Botao
             type="button"
             onClick={() => escolhidaAgora && void gravar(escolhidaAgora)}
-            disabled={ocupado || !escolhidaAgora || (doPaciente && precisaMarcar)}
+            disabled={ocupado || !escolhidaAgora}
           >
             {t.usarEstaFoto}
           </Botao>
@@ -164,9 +168,10 @@ export function FolhaTrocarFoto({
             ))}
           </div>
         ) : null}
-        {fotos.length === 0 ? <p>{t.semFotosAinda}</p> : null}
+        {ramoSaude ? <p>{doPaciente ? t.soFotoDePacienteAqui : t.soFotoDoLugarAqui}</p> : null}
+        {fotosDoSlide.length === 0 ? <p>{doPaciente ? t.semFotosDePacienteAinda : t.semFotosAinda}</p> : null}
         <div className={estilos.escolherFoto}>
-          {fotos.map((f, i) => (
+          {fotosDoSlide.map((f, i) => (
             <button
               key={f.id}
               type="button"
@@ -182,7 +187,7 @@ export function FolhaTrocarFoto({
             </button>
           ))}
         </div>
-        {ramoSaude ? (
+        {doPaciente ? (
           <label className={estilos.autorizacao}>
             <input
               type="checkbox"

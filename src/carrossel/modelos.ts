@@ -263,7 +263,7 @@ function miolo(d: DadosDoModelo, tipo: TipoDeSlide, fotoTopo: boolean): string {
         `<div class="s-corpo"><span class="s-marcador"></span><h1 class="s-titulo-capa">${esc(s.titulo)}</h1>${s.sub ? `<p class="s-sub">${esc(s.sub)}</p>` : ""}<span class="s-arraste">Arraste<span>${ICONES.arraste}</span></span></div>`
       );
     case "passo": {
-      const rotulo = s.de ? `Passo ${s.numero ?? 1} de ${s.de}` : `Passo ${s.numero ?? 1}`;
+      const rotulo = s.de && s.de > 1 ? `Passo ${s.numero ?? 1} de ${s.de}` : `Passo ${s.numero ?? 1}`;
       return (
         topo(rotulo) +
         (d.foto

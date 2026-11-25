@@ -15,6 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { slidesComColchete, temColchete } from "@/carrossel/colchetes";
 import {
   TAMANHOS_DO_CARROSSEL,
   TETO_DA_FOTO_BYTES,
@@ -29,6 +30,7 @@ import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 import estilos from "./CarrosselTela.module.css";
 import { FolhaTrocarFoto } from "./FolhaTrocarFoto";
 import { FolhaTrocarTexto } from "./FolhaTrocarTexto";
+import { TextoComColchetes } from "./TextoComColchetes";
 import {
   ErroDaRota,
   pedir,
@@ -114,6 +116,8 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
   const [temaLivre, setTemaLivre] = useState("");
   const [quantidade, setQuantidade] = useState<number>(7);
   const [fotos, setFotos] = useState<{ arquivo: File; url: string }[]>([]);
+  /** Só em marca de saúde: as fotos de paciente (com a autorização), à parte das do lugar e do trabalho. Só elas entram no antes e depois e no resultado. */
+  const [fotosDePaciente, setFotosDePaciente] = useState<{ arquivo: File; url: string }[]>([]);
   const [avisoDeFoto, setAvisoDeFoto] = useState<string | null>(null);
   const [autorizado, setAutorizado] = useState(false);
   const [cor, setCor] = useState(corMarca ?? "");
@@ -129,9 +133,12 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
   const [copiada, setCopiada] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [erroDoBaixar, setErroDoBaixar] = useState<string | null>(null);
+  /** O espaço para completar (trecho entre colchetes) ainda está na legenda ou nos slides: antes de copiar ou baixar, a tela pergunta. */
+  const [confirmando, setConfirmando] = useState<"copiar" | "baixar" | null>(null);
   const [arquivosParaCompartilhar, setArquivosParaCompartilhar] = useState<File[] | null>(null);
   const [corNova, setCorNova] = useState<string | null>(null);
   const entradaDeFoto = useRef<HTMLInputElement>(null);
+  const entradaDeFotoDePaciente = useRef<HTMLInputElement>(null);
   const etapa = useEtapa(fase === "gerando");
 
   const { fechar: fecharTexto } = useFolhaNoHistorico(folhaTexto, () => setFolhaTexto(false));
@@ -140,15 +147,15 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
   // As fotos escolhidas viram miniaturas locais; soltar o endereço quando elas saem ou a tela fecha.
   const urlsAbertas = useRef<string[]>([]);
   useEffect(() => {
-    urlsAbertas.current = fotos.map((f) => f.url);
-  }, [fotos]);
+    urlsAbertas.current = [...fotos, ...fotosDePaciente].map((f) => f.url);
+  }, [fotos, fotosDePaciente]);
   useEffect(() => () => urlsAbertas.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
   const temaEscolhido = tema?.trim() ? tema.trim() : null;
   const corValida = /^#[0-9a-fA-F]{6}$/.test(cor);
   const precisaDeCor = !corMarca;
 
-  async function adicionarFotos(lista: FileList | null) {
+  async function adicionarFotos(lista: FileList | null, dePaciente = false) {
     setAvisoDeFoto(null);
     const novas: { arquivo: File; url: string }[] = [];
     for (const original of Array.from(lista ?? [])) {
@@ -164,15 +171,17 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
       }
       novas.push({ arquivo, url: URL.createObjectURL(arquivo) });
     }
-    setFotos((atual) => {
-      const cabem = novas.slice(0, Math.max(0, MAXIMO_DE_FOTOS - atual.length));
+    // O teto de 9 vale para as duas áreas juntas.
+    const doutraArea = dePaciente ? fotos.length : fotosDePaciente.length;
+    (dePaciente ? setFotosDePaciente : setFotos)((atual) => {
+      const cabem = novas.slice(0, Math.max(0, MAXIMO_DE_FOTOS - doutraArea - atual.length));
       novas.slice(cabem.length).forEach((n) => URL.revokeObjectURL(n.url));
       return [...atual, ...cabem];
     });
   }
 
-  function tirarFoto(indice: number) {
-    setFotos((atual) => {
+  function tirarFoto(indice: number, dePaciente = false) {
+    (dePaciente ? setFotosDePaciente : setFotos)((atual) => {
       URL.revokeObjectURL(atual[indice]?.url ?? "");
       return atual.filter((_, i) => i !== indice);
     });
@@ -233,6 +242,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
             quantidade,
             cor: corValida ? cor : undefined,
             fotos: fotos.length,
+            ...(ramoSaude ? { fotosDePaciente: fotosDePaciente.length } : {}),
             de: temasDeHoje.includes(temaEscolhido)
               ? { origem: "tema", titulo: temaEscolhido }
               : { origem: "tema", texto: temaEscolhido },
@@ -243,10 +253,14 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
       // O carrossel já existe e já contou no teto: o endereço guarda o id, e recarregar a página abre este mesmo carrossel.
       marcarEndereco(id);
       guardarGerando(null);
-      for (const foto of fotos) {
+      for (const [foto, dePaciente] of [...fotos.map((f) => [f, false] as const), ...fotosDePaciente.map((f) => [f, true] as const)]) {
         const corpo = new FormData();
         corpo.append("foto", foto.arquivo);
-        if (ramoSaude) corpo.append("autorizacaoDoPaciente", "true");
+        // Em saúde, só a foto de paciente leva a marca e a confirmação da autorização escrita; a do lugar e do trabalho entra sem nada.
+        if (ramoSaude && dePaciente) {
+          corpo.append("dePaciente", "true");
+          corpo.append("autorizacaoDoPaciente", "true");
+        }
         try {
           const { aviso: avisoDaFoto } = await pedir<{ aviso?: string | null }>(
             `/api/carrossel/${id}/fotos`,
@@ -379,8 +393,23 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
     }
   }
 
+  /** Os trechos entre colchetes que a IA deixou no lugar de um fato que não pode inventar: nos slides e na legenda. */
+  const slidesParaCompletar = carrossel ? slidesComColchete(carrossel.slides) : [];
+  const legendaParaCompletar = carrossel ? temColchete(`${carrossel.legenda}\n${carrossel.hashtags.join(" ")}`) : false;
+
+  function pedirCopiarLegenda() {
+    if (legendaParaCompletar) setConfirmando("copiar");
+    else void copiarLegenda();
+  }
+
+  function pedirBaixar() {
+    if (slidesParaCompletar.length > 0 && !arquivosParaCompartilhar) setConfirmando("baixar");
+    else void baixar();
+  }
+
   async function copiarLegenda() {
     if (!carrossel) return;
+    setConfirmando(null);
     try {
       await navigator.clipboard.writeText(
         `${carrossel.legenda}\n\n${carrossel.hashtags.join(" ")}`,
@@ -422,6 +451,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
 
   async function baixar() {
     if (!carrossel) return;
+    setConfirmando(null);
     setErroDoBaixar(null);
     if (arquivosParaCompartilhar) {
       try {
@@ -621,23 +651,6 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
               <section className={estilos.bloco} aria-labelledby="t-fotos">
                 <h2 id="t-fotos">{t.fotosTitulo}</h2>
                 <p className={estilos.ajuda}>{t.fotosAjuda}</p>
-                {ramoSaude ? (
-                  <div className={estilos.bloco}>
-                    <h3 className={estilos.subtitulo}>{t.pacienteTitulo}</h3>
-                    <p className={estilos.ajuda}>{t.pacienteAjuda}</p>
-                    <label className={estilos.autorizacao}>
-                      <input
-                        type="checkbox"
-                        checked={autorizado}
-                        onChange={(e) => setAutorizado(e.target.checked)}
-                      />
-                      <span>
-                        <strong>{t.autorizacaoPaciente}</strong>
-                        <span>{t.autorizacaoPacienteAjuda}</span>
-                      </span>
-                    </label>
-                  </div>
-                ) : null}
                 <div className={estilos.fotos}>
                   {fotos.map((f, i) => (
                     <div key={f.url} className={estilos.fotoMini}>
@@ -655,11 +668,10 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                       </button>
                     </div>
                   ))}
-                  {fotos.length < MAXIMO_DE_FOTOS ? (
+                  {fotos.length + fotosDePaciente.length < MAXIMO_DE_FOTOS ? (
                     <button
                       type="button"
                       className={estilos.adicionar}
-                      disabled={ramoSaude && !autorizado}
                       onClick={() => entradaDeFoto.current?.click()}
                     >
                       <Plus size={22} strokeWidth={1.75} aria-hidden="true" />
@@ -675,15 +687,74 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                   className={estilos.escondido}
                   tabIndex={-1}
                   aria-hidden="true"
+                  data-testid="entrada-de-foto"
                   onChange={(e) => {
                     void adicionarFotos(e.target.files);
                     e.target.value = "";
                   }}
                 />
-                {ramoSaude && !autorizado ? (
-                  <p className={estilos.miudo}>{t.autorizacaoPrecisa}</p>
+                {ramoSaude ? (
+                  <div className={estilos.bloco} data-testid="area-de-paciente">
+                    <h3 className={estilos.subtitulo}>{t.pacienteTitulo}</h3>
+                    <p className={estilos.ajuda}>{t.pacienteAjuda}</p>
+                    <label className={estilos.autorizacao}>
+                      <input
+                        type="checkbox"
+                        checked={autorizado}
+                        onChange={(e) => setAutorizado(e.target.checked)}
+                      />
+                      <span>
+                        <strong>{t.autorizacaoPaciente}</strong>
+                        <span>{t.autorizacaoPacienteAjuda}</span>
+                      </span>
+                    </label>
+                    <div className={estilos.fotos}>
+                      {fotosDePaciente.map((f, i) => (
+                        <div key={f.url} className={estilos.fotoMini}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={f.url} alt={t.fotoDePacienteN(i + 1)} />
+                          <button
+                            type="button"
+                            className={estilos.tirar}
+                            aria-label={t.tirarFotoDePaciente(i + 1)}
+                            onClick={() => tirarFoto(i, true)}
+                          >
+                            <span>
+                              <X size={16} strokeWidth={2} aria-hidden="true" />
+                            </span>
+                          </button>
+                        </div>
+                      ))}
+                      {fotos.length + fotosDePaciente.length < MAXIMO_DE_FOTOS ? (
+                        <button
+                          type="button"
+                          className={estilos.adicionar}
+                          disabled={!autorizado}
+                          onClick={() => entradaDeFotoDePaciente.current?.click()}
+                        >
+                          <Plus size={22} strokeWidth={1.75} aria-hidden="true" />
+                          {t.mandarFotosDePaciente}
+                        </button>
+                      ) : null}
+                    </div>
+                    <input
+                      ref={entradaDeFotoDePaciente}
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp"
+                      className={estilos.escondido}
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      data-testid="entrada-de-foto-de-paciente"
+                      onChange={(e) => {
+                        void adicionarFotos(e.target.files, true);
+                        e.target.value = "";
+                      }}
+                    />
+                    {!autorizado ? <p className={estilos.miudo}>{t.autorizacaoPrecisa}</p> : null}
+                    <p className={estilos.miudo}>{t.linhaFixaNoSlide}</p>
+                  </div>
                 ) : null}
-                {ramoSaude ? <p className={estilos.miudo}>{t.linhaFixaNoSlide}</p> : null}
                 {avisoDeFoto ? (
                   <p className={estilos.erroCampo} role="alert">
                     <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
@@ -727,7 +798,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                   disabled={
                     !temaEscolhido ||
                     (precisaDeCor && !corValida) ||
-                    (ramoSaude && fotos.length > 0 && !autorizado)
+                    (ramoSaude && fotosDePaciente.length > 0 && !autorizado)
                   }
                 >
                   {t.criar}
@@ -759,7 +830,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
             {[
               t.etapaTexto(quantidade),
               ramoSaude ? t.etapaConferindoSaude : t.etapaConferindo,
-              ramoSaude ? t.etapaFotosSaude : t.etapaFotos(fotos.length),
+              ramoSaude ? t.etapaFotosSaude : t.etapaFotos(fotos.length + fotosDePaciente.length),
             ].map((texto, i) => (
               <li
                 key={texto}
@@ -809,6 +880,11 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
               {t.precisaEncurtarAviso(quantosPrecisamEncurtar)}
             </p>
           ) : null}
+          {slidesParaCompletar.length > 0 ? (
+            <p className={estilos.avisoColchete} role="alert" data-testid="aviso-colchetes">
+              <b>{t.completarSlides(slidesParaCompletar.map((x) => x.n))}</b>
+            </p>
+          ) : null}
 
           <div className={estilos.faixa} role="group" aria-label={t.faixaAria(total)}>
             {carrossel.slides.map((s, i) => {
@@ -829,6 +905,9 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                         <span className={estilos.marcaDeAviso}>{t.precisaEncurtarCurto}</span>
                       ) : previa.semFoto ? (
                         <span className={estilos.marcaDeAviso}>{t.precisaDeFotoCurto}</span>
+                      ) : null}
+                      {slidesParaCompletar.some((x) => x.n === i + 1) ? (
+                        <span className={estilos.marcaDeColchete}>{t.completarCurto}</span>
                       ) : null}
                     </button>
                   ) : (
@@ -870,6 +949,18 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
               {previas[escolhido + 1]?.semFoto ? (
                 <p className={estilos.alerta}>{t.precisaDeFoto}</p>
               ) : null}
+              {slidesParaCompletar.find((x) => x.n === escolhido + 1) ? (
+                <p className={estilos.avisoColchete} role="note" data-testid="colchetes-do-slide">
+                  <span>{t.completarSlide}</span>
+                  <span>
+                    {slidesParaCompletar.find((x) => x.n === escolhido + 1)!.trechos.map((trecho, k) => (
+                      <mark key={k} className={estilos.colchete}>
+                        {trecho}
+                      </mark>
+                    ))}
+                  </span>
+                </p>
+              ) : null}
               {slideAtual.rodape ? <p className={estilos.ajuda}>{t.linhaFixaNaoEdita}</p> : null}
               {t.metodo.dicasDeFoto[slideAtual.tipo] && !(ramoSaude && slideAtual.tipo === "passo") ? <p className={estilos.ajuda}>{t.metodo.dicasDeFoto[slideAtual.tipo]}</p> : null}
               <div className={estilos.acoesSlide}>
@@ -904,20 +995,36 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
               <span className={estilos.rotulo} id="t-legenda">
                 {t.legendaRotulo}
               </span>
+              {legendaParaCompletar ? (
+                <p className={estilos.avisoColchete} role="note" data-testid="colchetes-da-legenda">
+                  <b>{t.completarLegenda}</b>
+                </p>
+              ) : null}
               <p className={estilos.legendaTexto}>
-                {carrossel.legenda}
-                {"\n\n"}
-                {carrossel.hashtags.join(" ")}
+                <TextoComColchetes texto={`${carrossel.legenda}\n\n${carrossel.hashtags.join(" ")}`} />
               </p>
               <Botao
                 type="button"
                 variante="secundario"
-                onClick={() => void copiarLegenda()}
+                onClick={pedirCopiarLegenda}
                 style={{ justifySelf: "start" }}
               >
                 <Copy className={estilos.icone} size={18} strokeWidth={1.75} aria-hidden="true" />
                 {copiada ? t.legendaCopiada : t.copiarLegenda}
               </Botao>
+              {confirmando === "copiar" ? (
+                <div className={estilos.confirmaColchete} role="alertdialog" aria-label={t.confirmarCopiar} data-testid="confirma-copiar">
+                  <b>{t.confirmarCopiar}</b>
+                  <div className={estilos.acoesSlide}>
+                    <Botao type="button" onClick={() => void copiarLegenda()}>
+                      {t.copiarAssimMesmo}
+                    </Botao>
+                    <Botao type="button" variante="secundario" onClick={() => setConfirmando(null)}>
+                      {t.voltarECompletar}
+                    </Botao>
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             <section className={`${estilos.cartao} ${estilos.baixar}`} aria-labelledby="t-baixar">
@@ -927,7 +1034,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
               <Botao
                 type="button"
                 className={estilos.botaoCheio}
-                onClick={() => void baixar()}
+                onClick={pedirBaixar}
                 carregando={baixando}
                 disabled={baixando}
               >
@@ -946,6 +1053,19 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                       : t.baixar(total)}
               </Botao>
               <p className={estilos.miudo}>{t.baixarAjuda(total)}</p>
+              {confirmando === "baixar" ? (
+                <div className={estilos.confirmaColchete} role="alertdialog" aria-label={t.confirmarBaixar} data-testid="confirma-baixar">
+                  <b>{t.confirmarBaixar}</b>
+                  <div className={estilos.acoesSlide}>
+                    <Botao type="button" onClick={() => void baixar()}>
+                      {t.baixarAssimMesmo}
+                    </Botao>
+                    <Botao type="button" variante="secundario" onClick={() => setConfirmando(null)}>
+                      {t.voltarECompletar}
+                    </Botao>
+                  </div>
+                </div>
+              ) : null}
               {erroDoBaixar ? (
                 <p className={estilos.erroCampo} role="alert">
                   <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />

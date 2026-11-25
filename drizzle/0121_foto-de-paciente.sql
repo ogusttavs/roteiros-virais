@@ -1,0 +1,1 @@
+ALTER TABLE "carrossel_fotos" ADD COLUMN "de_paciente" boolean DEFAULT false NOT NULL;

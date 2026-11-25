@@ -3286,6 +3286,8 @@ export const carrosselFotos = pgTable(
     tipo: text("tipo").notNull(),
     bytes: bytea("bytes").notNull(),
     tamanho: integer("tamanho").notNull(),
+    /** Foto de paciente (E65 PR 5): só em marca de saúde, mandada com a autorização escrita do paciente confirmada; só ela entra em antes e depois e em resultado, e nunca em outro tipo de slide. */
+    dePaciente: boolean("de_paciente").notNull().default(false),
     criadoEm: criadoEm(),
   },
   (t) => [index("carrossel_fotos_carrossel").on(t.carrosselId, t.ordem)],

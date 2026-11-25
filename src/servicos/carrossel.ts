@@ -9,7 +9,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { larguraDaImagem } from "@/carrossel/fotos";
 import { avisosDoMetodo, verificarCapaVaga, verificarPromessaDaCapa } from "@/carrossel/metodo";
 import { corValida, garantirLeitura } from "@/carrossel/modelos";
-import { formulasDeMaquinaDosSlides, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFoto, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
+import { formulasDeMaquinaDosSlides, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFotoDasFotos, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
 import {
   CAMPOS_DO_TIPO,
   COR_NEUTRA,
@@ -19,7 +19,9 @@ import {
   ESTADOS_DO_CARROSSEL,
   MAXIMO_DE_FOTOS,
   TAMANHOS_DO_CARROSSEL,
+  FRASE_FOTO_DE_PACIENTE_SO_NO_ANTES_E_DEPOIS,
   FRASE_SEM_AUTORIZACAO_DO_PACIENTE,
+  FRASE_SO_FOTO_DE_PACIENTE,
   TETO_DA_FOTO_BYTES,
   TIPOS_COM_FOTO_DE_PACIENTE,
   TIPOS_DE_FOTO,
@@ -87,8 +89,11 @@ export type DeOndeVem =
   | { origem: "roteiro"; roteiroId: number }
   | { origem: "noticia"; noticiaId: number };
 
-/** `fotos`: quantas fotos o cliente vai mandar para este carrossel (0 a 9); sem foto, o texto não usa capa-foto nem prova-resultado. */
-export type PedidoDeCarrossel = { quantidade: number; cor?: string; observacao?: string; fotos?: number; de: DeOndeVem };
+/**
+ * `fotos`: quantas fotos o cliente vai mandar para este carrossel (0 a 9); sem foto, o texto não usa capa-foto nem prova-resultado. Em marca de saúde, `fotos` são as comuns (o lugar, a equipe, o trabalho) e
+ * `fotosDePaciente` as de paciente, mandadas com a autorização: só estas últimas podem ir em antes e depois e em resultado (E65 PR 5).
+ */
+export type PedidoDeCarrossel = { quantidade: number; cor?: string; observacao?: string; fotos?: number; fotosDePaciente?: number; de: DeOndeVem };
 
 function tamanhoValido(n: number): TamanhoDoCarrossel {
   if (!(TAMANHOS_DO_CARROSSEL as readonly number[]).includes(n)) throw new ErroCarrossel("Escolha um carrossel de 5, 7 ou 9 slides.");
@@ -179,6 +184,8 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
   if (!perfil) throw new ErroCarrossel("Falta terminar o briefing antes de criar um carrossel.", "sem-briefing");
 
   const fotosPrometidas = Math.min(MAXIMO_DE_FOTOS, Math.max(0, Math.floor(pedido.fotos ?? 0)));
+  // Foto de paciente só existe em marca de saúde; fora dela, o que vier é ignorado e as fotos valem para qualquer tipo, como sempre.
+  const fotosDePacientePrometidas = (await marcaEhDeSaude(clienteId)) ? Math.min(MAXIMO_DE_FOTOS, Math.max(0, Math.floor(pedido.fotosDePaciente ?? 0))) : 0;
   // A cor da marca: a que a pessoa escolheu agora (e fica guardada na marca, trocável depois), a que a marca já tem, ou o neutro escuro do produto. Clara demais, escurece e avisa.
   const corEscolhida = pedido.cor ?? cliente.corMarca ?? COR_NEUTRA;
   const leitura = garantirLeitura(corEscolhida);
@@ -276,6 +283,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       noticiasDoAssunto,
       roteiroDeOrigem: origem.roteiroDeOrigem,
       quantidadeDeFotos: fotosPrometidas,
+      ...(ramoSaude ? { quantidadeDeFotosDePaciente: fotosDePacientePrometidas } : {}),
       carrosseisRecentes: recentes.map((r) => r.tema),
     }),
     fontesDosFatos,
@@ -302,7 +310,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       const slidesDeTexto = slidesDaSaida(d.slides, { ramoSaude });
       return [
         ...verificarOrdemDosSlides(slidesDeTexto, quantidade),
-        ...verificarLimitesDosSlides(slidesDeTexto, { ramoSaude, fotosPrometidas, falasDoCliente }),
+        ...verificarLimitesDosSlides(slidesDeTexto, { ramoSaude, fotosPrometidas, fotosDePacientePrometidas, falasDoCliente }),
         ...verificarLegenda(d.legenda, d.hashtags),
         // A promessa da capa, a capa vaga e as fórmulas de máquina (R-COPY-26) reprovam na 1ª tentativa e só avisam na 2ª (como o roteiro): senão brigam com a regra de "nunca três do mesmo tipo seguidos"; o aviso sai em `avisarExtra`.
         ...(tentativa === 1 ? [...verificarPromessaDaCapa(slidesDeTexto), ...verificarCapaVaga(slidesDeTexto), ...formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos)] : []),
@@ -401,16 +409,20 @@ export async function trocarSlide(clienteId: number, carrosselId: number, indice
   if (!atual) throw new ErroCarrossel("Não achei esse carrossel.", "nao-achou");
   if (!Number.isInteger(indice) || indice < 0 || indice >= atual.slides.length) throw new ErroCarrossel("Esse slide não existe.", "nao-achou");
   const fotos = await fotosDoCarrossel(clienteId, carrosselId);
-  const ids = new Set(fotos.map((f) => f.id));
+  const porId = new Map(fotos.map((f) => [f.id, f] as const));
+  const saude = await marcaEhDeSaude(clienteId);
+  const tipoDoSlide = atual.slides[indice].tipo;
   for (const id of [mudanca.fotoId, mudanca.fotoDepoisId]) {
-    if (id !== undefined && id !== null && id !== SEM_FOTO && !ids.has(id)) throw new ErroCarrossel("Essa foto não é deste carrossel.", "foto-invalida");
+    if (id === undefined || id === null || id === SEM_FOTO) continue;
+    const foto = porId.get(id);
+    if (!foto) throw new ErroCarrossel("Essa foto não é deste carrossel.", "foto-invalida");
+    // Em saúde, os dois tipos de foto nunca se misturam: antes e depois e resultado só com foto de paciente (que já foi mandada com a autorização), e os outros slides só com foto comum.
+    if (saude && foto.dePaciente !== TIPOS_COM_FOTO_DE_PACIENTE.has(tipoDoSlide)) throw new ErroCarrossel(TIPOS_COM_FOTO_DE_PACIENTE.has(tipoDoSlide) ? FRASE_SO_FOTO_DE_PACIENTE : FRASE_FOTO_DE_PACIENTE_SO_NO_ANTES_E_DEPOIS, "foto-invalida");
   }
   if (mudanca.foco !== undefined && mudanca.foco !== null && !FOCO_VALIDO.test(mudanca.foco)) throw new ErroCarrossel("O ponto da foto não é válido.");
-  const poeFoto = [mudanca.fotoId, mudanca.fotoDepoisId].some((id) => id !== undefined && id !== null && id !== SEM_FOTO);
-  if (poeFoto && TIPOS_COM_FOTO_DE_PACIENTE.has(atual.slides[indice].tipo)) await exigirAutorizacaoDoPaciente(clienteId, mudanca.autorizacaoDoPaciente);
   const slideAntes = atual.slides[indice];
   const depoisDaFoto = atual.slides.map((s, i) => (i === indice ? { ...s, fotoId: mudanca.fotoId === undefined ? s.fotoId : mudanca.fotoId, fotoDepoisId: mudanca.fotoDepoisId === undefined ? s.fotoDepoisId : mudanca.fotoDepoisId } : s));
-  const comFoto = slidesComFoto(depoisDaFoto, fotos.length)[indice];
+  const comFoto = slidesComFotoDasFotos(depoisDaFoto, fotos, saude)[indice];
   const motivos = motivosDaMudanca(slideAntes, mudanca, comFoto, nomesDosCampos);
   // Em ramo de saúde o texto trocado pela pessoa também não pode prometer resultado, cura, garantia nem prazo (R-CONF-07, o mesmo que reprova a geração).
   const textosNovos = [...Object.values(mudanca.campos ?? {}), ...(mudanca.listas?.linhas ?? []), ...(mudanca.listas?.acoes ?? [])];
@@ -470,16 +482,16 @@ export type FotoSemBytes = Omit<CarrosselFoto, "bytes">;
 
 export async function fotosDoCarrossel(clienteId: number, carrosselId: number): Promise<FotoSemBytes[]> {
   return db()
-    .select({ id: carrosselFotos.id, carrosselId: carrosselFotos.carrosselId, clienteId: carrosselFotos.clienteId, ordem: carrosselFotos.ordem, tipo: carrosselFotos.tipo, tamanho: carrosselFotos.tamanho, criadoEm: carrosselFotos.criadoEm })
+    .select({ id: carrosselFotos.id, carrosselId: carrosselFotos.carrosselId, clienteId: carrosselFotos.clienteId, ordem: carrosselFotos.ordem, tipo: carrosselFotos.tipo, tamanho: carrosselFotos.tamanho, dePaciente: carrosselFotos.dePaciente, criadoEm: carrosselFotos.criadoEm })
     .from(carrosselFotos)
     .where(and(eq(carrosselFotos.carrosselId, carrosselId), eq(carrosselFotos.clienteId, clienteId)))
     .orderBy(asc(carrosselFotos.ordem));
 }
 
 /** As fotos com os bytes, para o render. */
-export async function fotosComBytes(clienteId: number, carrosselId: number): Promise<{ id: number; tipo: string; bytes: Buffer }[]> {
+export async function fotosComBytes(clienteId: number, carrosselId: number): Promise<{ id: number; tipo: string; bytes: Buffer; dePaciente: boolean }[]> {
   return db()
-    .select({ id: carrosselFotos.id, tipo: carrosselFotos.tipo, bytes: carrosselFotos.bytes })
+    .select({ id: carrosselFotos.id, tipo: carrosselFotos.tipo, bytes: carrosselFotos.bytes, dePaciente: carrosselFotos.dePaciente })
     .from(carrosselFotos)
     .where(and(eq(carrosselFotos.carrosselId, carrosselId), eq(carrosselFotos.clienteId, clienteId)))
     .orderBy(asc(carrosselFotos.ordem));
@@ -502,11 +514,13 @@ export function tipoPelosBytes(bytes: Buffer): (typeof TIPOS_DE_FOTO)[number] | 
   return null;
 }
 
-export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer; autorizacaoDoPaciente?: boolean }): Promise<FotoSemBytes & { largura: number | null }> {
+export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer; autorizacaoDoPaciente?: boolean; dePaciente?: boolean }): Promise<FotoSemBytes & { largura: number | null }> {
   const carrossel = await carrosselDaMarca(clienteId, carrosselId);
   if (!carrossel) throw new ErroCarrossel("Não achei esse carrossel.", "nao-achou");
-  // Em marca de saúde, TODO envio de foto exige a confirmação da autorização escrita do paciente (decisão do Gustavo, E65 PR 2): uma foto mandada antes de o carrossel ter antes e depois ou resultado também vai ser posta num deles.
-  await exigirAutorizacaoDoPaciente(clienteId, arquivo.autorizacaoDoPaciente);
+  // Em marca de saúde há dois tipos de foto (E65 PR 5): a comum (o lugar, a equipe, o trabalho) entra sem autorização e nunca vai em antes e depois nem em resultado; a de paciente (`dePaciente`) só é aceita com a
+  // confirmação da autorização escrita do paciente, é gravada com a marca e só serve a esses dois tipos. Fora da saúde, `dePaciente` é ignorado.
+  const dePaciente = arquivo.dePaciente === true && (await marcaEhDeSaude(clienteId));
+  if (dePaciente) await exigirAutorizacaoDoPaciente(clienteId, arquivo.autorizacaoDoPaciente);
   if (arquivo.bytes.length === 0) throw new ErroCarrossel("A foto veio vazia.", "foto-invalida");
   if (arquivo.bytes.length > TETO_DA_FOTO_BYTES) throw new ErroCarrossel(`A foto passa de ${Math.round(TETO_DA_FOTO_BYTES / 1024 / 1024)} MB. Mande uma menor.`, "foto-invalida");
   const tipo = tipoPelosBytes(arquivo.bytes);
@@ -521,8 +535,8 @@ export async function enviarFoto(clienteId: number, carrosselId: number, arquivo
     if (total >= MAXIMO_DE_FOTOS) return null;
     const [nova] = await tx
       .insert(carrosselFotos)
-      .values({ carrosselId, clienteId, ordem: ultima + 1, tipo, bytes: arquivo.bytes, tamanho: arquivo.bytes.length })
-      .returning({ id: carrosselFotos.id, carrosselId: carrosselFotos.carrosselId, clienteId: carrosselFotos.clienteId, ordem: carrosselFotos.ordem, tipo: carrosselFotos.tipo, tamanho: carrosselFotos.tamanho, criadoEm: carrosselFotos.criadoEm });
+      .values({ carrosselId, clienteId, ordem: ultima + 1, tipo, bytes: arquivo.bytes, tamanho: arquivo.bytes.length, dePaciente })
+      .returning({ id: carrosselFotos.id, carrosselId: carrosselFotos.carrosselId, clienteId: carrosselFotos.clienteId, ordem: carrosselFotos.ordem, tipo: carrosselFotos.tipo, tamanho: carrosselFotos.tamanho, dePaciente: carrosselFotos.dePaciente, criadoEm: carrosselFotos.criadoEm });
     return nova;
   });
   if (!linha) throw new ErroCarrossel(`Cada carrossel leva até ${MAXIMO_DE_FOTOS} fotos.`, "limite-de-fotos");

@@ -1,24 +1,34 @@
 /**
  * E65 PR 2: a distribuição das fotos pelos slides, pura e leve (sem navegador), para o servidor, o render e a tela usarem a mesma conta.
  */
-import { SEM_FOTO, TIPOS_COM_FOTO, type SlideDoCarrossel } from "@/config/carrossel";
+import { SEM_FOTO, TIPOS_COM_FOTO, TIPOS_COM_FOTO_DE_PACIENTE, type SlideDoCarrossel } from "@/config/carrossel";
 
 /**
  * Qual foto vai em qual slide: a que o slide aponta (`fotoId`), e, sem apontar, as fotos que sobraram na ordem em que foram enviadas, só nos tipos que aceitam foto (o antes e depois leva duas).
+ * Com `separarPaciente` (marca de saúde, E65 PR 5), os dois tipos de foto nunca se misturam: antes e depois e resultado só recebem foto de paciente (`dePaciente`), e os demais tipos só recebem foto comum,
+ * tanto na distribuição automática quanto numa foto que o slide aponta. Fora da saúde, uma foto só vale para qualquer tipo, como sempre.
  * Pura: o teste prova a distribuição sem navegador.
  */
-export function distribuirFotos(slides: SlideDoCarrossel[], fotosEmOrdem: { id: number }[]): { foto: number | null; fotoDepois: number | null }[] {
-  const existentes = new Set(fotosEmOrdem.map((f) => f.id));
+export function distribuirFotos(slides: SlideDoCarrossel[], fotosEmOrdem: { id: number; dePaciente?: boolean }[], separarPaciente = false): { foto: number | null; fotoDepois: number | null }[] {
+  const porId = new Map(fotosEmOrdem.map((f) => [f.id, f] as const));
+  const serve = (id: number | null | undefined, tipo: SlideDoCarrossel["tipo"]): id is number => {
+    const f = id ? porId.get(id) : undefined;
+    return Boolean(f) && (!separarPaciente || (f!.dePaciente === true) === TIPOS_COM_FOTO_DE_PACIENTE.has(tipo));
+  };
   const apontadas = new Set<number>();
   for (const s of slides) {
-    if (s.fotoId && existentes.has(s.fotoId)) apontadas.add(s.fotoId);
-    if (s.fotoDepoisId && existentes.has(s.fotoDepoisId)) apontadas.add(s.fotoDepoisId);
+    if (serve(s.fotoId, s.tipo)) apontadas.add(s.fotoId);
+    if (serve(s.fotoDepoisId, s.tipo)) apontadas.add(s.fotoDepoisId);
   }
-  const livres = fotosEmOrdem.filter((f) => !apontadas.has(f.id)).map((f) => f.id);
+  const livres = fotosEmOrdem.filter((f) => !apontadas.has(f.id));
+  const proxima = (tipo: SlideDoCarrossel["tipo"]): number | null => {
+    const i = livres.findIndex((f) => !separarPaciente || (f.dePaciente === true) === TIPOS_COM_FOTO_DE_PACIENTE.has(tipo));
+    return i < 0 ? null : livres.splice(i, 1)[0].id;
+  };
   return slides.map((s) => {
     if (!TIPOS_COM_FOTO.has(s.tipo)) return { foto: null, fotoDepois: null };
-    const foto = s.fotoId === SEM_FOTO ? null : s.fotoId && existentes.has(s.fotoId) ? s.fotoId : (livres.shift() ?? null);
-    const fotoDepois = s.tipo !== "antes-depois" || s.fotoDepoisId === SEM_FOTO ? null : s.fotoDepoisId && existentes.has(s.fotoDepoisId) ? s.fotoDepoisId : (livres.shift() ?? null);
+    const foto = s.fotoId === SEM_FOTO ? null : serve(s.fotoId, s.tipo) ? s.fotoId : proxima(s.tipo);
+    const fotoDepois = s.tipo !== "antes-depois" || s.fotoDepoisId === SEM_FOTO ? null : serve(s.fotoDepoisId, s.tipo) ? s.fotoDepoisId : proxima(s.tipo);
     return { foto, fotoDepois };
   });
 }

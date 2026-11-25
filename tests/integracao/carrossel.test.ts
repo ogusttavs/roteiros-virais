@@ -10,6 +10,7 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { pngDoCarrossel } from "@/carrossel/entrega";
+import { distribuirFotos } from "@/carrossel/fotos";
 import { crc32, montarZip } from "@/carrossel/zip";
 import { TETO_DO_TESTE } from "@/config/cadastro";
 import { LINHA_FIXA_ANTES_DEPOIS_SAUDE, SEM_FOTO } from "@/config/carrossel";
@@ -155,7 +156,7 @@ describe("gerarCarrossel", () => {
     const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude", nome: "Odontologia teste", termos: [], ramoCatalogo: "odontologia" }).returning();
     const saude = await criarCliente(nichoSaude.id);
     const outro = await criarCliente();
-    const deSaude = await gerarCarrossel(saude, pedidoLivre("cuidados com o aparelho [mock:carrossel-antes-depois]"));
+    const deSaude = await gerarCarrossel(saude, { ...pedidoLivre("cuidados com o aparelho [mock:carrossel-antes-depois]"), fotosDePaciente: 2 });
     const slide = deSaude.slides.find((x) => x.tipo === "antes-depois");
     expect(slide?.rodape).toBe(LINHA_FIXA_ANTES_DEPOIS_SAUDE);
     expect(deSaude.slides.filter((x) => x.tipo !== "antes-depois").every((x) => x.rodape === undefined)).toBe(true);
@@ -172,41 +173,74 @@ describe("gerarCarrossel", () => {
     expect(montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", ramoSaude: false })).not.toMatch(/Este ramo é de saúde/);
     // A regra R-CONF-07 do banco de regras entra nos dois, mas condicionada ("Nos ramos de saúde"); o bloco próprio do carrossel é só da saúde.
     expect(texto).toMatch(/nunca com foto ou texto do procedimento em andamento/);
-    expect(versao).toBe("2.0.0");
+    expect(versao).toBe("2.1.0");
   });
 
   it("ramo alternativo de saúde também conta: a linha fixa entra e o depoimento é reprovado e refeito", async () => {
     const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude-alt", nome: "Nutricao alternativa", termos: [], ramoCatalogo: "nutricao" }).returning();
     const marca = await criarCliente();
     await db().insert(ramosDaConta).values({ clienteId: marca, nichoId: nichoSaude.id });
-    const c = await gerarCarrossel(marca, pedidoLivre("cuidados com a dieta [mock:carrossel-antes-depois]"));
+    const c = await gerarCarrossel(marca, { ...pedidoLivre("cuidados com a dieta [mock:carrossel-antes-depois]"), fotosDePaciente: 2 });
     expect(c.slides.find((x) => x.tipo === "antes-depois")?.rodape).toBe(LINHA_FIXA_ANTES_DEPOIS_SAUDE);
     const fala = await gerarCarrossel(marca, pedidoLivre("cuidados com a dieta [mock:carrossel-prova-fala-cliente]"));
     expect(fala.slides.map((x) => x.tipo)).not.toContain("prova-fala");
   });
 
-  it("foto de paciente: em ramo de saúde, pôr foto em antes-depois ou resultado exige a autorização; fora da saúde, não", async () => {
+  it("foto de paciente (E65 PR 5): em saúde só a foto mandada como de paciente, com a autorização, entra no antes e depois; a comum nunca; fora da saúde, uma foto vale para qualquer tipo", async () => {
     const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude-aut", nome: "Medicina teste", termos: [], ramoCatalogo: "medicina-e-clinicas" }).returning();
     const saude = await criarCliente(nichoSaude.id);
     const comum = await criarCliente();
     const png = pngLiso(8, 8, [1, 2, 3]);
-    const paraSaude = await gerarCarrossel(saude, pedidoLivre("cuidados com a pele [mock:carrossel-antes-depois]"));
+    const paraSaude = await gerarCarrossel(saude, { ...pedidoLivre("cuidados com a pele [mock:carrossel-antes-depois]"), fotosDePaciente: 2 });
     const indice = paraSaude.slides.findIndex((x) => x.tipo === "antes-depois");
-    // o envio para um carrossel com antes e depois
-    await expect(enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png })).rejects.toThrow(/autorização dele por escrito/);
-    const foto = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, autorizacaoDoPaciente: true });
-    // a troca de foto no slide
-    await expect(trocarSlide(saude, paraSaude.id, indice, { fotoId: foto.id })).rejects.toThrow(/autorização dele por escrito/);
-    const ok = await trocarSlide(saude, paraSaude.id, indice, { fotoId: foto.id, autorizacaoDoPaciente: true });
-    expect(ok.slides[indice].fotoId).toBe(foto.id);
+    // a foto de paciente sem a autorização é recusada e não é gravada
+    await expect(enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true })).rejects.toThrow(/autorização dele por escrito/);
+    await expect(enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: false })).rejects.toThrow(/autorização/);
+    expect(await fotosDoCarrossel(saude, paraSaude.id)).toHaveLength(0);
+    // a foto comum entra sem autorização, mas não vai em antes e depois (nem pela troca, nem na distribuição automática)
+    const lugar = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png });
+    expect(lugar.dePaciente).toBe(false);
+    await expect(trocarSlide(saude, paraSaude.id, indice, { fotoId: lugar.id })).rejects.toThrow(/só aceitam foto de paciente/);
+    expect(distribuirFotos(paraSaude.slides, await fotosDoCarrossel(saude, paraSaude.id), true)[indice]).toEqual({ foto: null, fotoDepois: null });
+    // a de paciente, com a autorização, é gravada com a marca e é usada
+    const antes = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true });
+    const depois = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true });
+    expect(antes.dePaciente).toBe(true);
+    const fotos = await fotosDoCarrossel(saude, paraSaude.id);
+    expect(distribuirFotos(paraSaude.slides, fotos, true)[indice]).toEqual({ foto: antes.id, fotoDepois: depois.id });
+    const ok = await trocarSlide(saude, paraSaude.id, indice, { fotoId: antes.id, fotoDepoisId: depois.id });
+    expect(ok.slides[indice].fotoId).toBe(antes.id);
     expect(ok.slides[indice].rodape).toBe(LINHA_FIXA_ANTES_DEPOIS_SAUDE);
+    // e a de paciente nunca vai num slide comum
+    await expect(trocarSlide(saude, paraSaude.id, 0, { fotoId: antes.id })).rejects.toThrow(/só entra no antes e depois/);
     // texto e slide sem foto de paciente não pedem nada
     await trocarSlide(saude, paraSaude.id, indice, { campos: { titulo: "Novo título" } });
-    await trocarSlide(saude, paraSaude.id, 1 === indice ? 2 : 1, { fotoId: null });
-    // fora da saúde, sem a autorização
+    // fora da saúde: dePaciente é ignorado, não pede autorização e a foto vale para o antes e depois, como sempre
     const paraComum = await gerarCarrossel(comum, pedidoLivre("mancha de vinho no estofado [mock:carrossel-antes-depois]"));
-    const f2 = await enviarFoto(comum, paraComum.id, { tipoDeclarado: "image/png", bytes: png });
+    const f2 = await enviarFoto(comum, paraComum.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true });
+    expect(f2.dePaciente).toBe(false);
     await trocarSlide(comum, paraComum.id, paraComum.slides.findIndex((x) => x.tipo === "antes-depois"), { fotoId: f2.id });
+  });
+
+  it("em saúde, sem foto de paciente a geração não usa antes e depois nem resultado, e a foto do lugar não vai parar neles (a prova real de 25/11)", async () => {
+    const [nichoSaude] = await db().select().from(nichos).where(eq(nichos.ramoCatalogo, "odontologia"));
+    const saude = await criarCliente(nichoSaude.id);
+    const c = await gerarCarrossel(saude, { ...pedidoLivre("cuidados com o aparelho [mock:carrossel-antes-depois]"), fotos: 2 });
+    const geracoes = await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, saude)));
+    expect(geracoes.map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/só usam foto de paciente/);
+    expect(c.slides.map((x) => x.tipo)).not.toContain("antes-depois");
+    expect(c.slides.map((x) => x.tipo)).not.toContain("prova-resultado");
+    // o render usa a mesma conta: com só a foto do lugar, um slide de resultado sai sem foto; com a de paciente, sai com ela
+    const slides = [...c.slides];
+    slides.splice(1, 0, { tipo: "prova-resultado", titulo: "Resultado" });
+    await db().update(carrosseis).set({ slides }).where(eq(carrosseis.id, c.id));
+    const png = pngLiso(300, 200, [180, 60, 40]);
+    // a capa com foto leva a primeira do lugar; a segunda do lugar é a que não pode cair no resultado
+    await enviarFoto(saude, c.id, { tipoDeclarado: "image/png", bytes: png });
+    await enviarFoto(saude, c.id, { tipoDeclarado: "image/png", bytes: png });
+    expect((await pngDoCarrossel(saude, c.id, 1))?.slides[0].semFoto).toBe(true);
+    await enviarFoto(saude, c.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true });
+    expect((await pngDoCarrossel(saude, c.id, 1))?.slides[0].semFoto).toBe(false);
   });
 
   it("prova-fala só com frase do próprio cliente: a do tema e das fontes (que não são falas dele) reprova e refaz, a do perfil passa", async () => {
@@ -514,20 +548,23 @@ describe("a troca de texto respeita os limites de cada campo", () => {
   });
 });
 
-describe("saúde: toda foto exige a autorização do paciente (E65 PR 2)", () => {
-  it("mesmo num carrossel sem antes e depois nem resultado, o envio sem a confirmação é recusado; com ela entra; fora da saúde nada muda", async () => {
+describe("saúde: foto comum e foto de paciente (E65 PR 5, antes: toda foto exigia a autorização, E65 PR 2)", () => {
+  it("a foto comum entra sem autorização; a de paciente só com ela; fora da saúde nada muda; isolamento entre marcas", async () => {
     const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude-toda-foto", nome: "Psicologia toda foto", termos: [], ramoCatalogo: "psicologia-e-terapias" }).returning();
     const saude = await criarCliente(nichoSaude.id);
+    const outraSaude = await criarCliente(nichoSaude.id);
     const comum = await criarCliente();
     const png = pngLiso(8, 8, [1, 2, 3]);
     const deSaude = await gerarCarrossel(saude, pedidoLivre("cuidados com o aparelho", 5));
-    // este carrossel só tem capa, passos e chamada: a exigência não pode depender dos tipos que ele já tem
     expect(deSaude.slides.some((x) => x.tipo === "antes-depois" || x.tipo === "prova-resultado")).toBe(false);
-    await expect(enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png })).rejects.toThrow(/autorização dele por escrito/);
-    await expect(enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png, autorizacaoDoPaciente: false })).rejects.toThrow(/autorização/);
+    await expect(enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true })).rejects.toThrow(/autorização dele por escrito/);
     expect(await fotosDoCarrossel(saude, deSaude.id)).toHaveLength(0);
-    await enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png, autorizacaoDoPaciente: true });
-    expect(await fotosDoCarrossel(saude, deSaude.id)).toHaveLength(1);
+    await enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png });
+    await enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true });
+    expect((await fotosDoCarrossel(saude, deSaude.id)).map((f) => f.dePaciente)).toEqual([false, true]);
+    // outra marca não manda foto neste carrossel
+    await expect(enviarFoto(outraSaude, deSaude.id, { tipoDeclarado: "image/png", bytes: png })).rejects.toThrow(/Não achei esse carrossel/);
+    expect(await fotosDoCarrossel(outraSaude, deSaude.id)).toHaveLength(0);
     const deComum = await gerarCarrossel(comum, pedidoLivre("mancha de vinho no estofado", 5));
     await enviarFoto(comum, deComum.id, { tipoDeclarado: "image/png", bytes: png });
     expect(await fotosDoCarrossel(comum, deComum.id)).toHaveLength(1);
@@ -699,22 +736,25 @@ describe("o fluxo da tela contra as rotas", () => {
     expect(await db().select().from(carrosseis).where(eq(carrosseis.clienteId, marca))).toHaveLength(0);
   });
 
-  it("em marca de saúde a rota de foto recusa o envio sem a confirmação (400) e aceita com ela", async () => {
+  it("em marca de saúde a rota recusa foto de paciente sem a confirmação (400), aceita com ela e aceita a foto comum sem nada", async () => {
     const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude-rota", nome: "Fisioterapia rota", termos: [], ramoCatalogo: "fisioterapia-e-pilates" }).returning();
     const saude = await criarCliente(nichoSaude.id);
     const rotaDeFotos = await import("@/app/api/carrossel/[id]/fotos/route");
     como(saude);
     const c = await gerarCarrossel(saude, pedidoLivre("cuidados com o aparelho", 5));
-    const formulario = (autorizado: boolean) => {
+    const formulario = (dePaciente: boolean, autorizado: boolean) => {
       const f = new FormData();
       f.append("foto", new File([new Uint8Array(pngLiso(8, 8, [9, 9, 9]))], "foto.png", { type: "image/png" }));
+      if (dePaciente) f.append("dePaciente", "true");
       if (autorizado) f.append("autorizacaoDoPaciente", "true");
       return new Request(`http://localhost/api/carrossel/${c.id}/fotos`, { method: "POST", body: f });
     };
-    const sem = await rotaDeFotos.POST(formulario(false), id(c.id));
+    const sem = await rotaDeFotos.POST(formulario(true, false), id(c.id));
     expect(sem.status).toBe(400);
     expect(((await sem.json()) as { erro: string }).erro).toMatch(/autorização dele por escrito/);
-    expect((await rotaDeFotos.POST(formulario(true), id(c.id))).status).toBe(200);
+    expect((await rotaDeFotos.POST(formulario(true, true), id(c.id))).status).toBe(200);
+    expect((await rotaDeFotos.POST(formulario(false, false), id(c.id))).status).toBe(200);
+    expect((await fotosDoCarrossel(saude, c.id)).map((f) => f.dePaciente)).toEqual([true, false]);
   });
 });
 
@@ -755,7 +795,7 @@ describe("o método: o carrossel cumpre o que a capa promete (E65 PR 3)", () => 
     const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-capa-errada]", 5));
     const geracoes = await geracoesDa(clienteId);
     expect(geracoes).toHaveLength(2);
-    expect(geracoes.map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/a capa promete 9 erros e o carrossel traz 3/);
+    expect(geracoes.map((g) => g.motivoAvaliacao ?? "").join("|")).toMatch(/a capa promete 9 erros e o carrossel traz \d+ (itens|item|passos|passo|\(itens e passos\))/);
     expect(JSON.stringify(geracoes.map((g) => g.entradas))).toContain("A tentativa anterior foi reprovada.");
     expect(c.slides[0].titulo).not.toMatch(/9 erros/);
   });

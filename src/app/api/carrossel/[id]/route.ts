@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { distribuirFotos } from "@/carrossel/fotos";
-import { slidesComFoto } from "@/carrossel/regras";
+import { slidesComFotoDasFotos } from "@/carrossel/regras";
 import { idDoParametro, marcaDoCarrossel, respostaDeErro, respostaDoErroDoCarrossel, SEM_CACHE } from "@/lib/porta-do-carrossel";
 import { recusaDaCobranca } from "@/lib/portao-cobranca";
-import { carrosselDaMarca, fotosDoCarrossel, trocarCor, trocarSlide } from "@/servicos/carrossel";
+import { carrosselDaMarca, fotosDoCarrossel, marcaEhDeSaude, trocarCor, trocarSlide } from "@/servicos/carrossel";
 import { textosCarrossel } from "@/textos/carrossel";
 
 export const dynamic = "force-dynamic";
@@ -19,9 +19,10 @@ export async function GET(_request: Request, contexto: { params: Promise<{ id: s
   const carrossel = id === null ? null : await carrosselDaMarca(marca.clienteId, id);
   if (!carrossel) return respostaDeErro("nao encontrado", 404);
   const fotos = await fotosDoCarrossel(marca.clienteId, carrossel.id);
+  const saude = await marcaEhDeSaude(marca.clienteId);
   // Quais fotos caem em quais slides (a mesma conta do render): a tela mostra a foto de cada slide e usa o limite menor nos que levam foto.
-  const fotosDosSlides = distribuirFotos(carrossel.slides, fotos);
-  return NextResponse.json({ carrossel, fotos, fotosDosSlides, slidesComFoto: slidesComFoto(carrossel.slides, fotos.length) }, { headers: SEM_CACHE });
+  const fotosDosSlides = distribuirFotos(carrossel.slides, fotos, saude);
+  return NextResponse.json({ carrossel, fotos, fotosDosSlides, slidesComFoto: slidesComFotoDasFotos(carrossel.slides, fotos, saude) }, { headers: SEM_CACHE });
 }
 
 const CHAVES_DE_TEXTO = ["rotulo", "titulo", "sub", "texto", "antes", "depois", "valor", "unidade", "frase", "fonte", "referencia", "citacao", "quem", "contexto", "veiculo", "data"] as const;

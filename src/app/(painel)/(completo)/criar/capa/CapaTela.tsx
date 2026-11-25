@@ -4,6 +4,7 @@ import { ArrowLeft, Check, CircleAlert, Copy, Download, Pencil, Plus, RefreshCw,
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { slidesComColchete, temColchete } from "@/carrossel/colchetes";
 import { CAMPOS_DO_TIPO, TETO_DA_FOTO_BYTES } from "@/config/carrossel";
 import { textosCapa as t } from "@/textos/capa-noticia";
 import { textosCarrossel as tc } from "@/textos/carrossel";
@@ -11,6 +12,7 @@ import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { Botao } from "@/ui/componentes/Botao";
 
 import estilos from "../carrossel/CarrosselTela.module.css";
+import { TextoComColchetes } from "../carrossel/TextoComColchetes";
 import { ErroDaRota, pedir, type DadosDoCarrossel, type PreviaDoSlide } from "../carrossel/tipos";
 
 type Fase = "abrindo" | "erroAoAbrir" | "titulos" | "escolher" | "montando" | "pronto" | "erro" | "limite";
@@ -69,6 +71,8 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
   const [tituloNovo, setTituloNovo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [copiada, setCopiada] = useState(false);
+  /** O espaço para completar (trecho entre colchetes) ainda está na legenda ou na imagem: antes de copiar ou baixar, a tela pergunta. */
+  const [confirmando, setConfirmando] = useState<"copiar" | "baixar" | null>(null);
   const [baixando, setBaixando] = useState(false);
   const [arquivoParaCompartilhar, setArquivoParaCompartilhar] = useState<File | null>(null);
   const entradaDeFoto = useRef<HTMLInputElement>(null);
@@ -249,8 +253,22 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
     }
   }
 
+  const imagemParaCompletar = capa ? slidesComColchete(capa.slides).length > 0 : false;
+  const legendaParaCompletar = capa ? temColchete(capa.legenda) : false;
+
+  function pedirCopiarLegenda() {
+    if (legendaParaCompletar) setConfirmando("copiar");
+    else void copiarLegenda();
+  }
+
+  function pedirBaixar() {
+    if (imagemParaCompletar && !arquivoParaCompartilhar) setConfirmando("baixar");
+    else void baixar();
+  }
+
   async function copiarLegenda() {
     if (!capa) return;
+    setConfirmando(null);
     try {
       await navigator.clipboard.writeText(capa.legenda);
       setCopiada(true);
@@ -266,6 +284,7 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
 
   async function baixar() {
     if (!capa) return;
+    setConfirmando(null);
     if (arquivoParaCompartilhar) {
       try {
         await navigator.share({ files: [arquivoParaCompartilhar] });
@@ -574,6 +593,18 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
               {aviso}
             </p>
           ) : null}
+          {imagemParaCompletar ? (
+            <p className={estilos.avisoColchete} role="alert" data-testid="aviso-colchetes">
+              <b>{t.completarImagem}</b>
+              <span>
+                {slidesComColchete(capa.slides).flatMap((x) => x.trechos).map((trecho, k) => (
+                  <mark key={k} className={estilos.colchete}>
+                    {trecho}
+                  </mark>
+                ))}
+              </span>
+            </p>
+          ) : null}
 
           <div className={estilos.faixa} role="group" aria-label={t.capaAria}>
             <div className={estilos.miniItem}>
@@ -649,23 +680,56 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
               <span className={estilos.rotulo} id="c-legenda">
                 {t.legendaRotulo}
               </span>
-              <p className={estilos.legendaTexto}>{capa.legenda}</p>
+              {legendaParaCompletar ? (
+                <p className={estilos.avisoColchete} role="note" data-testid="colchetes-da-legenda">
+                  <b>{t.completarLegenda}</b>
+                </p>
+              ) : null}
+              <p className={estilos.legendaTexto}>
+                <TextoComColchetes texto={capa.legenda} />
+              </p>
               <p className={estilos.miudo}>{t.legendaAjuda}</p>
-              <Botao type="button" variante="secundario" onClick={() => void copiarLegenda()} style={{ justifySelf: "start" }}>
+              <Botao type="button" variante="secundario" onClick={pedirCopiarLegenda} style={{ justifySelf: "start" }}>
                 <Copy className={estilos.icone} size={18} strokeWidth={1.75} aria-hidden="true" />
                 {copiada ? t.legendaCopiada : t.copiarLegenda}
               </Botao>
+              {confirmando === "copiar" ? (
+                <div className={estilos.confirmaColchete} role="alertdialog" aria-label={t.confirmarCopiar} data-testid="confirma-copiar">
+                  <b>{t.confirmarCopiar}</b>
+                  <div className={estilos.acoesSlide}>
+                    <Botao type="button" onClick={() => void copiarLegenda()}>
+                      {t.copiarAssimMesmo}
+                    </Botao>
+                    <Botao type="button" variante="secundario" onClick={() => setConfirmando(null)}>
+                      {t.voltarECompletar}
+                    </Botao>
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             <section className={`${estilos.cartao} ${estilos.baixar}`} aria-labelledby="c-baixar">
               <span className={estilos.rotulo} id="c-baixar">
                 {tc.paraPostar}
               </span>
-              <Botao type="button" className={estilos.botaoCheio} onClick={() => void baixar()} carregando={baixando} disabled={baixando}>
+              <Botao type="button" className={estilos.botaoCheio} onClick={pedirBaixar} carregando={baixando} disabled={baixando}>
                 <Download className={estilos.icone} size={18} strokeWidth={1.75} aria-hidden="true" />
                 {baixando ? t.baixando : arquivoParaCompartilhar ? t.salvarNoCelular : compartilhaArquivos ? t.prepararParaCelular : t.baixar}
               </Botao>
               <p className={estilos.miudo}>{t.baixarAjuda}</p>
+              {confirmando === "baixar" ? (
+                <div className={estilos.confirmaColchete} role="alertdialog" aria-label={t.confirmarBaixar} data-testid="confirma-baixar">
+                  <b>{t.confirmarBaixar}</b>
+                  <div className={estilos.acoesSlide}>
+                    <Botao type="button" onClick={() => void baixar()}>
+                      {t.baixarAssimMesmo}
+                    </Botao>
+                    <Botao type="button" variante="secundario" onClick={() => setConfirmando(null)}>
+                      {t.voltarECompletar}
+                    </Botao>
+                  </div>
+                </div>
+              ) : null}
               <button type="button" className={estilos.textoBotao} onClick={fazerOutra}>
                 {t.fazerOutra}
               </button>
