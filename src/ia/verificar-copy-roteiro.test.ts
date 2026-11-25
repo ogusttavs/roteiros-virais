@@ -132,6 +132,24 @@ describe("R-CONF-07: ramo de saúde", () => {
   it("'curar' não pega 'curado' nem 'procura'", () => {
     expect(com(reprovam({ ramoSaude: true, corpo: BOM.corpo + " Quem procura um dentista de confiança já chega melhor." }), "R-CONF-07")).toBe(false);
   });
+  it("conselho: preço em reais reprova em saúde, no gancho, no corpo e na chamada", () => {
+    expect(com(reprovam({ ramoSaude: true, gancho: "Limpeza por R$ 150 só esta semana." }), "R-CONF-07")).toBe(true);
+    expect(com(reprovam({ ramoSaude: true, corpo: BOM.corpo + " A consulta custa 150 reais." }), "R-CONF-07")).toBe(true);
+    expect(com(reprovam({ ramoSaude: true, chamadaFinal: "Clareamento a R$99, chame no WhatsApp." }), "R-CONF-07")).toBe(true);
+  });
+  it("conselho: serviço grátis reprova em saúde, mesmo com a ficha dizendo grátis", () => {
+    expect(com(reprovam({ ramoSaude: true, chamadaFinal: "Agende sua avaliação gratuita." }), "R-CONF-07")).toBe(true);
+    expect(com(reprovam({ ramoSaude: true, corpo: BOM.corpo + " A primeira consulta é sem custo." }), "R-CONF-07")).toBe(true);
+    expect(com(reprovam({ ramoSaude: true, corpo: BOM.corpo + " Aqui a limpeza é de graça.", fontes: "perfil: avaliação grátis" }), "R-CONF-07")).toBe(true);
+  });
+  it("conselho: desconto e chamar para agendar uma avaliação passam em saúde", () => {
+    expect(com(reprovam({ ramoSaude: true, corpo: BOM.corpo + " Neste mês tem 10% de desconto no clareamento." }), "R-CONF-07")).toBe(false);
+    expect(com(reprovam({ ramoSaude: true, chamadaFinal: "Agende sua avaliação pelo WhatsApp." }), "R-CONF-07")).toBe(false);
+  });
+  it("fora da saúde preço e 'sem custo' não caem na R-CONF-07", () => {
+    expect(com(reprovam({ ramoSaude: false, gancho: "Limpeza por R$ 150 só esta semana." }), "R-CONF-07")).toBe(false);
+    expect(com(reprovam({ ramoSaude: false, corpo: BOM.corpo + " A primeira visita é sem custo.", fontes: "perfil: visita sem custo" }), "R-CONF-07")).toBe(false);
+  });
 });
 
 describe("R-CONF-09: palavrão", () => {

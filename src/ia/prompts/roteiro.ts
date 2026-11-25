@@ -320,10 +320,13 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * título do bloco diz que ela manda no assunto e no público. Sem foco confirmado o bloco é o da 2.23.0, palavra por palavra, fora o título. O schema de saída não muda.
  */
 /**
+ * 2.26.0 (25/11/2026, decisão do Gustavo "faz o que o conselho falou"): a regra dura 1 ganha, para os ramos de saúde, a cena que prova (consultório, equipe, equipamento, explicação, resultado final com autorização) e proíbe sugerir gravar o procedimento em andamento. A `R-CONF-07` das regras 1.4.0 passa a proibir preço e serviço grátis em saúde. O schema não muda. Precisa de prova com chave real.
+ */
+/**
  * 2.25.0 (onda 1 de texto, 25/11/2026): o bloco de regras de texto (`regras-copy-roteiro-uso.ts`, gerado da seção 11 das rubricas 1.3.0) ganha `R-COPY-26` (nenhuma fórmula de texto de máquina) e `R-COPY-27`
  * (o título e o gancho têm um elemento só desta marca ou deste ramo), e `R-COPY-19` passa a pedir o contraste só com os dois lados em fatos. O schema de saída não muda. Precisa de prova com chave real.
  */
-export const versao = "2.25.0";
+export const versao = "2.26.0";
 
 /**
  * E59: o bloco da entrada que liga a prova visual com imagem de outro (`R-ROTEIRO-20`). Só entra quando `motivosDaProvaVisualDeOutro` devolve algum motivo; sem motivo, nada entra e a regra do sistema
@@ -627,7 +630,10 @@ gravar com a própria cara no celular. Regras duras:
 
 1. Todo roteiro diz onde gravar e o que mostrar, usando as cenas que o cliente disse que a
    câmera pode ver. Fala direta para a câmera em frente a uma parede lisa só é aceita se o
-   próprio roteiro justificar por que nenhuma cena real cabe ali.
+   próprio roteiro justificar por que nenhuma cena real cabe ali. Em ramo de saúde (dentista,
+   médico, estética clínica, veterinário), a cena que prova é o consultório, a equipe, o
+   equipamento, a explicação e o resultado final com a autorização do paciente; nunca grave
+   nem sugira gravar o procedimento em andamento num paciente (R-CONF-07).
 2. O roteiro cita a evidência (ids de vídeo do banco) que sustenta o tema e a estrutura. Sem
    evidência, diga isso e não invente.
 3. O roteiro usa frases que o cliente disse de verdade (estão no perfil) e nunca fere uma

@@ -149,10 +149,21 @@ const PALAVRAS_DE_SAUDE = COM_FRONTEIRA([
   "diagnostico (a distancia|online|por (whatsapp|zap|direct|mensagem|video|foto|chat)|pelo (whatsapp|zap|direct|celular|video|chat)|pela (foto|internet))",
 ]);
 
-/** R-CONF-07 (gancho, corpo, chamada), só nos ramos de saúde. */
+/** Preço em reais: "R$ 150", "150 reais", "150,00 reais". Desconto em porcentagem não entra. */
+const PRECO_EM_REAIS = /(^|[^a-z0-9])(r\$ ?[0-9]|[0-9][0-9.,]* reais)/;
+
+/** Serviço grátis em saúde: as palavras da R-CONF-03 mais "de graça". */
+const GRATIS_EM_SAUDE = COM_FRONTEIRA(["gratis", "gratuito", "gratuita", "gratuitos", "gratuitas", "sem custo", "de graca"]);
+
+/** R-CONF-07 (gancho, corpo, chamada), só nos ramos de saúde: cura e garantia, preço em reais e serviço grátis (conselho de odontologia, 25/11/2026). */
 function confSaude(e: EntradaCopyRoteiro): string | null {
   if (!e.ramoSaude) return null;
-  const achado = achar(`${e.gancho} ${e.corpo} ${e.chamadaFinal}`, PALAVRAS_DE_SAUDE);
+  const texto = `${e.gancho} ${e.corpo} ${e.chamadaFinal}`;
+  const preco = achar(texto, PRECO_EM_REAIS);
+  if (preco) return `R-CONF-07: em ramo de saúde o conselho de odontologia e saúde proíbe preço no anúncio; tire "${preco.replace(/^[^a-z0-9]+/, "")}" (desconto pode)`;
+  const gratis = achar(texto, GRATIS_EM_SAUDE);
+  if (gratis) return `R-CONF-07: em ramo de saúde o conselho de odontologia e saúde proíbe serviço grátis; tire "${gratis.replace(/^[^a-z]+/, "")}" (agendar uma avaliação pode)`;
+  const achado = achar(texto, PALAVRAS_DE_SAUDE);
   if (!achado) return null;
   return `R-CONF-07: em ramo de saúde o roteiro não promete cura, resultado garantido nem diagnóstico à distância; tire "${achado.replace(/^[^a-z0-9]+/, "")}"`;
 }
