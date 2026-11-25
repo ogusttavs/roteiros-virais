@@ -266,6 +266,7 @@ export const ESTILO_DOS_SLIDES = `
    capa de notícia no modo claro. Ordem no HTML: foto, topo, corpo, pé. */
 .slide.foto-topo { grid-template-rows: 620px auto minmax(0, 1fr) auto; padding-top: 0; gap: 36px; }
 .slide.foto-topo .s-foto.topo { margin: 0 calc(var(--s-margem) * -1); border-radius: 0; }
+.slide.foto-topo .s-foto.topo.cor-cheia { background: var(--marca); }
 .slide.foto-topo .s-corpo { justify-content: flex-start; gap: 24px; }
 .slide.foto-topo .s-titulo-capa { font-size: 84px; line-height: 1.04; }
 .slide.foto-topo.ajustado .s-titulo-capa { font-size: 72px; }

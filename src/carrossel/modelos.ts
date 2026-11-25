@@ -323,6 +323,8 @@ function miolo(d: DadosDoModelo, tipo: TipoDeSlide, fotoTopo: boolean): string {
     case "noticia": {
       const alto = topo("Notícia", `<span class="s-data">${esc(s.data ?? "")}</span>`);
       const dentro = `<h1 class="s-titulo-capa">${esc(s.titulo)}</h1><p class="s-de-onde"><b>Fonte: ${esc(s.veiculo ?? "")}</b>, ${esc(s.data ?? "")}</p>`;
+      // Sem foto (E66, dúvida 10 do desenho, proposta ainda sem o sim do dono): a versão clara com a cor cheia da marca no lugar da foto.
+      if (!d.foto) return '<div class="s-foto topo cor-cheia" aria-hidden="true"></div>' + alto + `<div class="s-corpo">${dentro}</div>`;
       return fotoTopo ? bloco("topo", d.foto, s.foco) + alto + `<div class="s-corpo">${dentro}</div>` : bloco("fundo", d.foto, s.foco) + alto + `<div class="s-corpo na-base">${dentro}</div>`;
     }
   }
@@ -338,9 +340,10 @@ function progresso(pos: number, total: number): string {
 export function slideHTML(d: DadosDoModelo): string {
   const temFoto = Boolean(d.foto);
   const tipo = tipoDesenhado(d.slide, temFoto);
-  const modo: ModoDoSlide = tipo === "capa-texto" && d.slide.tipo === "capa-foto" ? "marca" : d.modo;
+  const semFotoDaNoticia = tipo === "noticia" && !temFoto;
+  const modo: ModoDoSlide = tipo === "capa-texto" && d.slide.tipo === "capa-foto" ? "marca" : semFotoDaNoticia ? "claro" : d.modo;
   const comFotoNoTopo = (tipo === "capa-foto" || tipo === "noticia") && temFoto;
-  const fotoTopo = comFotoNoTopo && modo === "claro";
+  const fotoTopo = (comFotoNoTopo && modo === "claro") || semFotoDaNoticia;
   const qual = fundoDoSlide(tipo, modo, d.numero, temFoto);
   const fundo = d.fundos && qual !== null ? (d.fundos[qual] ?? null) : null;
   const classes = ["slide", fundo ? "fundo" : "", comFotoNoTopo && !fotoTopo ? "foto-cheia" : "", fotoTopo ? "foto-topo" : "", tipo === "passo" && temFoto ? "com-foto" : ""].filter(Boolean).join(" ");

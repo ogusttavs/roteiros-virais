@@ -27,6 +27,8 @@ export const textosNoticias = {
   // O cartão.
   foto: (veiculo: string) => `Foto: ${veiculo}`,
   criarRoteiro: "Criar roteiro com esta notícia",
+  /** E66: só com `CARROSSEL_ATIVO` ligada e em notícia do setor com data de até 7 dias. */
+  criarCapa: "Criar capa com esta notícia",
   virouRoteiro: "virou roteiro",
   verORoteiro: "Ver o roteiro",
   veiculoDesconhecido: "Notícia",
