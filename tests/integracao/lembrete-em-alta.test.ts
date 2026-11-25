@@ -8,6 +8,9 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/email", () => ({ enviarEmail: vi.fn().mockResolvedValue(undefined) }));
+// O calendário de datas (E60) acrescenta ao aviso "Daqui a N dias é <data>" quando o relógio de verdade cai perto de uma data; este arquivo prova o assunto do momento, não o calendário, então
+// o calendário fica sem datas aqui e o teste não muda de resultado conforme o dia em que roda.
+vi.mock("@/config/datas", async (importarOriginal) => ({ ...(await importarOriginal<typeof import("@/config/datas")>()), datasParaOAviso: () => [] }));
 vi.mock("@/lib/push", () => ({
   enviarPush: vi.fn().mockResolvedValue({ ok: true }),
   pushConfigurado: () => true,
