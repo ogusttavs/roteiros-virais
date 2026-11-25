@@ -11,8 +11,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { pngDoCarrossel } from "@/carrossel/entrega";
 import { crc32, montarZip } from "@/carrossel/zip";
+import { TETO_DO_TESTE } from "@/config/cadastro";
 import { db, getPool } from "@/db";
-import { briefings, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, user, videos, type PerfilCompilado } from "@/db/schema";
+import { briefings, cadastrosProprios, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, user, videos, type PerfilCompilado } from "@/db/schema";
+import { barreiraDoCadastro } from "@/servicos/cadastro-travas";
 import { ErroCarrossel, apagarFoto, carrosselDaMarca, carrosseisDaMarca, enviarFoto, fotoDaMarca, fotosDoCarrossel, gerarCarrossel, tipoPelosBytes, trocarSlide } from "@/servicos/carrossel";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -216,6 +218,19 @@ describe("isolamento entre marcas", () => {
     await expect(trocarSlide(dona, meu.id, 0, { fotoId: fotoAlheia.id })).rejects.toThrow(/foto/);
     expect((await carrosselDaMarca(dona, meu.id))?.slides[0].fotoId).toBeUndefined();
   });
+});
+
+describe("o teto do teste", () => {
+  it("o carrossel conta como um roteiro no teto de quem criou a conta sozinho", async () => {
+    const clienteId = await criarCliente();
+    const [{ usuarioId }] = await db().select({ usuarioId: clientes.usuarioId }).from(clientes).where(eq(clientes.id, clienteId));
+    await db().update(user).set({ emailVerified: true }).where(eq(user.id, usuarioId!));
+    await db().insert(cadastrosProprios).values({ usuarioId: usuarioId!, clienteId, termosVersao: "teste" });
+    expect(await barreiraDoCadastro({ clienteId, cortesia: false, gasto: "roteiro" })).toBeNull();
+    for (let i = 0; i < TETO_DO_TESTE.roteiros; i += 1) await gerarCarrossel(clienteId, pedidoLivre(`tema ${i}`, 5));
+    expect(await barreiraDoCadastro({ clienteId, cortesia: false, gasto: "roteiro" })).toEqual({ tipo: "teto", qual: "roteiros" });
+    await db().delete(cadastrosProprios).where(eq(cadastrosProprios.clienteId, clienteId));
+  }, 60_000);
 });
 
 describe("fotos", () => {
