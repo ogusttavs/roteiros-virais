@@ -478,6 +478,7 @@ export function HojeTela({
     <div className={styles.pagina}>
       <BarraTopo
         titulo={textosHoje.titulo}
+        tituloAoRolar={ehHoje}
         direita={
           <>
             <SeletorMarcaCelular marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />

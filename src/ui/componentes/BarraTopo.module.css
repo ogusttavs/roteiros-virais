@@ -21,6 +21,23 @@
   font-size: var(--tamanho-cabecalho);
 }
 
+/* Telas com o mesmo título grande no conteúdo (Hoje, Criar): o da barra entra só depois da rolagem. */
+.tituloAoRolar .titulo {
+  opacity: 0;
+  transition: opacity var(--duracao-troca) var(--curva-padrao);
+}
+
+.tituloAoRolar.rolada .titulo {
+  opacity: 1;
+}
+
+@media (min-width: 768px) {
+  /* No computador a barra não reage à rolagem e o título grande já está na tela. */
+  .tituloAoRolar .titulo {
+    visibility: hidden;
+  }
+}
+
 .direita {
   margin-left: auto;
   display: flex;
