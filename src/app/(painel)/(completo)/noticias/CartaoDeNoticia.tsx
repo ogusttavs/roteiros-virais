@@ -27,6 +27,8 @@ export type NoticiaNaTela = {
   imagemUrl: string | null;
   imagemCredito: string | null;
   roteiroId: number | null;
+  /** E66: notícia do setor, com data de até 7 dias e veículo, com a chave do carrossel ligada: mostra "Criar capa com esta notícia". */
+  podeVirarCapa?: boolean;
 };
 
 type Props = {
@@ -122,6 +124,11 @@ export function CartaoDeNoticia({ noticia, destaque = false, aoAbrir, aoCriarRot
             {textosNoticias.criarRoteiro}
           </Botao>
         )}
+        {noticia.podeVirarCapa ? (
+          <Link href={`/criar/capa?noticia=${noticia.noticiaId}`} className={styles.verRoteiro}>
+            {textosNoticias.criarCapa}
+          </Link>
+        ) : null}
       </div>
     </>
   );

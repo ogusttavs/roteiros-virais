@@ -68,7 +68,7 @@ async function exigirAutorizacaoDoPaciente(clienteId: number, autorizado: boolea
   if (await marcaEhDeSaude(clienteId)) throw new ErroCarrossel(FRASE_SEM_AUTORIZACAO_DO_PACIENTE, "sem-autorizacao");
 }
 
-const AVISO_DA_COR_CLARA = "A cor da sua marca era clara demais para ler bem nos slides, então a gente escureceu um pouco.";
+export const AVISO_DA_COR_CLARA = "A cor da sua marca era clara demais para ler bem nos slides, então a gente escureceu um pouco.";
 
 /** O erro que a tela e a rota podem mostrar: a mensagem já é para a pessoa. */
 export class ErroCarrossel extends Error {
@@ -147,7 +147,7 @@ function conformidadeDoCarrossel(slides: SlideDoCarrossel[], contexto: { fontes:
 }
 
 /** A primeira parte do par da trava de aviso do Postgres (cada família de trava tem a sua; ver `lib/reserva-de-envio.ts`). */
-const TRAVA_DA_GERACAO_DO_CARROSSEL = 6500;
+export const TRAVA_DA_GERACAO_DO_CARROSSEL = 6500;
 
 /**
  * Uma geração de carrossel por vez por marca: pega a trava do banco (`pg_try_advisory_lock`, sem migração), lê o teto (`conferirTeto`, que devolve a recusa ou nulo) JÁ dentro da trava e só então gera.
