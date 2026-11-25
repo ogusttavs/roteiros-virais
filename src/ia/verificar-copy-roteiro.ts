@@ -19,11 +19,14 @@
  * resultado para o `verificarExtra` e para os avisos de `gerarComVerificacao`.
  */
 
+import { acharFormulasDeMaquina, avisosDeFormaDaFala, motivosDasFormulas } from "./formulas-de-maquina";
 import { acharNomePolitico } from "./nomes-politicos";
 
 export type EntradaCopyRoteiro = {
   /** Reels falado tem gancho, corpo, fechamento e chamada; Story e sem fala só têm o texto dos cartões (as regras de estrutura não valem lá). */
   estrutura: "reels_falado" | "cartoes";
+  /** O título do roteiro (a fórmula de máquina também vale nele, R-COPY-26). */
+  titulo?: string;
   gancho: string;
   corpo: string;
   fechamento: string;
@@ -428,6 +431,14 @@ function copyChamada(e: EntradaCopyRoteiro): string | null {
   return null;
 }
 
+/** R-COPY-26 (título, gancho, corpo, fechamento, chamada): nenhuma fórmula de texto de máquina (lista fechada em `formulas-de-maquina.ts`). Reprova na 1ª tentativa e vira aviso na 2ª. */
+function copyFormulaDeMaquina(e: EntradaCopyRoteiro): string | null {
+  const achados = acharFormulasDeMaquina({ titulo: e.titulo, gancho: e.gancho, corpo: e.corpo, fechamento: e.fechamento, chamada: e.chamadaFinal }, { fontes: e.fontes });
+  if (achados.length === 0) return null;
+  // Um motivo só, com até três achados: a segunda tentativa lê tudo de uma vez.
+  return motivosDasFormulas(achados.slice(0, 3)).join("; ");
+}
+
 /** R-ROTEIRO-01 (todos, só Reels falado): gancho, corpo e fechamento preenchidos. */
 function roteiroPreenchido(e: EntradaCopyRoteiro): string | null {
   if (e.estrutura !== "reels_falado") return null;
@@ -538,6 +549,7 @@ const DEMAIS: Conferencia[] = [
   { regra: "R-COPY-08", roda: copyFatoEspecifico },
   { regra: "R-COPY-23", roda: copyAtaque },
   { regra: "R-COPY-25", roda: copyChamada },
+  { regra: "R-COPY-26", roda: copyFormulaDeMaquina },
   { regra: "R-ROTEIRO-01", roda: roteiroPreenchido },
   { regra: "R-ROTEIRO-14", roda: roteiroUltimoBloco },
   { regra: "R-ROTEIRO-15", roda: roteiroFechamentoCurto },
@@ -594,11 +606,14 @@ export function verificarRegrasCopyRoteiro(entrada: EntradaCopyRoteiro): Resulta
     (entrada.tentativa === 1 ? reprovam : avisos).push(motivo);
   }
   avisos.push(...avisosSomente(entrada));
+  // R-COPY-28 e R-COPY-29 (indício): só a fala; no Story e no sem fala o texto é o do cartão, curto de propósito.
+  if (entrada.estrutura === "reels_falado") avisos.push(...avisosDeFormaDaFala({ gancho: entrada.gancho, corpo: entrada.corpo, fechamento: entrada.fechamento, chamada: entrada.chamadaFinal }));
   return { reprovam, avisos };
 }
 
 /** O que a saída do roteiro precisa ter para virar `EntradaCopyRoteiro` (o schema do prompt tem de sobra). */
 export type SaidaParaCopyRoteiro = {
+  titulo?: string | null;
   gancho: string | null;
   corpo: string | null;
   fechamento: string | null;
@@ -628,6 +643,7 @@ export function montarEntradaCopyRoteiro(
     return {
       ...contexto,
       estrutura: "cartoes",
+      titulo: saida.titulo ?? undefined,
       gancho: textos[0],
       corpo: textos.slice(1, textos.length > 1 ? -1 : undefined).join(". "),
       fechamento: "",
@@ -645,6 +661,7 @@ export function montarEntradaCopyRoteiro(
   return {
     ...contexto,
     estrutura: "reels_falado",
+    titulo: saida.titulo ?? undefined,
     gancho,
     corpo,
     fechamento,

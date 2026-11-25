@@ -282,6 +282,6 @@ describe("os temas do dia por conta", () => {
     expect(tarefas).toContain("temasDoDia");
     const temas = deA.find((g) => g.tarefa === "temasDoDia")!;
     expect((temas.entradas as { modo?: string }).modo).toBe("foco_da_conta");
-    expect(temas.versaoPrompt).toBe("1.10.0");
+    expect(temas.versaoPrompt).toBe("1.11.0");
   });
 });

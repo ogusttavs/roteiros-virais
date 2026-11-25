@@ -37,6 +37,7 @@ import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { clientes, nichos, ramosDaConta, roteiros, temasDia, type TemaDoDia } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
+import { formulasDoTema, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
 import { registrarGeracao } from "@/ia/registro";
 import { hojeISO } from "@/lib/config";
@@ -172,11 +173,13 @@ async function tentarGerarTemas(dados: {
  * (V2b, item 8). Tema evidenciado só por notícia (`evidencias` vazio) nunca
  * passa: a prova exige vídeo analisado, notícia não conta.
  */
-async function filtrarTemasComProva(
+export async function filtrarTemasComProva(
   temas: TemaDoDia[],
   nicho: NichoAtivo,
   agora: Date,
   proporcaoBrasil: number,
+  /** Onda 1 de texto: na 1ª passada o tema com fórmula de máquina (`R-COPY-26`) é barrado e volta para o modelo com o motivo; na 2ª fica e vira só aviso no log (o dia não pode fechar sem tema por causa de um enfeite). */
+  tentativa: 1 | 2 = 1,
 ): Promise<{ temasComProva: TemaDoDia[]; temasSemProva: number; barrados: { titulo: string; motivo: string }[] }> {
   const idsVideo = [...new Set(temas.flatMap((t) => t.evidencias))];
   const videosPorId = await buscarVideosParaProva(idsVideo);
@@ -186,8 +189,17 @@ async function filtrarTemasComProva(
   const barrados: { titulo: string; motivo: string }[] = [];
   for (const tema of temas) {
     const motivo = motivoSemProva(tema.evidencias, videosPorId, agora, janela, proporcaoBrasil);
-    if (motivo === null) temasComProva.push(tema);
-    else barrados.push({ titulo: tema.titulo, motivo });
+    if (motivo !== null) {
+      barrados.push({ titulo: tema.titulo, motivo });
+      continue;
+    }
+    const formulas = formulasDoTema(tema);
+    if (formulas.length > 0 && tentativa === 1) {
+      barrados.push({ titulo: tema.titulo, motivo: motivosDasFormulas(formulas.slice(0, 2)).join("; ") });
+      continue;
+    }
+    if (formulas.length > 0) logger.info({ nichoId: nicho.id, titulo: tema.titulo, avisos: motivosDasFormulas(formulas) }, "temas do dia: tema mantido com fórmula de texto de máquina (aviso)");
+    temasComProva.push(tema);
   }
   return { temasComProva, temasSemProva: barrados.length, barrados };
 }
@@ -455,7 +467,7 @@ async function gerarTemasDoNicho(
   if (temVideo && temasComProva.length < TEMAS_POR_DIA) {
     const jaAprovados = temasComProva.map((t) => `"${t.titulo}"`).join(", ");
     const ajuste = [
-      "Segunda tentativa. Na primeira, estes temas foram descartados por não cumprirem a regra da prova:",
+      "Segunda tentativa. Na primeira, estes temas foram descartados por não cumprirem a regra da prova ou a regra de texto (sem fórmula de texto de máquina):",
       ...primeira.barrados.map((b) => `- "${b.titulo}": ${b.motivo}.`),
       jaAprovados ? `Estes já foram aprovados, não repita o assunto deles: ${jaAprovados}.` : "",
       "Proponha três temas de novo, cada um apoiado num grupo de vídeos da lista que cumpra a regra da prova. Confira conta e origem de cada id antes de citar.",
@@ -467,7 +479,7 @@ async function gerarTemasDoNicho(
       entrada: temasDoDiaIA.montarEntrada({ ...dadosEntrada, ajuste }),
     });
     if (segunda.valido) {
-      const refeita = await filtrarTemasComProva(segunda.temas, nicho, new Date(), regua.proporcaoBrasil);
+      const refeita = await filtrarTemasComProva(segunda.temas, nicho, new Date(), regua.proporcaoBrasil, 2);
       const titulos = new Set(temasComProva.map((t) => t.titulo));
       for (const tema of refeita.temasComProva) {
         if (temasComProva.length >= TEMAS_POR_DIA) break;
@@ -628,9 +640,9 @@ function ferramentasDosTemasDaConta(nicho: NichoAtivo): FerramentasDosTemas {
         clienteId: dados.clienteId,
         focoHash: dados.focoHash,
       }),
-    filtrarProva: async (temas) => {
+    filtrarProva: async (temas, tentativa) => {
       const regua = await reguaDoSetor(nicho.id);
-      const { temasComProva, barrados } = await filtrarTemasComProva(temas, nicho, new Date(), regua.proporcaoBrasil);
+      const { temasComProva, barrados } = await filtrarTemasComProva(temas, nicho, new Date(), regua.proporcaoBrasil, tentativa);
       return { temasComProva, barrados };
     },
   };
