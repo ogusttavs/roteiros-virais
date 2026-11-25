@@ -6,15 +6,20 @@
  */
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 
+import { larguraDaImagem } from "@/carrossel/fotos";
+import { avisosDoMetodo, verificarCapaVaga, verificarPromessaDaCapa } from "@/carrossel/metodo";
 import { corValida, garantirLeitura } from "@/carrossel/modelos";
-import { normalizarHashtags, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
+import { formulasDeMaquinaDosSlides, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFoto, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
 import {
+  CAMPOS_DO_TIPO,
   COR_NEUTRA,
+  LISTAS_DO_TIPO,
+  SEM_FOTO,
+  type ChaveDeCampo,
   ESTADOS_DO_CARROSSEL,
   MAXIMO_DE_FOTOS,
   TAMANHOS_DO_CARROSSEL,
   FRASE_SEM_AUTORIZACAO_DO_PACIENTE,
-  LINHA_FIXA_ANTES_DEPOIS_SAUDE,
   TETO_DA_FOTO_BYTES,
   TIPOS_COM_FOTO_DE_PACIENTE,
   TIPOS_DE_FOTO,
@@ -33,6 +38,7 @@ import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
+import { textosCarrossel } from "@/textos/carrossel";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
@@ -48,7 +54,7 @@ import { ramosAlternativosDaMarca } from "./ramos-da-conta";
 import { combinarEvidencias, ErroRoteiro, filtrarEvidenciaPelaMarca, formatarCamadaExclusiva, LIMITE_EVIDENCIA, resolverTemaDoPedido, roteiroPorId } from "./roteiro";
 
 /** Saúde vale quando o ramo principal OU qualquer ramo alternativo da marca é de saúde. `ramoPrincipal` é o slug já lido; sem ele, lê da marca. */
-async function marcaEhDeSaude(clienteId: number, ramoPrincipal?: string | null): Promise<boolean> {
+export async function marcaEhDeSaude(clienteId: number, ramoPrincipal?: string | null): Promise<boolean> {
   let principal = ramoPrincipal;
   if (principal === undefined) {
     const cliente = await clientePorId(clienteId);
@@ -63,6 +69,8 @@ async function exigirAutorizacaoDoPaciente(clienteId: number, autorizado: boolea
   if (autorizado === true) return;
   if (await marcaEhDeSaude(clienteId)) throw new ErroCarrossel(FRASE_SEM_AUTORIZACAO_DO_PACIENTE, "sem-autorizacao");
 }
+
+export const AVISO_DA_COR_CLARA = "A cor da sua marca era clara demais para ler bem nos slides, então a gente escureceu um pouco.";
 
 /** O erro que a tela e a rota podem mostrar: a mensagem já é para a pessoa. */
 export class ErroCarrossel extends Error {
@@ -125,15 +133,15 @@ async function resolverOrigem(clienteId: number, nichoId: number, de: DeOndeVem)
 }
 
 /** A conformidade (R-CONF) sobre o texto dos slides: a capa faz o papel do gancho, os do meio do corpo, a chamada da chamada final. Só elas, nas duas tentativas. */
-function conformidadeDoCarrossel(slides: { tipo: string; titulo: string; corpo: string }[], contexto: { fontes: string; ramoSaude: boolean }): string[] {
+function conformidadeDoCarrossel(slides: SlideDoCarrossel[], contexto: { fontes: string; ramoSaude: boolean }): string[] {
   const capa = slides[0];
   const chamada = slides[slides.length - 1];
   const meio = slides.slice(1, -1);
   return verificarConformidadeDoLongo(
     {
-      gancho: capa ? `${capa.titulo}. ${capa.corpo}` : "",
-      chamadaFinal: chamada ? `${chamada.titulo}. ${chamada.corpo}` : "",
-      capitulos: meio.map((s) => ({ nome: s.titulo, pontos: [s.corpo], ganchoParaOProximo: null, naImagem: "" })),
+      gancho: capa ? textoDoSlide(capa).join(". ") : "",
+      chamadaFinal: chamada ? textoDoSlide(chamada).join(". ") : "",
+      capitulos: meio.map((s) => ({ nome: s.titulo || s.valor || s.citacao || "", pontos: textoDoSlide(s), ganchoParaOProximo: null, naImagem: "" })),
       edicao: { textoNaTela: [] },
     },
     contexto,
@@ -141,7 +149,7 @@ function conformidadeDoCarrossel(slides: { tipo: string; titulo: string; corpo: 
 }
 
 /** A primeira parte do par da trava de aviso do Postgres (cada família de trava tem a sua; ver `lib/reserva-de-envio.ts`). */
-const TRAVA_DA_GERACAO_DO_CARROSSEL = 6500;
+export const TRAVA_DA_GERACAO_DO_CARROSSEL = 6500;
 
 /**
  * Uma geração de carrossel por vez por marca: pega a trava do banco (`pg_try_advisory_lock`, sem migração), lê o teto (`conferirTeto`, que devolve a recusa ou nulo) JÁ dentro da trava e só então gera.
@@ -174,7 +182,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
   // A cor da marca: a que a pessoa escolheu agora (e fica guardada na marca, trocável depois), a que a marca já tem, ou o neutro escuro do produto. Clara demais, escurece e avisa.
   const corEscolhida = pedido.cor ?? cliente.corMarca ?? COR_NEUTRA;
   const leitura = garantirLeitura(corEscolhida);
-  const avisosDoCarrossel = leitura.escureceu ? ["A cor da sua marca era clara demais para ler bem nos slides, então a gente escureceu um pouco."] : [];
+  const avisosDoCarrossel = leitura.escureceu ? [AVISO_DA_COR_CLARA] : [];
 
   const origem = await resolverOrigem(clienteId, nichoId, pedido.de);
   const alternativos = (await ramosAlternativosDaMarca(clienteId)).map((a) => a.nichoId);
@@ -231,7 +239,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     .filter(Boolean)
     .join(String.fromCharCode(10, 10));
 
-  const { dados: saida, geracaoId } = await gerarComVerificacao({
+  const { dados: saida, geracaoId, avisos: avisosDaIA } = await gerarComVerificacao({
     tarefa: "carrossel",
     nivel: carrosselIA.nivel,
     effort: carrosselIA.esforco,
@@ -281,23 +289,34 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     extrairEvidencias: (d) => d.evidencias,
     extrairCampos: (d) => {
       const campos: Record<string, string> = {};
-      d.slides.forEach((s, i) => {
-        campos[`slide ${i + 1} titulo`] = s.titulo;
-        if (s.corpo.trim()) campos[`slide ${i + 1} corpo`] = s.corpo;
-        if (s.fonte?.trim()) campos[`slide ${i + 1} fonte`] = s.fonte;
+      slidesDaSaida(d.slides, { ramoSaude }).forEach((s, i) => {
+        const textos = textoDoSlide(s).filter((t) => t !== s.referencia);
+        textos.forEach((t, k) => {
+          campos[`slide ${i + 1} campo ${k + 1}`] = t;
+        });
       });
       campos.legenda = d.legenda;
       return campos;
     },
-    verificarExtra: (d) => [
-      ...verificarOrdemDosSlides(d.slides, quantidade),
-      ...verificarLimitesDosSlides(d.slides, { ramoSaude, fotosPrometidas, falasDoCliente }),
-      ...verificarLegenda(d.legenda, d.hashtags),
-      ...conformidadeDoCarrossel(d.slides, { fontes: fontesDosFatos, ramoSaude }),
-    ],
+    verificarExtra: (d, tentativa) => {
+      const slidesDeTexto = slidesDaSaida(d.slides, { ramoSaude });
+      return [
+        ...verificarOrdemDosSlides(slidesDeTexto, quantidade),
+        ...verificarLimitesDosSlides(slidesDeTexto, { ramoSaude, fotosPrometidas, falasDoCliente }),
+        ...verificarLegenda(d.legenda, d.hashtags),
+        // A promessa da capa, a capa vaga e as fórmulas de máquina (R-COPY-26) reprovam na 1ª tentativa e só avisam na 2ª (como o roteiro): senão brigam com a regra de "nunca três do mesmo tipo seguidos"; o aviso sai em `avisarExtra`.
+        ...(tentativa === 1 ? [...verificarPromessaDaCapa(slidesDeTexto), ...verificarCapaVaga(slidesDeTexto), ...formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos)] : []),
+        ...conformidadeDoCarrossel(slidesDeTexto, { fontes: fontesDosFatos, ramoSaude }),
+      ];
+    },
+    avisarExtra: (d, tentativa) => {
+      if (tentativa !== 2) return [];
+      const slidesDeTexto = slidesDaSaida(d.slides, { ramoSaude });
+      return [...verificarPromessaDaCapa(slidesDeTexto), ...verificarCapaVaga(slidesDeTexto), ...formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos)];
+    },
   });
 
-  const slides: SlideDoCarrossel[] = saida.slides.map((s) => ({ tipo: s.tipo, titulo: s.titulo.trim(), corpo: s.corpo.trim(), fonte: s.tipo === "dado" ? (s.fonte ?? "").trim() || null : null, ...(ramoSaude && s.tipo === "antes-depois" ? { rodape: LINHA_FIXA_ANTES_DEPOIS_SAUDE } : {}) }));
+  const slides: SlideDoCarrossel[] = slidesDaSaida(saida.slides, { ramoSaude });
   const [criado] = await db()
     .insert(carrosseis)
     .values({
@@ -307,7 +326,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       tema: origem.tema,
       quantidade,
       cor: leitura.cor,
-      avisos: avisosDoCarrossel,
+      avisos: [...avisosDoCarrossel, ...avisosDoMetodo(slides, saida.legenda)],
       slides,
       legenda: saida.legenda.trim(),
       hashtags: normalizarHashtags(saida.hashtags),
@@ -315,7 +334,8 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     })
     .returning();
   if (pedido.cor !== undefined && pedido.cor !== cliente.corMarca) await db().update(clientes).set({ corMarca: pedido.cor }).where(eq(clientes.id, clienteId));
-  logger.info({ clienteId, carrosselId: criado.id, quantidade }, "carrossel gerado");
+  // Os avisos da IA (o motivo escrito para o modelo, com o código da regra) ficam só no log: `avisos` do carrossel é o que a pessoa lê.
+  logger.info({ clienteId, carrosselId: criado.id, quantidade, avisosDaIA }, "carrossel gerado");
   return criado;
 }
 
@@ -333,29 +353,85 @@ export async function carrosselDaMarca(clienteId: number, carrosselId: number): 
   return linha ?? null;
 }
 
-/** Troca o texto de um slide (só o texto e as fotos escolhidas, nunca o tipo); o resultado passa pelos limites do tipo no render. */
-export async function trocarSlide(
-  clienteId: number,
-  carrosselId: number,
-  indice: number,
-  mudanca: { titulo?: string; corpo?: string; fonte?: string | null; fotoId?: number | null; fotoDepoisId?: number | null; autorizacaoDoPaciente?: boolean },
-): Promise<Carrossel> {
+/** O que a pessoa pode mudar num slide: os campos de texto do tipo (os limites são conferidos), as listas, o ponto de foco e as fotos. O tipo nunca muda. */
+export type MudancaDoSlide = {
+  campos?: Partial<Record<ChaveDeCampo, string>>;
+  listas?: { linhas?: string[]; acoes?: string[] };
+  foco?: string | null;
+  fotoId?: number | null;
+  fotoDepoisId?: number | null;
+  autorizacaoDoPaciente?: boolean;
+};
+
+const FOCO_VALIDO = /^\d{1,3}% \d{1,3}%$/;
+
+/** Os motivos (para a pessoa) de a mudança não caber no slide, campo a campo; vazio quando cabe. A tela usa os mesmos limites para segurar o botão. */
+export function motivosDaMudanca(slide: SlideDoCarrossel, mudanca: Pick<MudancaDoSlide, "campos" | "listas">, comFoto: boolean, nomes: Record<string, string>): string[] {
+  const motivos: string[] = [];
+  for (const [chave, valor] of Object.entries(mudanca.campos ?? {}) as [ChaveDeCampo, string][]) {
+    if (!(chave in CAMPOS_DO_TIPO[slide.tipo])) {
+      motivos.push(`${nomes[chave] ?? chave}: este slide não tem esse campo.`);
+      continue;
+    }
+    const motivo = motivoDoCampo(slide.tipo, chave, valor, comFoto);
+    if (motivo) motivos.push(motivo === "vazio" ? `${nomes[chave] ?? chave}: não pode ficar vazio.` : `${nomes[chave] ?? chave}: ${motivo}.`);
+  }
+  const lista = LISTAS_DO_TIPO[slide.tipo];
+  for (const [chave, itens] of Object.entries(mudanca.listas ?? {})) {
+    if (itens === undefined) continue;
+    if (!lista || lista.chave !== chave) {
+      motivos.push(`${chave}: este slide não tem essa lista.`);
+      continue;
+    }
+    const cheios = (itens ?? []).filter((l) => l.trim());
+    if (cheios.length < lista.minimo || cheios.length > lista.maximo) motivos.push(`${chave}: precisa de ${lista.minimo === lista.maximo ? lista.minimo : `${lista.minimo} a ${lista.maximo}`} itens.`);
+    cheios.forEach((l, k) => {
+      if (l.trim().split(/\s+/).length > lista.palavras || l.trim().length > lista.caracteres) motivos.push(`${chave} ${k + 1}: passa de ${lista.palavras} palavras ou ${lista.caracteres} caracteres.`);
+    });
+  }
+  return motivos;
+}
+
+/**
+ * Troca o texto ou a foto de um slide. Cada campo passa pelo limite do tipo (o do slide com foto, quando ele leva foto): passou, a troca é recusada com o motivo e nada é gravado. O tipo, o número do passo e as
+ * linhas fixas de código nunca mudam.
+ */
+export async function trocarSlide(clienteId: number, carrosselId: number, indice: number, mudanca: MudancaDoSlide, nomesDosCampos: Record<string, string> = {}): Promise<Carrossel> {
   const atual = await carrosselDaMarca(clienteId, carrosselId);
   if (!atual) throw new ErroCarrossel("Não achei esse carrossel.", "nao-achou");
   if (!Number.isInteger(indice) || indice < 0 || indice >= atual.slides.length) throw new ErroCarrossel("Esse slide não existe.", "nao-achou");
   const fotos = await fotosDoCarrossel(clienteId, carrosselId);
   const ids = new Set(fotos.map((f) => f.id));
   for (const id of [mudanca.fotoId, mudanca.fotoDepoisId]) {
-    if (id !== undefined && id !== null && !ids.has(id)) throw new ErroCarrossel("Essa foto não é deste carrossel.", "foto-invalida");
+    if (id !== undefined && id !== null && id !== SEM_FOTO && !ids.has(id)) throw new ErroCarrossel("Essa foto não é deste carrossel.", "foto-invalida");
   }
-  const poeFoto = [mudanca.fotoId, mudanca.fotoDepoisId].some((id) => id !== undefined && id !== null);
+  if (mudanca.foco !== undefined && mudanca.foco !== null && !FOCO_VALIDO.test(mudanca.foco)) throw new ErroCarrossel("O ponto da foto não é válido.");
+  const poeFoto = [mudanca.fotoId, mudanca.fotoDepoisId].some((id) => id !== undefined && id !== null && id !== SEM_FOTO);
   if (poeFoto && TIPOS_COM_FOTO_DE_PACIENTE.has(atual.slides[indice].tipo)) await exigirAutorizacaoDoPaciente(clienteId, mudanca.autorizacaoDoPaciente);
+  const slideAntes = atual.slides[indice];
+  const depoisDaFoto = atual.slides.map((s, i) => (i === indice ? { ...s, fotoId: mudanca.fotoId === undefined ? s.fotoId : mudanca.fotoId, fotoDepoisId: mudanca.fotoDepoisId === undefined ? s.fotoDepoisId : mudanca.fotoDepoisId } : s));
+  const comFoto = slidesComFoto(depoisDaFoto, fotos.length)[indice];
+  const motivos = motivosDaMudanca(slideAntes, mudanca, comFoto, nomesDosCampos);
+  // Em ramo de saúde o texto trocado pela pessoa também não pode prometer resultado, cura, garantia nem prazo (R-CONF-07, o mesmo que reprova a geração).
+  const textosNovos = [...Object.values(mudanca.campos ?? {}), ...(mudanca.listas?.linhas ?? []), ...(mudanca.listas?.acoes ?? [])];
+  if (motivos.length === 0 && textosNovos.length > 0 && (await marcaEhDeSaude(clienteId))) {
+    for (const texto of textosNovos) {
+      const promessa = promessaEmSaude(texto);
+      if (promessa) motivos.push(textosCarrossel.promessaEmSaude(promessa));
+    }
+  }
+  if (motivos.length > 0) throw new ErroCarrossel(motivos.join(" "), "pedido-invalido");
   const slides = atual.slides.map((s, i) => {
     if (i !== indice) return s;
-    const novo = { ...s };
-    if (mudanca.titulo !== undefined) novo.titulo = mudanca.titulo.trim().slice(0, 300);
-    if (mudanca.corpo !== undefined) novo.corpo = mudanca.corpo.trim().slice(0, 1200);
-    if (mudanca.fonte !== undefined && s.tipo === "dado") novo.fonte = mudanca.fonte?.trim().slice(0, 200) || null;
+    const novo: SlideDoCarrossel = { ...s };
+    for (const [chave, valor] of Object.entries(mudanca.campos ?? {}) as [ChaveDeCampo, string][]) {
+      const limpo = valor.trim();
+      if (chave === "fonte") novo.fonte = limpo || null;
+      else (novo as Record<string, unknown>)[chave] = limpo === "" ? undefined : limpo;
+    }
+    if (mudanca.listas?.linhas) novo.linhas = mudanca.listas.linhas.map((l) => l.trim()).filter(Boolean);
+    if (mudanca.listas?.acoes) novo.acoes = mudanca.listas.acoes.map((l) => l.trim()).filter(Boolean);
+    if (mudanca.foco !== undefined) novo.foco = mudanca.foco ?? undefined;
     if (mudanca.fotoId !== undefined) novo.fotoId = mudanca.fotoId;
     if (mudanca.fotoDepoisId !== undefined) novo.fotoDepoisId = mudanca.fotoDepoisId;
     return novo;
@@ -366,6 +442,27 @@ export async function trocarSlide(
     .where(and(eq(carrosseis.id, carrosselId), eq(carrosseis.clienteId, clienteId)))
     .returning();
   return linha;
+}
+
+/** Troca a cor do carrossel (e a da marca, para os próximos): clara demais escurece sozinha e o carrossel guarda o aviso. */
+export async function trocarCor(clienteId: number, carrosselId: number, cor: string): Promise<Carrossel> {
+  if (!corValida(cor)) throw new ErroCarrossel("A cor precisa ser no formato #rrggbb.");
+  const atual = await carrosselDaMarca(clienteId, carrosselId);
+  if (!atual) throw new ErroCarrossel("Não achei esse carrossel.", "nao-achou");
+  const leitura = garantirLeitura(cor);
+  const [linha] = await db()
+    .update(carrosseis)
+    .set({ cor: leitura.cor, avisos: [...atual.avisos.filter((a) => a !== AVISO_DA_COR_CLARA), ...(leitura.escureceu ? [AVISO_DA_COR_CLARA] : [])], atualizadoEm: new Date() })
+    .where(and(eq(carrosseis.id, carrosselId), eq(carrosseis.clienteId, clienteId)))
+    .returning();
+  await db().update(clientes).set({ corMarca: cor }).where(eq(clientes.id, clienteId));
+  return linha;
+}
+
+/** O @ da marca para o rodapé dos slides ("@clinica.exemplo"), ou vazio. Aceita o @ solto, com arroba ou o endereço do perfil. */
+export function arrobaDaMarca(instagram: string | null | undefined): string {
+  const bruto = (instagram ?? "").trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/[/?#].*$/, "").replace(/^@+/, "");
+  return /^[A-Za-z0-9._]{1,30}$/.test(bruto) ? `@${bruto}` : "";
 }
 
 /** Só o necessário das fotos, sem os bytes. */
@@ -405,11 +502,11 @@ export function tipoPelosBytes(bytes: Buffer): (typeof TIPOS_DE_FOTO)[number] | 
   return null;
 }
 
-export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer; autorizacaoDoPaciente?: boolean }): Promise<FotoSemBytes> {
+export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer; autorizacaoDoPaciente?: boolean }): Promise<FotoSemBytes & { largura: number | null }> {
   const carrossel = await carrosselDaMarca(clienteId, carrosselId);
   if (!carrossel) throw new ErroCarrossel("Não achei esse carrossel.", "nao-achou");
-  // Um carrossel com slide de antes e depois ou de resultado só recebe foto de marca de saúde com a autorização do paciente confirmada.
-  if (carrossel.slides.some((s) => TIPOS_COM_FOTO_DE_PACIENTE.has(s.tipo))) await exigirAutorizacaoDoPaciente(clienteId, arquivo.autorizacaoDoPaciente);
+  // Em marca de saúde, TODO envio de foto exige a confirmação da autorização escrita do paciente (decisão do Gustavo, E65 PR 2): uma foto mandada antes de o carrossel ter antes e depois ou resultado também vai ser posta num deles.
+  await exigirAutorizacaoDoPaciente(clienteId, arquivo.autorizacaoDoPaciente);
   if (arquivo.bytes.length === 0) throw new ErroCarrossel("A foto veio vazia.", "foto-invalida");
   if (arquivo.bytes.length > TETO_DA_FOTO_BYTES) throw new ErroCarrossel(`A foto passa de ${Math.round(TETO_DA_FOTO_BYTES / 1024 / 1024)} MB. Mande uma menor.`, "foto-invalida");
   const tipo = tipoPelosBytes(arquivo.bytes);
@@ -429,7 +526,7 @@ export async function enviarFoto(clienteId: number, carrosselId: number, arquivo
     return nova;
   });
   if (!linha) throw new ErroCarrossel(`Cada carrossel leva até ${MAXIMO_DE_FOTOS} fotos.`, "limite-de-fotos");
-  return linha;
+  return { ...linha, largura: larguraDaImagem(arquivo.bytes) };
 }
 
 export async function apagarFoto(clienteId: number, carrosselId: number, fotoId: number): Promise<boolean> {

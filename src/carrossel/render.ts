@@ -1,100 +1,110 @@
 /**
- * E65 PR 1: o render do carrossel, HTML para PNG, um por slide, 1080 por 1350, no mesmo Chromium e na mesma vaga do PDF e da imagem do roteiro (`comLimiteDeChromium`: no máximo
- * dois navegadores, fila de seis, 15 s por passo). Um navegador por pedido, uma página, todos os slides em sequência. Antes de cada foto, `AJUSTAR_CAIXAS` mede as caixas no próprio navegador
- * (letra menor, e só em último caso corta o fim do texto); o que foi cortado volta em `avisos`.
+ * E65 PR 1 e 2: o render do carrossel, HTML para PNG, um por slide, 1080 por 1350, no mesmo Chromium e na mesma vaga do PDF e da imagem do roteiro (`comLimiteDeChromium`: no máximo
+ * dois navegadores, fila de seis, 15 s por passo). Um navegador por pedido, uma página, todos os slides em sequência. Antes de cada foto, `CONFERIR_TEXTO` mede o corpo no próprio navegador: desce UM passo
+ * de letra e, se ainda passar, NUNCA corta o texto: o slide sai marcado como "precisa encurtar" e a tela diz isso para a pessoa.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { chromium } from "playwright";
 
-import { ALTURA_DO_SLIDE, LARGURA_DO_SLIDE, TIPOS_COM_FOTO, type SlideDoCarrossel } from "@/config/carrossel";
+import { LARGURA_DO_SLIDE, ALTURA_DO_SLIDE, type SlideDoCarrossel } from "@/config/carrossel";
 import { comLimiteDeChromium, comTempoLimite } from "@/lib/chromium-de-impressao";
 import { logger } from "@/lib/log";
 
-import { AJUSTAR_CAIXAS, htmlDoSlide, type FotoParaOModelo } from "./modelos";
-import { ajustarAosLimites } from "./regras";
+import { distribuirFotos } from "./fotos";
+import { CONFERIR_TEXTO, faltaFoto, htmlDoSlide, modosDosSlides, type FotoParaOModelo } from "./modelos";
+
+export { distribuirFotos } from "./fotos";
 
 export type FotoDoCarrossel = { id: number; tipo: string; bytes: Buffer };
 
-let fonteEmBase64: string | null | undefined;
+let fundosEmBase64: string[] | undefined;
 
-/** A letra do projeto (Mona Sans), lida uma vez; se o arquivo não está onde se espera (a imagem de produção copia `src/ui/fontes`), o render segue com a letra do sistema. */
-function fonteDoProjeto(): string | null {
-  if (fonteEmBase64 !== undefined) return fonteEmBase64;
+/** Os seis fundos abstratos, lidos uma vez de `src/carrossel/fundos` (a imagem de produção os copia); se faltam, os slides saem com o fundo liso. */
+function fundosDoProjeto(): string[] | null {
+  if (fundosEmBase64 === undefined) {
+    try {
+      fundosEmBase64 = Array.from({ length: 6 }, (_, i) => readFileSync(path.join(process.cwd(), "src", "carrossel", "fundos", `fundo-0${i + 1}.jpg`)).toString("base64"));
+    } catch {
+      logger.warn("carrossel: os fundos abstratos nao foram achados, os slides saem com o fundo liso");
+      fundosEmBase64 = [];
+    }
+  }
+  return fundosEmBase64.length === 6 ? fundosEmBase64 : null;
+}
+
+const fontesEmBase64: Record<string, string | null> = {};
+
+/** Uma letra do projeto, lida uma vez; se o arquivo não está onde se espera (a imagem de produção copia `src/ui/fontes`), o render segue com a letra do sistema. */
+function letraDoProjeto(arquivo: string): string | null {
+  if (arquivo in fontesEmBase64) return fontesEmBase64[arquivo];
   try {
-    fonteEmBase64 = readFileSync(path.join(process.cwd(), "src", "ui", "fontes", "monasans-latin.woff2")).toString("base64");
+    fontesEmBase64[arquivo] = readFileSync(path.join(process.cwd(), "src", "ui", "fontes", arquivo)).toString("base64");
   } catch {
-    logger.warn("carrossel: a fonte monasans-latin.woff2 nao foi achada, o render usa a letra do sistema");
-    fonteEmBase64 = null;
+    logger.warn(`carrossel: a fonte ${arquivo} nao foi achada, o render usa a letra do sistema`);
+    fontesEmBase64[arquivo] = null;
   }
-  return fonteEmBase64;
+  return fontesEmBase64[arquivo];
 }
 
-/**
- * Qual foto vai em qual slide: a que o slide aponta (`fotoId`), e, sem apontar, as fotos que sobraram na ordem em que foram enviadas, só nos tipos que aceitam foto (o antes e depois leva duas).
- * Pura: o teste prova a distribuição sem navegador.
- */
-export function distribuirFotos(slides: SlideDoCarrossel[], fotosEmOrdem: { id: number }[]): { foto: number | null; fotoDepois: number | null }[] {
-  const existentes = new Set(fotosEmOrdem.map((f) => f.id));
-  const apontadas = new Set<number>();
-  for (const s of slides) {
-    if (s.fotoId && existentes.has(s.fotoId)) apontadas.add(s.fotoId);
-    if (s.fotoDepoisId && existentes.has(s.fotoDepoisId)) apontadas.add(s.fotoDepoisId);
-  }
-  const livres = fotosEmOrdem.filter((f) => !apontadas.has(f.id)).map((f) => f.id);
-  return slides.map((s) => {
-    if (!TIPOS_COM_FOTO.has(s.tipo)) return { foto: null, fotoDepois: null };
-    const foto = s.fotoId && existentes.has(s.fotoId) ? s.fotoId : (livres.shift() ?? null);
-    const fotoDepois = s.tipo === "antes-depois" ? (s.fotoDepoisId && existentes.has(s.fotoDepoisId) ? s.fotoDepoisId : (livres.shift() ?? null)) : null;
-    return { foto, fotoDepois };
-  });
-}
+export type SlideRenderizado = { png: Buffer; /** O texto não coube nem um passo abaixo: a pessoa precisa encurtar. */ precisaEncurtar: boolean; /** O tipo pede uma foto e o slide não tem. */ semFoto: boolean };
+export type ResultadoDoRender = { png: Buffer[]; slides: SlideRenderizado[]; avisos: string[] };
 
-export type ResultadoDoRender = { png: Buffer[]; avisos: string[] };
-
-export async function renderizarSlides(entrada: { slides: SlideDoCarrossel[]; fotos: FotoDoCarrossel[]; cor: string; /** Só este slide (índice a partir de 0); ausente, todos. */ somente?: number }): Promise<ResultadoDoRender> {
+export async function renderizarSlides(entrada: {
+  slides: SlideDoCarrossel[];
+  fotos: FotoDoCarrossel[];
+  cor: string;
+  arroba?: string;
+  /** Só este slide (índice a partir de 0); ausente, todos. */
+  somente?: number;
+  /** 1 é o PNG final de 1080 por 1350; menor, a prévia da tela (0,4 dá 432 por 540). */
+  escala?: number;
+}): Promise<ResultadoDoRender> {
   const avisos: string[] = [];
-  const ajustados = entrada.slides.map((s) => {
-    const r = ajustarAosLimites(s);
-    avisos.push(...r.cortou.map((c) => `slide ${entrada.slides.indexOf(s) + 1}: ${c}`));
-    return r.slide;
-  });
   const porId = new Map(entrada.fotos.map((f) => [f.id, f] as const));
   const paraModelo = (id: number | null): FotoParaOModelo | null => {
     const f = id ? porId.get(id) : undefined;
     return f ? { tipo: f.tipo, base64: f.bytes.toString("base64") } : null;
   };
-  const escolhidas = distribuirFotos(ajustados, entrada.fotos);
-  const fonte = fonteDoProjeto();
+  const escolhidas = distribuirFotos(entrada.slides, entrada.fotos);
+  const modos = modosDosSlides(entrada.slides.map((s, i) => ({ tipo: s.tipo, comFoto: escolhidas[i].foto !== null })));
+  const fontes = { mona: letraDoProjeto("monasans-latin.woff2"), mono: letraDoProjeto("jetbrainsmono-latin.woff2") };
+  const fundos = fundosDoProjeto();
+  const escala = Math.min(1, Math.max(0.1, entrada.escala ?? 1));
 
-  const png = await comLimiteDeChromium(async () => {
+  const slides = await comLimiteDeChromium(async () => {
     const navegador = await chromium.launch();
     try {
-      const pagina = await navegador.newPage({ viewport: { width: LARGURA_DO_SLIDE, height: ALTURA_DO_SLIDE }, deviceScaleFactor: 1 });
+      const pagina = await navegador.newPage({ viewport: { width: LARGURA_DO_SLIDE, height: ALTURA_DO_SLIDE }, deviceScaleFactor: escala });
       await pagina.emulateMedia({ colorScheme: "light" });
-      const fotos: Buffer[] = [];
-      for (let i = 0; i < ajustados.length; i += 1) {
+      const feitos: SlideRenderizado[] = [];
+      for (let i = 0; i < entrada.slides.length; i += 1) {
         if (entrada.somente !== undefined && entrada.somente !== i) continue;
+        const foto = paraModelo(escolhidas[i].foto);
         const html = htmlDoSlide({
-          slide: ajustados[i],
+          slide: entrada.slides[i],
           numero: i + 1,
-          total: ajustados.length,
+          total: entrada.slides.length,
           cor: entrada.cor,
-          foto: paraModelo(escolhidas[i].foto),
+          arroba: entrada.arroba ?? "",
+          modo: modos[i],
+          foto,
           fotoDepois: paraModelo(escolhidas[i].fotoDepois),
-          fonteBase64: fonte,
+          fundos,
+          fontes,
         });
         await comTempoLimite(pagina.setContent(html, { waitUntil: "load" }), "tempo esgotado montando o slide");
         await comTempoLimite(pagina.evaluate("document.fonts.ready.then(() => true)"), "tempo esgotado esperando a letra");
-        const cortados = JSON.parse(String(await comTempoLimite(pagina.evaluate(AJUSTAR_CAIXAS), "tempo esgotado medindo o texto"))) as string[];
-        if (cortados.length > 0) avisos.push(`slide ${i + 1}: texto cortado para caber na caixa (${cortados.join(", ")})`);
-        fotos.push(await comTempoLimite(pagina.screenshot({ type: "png", clip: { x: 0, y: 0, width: LARGURA_DO_SLIDE, height: ALTURA_DO_SLIDE } }), "tempo esgotado gerando a imagem"));
+        const conferencia = JSON.parse(String(await comTempoLimite(pagina.evaluate(CONFERIR_TEXTO), "tempo esgotado medindo o texto"))) as { estourou: boolean };
+        if (conferencia.estourou) avisos.push(`slide ${i + 1}: o texto nao coube, precisa encurtar`);
+        const png = await comTempoLimite(pagina.screenshot({ type: "png", clip: { x: 0, y: 0, width: LARGURA_DO_SLIDE, height: ALTURA_DO_SLIDE } }), "tempo esgotado gerando a imagem");
+        feitos.push({ png, precisaEncurtar: conferencia.estourou, semFoto: faltaFoto(entrada.slides[i], foto !== null) });
       }
-      return fotos;
+      return feitos;
     } finally {
       await navegador.close();
     }
   });
-  return { png, avisos };
+  return { png: slides.map((s) => s.png), slides, avisos };
 }

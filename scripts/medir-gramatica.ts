@@ -10,6 +10,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
+import * as carrossel from "../src/ia/prompts/carrossel";
 import * as decidirEdicao from "../src/ia/prompts/decidirEdicao";
 import * as roteiro from "../src/ia/prompts/roteiro";
 import * as longo from "../src/ia/prompts/roteiroLongo";
@@ -46,6 +47,8 @@ async function main() {
   const resultados = [
     await medir("roteiro (curto)", roteiro.schema),
     await medir("roteiro longo", longo.schema),
+    // E65 PR 4: o schema do carrossel (lista de slides com todos os campos) também precisa caber.
+    await medir("carrossel", carrossel.schema),
     // E47 PR 3: a decisão da edição (modelo forte) e o verificador da edição (modelo barato).
     await medir("decisão da edição", decidirEdicao.schema),
     await medir("verificador da edição", verificarEdicao.schema, config.ia.modeloBarato),

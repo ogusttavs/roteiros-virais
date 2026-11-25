@@ -32,6 +32,8 @@ function temBarraPropria(pathname: string): boolean {
     // aqui; o cabeçalho genérico ficava por baixo e o nome do produto aparecia em cima do título da tela, com os dois pares de botões também empilhados.
     pathname.startsWith("/planejamento") ||
     pathname.startsWith("/criar/pesquisa") ||
+    // E65 PR 2: a tela Criar carrossel tem a própria BarraTopo (com a seta de voltar a Criar).
+    pathname.startsWith("/criar/carrossel") ||
     pathname.startsWith("/roteiros/")
   );
 }

@@ -101,6 +101,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockRoteiro(entrada, sistemaEstavel);
     case "carrossel":
       return mockCarrossel(entrada);
+    case "capaNoticia":
+      return mockCapaNoticia(entrada);
     case "roteiroLongo":
       return mockRoteiroLongo(entrada);
     case "verificarTexto":
@@ -616,6 +618,24 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
  * descrição lê errado) e `[mock:nome-com-colchete]` (um espaço marcado dentro do nome).
  */
 /**
+ * E66: os títulos da capa de notícia simulados, determinísticos: quatro leituras da manchete (que vem na entrada). Marcadores de teste na manchete, que valem só na primeira tentativa (a segunda corrige):
+ * "[mock:capa-numero-solto]" escreve um número que a notícia não traz, "[mock:capa-longo]" passa do limite de palavras, "[mock:capa-promessa]" promete resultado, "[mock:capa-igual]" copia a manchete, "[mock:capa-formula]" usa uma fórmula de texto de máquina (R-COPY-26).
+ */
+function mockCapaNoticia(entrada: string) {
+  const manchete = extrairCampo(entrada, "Titulo:").replace(/\[mock:[^\]]*\]/g, "").trim() || "notícia simulada";
+  const segunda = entrada.includes("A tentativa anterior foi reprovada.");
+  const marcado = (nome: string) => entrada.includes(`[mock:${nome}]`) && !segunda;
+  const curto = manchete.split(/\s+/).slice(0, 7).join(" ").slice(0, 60).trim();
+  const titulos = [`O que muda para você: ${curto}`, `Fique de olho: ${curto}`, `Você viu? ${curto}`, `Entenda: ${curto}`];
+  if (marcado("capa-numero-solto")) titulos[0] = "87% das pessoas ainda erram isso";
+  if (marcado("capa-longo")) titulos[1] = Array.from({ length: 20 }, () => "palavra").join(" ");
+  if (marcado("capa-promessa")) titulos[2] = "Esta técnica garante o resultado em uma sessão";
+  if (marcado("capa-igual")) titulos[3] = manchete;
+  if (marcado("capa-formula")) titulos[1] = "Um resultado incrível para o seu sorriso";
+  return { titulos };
+}
+
+/**
  * E65 PR 1: o carrossel simulado, determinístico: a quantidade vem da entrada, a capa abre (capa-foto só se a entrada diz que há foto), a chamada fecha e o meio alterna passo e item (nunca três iguais). Marcadores de teste no tema:
  * "[mock:carrossel-longo]" estoura o limite de palavras de um slide, "[mock:carrossel-tres-iguais]" repete o tipo três vezes, "[mock:carrossel-dado-sem-fonte]" tira a fonte do dado,
  * "[mock:carrossel-prova-resultado]" põe um slide de resultado com foto, "[mock:carrossel-prova-fala-outro]" e "[mock:carrossel-prova-fala-cliente]" põem uma fala que só está no tema (nunca do cliente) e uma do perfil, "[mock:carrossel-numero-solto]" escreve um número que a entrada não traz. Os marcadores valem só na primeira tentativa (a segunda corrige, como um modelo corrigiria).
@@ -627,19 +647,33 @@ function mockCarrossel(entrada: string) {
   const marcado = (nome: string) => entrada.includes(`[mock:${nome}]`) && !segunda;
   const ids = extrairIds(entrada);
   const meio = ["passo", "item", "passo", "item", "passo", "item", "passo"] as const;
-  const slides: { tipo: string; titulo: string; corpo: string; fonte: string | null }[] = [{ tipo: entrada.includes("O cliente enviou") ? "capa-foto" : "capa-texto", titulo: `${quantidade - 2} dicas sobre ${tema}`.split(" ").slice(0, 10).join(" "), corpo: "Para você salvar e usar hoje", fonte: null }];
+  type Fatia = { tipo: string; rotulo: string; titulo: string; texto: string; antes: string; depois: string; valor: string; unidade: string; fonte: string; referencia: string; quem: string; contexto: string; linhas: string[]; acoes: string[] };
+  const vazio: Fatia = { tipo: "item", rotulo: "", titulo: "", texto: "", antes: "", depois: "", valor: "", unidade: "", fonte: "", referencia: "", quem: "", contexto: "", linhas: [], acoes: [] };
+  const slides: Fatia[] = [
+    { ...vazio, tipo: entrada.includes("O cliente enviou") ? "capa-foto" : "capa-texto", rotulo: "Dicas", titulo: `${quantidade - 2} dicas sobre ${tema}`.split(" ").slice(0, 10).join(" "), texto: "Para você salvar e usar hoje" },
+  ];
   for (let i = 0; i < quantidade - 2; i += 1) {
     const tipo = marcado("carrossel-tres-iguais") ? "item" : meio[i % meio.length];
-    slides.push({ tipo, titulo: `Dica ${i + 1} para você`, corpo: `Olhe com calma o que importa no ponto ${i + 1} e faça um passo de cada vez.`, fonte: null });
+    slides.push({ ...vazio, tipo, rotulo: tipo === "item" ? `Dica ${i + 1}` : "", titulo: `Dica ${i + 1} para você`, texto: `Olhe com calma o que importa no ponto ${i + 1} e faça um passo de cada vez.` });
   }
-  slides.push({ tipo: "chamada", titulo: "Salve este post", corpo: "Mande para quem precisa ver isso.", fonte: null });
-  if (marcado("carrossel-longo")) slides[1].corpo = Array.from({ length: 60 }, () => "palavra").join(" ");
-  if (marcado("carrossel-dado-sem-fonte")) slides[1] = { tipo: "dado", titulo: "30%", corpo: "É o que a pesquisa diz.", fonte: null };
-  if (marcado("carrossel-antes-depois")) slides[1] = { tipo: "antes-depois", titulo: "Como ficou", corpo: "Antes: manchado. Depois: limpo.", fonte: null };
-  if (marcado("carrossel-prova-resultado")) slides[1] = { tipo: "prova-resultado", titulo: "Resultado de verdade", corpo: "", fonte: null };
-  if (marcado("carrossel-prova-fala-outro")) slides[1] = { tipo: "prova-fala", titulo: "Ana", corpo: tema, fonte: null };
-  if (marcado("carrossel-prova-fala-cliente")) slides[1] = { tipo: "prova-fala", titulo: "Ana", corpo: "relaxa que sai sim", fonte: null };
-  if (marcado("carrossel-numero-solto")) slides[1].corpo = "Nove em cada dez pessoas, 87% delas, erram isso todo mês.";
+  slides.push({ ...vazio, tipo: "chamada", titulo: "Salve este post", texto: "Mande para quem precisa ver isso.", acoes: ["Salve para lembrar", "Mande para alguém"] });
+  if (marcado("carrossel-longo")) slides[1].texto = Array.from({ length: 60 }, () => "palavra").join(" ");
+  if (marcado("carrossel-dado-sem-fonte")) slides[1] = { ...vazio, tipo: "dado", valor: "30", unidade: "%", texto: "É o que a pesquisa diz.", referencia: "Pesquisa de 2026" };
+  if (marcado("carrossel-antes-depois")) slides[1] = { ...vazio, tipo: "antes-depois", titulo: "Como ficou", antes: "Manchado e sem brilho.", depois: "Limpo e macio." };
+  if (marcado("carrossel-prova-resultado")) slides[1] = { ...vazio, tipo: "prova-resultado", titulo: "Resultado de verdade" };
+  if (marcado("carrossel-prova-fala-outro")) slides[1] = { ...vazio, tipo: "prova-fala", texto: tema, quem: "Ana", contexto: "Cliente" };
+  if (marcado("carrossel-prova-fala-cliente")) slides[1] = { ...vazio, tipo: "prova-fala", texto: "relaxa que sai sim", quem: "Ana", contexto: "Cliente" };
+  if (marcado("carrossel-numero-solto")) slides[1].texto = "Nove em cada dez pessoas, 87% delas, erram isso todo mês.";
+  // Texto com cara de máquina na linha de apoio da capa: `[mock:carrossel-formula]` só na 1ª tentativa, `[mock:carrossel-formula-sempre]` nas duas.
+  if (entrada.includes("[mock:carrossel-formula-sempre]") || marcado("carrossel-formula")) slides[0].texto = "Não é sorte, é método.";
+  if (marcado("carrossel-capa-errada")) slides[0].titulo = `9 erros que estragam ${tema}`.split(" ").slice(0, 10).join(" ");
+  // A mesma promessa errada nas DUAS tentativas (E65 PR 4): na 2ª ela só vira aviso de log e o carrossel sai.
+  if (entrada.includes("[mock:carrossel-capa-errada-sempre]")) slides[0].titulo = `9 erros que estragam ${tema}`.split(" ").slice(0, 10).join(" ");
+  if (marcado("carrossel-capa-vaga")) slides[0].titulo = `Tudo sobre ${tema}`.split(" ").slice(0, 10).join(" ");
+  if (marcado("carrossel-capa-sem-promessa")) slides[0].titulo = `Estofado bonito`;
+  if (marcado("carrossel-promessa")) slides[1].texto = "Com o clareamento, o dente volta ao branco em uma sessão.";
+  if (marcado("carrossel-resumo")) slides[1] = { ...vazio, tipo: "resumo", titulo: "Para guardar", linhas: ["Deixe agir antes", "Um produto por vez", "Banheiro aberto"] };
+  if (marcado("carrossel-resumo")) slides[0].titulo = `${quantidade - 3} dicas sobre ${tema}`.split(" ").slice(0, 10).join(" ");
   return {
     slides,
     legenda: `Salve este carrossel sobre ${tema} e mande para quem precisa. Comenta qual dica você já usa.`,

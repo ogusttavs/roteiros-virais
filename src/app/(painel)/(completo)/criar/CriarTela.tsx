@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ChevronRight, Mic, Pencil, Search, UserRound, Zap } from "lucide-react";
+import { CalendarDays, ChevronRight, Images, Mic, Pencil, Search, UserRound, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -12,6 +12,7 @@ import type { DadosDoCampoDePesquisa, PesquisaEmAberto } from "@/servicos/pesqui
 import type { ItemPlano } from "@/servicos/plano";
 import type { DadosDoLongo } from "@/servicos/roteiro-longo";
 import type { PerguntasDaTela } from "@/servicos/vozes-do-publico";
+import { textosCarrossel } from "@/textos/carrossel";
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
@@ -72,6 +73,8 @@ type Props = {
   longo?: DadosDoLongo;
   /** Hotfix de 22/10/2026 (item 3): o assunto seu que já recebeu nota e não foi descartado; a linha "Continuar de onde parou" leva direto a ele. */
   temaLivreAvaliado?: { texto: string; nota: number } | null;
+  /** E65 PR 2: a chave `CARROSSEL_ATIVO` está ligada: aparece a porta "Carrossel". Desligada, nada muda em Criar. */
+  carrosselAtivo?: boolean;
 };
 
 /**
@@ -101,6 +104,7 @@ export function CriarTela({
   pesquisaEmAberto = null,
   longo,
   temaLivreAvaliado = null,
+  carrosselAtivo = false,
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -413,6 +417,19 @@ export function CriarTela({
               </span>
               <MotivoSemRede className={styles.motivoNaPorta} />
             </button>
+
+            {carrosselAtivo ? (
+              <button type="button" className={`${styles.porta} cartao-toque`} disabled={ocupado} aria-busy={acao === "carrossel" || undefined} onClick={() => ir("carrossel", "/criar/carrossel")}>
+                <span className={styles.marcaPorta} aria-hidden="true">
+                  <Images size={20} strokeWidth={1.75} aria-hidden="true" />
+                </span>
+                <strong>{textosCarrossel.porta.titulo}</strong>
+                <span className={styles.ajuda}>{textosCarrossel.porta.ajuda}</span>
+                <span className={styles.seta} aria-hidden="true">
+                  <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
+                </span>
+              </button>
+            ) : null}
 
             {/* E28 (passo 25): responder o que estão perguntando nos comentários do setor; cada pergunta leva ao Tema livre com ela presa. Sem leitura da semana, o estado calmo (sem aparência de erro). */}
             <section className={styles.portaPerguntas} aria-labelledby="t-porta-perguntas" data-porta-perguntas={perguntas ? "com" : "sem"}>
