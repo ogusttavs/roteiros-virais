@@ -66,6 +66,8 @@
   font-family: var(--fonte-texto);
   font-size: var(--tamanho-secundario);
   text-decoration: underline;
+  text-align: left;
+  text-wrap: balance;
   cursor: pointer;
 }
 

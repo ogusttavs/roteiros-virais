@@ -13,6 +13,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  text-decoration: none;
 }
 
 .avatarConta span {
@@ -23,8 +24,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
   color: var(--cor-titulo);
 }
 
