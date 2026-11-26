@@ -294,6 +294,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     condicao: () => publicarImagensAtivo(),
   },
   {
+    fila: FILAS.varrerPedidos,
+    cron: "* * * * *",
+    descricao: "varredura dos pedidos de geracao parados (E74 PR 2a): de minuto em minuto, o pedido sem batimento alem do prazo vira pronto com o que ja foi escrito ou falha sem contar no limite",
+  },
+  {
     fila: FILAS.vigiarDisco,
     cron: "*/15 * * * *",
     descricao: "alarme do disco do servidor (atencao com 80% de uso, critico com 90%), a cada 15 minutos",

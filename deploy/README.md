@@ -84,6 +84,15 @@ sha dela (`acessos/DEPLOYS.md` guarda a lista). A regra existe desde 10/10/2026:
 com uma crase em aspas duplas executou o script sem argumento e subiu `latest` em producao.
 `deploy/deploy.sh --conferir <sha>` so valida o argumento e sai.
 
+**O deploy espera os pedidos em andamento (E74 PR 2a, 26/11/2026).** O roteiro e o carrossel sao
+escritos pelo app enquanto a pessoa espera; recriar o app no meio mataria a escrita. Depois de migrar
+e antes de recriar o app e o worker, o script conta os pedidos de `pedidos_de_geracao` que ainda andam
+e espera eles terminarem, por ate 4 minutos (`deploy/pedidos-andando.sh`, o mesmo numero de
+`ESPERA_DO_DEPLOY_S` em `src/config/pedidos.ts`). Passado o prazo, ou sem conseguir contar, segue: o
+pedido que parar no meio e fechado pela varredura (`varrer-pedidos`, de minuto em minuto), pronto com
+as versoes que ja sairam ou falho sem contar no limite da pessoa. O ensaio confere a mesma conta contra
+o banco recem-migrado.
+
 ## Editar o Caddyfile compartilhado
 
 `/srv/proxy/Caddyfile` e de dois produtos (`acessos/VPS.md`, convencao de convivencia); cada

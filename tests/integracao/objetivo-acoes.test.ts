@@ -62,6 +62,13 @@ afterAll(async () => {
   await getPool().end();
 });
 
+/** E74 PR 2a: o grupo quando a escrita terminou nesta chamada (nem o mesmo pedido mandado de novo, nem outro roteiro andando na marca). */
+function grupoDe(r: Awaited<ReturnType<typeof gerarVersoesAction>>): string {
+  if (!r.ok) throw new Error(r.erro);
+  if (!("grupo" in r.dado)) throw new Error(`a escrita nao terminou nesta chamada: ${JSON.stringify(r.dado)}`);
+  return r.dado.grupo;
+}
+
 /** A primeira versão do grupo vira o roteiro (o "Ficar com esta" do serviço) e devolve a linha de `roteiros`. */
 async function roteiroDaPrimeiraVersao(clienteId: number, grupo: string) {
   const [primeira] = await db()
@@ -81,7 +88,7 @@ describe("gerarVersoesAction", () => {
     const resultado = await gerarVersoesAction({ origem: "livre", textoTema: "mancha de tinta no sofa" }, "conversao");
 
     if (!resultado.ok) throw new Error(resultado.erro);
-    const versoes = await db().select().from(versoesDoRoteiro).where(eq(versoesDoRoteiro.grupo, resultado.dado.grupo));
+    const versoes = await db().select().from(versoesDoRoteiro).where(eq(versoesDoRoteiro.grupo, grupoDe(resultado)));
     expect(versoes).toHaveLength(3);
     expect(new Set(versoes.map((v) => v.clienteId))).toEqual(new Set([marcaA.id]));
     const roteirosDepois = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
@@ -98,7 +105,7 @@ describe("gerarVersoesAction", () => {
     );
 
     if (!resultado.ok) throw new Error(resultado.erro);
-    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, resultado.dado.grupo);
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, grupoDe(resultado));
     expect(roteiro.formato).toBe("story");
   });
 
@@ -108,7 +115,7 @@ describe("gerarVersoesAction", () => {
     const resultado = await gerarVersoesAction({ origem: "livre", textoTema: "cheiro de bicho no sofa" }, "alcance");
 
     if (!resultado.ok) throw new Error(resultado.erro);
-    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, resultado.dado.grupo);
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, grupoDe(resultado));
     expect(roteiro.formato).toBe("reels");
   });
 
@@ -168,7 +175,7 @@ describe("gerarVersoesAction com o que o navegador manda", () => {
     const resultado = await gerarVersoesAction(comSobra as never, "alcance");
 
     if (!resultado.ok) throw new Error(resultado.erro);
-    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, resultado.dado.grupo);
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, grupoDe(resultado));
     expect(roteiro.clienteId).toBe(marcaA.id);
     expect(roteiro.origem).toBe("livre");
     expect(roteiro.momento).toBeNull();
@@ -202,7 +209,7 @@ describe("gerarVersoesAction com ficha", () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marca.id));
     const r = await gerarVersoesAction({ origem: "livre", textoTema: `tema numero ${++contador} da ficha ${ficha ?? "sem"} ${formato}` }, objetivo, formato, undefined, undefined, undefined, undefined, undefined, undefined, ficha);
     if (!r.ok) throw new Error(r.erro);
-    return roteiroDaPrimeiraVersao(marca.clienteId, r.dado.grupo);
+    return roteiroDaPrimeiraVersao(marca.clienteId, grupoDe(r));
   }
 
   it("a ficha vira o objetivo que se grava (guardem conta em lembrarem de você, mesmo se a tela mandou outro)", async () => {
@@ -238,7 +245,7 @@ describe("gerarVersoesAction com ficha", () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marca.id));
     const r = await gerarVersoesAction({ origem: "livre", textoTema: "tema sem fala com ficha" }, "alcance", "reels", "sem_fala", undefined, undefined, undefined, undefined, undefined, "comentem");
     if (!r.ok) throw new Error(r.erro);
-    const roteiro = await roteiroDaPrimeiraVersao(marca.clienteId, r.dado.grupo);
+    const roteiro = await roteiroDaPrimeiraVersao(marca.clienteId, grupoDe(r));
     expect(roteiro.estilo).toBe("sem_fala");
     expect(roteiro.ficha).toBeNull();
   });
@@ -297,7 +304,7 @@ describe("gerarVersoesAction com a pesquisa na hora", () => {
 
     const r = await chamar(criada.id);
     if (!r.ok) throw new Error(r.erro);
-    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, r.dado.grupo);
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, grupoDe(r));
     expect(roteiro.pesquisaNaHora).toMatchObject({ pesquisaId: criada.id });
     expect(roteiro.pesquisaNaHora!.dados.length).toBeGreaterThan(0);
   });
@@ -306,7 +313,7 @@ describe("gerarVersoesAction com a pesquisa na hora", () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
     const r = await chamar(undefined, "um tema sem pesquisa nenhuma");
     if (!r.ok) throw new Error(r.erro);
-    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, r.dado.grupo);
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, grupoDe(r));
     expect(roteiro.pesquisaNaHora).toBeNull();
   });
 });

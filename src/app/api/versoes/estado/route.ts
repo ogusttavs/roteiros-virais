@@ -4,7 +4,7 @@ import { rotuloParaQue } from "@/config/fichas";
 import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
-import { grupoEmAberto } from "@/servicos/versoes";
+import { versoesNoHoje } from "@/servicos/pedidos-estado";
 
 export const dynamic = "force-dynamic";
 const SEM_CACHE = { "Cache-Control": "private, no-store" };
@@ -12,9 +12,8 @@ const SEM_CACHE = { "Cache-Control": "private, no-store" };
 export type EstadoDasVersoes = { estado: "nenhum" | "escrevendo" } | { estado: "prontas"; grupo: string; tema: string; quantidade: number; paraQue: string };
 
 /**
- * E74 PR 1: o Hoje pergunta aqui, de 5 em 5 segundos, se as versões que a pessoa pediu já ficaram prontas. É uma rota comum (GET), não `router.refresh` nem Server Action: os dois entram
- * na fila de ações do roteador do Next, e um `router.refresh` com a escrita ainda pendente fez o navegador pedir a escrita de novo (versões duplicadas, e o gasto da IA em dobro).
- * Só lê: o grupo mais novo da marca da sessão, ainda não escolhido.
+ * E74 PR 1: o Hoje perguntava aqui se as versões já tinham ficado prontas. Desde o PR 2a o Hoje segue o pedido (`/api/pedidos/estado`); esta rota fica como invólucro fino, com a mesma
+ * regra nova (o pedido andando é "escrevendo", e um grupo antigo que falta escolher não o esconde, R-b), só para a aba que ficou aberta de antes da subida. Sai no PR 3.
  */
 export async function GET() {
   const sessao = await sessaoAtual();
@@ -22,16 +21,16 @@ export async function GET() {
   if (!cliente) return NextResponse.json({ erro: "nao autenticado" }, { status: 401, headers: SEM_CACHE });
   const recusa = await recusaDaCobranca();
   if (recusa) return recusa;
-  const grupo = await grupoEmAberto(cliente.id);
+  const { escrevendo, aberto } = await versoesNoHoje(cliente.id);
   let corpo: EstadoDasVersoes = { estado: "nenhum" };
-  if (grupo?.emEscrita) corpo = { estado: "escrevendo" };
-  else if (grupo) {
+  if (escrevendo) corpo = { estado: "escrevendo" };
+  else if (aberto) {
     corpo = {
       estado: "prontas",
-      grupo: grupo.grupo,
-      tema: grupo.tema,
-      quantidade: grupo.quantidade,
-      paraQue: rotuloParaQue({ ficha: grupo.ficha, objetivo: grupo.objetivo, formato: grupo.formato === "story" ? "story" : "reels" }),
+      grupo: aberto.grupo,
+      tema: aberto.tema,
+      quantidade: aberto.quantidade,
+      paraQue: rotuloParaQue({ ficha: aberto.ficha, objetivo: aberto.objetivo, formato: aberto.formato === "story" ? "story" : "reels" }),
     };
   }
   return NextResponse.json(corpo, { headers: SEM_CACHE });

@@ -3,7 +3,7 @@
 import { Play } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import { AJUDA_EM_DA_FICHA, EXEMPLO_DA_FICHA, FICHAS_EM_ORDEM, FRASE_DA_FICHA, NOME_DA_FICHA, objetivoDaFicha, OBJETIVO_DO_SEM_FALA, OBJETIVO_DO_STORY, PARECE_FEITO_PARA } from "@/config/fichas";
@@ -16,10 +16,13 @@ import {
   ROTULO_FORMATO_ROTEIRO,
 } from "@/ia/enums";
 import { hojeISO } from "@/lib/config";
+import { novoIdDePedido } from "@/lib/id-do-pedido";
 import { ehFalhaDeRede } from "@/lib/offline";
+import type { PedidoNaTela } from "@/servicos/pedidos-estado";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosObjetivo } from "@/textos/objetivo";
+import { textosPedidos } from "@/textos/pedidos";
 import { textosPesquisa } from "@/textos/pesquisa";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { CampoComFala } from "@/ui/componentes/CampoComFala";
@@ -27,7 +30,8 @@ import { CapaImagem } from "@/ui/componentes/CapaImagem";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { PerguntaMomentoDoDia, PerguntaParaQuando } from "@/ui/componentes/PerguntaAgendamento";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
-import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
+import { useConexao } from "@/ui/ConexaoContext";
+import { useConsultaViva } from "@/ui/useConsultaViva";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import { grupoRecenteDesdeAction } from "../../hoje/acoes";
@@ -37,6 +41,7 @@ import { exemplosDaFichaAction, gerarVersoesAction, sugerirEstiloAction, type Ex
 import { chaveDaEscolha, gravarEscolha, lerEscolha } from "./escolha-guardada";
 import { ESPERA_MAXIMA_MS, guardarDesfecho, guardarEspera, lerEspera, tomarDesfecho } from "./espera-guardada";
 import styles from "./ObjetivoTela.module.css";
+import { decidirSobreOPedido, type PedidoSeguido } from "./seguir-pedido";
 
 /** A capa do exemplo: a miniatura da plataforma quando existe e carrega; senão o retângulo neutro com o ícone, como no cartão de Referências. */
 function CapaDoExemplo({ capaUrl }: { capaUrl: string | null }) {
@@ -78,6 +83,8 @@ type Props = {
   perguntaChave?: string;
   /** E54 (parte 3): a pesquisa que a pessoa aprovou para este vídeo (`?pesquisa=`), com quantos dados ela marcou; o id vai ao servidor junto, que confere de novo que é desta marca. */
   pesquisa?: { id: number; dados: number };
+  /** E74 PR 2a (R-c): o pedido de roteiro deste tema que o servidor ainda escreve (o app reaberto depois de o iPhone fechá-lo), com quanto tempo já passou no relógio do servidor. */
+  pedidoDoTema?: { id: string; decorridoMs: number } | null;
 };
 
 /** `/criar/objetivo` (etapa 11, brief-frontend.md 6.3; `ObjetivoFluxo.dc.html`). */
@@ -95,6 +102,7 @@ export function ObjetivoTela({
   assuntoEmAlta,
   perguntaChave,
   pesquisa,
+  pedidoDoTema = null,
 }: Props) {
   // V12c, item 3: pessoa tem "quem aparece" fixo (config/briefing.ts); o controle nem aparece.
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
@@ -172,7 +180,21 @@ export function ObjetivoTela({
   const [retomadaDesde, setRetomadaDesde] = useState<number | null>(null);
   /** A comparação está abrindo (a página nova carrega): a espera continua na tela até lá, nunca o formulário. */
   const [abrindo, setAbrindo] = useState(false);
-    const tratarFalha = useTratarFalha();
+  /** E74 PR 2a (R-a): o pedido que a tela segue pelo id no servidor, em vez de depender da resposta da escrita. */
+  const [seguido, setSeguidoNoEstado] = useState<PedidoSeguido | null>(null);
+  /** O mesmo pedido, lido pela consulta: muda junto com o estado, para a consulta que sai logo depois de uma troca (`consultarAgora`) já ver o pedido novo. */
+  const seguidoRef = useRef<PedidoSeguido | null>(null);
+  const setSeguido = useCallback((novo: PedidoSeguido | null) => {
+    seguidoRef.current = novo;
+    setSeguidoNoEstado(novo);
+  }, []);
+  /** A etapa que o servidor disse ("Etapa 2 de 3: ..."), e quando a escrita começou no relógio do aparelho (corrigido pelo do servidor). */
+  const [etapa, setEtapa] = useState<string | null>(null);
+  const [desdeDoPedido, setDesdeDoPedido] = useState<number | null>(null);
+  /** Outro roteiro desta marca está sendo escrito (estado 6 do desenho): a frase, sem escrever nada. */
+  const [ocupadoPor, setOcupadoPor] = useState<string | null>(null);
+  /** O que o próximo "Tentar de novo" manda: o MESMO id (o pedido que nunca chegou ao servidor) ou o pedido falho que o novo refaz. */
+  const proximoEnvioRef = useRef<{ mesmoId?: string; refeitoDe?: string }>({});
   const { avisarRedeOk } = useConexao();
   /**
    * Revisão do PR #62, item 2: "Voltar depois" navegava para o Hoje, mas a transição continuava
@@ -202,7 +224,14 @@ export function ObjetivoTela({
       setErro(desfecho.erro);
     } else {
       const espera = lerEspera(chaveDaEscolhaDoTema);
-      if (espera !== null) setRetomadaDesde(espera);
+      // E74 PR 2a (R-c): a verdade é o servidor. O pedido que ele diz andar neste tema vale mesmo sem nada guardado no aparelho (o iPhone fechou o app em segundo plano); o guardado com id
+      // é seguido pelo servidor; o guardado sem id (de uma aba de antes desta versão) segue o caminho do PR 1.
+      if (pedidoDoTema) {
+        const meu = espera?.pedidoId === pedidoDoTema.id;
+        setSeguido({ pedidoId: pedidoDoTema.id, desde: meu && espera ? espera.desde : Date.now() - pedidoDoTema.decorridoMs, porque: meu ? "rede" : "servidor", vistoAndando: false });
+      } else if (espera?.pedidoId) {
+        setSeguido({ pedidoId: espera.pedidoId, desde: espera.desde, porque: "rede", vistoAndando: false });
+      } else if (espera !== null) setRetomadaDesde(espera.desde);
     }
     const guardada = lerEscolha(chaveDaEscolhaDoTema, hojeISO());
     if (guardada) {
@@ -297,13 +326,75 @@ export function ObjetivoTela({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retomadaDesde]);
 
+  /** Abre a comparação das versões (uma vez só: quem chegar depois, a resposta da escrita ou a consulta, não abre de novo). */
+  const abrirVersoes = useCallback(
+    (grupo: string) => {
+      if (navegandoRef.current) return;
+      guardarEspera(chaveDaEscolhaDoTema, null);
+      avisarRedeOk();
+      navegandoRef.current = true;
+      setAbrindo(true);
+      router.push(`/criar/versoes/${grupo}`);
+    },
+    [avisarRedeOk, chaveDaEscolhaDoTema, router],
+  );
+
+  /**
+   * E74 PR 2a (R-a, R-c, R-i, R-j): enquanto há um pedido seguido, pergunta por ele (`GET /api/pedidos/estado?id=`, rota comum, fora da fila de ações do roteador), só com a aba visível, e na hora
+   * em que a pessoa volta ao app. Sem rede, a tela continua na espera e diz isso; o pedido não muda por causa da rede.
+   */
+  const consultarPedido = useCallback(async () => {
+    const atual = seguidoRef.current;
+    if (!atual) return;
+    const resposta = await fetch(`/api/pedidos/estado?id=${encodeURIComponent(atual.pedidoId)}`, { cache: "no-store" });
+    const pedido = resposta.ok ? ((await resposta.json()) as PedidoNaTela & { agora: string }) : null;
+    if (saiuRef.current || navegandoRef.current) return;
+    // A pergunta voltou depois de a tela trocar de pedido (ou de parar de seguir): a resposta é de outro pedido e não vale mais.
+    if (seguidoRef.current?.pedidoId !== atual.pedidoId) return;
+    const decisao = decidirSobreOPedido(seguidoRef.current, { status: resposta.status, pedido }, Date.now());
+    if (decisao.acao === "abrir") {
+      abrirVersoes(decisao.grupo);
+      return;
+    }
+    if (decisao.acao === "esperar") {
+      setEtapa(decisao.etapa);
+      if (decisao.desdeMs !== null) setDesdeDoPedido(decisao.desdeMs);
+      if (decisao.vistoAndando && !seguidoRef.current.vistoAndando) setSeguido({ ...seguidoRef.current, vistoAndando: true });
+      return;
+    }
+    // A escrita ainda pendente decide sozinha o que mostrar quando responder: aqui só o que o servidor já confirmou.
+    if (seguidoRef.current.porque === "enviando" && decisao.acao !== "falhou") return;
+    guardarEspera(chaveDaEscolhaDoTema, null);
+    setSeguido(null);
+    setEtapa(null);
+    setDesdeDoPedido(null);
+    if (decisao.acao === "falhou") {
+      proximoEnvioRef.current = { refeitoDe: decisao.refeitoDe };
+      setErro(decisao.frase);
+    } else if (decisao.acao === "nao-chegou") {
+      proximoEnvioRef.current = { mesmoId: decisao.mesmoId };
+      setErro(decisao.frase);
+    }
+  }, [abrirVersoes, chaveDaEscolhaDoTema, setSeguido]);
+  // Pergunta já ao começar a seguir (a volta ao app, o pedido que a página disse andar); enquanto a escrita não responde, um "não existe" é só o atraso e não muda nada.
+  const { semRede, consultarAgora } = useConsultaViva(seguido !== null, consultarPedido, { jaNaEntrada: true });
+
   async function escrever() {
     if (escrevendo || pergunta && !ficha) return;
     // O Story e o sem fala não têm ficha: o Story grava o objetivo de falar com quem já segue; o sem fala, o de mais gente te conhecer.
     const objetivo: Objetivo = formato === "story" ? OBJETIVO_DO_STORY : !pergunta || !ficha ? OBJETIVO_DO_SEM_FALA : objetivoDaFicha(ficha);
     setErro(null);
+    setOcupadoPor(null);
+    // E74 PR 2a (R-a): o id do pedido nasce aqui e fica guardado ANTES de a rede ser usada. "Tentar de novo" depois de um pedido que nunca chegou manda o mesmo id; depois de uma falha
+    // confirmada, um id novo que diz qual pedido refaz.
+    const { mesmoId, refeitoDe } = proximoEnvioRef.current;
+    proximoEnvioRef.current = {};
+    const pedidoId = mesmoId ?? novoIdDePedido();
     const desdeMs = Date.now();
-    guardarEspera(chaveDaEscolhaDoTema, desdeMs);
+    guardarEspera(chaveDaEscolhaDoTema, { desde: desdeMs, pedidoId });
+    setEtapa(null);
+    setDesdeDoPedido(desdeMs);
+    setSeguido({ pedidoId, desde: desdeMs, porque: "enviando", vistoAndando: false });
     setEscrevendo(true);
     try {
       const resultado = await gerarVersoesAction(
@@ -322,54 +413,49 @@ export function ObjetivoTela({
         noticiaAssuntoId,
         perguntaChave,
         pesquisa?.id,
+        pedidoId,
+        refeitoDe,
       );
-      // Com a pessoa fora da tela, o desfecho fica guardado para quando ela voltar a este tema (o grupo pronto, ou o erro de sempre); na tela, é só o que se vê agora.
+      // Com a pessoa fora da tela, o desfecho fica guardado para quando ela voltar a este tema (o grupo pronto, ou a frase que o servidor deu); "continua sendo escrito" não é desfecho:
+      // a espera com o id fica, e quem voltar segue o pedido pelo servidor.
       if (saiuRef.current) {
-        guardarDesfecho(chaveDaEscolhaDoTema, resultado.ok ? { grupo: resultado.dado.grupo } : { erro: resultado.erro });
+        if (!resultado.ok) guardarDesfecho(chaveDaEscolhaDoTema, { erro: resultado.erro });
+        else if ("grupo" in resultado.dado) guardarDesfecho(chaveDaEscolhaDoTema, { grupo: resultado.dado.grupo });
+        else if ("jaEmAndamento" in resultado.dado) guardarDesfecho(chaveDaEscolhaDoTema, { erro: resultado.dado.frase });
         return;
       }
-      guardarEspera(chaveDaEscolhaDoTema, null);
+      if (navegandoRef.current) return;
       if (!resultado.ok) {
+        guardarEspera(chaveDaEscolhaDoTema, null);
+        setSeguido(null);
+        // Uma recusa ou uma falha que o servidor confirmou (a escrita marcou o pedido como falho): o próximo pedido refaz este.
+        proximoEnvioRef.current = { refeitoDe: pedidoId };
         setErro(resultado.erro);
         return;
       }
-      avisarRedeOk();
-      // E26 4b: o que nasce são as três versões do tema; o roteiro só existe depois de "Ficar com esta".
-      navegandoRef.current = true;
-      router.push(`/criar/versoes/${resultado.dado.grupo}`);
-    } catch (falha) {
-      if (saiuRef.current) {
-        // Sem a resposta e com a pessoa fora: quem voltar confere no servidor (as versões ficam gravadas assim que prontas).
-        if (!ehFalhaDeRede(falha)) guardarDesfecho(chaveDaEscolhaDoTema, { erro: textosObjetivo.erro });
+      const dado = resultado.dado;
+      if ("jaEmAndamento" in dado) {
+        // Outro roteiro desta marca anda agora: nada foi escrito nem gasto (estado 6 do desenho).
+        guardarEspera(chaveDaEscolhaDoTema, null);
+        setSeguido(null);
+        setOcupadoPor(dado.frase);
         return;
       }
-      /**
-       * R1, item 0c: a geração não depende da aba continuar aberta (o servidor termina mesmo
-       * sem ninguém esperando). Uma falha que parece de rede pode ser só a resposta que não
-       * voltou, não a geração que não aconteceu: antes de assumir que precisa repetir, confere
-       * se já existem versões novas deste tema escritas desde que a espera começou (cada versão
-       * é gravada assim que fica pronta).
-       */
-      if (ehFalhaDeRede(falha)) {
-        try {
-          const recuperado = await grupoRecenteDesdeAction(desdeMs, temaEscolhidoTexto);
-          if (saiuRef.current) return;
-          if (recuperado) {
-            avisarRedeOk();
-            guardarEspera(chaveDaEscolhaDoTema, null);
-            navegandoRef.current = true;
-            router.push(`/criar/versoes/${recuperado.grupo}`);
-            return;
-          }
-        } catch {
-          // Sem resposta nem na recuperação: segue para a frase de rede de sempre, abaixo.
-        }
+      if ("escrevendo" in dado) {
+        // O mesmo pedido já estava sendo escrito (a primeira resposta se perdeu): a tela segue ele, sem escrever de novo.
+        setSeguido({ pedidoId: dado.pedidoId, desde: desdeMs, porque: "repetido", vistoAndando: false });
+        consultarAgora();
+        return;
       }
-      if (saiuRef.current) return;
-      // Gerar demora e o servidor pode ter terminado antes de a conexão cair: repetir escreve outras versões,
-      // então a frase de rede manda olhar o Hoje primeiro (V7, item 4 do PROXIMO.md; E26 4b: as versões prontas aparecem lá).
-      guardarEspera(chaveDaEscolhaDoTema, null);
-      setErro(tratarFalha(falha, textosObjetivo.erro, textosObjetivo.conexaoCaiuNoMeio));
+      // E26 4b: o que nasce são as três versões do tema; o roteiro só existe depois de "Ficar com esta".
+      abrirVersoes(dado.grupo);
+    } catch (falha) {
+      // E74 PR 2a (R-a, achado do Fable de 26/11): perder a resposta NUNCA vira "a conexão caiu" com "Tentar de novo" (no iPhone, bloquear a tela derrubava a resposta com o servidor ainda
+      // escrevendo, e quem tocava ali pagava duas vezes). A tela segue o pedido pelo id: a espera continua até o servidor dizer que ficou pronto ou que falhou. Com a pessoa fora da tela,
+      // a espera com o id fica guardada, e quem voltar segue o pedido do mesmo jeito.
+      if (saiuRef.current || navegandoRef.current) return;
+      setSeguido({ pedidoId, desde: desdeMs, porque: ehFalhaDeRede(falha) ? "rede" : "outra", vistoAndando: false });
+      consultarAgora();
     } finally {
       if (!saiuRef.current && !navegandoRef.current) setEscrevendo(false);
     }
@@ -381,8 +467,41 @@ export function ObjetivoTela({
     router.push("/hoje");
   }
 
-  if (escrevendo || abrindo || retomadaDesde !== null) {
-    return <TelaEscrevendo aberto fraseDemorando={textosObjetivo.demorando} aoVoltarDepois={voltarDepois} titulo={textosObjetivo.esperaVersoesTitulo} duracao={textosObjetivo.esperaVersoesDuracao} />;
+  if (escrevendo || abrindo || retomadaDesde !== null || seguido !== null) {
+    return (
+      <TelaEscrevendo
+        aberto
+        fraseDemorando={textosObjetivo.demorando}
+        aoVoltarDepois={voltarDepois}
+        titulo={textosObjetivo.esperaVersoesTitulo}
+        duracao={textosObjetivo.esperaVersoesDuracao}
+        etapa={semRede ? textosPedidos.semRede : etapa}
+        desdeMs={desdeDoPedido}
+      />
+    );
+  }
+
+  if (ocupadoPor !== null) {
+    // Estado 6 do desenho: um roteiro desta marca já está sendo escrito; nenhuma escrita nova, nenhum custo. O Hoje mostra o que está sendo escrito.
+    return (
+      <div className={styles.pagina}>
+        <div className={styles.temaEscolhido}>
+          <span className={styles.rotulo}>{textosObjetivo.temaEscolhido}</span>
+          <span className={styles.tema}>{temaEscolhidoTexto}</span>
+        </div>
+        <div className={styles.colunaPrincipal}>
+          <div className={styles.espera}>
+            <p className={styles.fraseErro} role="status" data-ja-em-andamento>
+              {ocupadoPor}
+            </p>
+            <BarraAcao
+              secundaria={{ rotulo: textosComuns.voltar, onClick: () => router.back() }}
+              primaria={{ rotulo: textosPedidos.verOQueEstaSendoEscrito, onClick: () => router.push("/hoje") }}
+            />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (erro !== null) {

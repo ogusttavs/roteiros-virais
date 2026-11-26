@@ -136,6 +136,11 @@ export const FILAS = {
    * `roteiros-render` (a mesma trava de um vídeo por vez da edição); o worker comum nunca registra esta fila. Sem repetição da fila: a animação conta as tentativas e o próprio job se enfileira de novo.
    */
   renderizarAnimacao: "renderizar-animacao",
+  /**
+   * E74 PR 2a: de minuto em minuto, fecha o pedido de geração (roteiro, carrossel) que parou sem batimento além do prazo: pronto com as versões que já existem, ou falho (e não conta no limite).
+   * Job curto (uma consulta indexada).
+   */
+  varrerPedidos: "varrer-pedidos",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
@@ -207,6 +212,7 @@ const FILAS_CURTAS = new Set<string>([
   FILAS.transcreverEdicao,
   FILAS.limparEdicoes,
   FILAS.vigiarDisco,
+  FILAS.varrerPedidos,
 ]);
 
 const QUATRO_HORAS_S = 4 * 60 * 60;

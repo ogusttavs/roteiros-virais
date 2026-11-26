@@ -47,6 +47,7 @@ import { textosConexao } from "../../src/textos/conexao";
 import { textosGravacao } from "../../src/textos/gravacao";
 import { textosNav } from "../../src/textos/nav";
 import { textosObjetivo } from "../../src/textos/objetivo";
+import { textosPedidos } from "../../src/textos/pedidos";
 import { textosRoteiro } from "../../src/textos/roteiro";
 import { textosTemaLivre } from "../../src/textos/tema-livre";
 
@@ -518,9 +519,14 @@ test.describe("painel sem rede", () => {
     await expect(page.getByText(textosTemaLivre.tituloCompactoResultado)).toBeVisible({ timeout: 20_000 });
   });
 
-  test("gerar as versoes: a conexao cai no meio, a frase manda olhar o Hoje, e tentar de novo funciona", async ({
+  /**
+   * E74 PR 2a (R-a): o pedido nunca chegou ao servidor (a rede caiu antes). A tela não diz "a conexão caiu no meio" nem oferece tentar de novo na hora: segue o pedido pelo id, diz que o roteiro
+   * continua enquanto não há rede e, quando o servidor responde que nunca viu o pedido (passada a graça), diz que nada foi escrito; "Tentar de novo" manda o MESMO pedido.
+   */
+  test("gerar as versoes: o pedido nao chega, a tela espera em vez de oferecer pagar de novo, e tentar de novo funciona", async ({
     page,
   }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-c");
     await page.goto("/criar/objetivo?tema=0");
@@ -537,11 +543,17 @@ test.describe("painel sem rede", () => {
     await cortarRedeNaProximaAcao(page);
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
 
-    await expect(page.getByText(textosObjetivo.conexaoCaiuNoMeio)).toBeVisible();
+    await expect(page.getByText(textosPedidos.semRede)).toBeVisible();
     await expect(faixaSemConexao(page)).toBeVisible();
+    await expect(page.getByText(textosObjetivo.conexaoCaiuNoMeio)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Tentar de novo" })).toHaveCount(0);
 
     await restaurarRede(page);
     await expect(faixaSemConexao(page)).toHaveCount(0);
+    // A volta ao app pergunta na hora (R-i).
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await expect(page.getByText(textosPedidos.naoChegou)).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText(textosObjetivo.conexaoCaiuNoMeio)).toHaveCount(0);
     await page.getByRole("button", { name: "Tentar de novo" }).click();
     await ficarComAPrimeiraVersao(page, 20_000);
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 20_000 });

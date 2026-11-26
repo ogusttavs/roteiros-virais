@@ -18,9 +18,9 @@ import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoSubindoParaAviso } from "@/servicos/curva";
 import { ramosDaMarcaParaDatasSemFalha } from "@/servicos/datas";
 import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
+import { versoesNoHoje } from "@/servicos/pedidos-estado";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { agendaDoDia, atrasados, proximoDiaMarcado, somarDiasISO, semanaDaAgenda } from "@/servicos/roteiro";
-import { grupoEmAberto } from "@/servicos/versoes";
 import { textosHoje } from "@/textos/hoje";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
@@ -95,7 +95,7 @@ export default async function Hoje({ searchParams }: Props) {
   const diaVisualizado = validarDiaDaUrl(dia, hoje);
   const ehHoje = diaVisualizado === hoje;
 
-  const [semana, agendaDoDiaTodo, videoSubindo, briefing, atrasadosDoDia, emAlta, grupoAbertoBruto] = await Promise.all([
+  const [semana, agendaDoDiaTodo, videoSubindo, briefing, atrasadosDoDia, emAlta, versoesDoHoje] = await Promise.all([
     semanaDaAgenda(cliente.id, diaVisualizado),
     agendaDoDia(cliente.id, diaVisualizado),
     videoSubindoParaAviso(cliente.id),
@@ -103,17 +103,18 @@ export default async function Hoje({ searchParams }: Props) {
     ehHoje ? atrasados(cliente.id, hoje) : Promise.resolve([]),
     // E55 PR 2: o assunto em alta hoje, só em hoje. Uma falha aqui nunca derruba a agenda (o cartão só não aparece, e a falha vai para o log).
     ehHoje ? cartaoEmAltaSemFalha(cliente, hoje) : Promise.resolve(null),
-    // E26 4b: as versões que a pessoa pediu e ainda não escolheu (só o grupo mais novo; os outros ficam guardados). Uma falha aqui nunca derruba a agenda.
-    ehHoje ? grupoEmAberto(cliente.id).catch(() => null) : Promise.resolve(null),
+    // E26 4b: as versões que a pessoa pediu e ainda não escolheu (só o grupo mais novo; os outros ficam guardados). E74 PR 2a: e o pedido que anda, à parte (R-b). Uma falha aqui nunca derruba a agenda.
+    ehHoje ? versoesNoHoje(cliente.id).catch(() => null) : Promise.resolve(null),
   ]);
 
   // E60: "hoje é..." e "daqui a N dias é...", só em hoje, só com as datas gerais e as do ramo da marca (a base é curta, em `src/config/datas.ts`).
   const datas = ehHoje ? datasDeHojeEProximas(hoje, await ramosDaMarcaParaDatasSemFalha(cliente)) : null;
 
-  // Enquanto o servidor ainda escreve as versões, não há cartão: ele aparece quando as três ficam prontas.
-  const grupoAberto = grupoAbertoBruto && !grupoAbertoBruto.emEscrita ? grupoAbertoBruto : null;
-  /** E74 PR 1: o servidor ainda escreve as versões deste grupo (o Hoje mostra "escrevendo" e se atualiza sozinho). */
-  const versoesEscrevendo = Boolean(grupoAbertoBruto?.emEscrita);
+  // O grupo que falta escolher nunca é o que está sendo escrito (E74 PR 2a, R-b): os dois aparecem, cada um no seu cartão.
+  const grupoAberto = versoesDoHoje?.aberto ?? null;
+  /** E74 PR 1: o servidor ainda escreve as versões (o Hoje mostra "escrevendo" e se atualiza sozinho); PR 2a: pelo pedido, quando há. */
+  const versoesEscrevendo = Boolean(versoesDoHoje?.escrevendo);
+  const pedidoEscrevendoId = versoesDoHoje?.escrevendo && "pedidoId" in versoesDoHoje.escrevendo ? versoesDoHoje.escrevendo.pedidoId : null;
   const versoesProntas: VersoesProntasHoje | null = grupoAberto
     ? {
         grupo: grupoAberto.grupo,
@@ -198,6 +199,7 @@ export default async function Hoje({ searchParams }: Props) {
       emAlta={emAlta}
       versoesProntas={versoesProntas}
       versoesEscrevendo={versoesEscrevendo}
+      pedidoEscrevendoId={pedidoEscrevendoId}
       datas={datas}
       marcaAtiva={cliente}
       marcas={marcas}

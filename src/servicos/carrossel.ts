@@ -38,6 +38,7 @@ import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { hojeISO } from "@/lib/config";
+import { novoIdDePedido } from "@/lib/id-do-pedido";
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 import { textosCarrossel } from "@/textos/carrossel";
@@ -49,6 +50,7 @@ import { clientePorId } from "./clientes";
 import { desempenhoDaConta } from "./desempenho-da-conta";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { noticiaPorId } from "./noticias";
+import { criarPedido, ErroPedido, falharPedido, marcarEtapa, terminarPedido } from "./pedidos";
 import { leiturasDoCliente } from "./perfis-analisados";
 import { evidenciaParaRoteiro, evidenciaPorIds, formatarModeloNicho, modeloNichoAtual, reguaDoSetor } from "./pesquisa";
 import { ramoAtualDoCliente } from "./ramos";
@@ -201,18 +203,54 @@ export function aplicarTrocasNosCampos(d: carrosselIA.SaidaCarrossel, trocas: Re
 /** A primeira parte do par da trava de aviso do Postgres (cada família de trava tem a sua; ver `lib/reserva-de-envio.ts`). */
 export const TRAVA_DA_GERACAO_DO_CARROSSEL = 6500;
 
+const FRASE_CARROSSEL_EM_ANDAMENTO = "Já tem um carrossel sendo escrito para esta marca. Espere ele ficar pronto.";
+
+/** O que a lista dos pedidos diz do carrossel enquanto ele é escrito: o tema que a pessoa deu, ou de onde ele vem. */
+function tituloDoPedidoDoCarrossel(de: DeOndeVem): string {
+  if (de.origem === "tema") return (de.titulo ?? de.texto ?? "").trim() || textosCarrossel.tituloDoPedido.tema;
+  return de.origem === "roteiro" ? textosCarrossel.tituloDoPedido.roteiro : textosCarrossel.tituloDoPedido.noticia;
+}
+
 /**
  * Uma geração de carrossel por vez por marca: pega a trava do banco (`pg_try_advisory_lock`, sem migração), lê o teto (`conferirTeto`, que devolve a recusa ou nulo) JÁ dentro da trava e só então gera.
  * Duplo clique ou dois pedidos ao mesmo tempo: o segundo recebe "já tem um carrossel sendo escrito" e não gasta a IA. A trava solta ao fim, e sozinha se o processo cair.
+ *
+ * E74 PR 2a: dentro da trava, o carrossel nasce como um pedido (`pedidos_de_geracao`, tipo `carrossel`) antes de gastar a IA. Enquanto anda, ele reserva o lugar dele no teto do teste (um roteiro
+ * pedido ao mesmo tempo é recusado antes de gastar, decisão do Gustavo de 26/11: "um de cada tipo", com a folga reservada) e aparece no que a marca tem andando; o índice único do pedido é a
+ * segunda trava, a que sobrevive ao processo. Pronto, o pedido guarda o id do carrossel; falho, deixa de contar no limite (R-o).
  */
 export async function gerarCarrosselComTrava<R>(clienteId: number, pedido: PedidoDeCarrossel, conferirTeto: () => Promise<R | null>): Promise<{ recusa: R } | { carrossel: Carrossel }> {
   const reserva = await reservarEnvioPorTrava(TRAVA_DA_GERACAO_DO_CARROSSEL, clienteId, "carrossel");
-  if (reserva === "ocupada") throw new ErroCarrossel("Já tem um carrossel sendo escrito para esta marca. Espere ele ficar pronto.", "em-andamento");
+  if (reserva === "ocupada") throw new ErroCarrossel(FRASE_CARROSSEL_EM_ANDAMENTO, "em-andamento");
   if (reserva === "indisponivel") throw new ErroCarrossel("Estamos escrevendo vários carrosséis agora. Tente de novo em instantes.", "indisponivel");
   try {
     const recusa = await conferirTeto();
     if (recusa !== null) return { recusa };
-    return { carrossel: await gerarCarrossel(clienteId, pedido) };
+    let pedidoId: string;
+    try {
+      ({
+        pedido: { id: pedidoId },
+      } = await criarPedido({
+        id: novoIdDePedido(),
+        clienteId,
+        tipo: "carrossel",
+        titulo: tituloDoPedidoDoCarrossel(pedido.de),
+        parametros: JSON.parse(JSON.stringify(pedido)) as Record<string, unknown>,
+      }));
+    } catch (erro) {
+      if (erro instanceof ErroPedido && erro.codigo === "ja-em-andamento") throw new ErroCarrossel(FRASE_CARROSSEL_EM_ANDAMENTO, "em-andamento");
+      throw erro;
+    }
+    await marcarEtapa(pedidoId, { estado: "escrevendo" });
+    try {
+      const carrossel = await gerarCarrossel(clienteId, pedido);
+      await terminarPedido(pedidoId, { tipo: "carrossel", id: String(carrossel.id) });
+      return { carrossel };
+    } catch (erro) {
+      // A frase do erro do carrossel é para a pessoa; o resto, a de que não conta no limite. O erro segue para a rota responder como sempre.
+      await falharPedido(pedidoId, { tipo: "carrossel", codigo: erro instanceof ErroCarrossel ? erro.codigo : erro instanceof Error ? erro.name : "erro", motivo: erro instanceof ErroCarrossel ? erro.message : null });
+      throw erro;
+    }
   } finally {
     await reserva.soltar();
   }

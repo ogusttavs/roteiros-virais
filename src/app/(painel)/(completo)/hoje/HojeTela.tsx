@@ -68,6 +68,8 @@ type Props = {
   versoesProntas: VersoesProntasHoje | null;
   /** E74 PR 1: o servidor ainda escreve as versões do grupo mais novo. */
   versoesEscrevendo?: boolean;
+  /** E74 PR 2a: o pedido de roteiro que anda agora; o cartão "Escrevendo" o segue pelo id (R-b). */
+  pedidoEscrevendoId?: string | null;
   /** E60: as datas de hoje e as dos próximos 7 dias que valem para a marca (só em hoje); nulo em outro dia. */
   datas: { hoje: DataMarcada[]; proximas: DataProxima[] } | null;
   marcaAtiva: MarcaResumo;
@@ -392,14 +394,16 @@ export function HojeTela({
   emAlta,
   versoesProntas: versoesProntasDoServidor,
   versoesEscrevendo: versoesEscrevendoNoServidor = false,
+  pedidoEscrevendoId = null,
   datas,
   marcaAtiva,
   marcas,
   nomePessoa,
 }: Props) {
   const router = useRouter();
-  const { escrevendo: versoesEscrevendo, prontasAoVivo } = useVersoesEscrevendo(versoesEscrevendoNoServidor, Boolean(versoesProntasDoServidor));
-  const versoesProntas: VersoesProntasHoje | null = versoesProntasDoServidor ?? prontasAoVivo;
+  const { escrevendo: versoesEscrevendo, prontasAoVivo } = useVersoesEscrevendo(versoesEscrevendoNoServidor, pedidoEscrevendoId);
+  // E74 PR 2a: as que acabaram de ficar prontas (o pedido que o cartão seguia) passam na frente do grupo mais antigo que o servidor mostrou.
+  const versoesProntas: VersoesProntasHoje | null = prontasAoVivo ?? versoesProntasDoServidor;
   const { trocando, marcaAlvo } = useTrocaMarca();
   const { avisarFalhaDeRede } = useConexao();
   const [ocupado, iniciarTransicao] = useTransition();
