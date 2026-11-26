@@ -46,6 +46,7 @@ export const ROTULO_DA_TAREFA: Record<string, string> = {
   sugerirPalavrasDoAssunto: "Sugerir palavras para um assunto das Notícias",
   sugerirFoco: "Sugerir o foco da conta",
   ganchosAlternativos: "Ganchos alternativos do roteiro",
+  repararFato: "Reparar fato sem apoio no texto",
   derivarBuscaDoFoco: "Montar a busca do foco da conta",
   decidirEdicao: "IA: decidir a edição dos vídeos",
   verificarEdicao: "IA: conferir a legenda e o título dos vídeos",

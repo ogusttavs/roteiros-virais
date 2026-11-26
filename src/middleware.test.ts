@@ -43,6 +43,18 @@ describe("middleware", () => {
     }
   });
 
+  it("/api/saude exata e publica, /api/saude/viagem (dado de operacao) pede sessao (T100, M2)", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/api/saude")))).toBe(false);
+    for (const caminho of ["/api/saude/viagem", "/api/saude/qualquer", "/api/saudeX"]) {
+      const resposta = middleware(requisicao(caminho));
+      expect(resposta.status, caminho).toBe(307);
+      expect(new URL(resposta.headers.get("location")!).pathname).toBe("/entrar");
+    }
+    vi.mocked(getSessionCookie).mockReturnValue("cookie");
+    expect(foiRedirecionada(middleware(requisicao("/api/saude/viagem")))).toBe(false);
+  });
+
   it("/dados passa sem cookie de sessao (rota publica, exclusao de dados da Meta, E6 parte 3, item 8)", () => {
     vi.mocked(getSessionCookie).mockReturnValue(null);
     expect(foiRedirecionada(middleware(requisicao("/dados")))).toBe(false);

@@ -28,6 +28,8 @@ function separarFalha(linha: string): { erro: string; proximoPasso: string } {
 type Props = {
   roteiroId: number;
   visao: VisaoDaAnimacao;
+  /** Abre o roteiro para editar (para a pessoa completar os espaços entre colchetes). */
+  aoCompletar?: () => void;
 };
 
 /**
@@ -35,7 +37,7 @@ type Props = {
  * texto do roteiro até o arquivo para baixar: pedir, prévia sendo montada, prévia para ver (aprovar ou "Agora não"), final sendo montado, final para baixar, ou falha com "Tentar de novo".
  * No "ver como" o cartão só mostra em que ponto está: nenhum botão.
  */
-export function ChamadoAnimacao({ roteiroId, visao }: Props) {
+export function ChamadoAnimacao({ roteiroId, visao, aoCompletar }: Props) {
   const tratarFalha = useTratarFalha();
   const [animacao, setAnimacao] = useState<VistaDaAnimacao | null>(visao.animacao);
   const [ocupado, setOcupado] = useState(false);
@@ -95,6 +97,7 @@ export function ChamadoAnimacao({ roteiroId, visao }: Props) {
   const frasesDaFalha = separarFalha(linha ?? "");
   const andamento = animacao?.progresso != null && ESTADOS_DE_ESPERA.has(animacao.estado) ? animacao.progresso : null;
   const mostrarBotoes = !visao.verComo;
+  const faltaCompletar = !animacao && visao.colchetes > 0;
 
   return (
     <Cartao variante="recuado" className={styles.chamado} data-chamado-animacao data-estado-da-animacao={estado ?? undefined}>
@@ -115,6 +118,10 @@ export function ChamadoAnimacao({ roteiroId, visao }: Props) {
             <p className={styles.estado} role="status">
               {linha}
             </p>
+          ) : faltaCompletar ? (
+            <p className={styles.nota} data-completar-colchetes>
+              {t.chamado.completar(visao.colchetes)}
+            </p>
           ) : (
             <p className={styles.nota}>{t.chamado.texto}</p>
           )}
@@ -128,6 +135,17 @@ export function ChamadoAnimacao({ roteiroId, visao }: Props) {
         <>
           <video className={styles.video} controls playsInline preload="metadata" src={`/api/animacao/${animacao.id}/previa`} onError={() => setVideoQuebrou(true)} data-previa-da-animacao />
           {videoQuebrou ? <p className={styles.erro}>{t.aviso.videoQuebrou}</p> : null}
+          {animacao.foraDoVideo.length > 0 ? (
+            <div className={styles.foraDoVideo} data-fora-do-video>
+              <p className={styles.nota}>{t.aviso.foraDoVideo(animacao.foraDoVideo.length)}</p>
+              <ul className={styles.listaDeFora}>
+                {animacao.foraDoVideo.map((frase, i) => (
+                  <li key={i}>{frase}</li>
+                ))}
+              </ul>
+              <p className={styles.nota}>{t.aviso.foraDoVideoDica}</p>
+            </div>
+          ) : null}
         </>
       ) : null}
 
@@ -149,12 +167,19 @@ export function ChamadoAnimacao({ roteiroId, visao }: Props) {
 
       {mostrarBotoes ? (
         <div className={styles.botoes}>
-          {!animacao ? (
+          {faltaCompletar ? (
+            aoCompletar ? (
+              <Botao type="button" variante="secundario" onClick={aoCompletar} data-completar-roteiro>
+                {t.chamado.botaoCompletar}
+              </Botao>
+            ) : null
+          ) : null}
+          {!animacao && !faltaCompletar ? (
             <Botao type="button" variante="secundario" precisaDeRede disabled={ocupado || visao.outraEmAndamento} carregando={ocupado} onClick={() => void rodar(() => pedirAnimacaoAction(roteiroId))} data-pedir-animacao>
               {t.chamado.botao}
             </Botao>
           ) : null}
-          {!animacao && visao.outraEmAndamento ? <p className={styles.nota}>{t.frases["em-andamento"]}</p> : null}
+          {!animacao && !faltaCompletar && visao.outraEmAndamento ? <p className={styles.nota}>{t.frases["em-andamento"]}</p> : null}
 
           {animacao && estado === "previa_pronta" ? (
             <>

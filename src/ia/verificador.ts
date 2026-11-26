@@ -11,8 +11,9 @@ import { EMOJI, encontrarJargaoDoMotor, encontrarProblemas, MOTIVO_EMOJI, MOTIVO
 import { dadosForaDasFontes } from "@/servicos/conferencia-da-pesquisa";
 
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
-import { ErroIA } from "./erro";
+import { ErroReprovadoDuasVezes } from "./erro";
 import { NUMEROS_REGRAS_STORY } from "./prompts/regras-formato";
+import * as repararFato from "./prompts/repararFato";
 import type { InstrucaoAbertura } from "./prompts/roteiro";
 import * as verificarTexto from "./prompts/verificarTexto";
 import type { GeneroTexto } from "./prompts/verificarTexto";
@@ -742,7 +743,20 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
    * garante que ele vem por último nas duas tentativas.
    */
   lembreteFinal?: string;
+  /**
+   * T80 (26/11/2026): o reparo dirigido do que ainda reprova depois das duas tentativas por fato sem apoio nas fontes (ou pelo que `motivoReparavel` aceitar, como a promessa em saúde). Com ele, a segunda
+   * tentativa recebe a ordem de tirar a frase ou trocar por um espaço entre colchetes (sem reescrever o resto nem inventar outro fato), e, se mesmo assim reprovar só por isso, um modelo barato
+   * (`prompts/repararFato.ts`) recebe os campos, o motivo e as fontes e devolve só os campos a trocar; `aplicarCampos` devolve a saída com eles trocados, e o resultado passa de novo por TODAS as
+   * conferências (até `RODADAS_DE_REPARO` vezes). Sem este parâmetro, nada muda.
+   */
+  repararFato?: {
+    aplicarCampos: (dados: T, campos: Record<string, string>) => T;
+    motivoReparavel: (motivo: string) => boolean;
+  };
 };
+
+/** Quantas vezes o reparo roda: o verificador de texto aponta um fato por vez, então duas rodadas pegam dois. */
+export const RODADAS_DE_REPARO = 2;
 
 export type ResultadoVerificacao<T> = {
   dados: T;
@@ -794,11 +808,85 @@ export async function gerarComVerificacao<T>(
     faixaDuracaoNicho: undefined,
     // E49 PR 1: a heurística da ficha "que guardem" vale só na primeira tentativa, como a faixa de duração: nunca derruba a geração sozinha.
     ficha: undefined,
-    entrada: comLembrete(`${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`),
+    entrada: comLembrete(`${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.${primeira.reparavel ? ` ${ORDEM_DE_TIRAR_O_FATO}` : ""}`),
   }, 2);
   if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId, avisos: segunda.avisos };
 
-  throw new ErroIA(`tarefa "${params.tarefa}" reprovada duas vezes: ${segunda.motivos.join("; ")}`);
+  const reparado = segunda.reparavel ? await repararOQueSobrou(params, segunda) : null;
+  if (reparado) return reparado;
+
+  throw new ErroReprovadoDuasVezes(`tarefa "${params.tarefa}" reprovada duas vezes: ${segunda.motivos.join("; ")}`, segunda.dados);
+}
+
+/** O que a segunda tentativa lê a mais quando a primeira reprovou por fato sem apoio (T80): tirar a frase, não reescrever o slide e não inventar outro costume. */
+const ORDEM_DE_TIRAR_O_FATO =
+  "Para isso, tire só a frase apontada (ou troque por um espaço entre colchetes para a pessoa completar, como [conte aqui como é na sua clínica]) e mantenha o resto do texto como estava. " +
+  "Não escreva nenhum costume, frequência, público atendido, estrutura, produto ou caso da marca que as fontes não tragam; na dúvida, fale do ofício em geral, sem afirmar nada sobre a marca.";
+
+/**
+ * T80: o reparo dirigido (ver `repararFato` em `ParametrosGeracaoVerificada`). Devolve o resultado aprovado, ou nulo quando o reparo não resolveu (quem chama segue para o `ErroIA` de sempre).
+ * A saída consertada é registrada como uma geração da própria tarefa (modelo "reparo"), com os custos do reparo e das conferências já nas suas linhas.
+ */
+async function repararOQueSobrou<T>(
+  params: ParametrosGeracaoVerificada<T>,
+  ultima: { dados: T; motivos: string[] },
+): Promise<ResultadoVerificacao<T> | null> {
+  const reparo = params.repararFato;
+  if (!reparo) return null;
+  let atual = ultima;
+  for (let rodada = 0; rodada < RODADAS_DE_REPARO; rodada += 1) {
+    const campos = params.extrairCampos(atual.dados);
+    const inicio = Date.now();
+    const resposta = await gerarEstruturado({
+      tarefa: "repararFato",
+      nivel: repararFato.nivel,
+      effort: repararFato.esforco,
+      schema: repararFato.schema,
+      sistemaEstavel: repararFato.montarSistemaEstavel(),
+      entrada: repararFato.montarEntrada({ campos, motivos: atual.motivos, fontes: params.fontesDosFatos ?? "" }),
+    });
+    await registrarGeracao({
+      tarefa: "repararFato",
+      versaoPrompt: repararFato.versao,
+      modelo: resposta.modelo,
+      nivel: repararFato.nivel,
+      clienteId: params.clienteId,
+      entradas: { motivos: atual.motivos },
+      saida: resposta.dados,
+      uso: {
+        tokensEntrada: resposta.tokensEntrada,
+        tokensSaida: resposta.tokensSaida,
+        tokensCacheLeitura: resposta.tokensCacheLeitura,
+        tokensCacheEscrita: resposta.tokensCacheEscrita,
+      },
+      duracaoMs: Date.now() - inicio,
+    });
+    // Só os campos que existem e mudaram de verdade; o resto da saída fica como está.
+    const trocas: Record<string, string> = {};
+    for (const { campo, texto } of resposta.dados.campos) {
+      if (campo in campos && texto.trim() !== "" && texto.trim() !== campos[campo].trim()) trocas[campo] = texto.trim();
+    }
+    if (Object.keys(trocas).length === 0) return null;
+
+    const conferencia = await conferirSaida(params, reparo.aplicarCampos(atual.dados, trocas), 2);
+    if (conferencia.aprovado) {
+      const geracaoId = await registrarGeracao({
+        tarefa: params.tarefa,
+        versaoPrompt: params.versaoPrompt,
+        modelo: "reparo",
+        nivel: params.nivel,
+        clienteId: params.clienteId,
+        entradas: { entrada: params.entrada, reparoDeFato: true, camposTrocados: Object.keys(trocas) },
+        evidencias: conferencia.evidencias,
+        saida: conferencia.dados as Record<string, unknown>,
+        uso: { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0 },
+      });
+      return { dados: conferencia.dados, geracaoId, avisos: params.avisarExtra?.(conferencia.dados, 2) ?? [] };
+    }
+    if (!conferencia.reparavel) return null;
+    atual = { dados: conferencia.dados, motivos: conferencia.motivos };
+  }
+  return null;
 }
 
 /**
@@ -839,15 +927,14 @@ function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados
   };
 }
 
-async function tentarGerarEVerificar<T>(
-  params: ParametrosGeracaoVerificada<T>,
-  tentativa: 1 | 2 = 1,
-): Promise<{ aprovado: boolean; dados: T; motivos: string[]; geracaoId: number; avisos: string[] }> {
-  const inicio = Date.now();
-  const resultado = await gerarEstruturado(params);
-  const duracaoMs = Date.now() - inicio;
+type ConferenciaDaSaida<T> = { aprovado: boolean; dados: T; motivos: string[]; evidencias: number[]; reparavel: boolean };
 
-  let dados = resultado.dados;
+/**
+ * A conferência de uma saída (locais, correção mecânica, `verificarExtra` e o verificador de texto), sem gerar nada: serve à saída de uma tentativa e à saída consertada pelo reparo. `reparavel`
+ * diz que o que reprovou é só fato sem apoio (o verificador de texto apontou o fato) ou o que a tarefa aceita consertar por reparo (`repararFato.motivoReparavel`, a promessa em saúde do carrossel).
+ */
+export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, dadosDaSaida: T, tentativa: 1 | 2): Promise<ConferenciaDaSaida<T>> {
+  let dados = dadosDaSaida;
   let campos = params.extrairCampos(dados);
   let evidencias = params.extrairEvidencias?.(dados) ?? [];
   // As conferências locais de sempre mais as da tarefa (`verificarExtra`); a correção mecânica abaixo é conferida pelas duas, nunca só pelas de sempre.
@@ -885,6 +972,7 @@ async function tentarGerarEVerificar<T>(
 
   let aprovado = local.aprovado;
   let motivos = local.motivos;
+  let reparavel = !aprovado && Boolean(params.repararFato) && motivos.length > 0 && motivos.every((m) => params.repararFato?.motivoReparavel(m));
 
   /**
    * Sem nenhum campo (segunda rodada do PR #42, item 4: a saída vazia do
@@ -914,6 +1002,7 @@ async function tentarGerarEVerificar<T>(
     aprovado = verificacao.dados.aprovado;
     // Reprovando por fato, o motivo carrega o fato e a frase mais próxima das fontes (`motivoDaConferencia`): é o que a segunda tentativa recebe para corrigir.
     motivos = verificacao.dados.aprovado ? [] : [verificarTexto.motivoDaConferencia(verificacao.dados)];
+    reparavel = !verificacao.dados.aprovado && Boolean(verificacao.dados.fatoEspecifico) && Boolean(params.repararFato);
 
     await registrarGeracao({
       tarefa: "verificarTexto",
@@ -931,6 +1020,19 @@ async function tentarGerarEVerificar<T>(
       },
     });
   }
+
+  return { aprovado, dados, motivos, evidencias, reparavel };
+}
+
+async function tentarGerarEVerificar<T>(
+  params: ParametrosGeracaoVerificada<T>,
+  tentativa: 1 | 2 = 1,
+): Promise<{ aprovado: boolean; dados: T; motivos: string[]; geracaoId: number; avisos: string[]; reparavel: boolean }> {
+  const inicio = Date.now();
+  const resultado = await gerarEstruturado(params);
+  const duracaoMs = Date.now() - inicio;
+
+  const { aprovado, dados, motivos, evidencias, reparavel } = await conferirSaida(params, resultado.dados, tentativa);
 
   const geracaoId = await registrarGeracao({
     tarefa: params.tarefa,
@@ -951,7 +1053,7 @@ async function tentarGerarEVerificar<T>(
     duracaoMs,
   });
 
-  return { aprovado, dados, motivos, geracaoId, avisos: params.avisarExtra?.(dados, tentativa) ?? [] };
+  return { aprovado, dados, motivos, geracaoId, avisos: params.avisarExtra?.(dados, tentativa) ?? [], reparavel };
 }
 
 /**

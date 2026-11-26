@@ -7,6 +7,7 @@ import type { EstadoDaAnimacao } from "@/config/animacao-fila";
 export type CodigoDaAnimacao =
   | "nao-achou"
   | "sem-texto"
+  | "colchete"
   | "longo"
   | "em-andamento"
   | "nao-comecou"
@@ -24,6 +25,7 @@ export const textosAnimacao = {
   frases: {
     "nao-achou": "Não achamos esse vídeo. Volte para o roteiro e comece de novo.",
     "sem-texto": "Este roteiro não tem texto para virar vídeo. Escolha outro roteiro.",
+    colchete: "Seu roteiro ainda tem espaços para completar, entre colchetes. Complete esses trechos no roteiro e peça o vídeo de novo.",
     longo: "O vídeo em animação é para vídeos curtos. Neste roteiro, grave você mesmo.",
     "em-andamento": "Você já tem um vídeo em animação sendo feito. Espere ele ficar pronto ou escolha \"Agora não\" na prévia.",
     "nao-comecou": "Não foi possível começar agora. Tente de novo em instantes.",
@@ -36,6 +38,8 @@ export const textosAnimacao = {
     texto: "Fazemos um vídeo só com as palavras do seu roteiro, sem você aparecer.",
     botao: "Fazer em animação",
     botaoOcupado: "Pedindo...",
+    completar: (quantos: number) => (quantos === 1 ? "Falta completar 1 espaço entre colchetes no seu roteiro. O vídeo mostra só o que está escrito, então complete antes de pedir." : `Faltam completar ${quantos} espaços entre colchetes no seu roteiro. O vídeo mostra só o que está escrito, então complete antes de pedir.`),
+    botaoCompletar: "Completar o roteiro",
   },
   estados: {
     pedida: (tempo: string) => `Estamos montando a prévia do seu vídeo. Costuma levar ${tempo}. Pode ficar nesta tela.`,
@@ -55,6 +59,8 @@ export const textosAnimacao = {
   aviso: {
     verComo: "Você está vendo como a pessoa. Aqui só dá para ler: pedir, aprovar e baixar são dela.",
     videoQuebrou: "Não foi possível tocar o vídeo aqui. Atualize a tela.",
+    foraDoVideo: (quantas: number) => (quantas === 1 ? "O vídeo tem no máximo 1 minuto, então 1 frase do meio ficou de fora:" : `O vídeo tem no máximo 1 minuto, então ${quantas} frases do meio ficaram de fora:`),
+    foraDoVideoDica: "Se alguma faz falta, encurte o roteiro, escolha \"Agora não\" e peça o vídeo de novo.",
     andamento: (porcento: number) => `${porcento}% pronto`,
   },
 } as const;

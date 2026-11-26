@@ -37,6 +37,7 @@
     "worker": "tsx src/jobs/worker.ts",
     "job": "tsx src/jobs/rodar.ts",
     "admin:criar": "tsx scripts/criar-admin.ts",
+    "marca:demonstracao": "tsx scripts/marca-demonstracao.ts",
     "carrossel:ilustrar": "tsx scripts/carrossel-ilustrar.ts",
     "marca:apagar": "tsx scripts/apagar-marca.ts",
     "posts:enviar": "tsx scripts/enviar-posts-prontos.ts",

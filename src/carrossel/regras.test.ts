@@ -188,6 +188,29 @@ describe("legenda e hashtags", () => {
   });
 });
 
+describe("promessaEmSaude: a frase que desmente a promessa passa, a promessa de verdade reprova (B1, 26/11/2026)", () => {
+  it("negação antes ou depois do trecho não é promessa", () => {
+    for (const frase of [
+      "O clareamento não dura para sempre",
+      "Resultado garantido não existe",
+      "Gengivite não se cura sozinha",
+      "Nunca prometa clareamento definitivo",
+      "É mito que o clareamento dura para sempre",
+      "Dizer que o resultado dura para sempre é mito",
+    ]) {
+      expect(promessaEmSaude(frase), frase).toBeNull();
+    }
+  });
+  it("a promessa de verdade continua reprovando, inclusive com negação de outra coisa", () => {
+    expect(promessaEmSaude("O resultado dura para sempre")).toBe("para sempre");
+    expect(promessaEmSaude("Clareamento garantido")).toBe("garantido");
+    expect(promessaEmSaude("Não se preocupe, o resultado é garantido")).toBe("garantido");
+    expect(promessaEmSaude("Escove bem. Seu sorriso fica branco para sempre")).toBe("fica branco");
+    // uma frase negada e uma promessa na mesma fala: a promessa pega
+    expect(promessaEmSaude("Não dura para sempre sozinho, mas com a gente é garantido")).toBe("garantido");
+  });
+});
+
 describe("promessaEmSaude", () => {
   it("acha resultado, cura, garantia e prazo, devolvendo o trecho como a pessoa escreveu", () => {
     expect(promessaEmSaude("Com o clareamento, o dente volta ao branco em uma sessão.")).toBe("volta ao branco");

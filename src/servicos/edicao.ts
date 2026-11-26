@@ -18,7 +18,8 @@ import { GUARDA_DO_BRUTO_MS, DESLOCAMENTO_DE_BRASILIA_H, ENVIO_DA_EDICAO_PARADO_
 import { tipoDeVideoAceito } from "@/config/publicacao";
 import { db } from "@/db";
 import { edicoes, type Edicao, type EstadoDaEdicao } from "@/db/schema";
-import { apagarArquivoDaEdicao, ErroDoArquivoDeEdicao, caminhoNoVolume, guardarBruto } from "@/edicao/arquivos";
+import { apagarArquivoDaEdicao, ErroDoArquivoDeEdicao, caminhoNoVolume, guardarBruto, primeirosBytesDoArquivoDaEdicao } from "@/edicao/arquivos";
+import { comecaComoMp4OuMov } from "@/edicao/entrada-segura";
 import { ErroDeSondagem, recusaDaSondagem, sondarVideo, type Sondagem } from "@/edicao/sondagem";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
@@ -263,6 +264,13 @@ export async function receberVideoDaEdicao(entrada: EntradaDoVideoDaEdicao, deps
     logger.warn({ clienteId, edicaoId, motivo: erro instanceof ErroDoArquivoDeEdicao ? erro.message : "erro" }, "edicao: o video nao chegou inteiro");
     await falhar(edicaoId, clienteId, "envio-interrompido", agora);
     return semStatus("envio-interrompido", 400);
+  }
+
+  // O que o navegador declarou não vale (achado A2 de 26/11/2026): o arquivo tem de começar como MP4 ou MOV, pelos bytes, antes de qualquer ffprobe ou ffmpeg encostar nele.
+  if (!comecaComoMp4OuMov(await primeirosBytesDoArquivoDaEdicao(relativo))) {
+    await apagarArquivoDaEdicao(relativo);
+    await falhar(edicaoId, clienteId, "arquivo-tipo", agora);
+    return semStatus("arquivo-tipo", 422);
   }
 
   let sondagem: Sondagem;

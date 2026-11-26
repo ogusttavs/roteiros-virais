@@ -105,8 +105,11 @@ async function gerarVideos(): Promise<Record<string, Buffer>> {
   ffmpeg(...IMAGEM("640x360", 15), ...SOM, "-t", "5", ...CODECS, g("deitado.mp4"));
   ffmpeg("-display_rotation", "90", "-i", g("deitado.mp4"), "-c", "copy", g("girado.mp4"));
   await writeFile(g("falso.mp4"), Buffer.from("isto nao e um video, so bytes soltos ".repeat(200)));
+  // A2 (26/11/2026): a lista do ffmpeg com nome de vídeo; e uma caixa `ftyp` de verdade seguida de lixo (passa pelos bytes, o ffprobe é quem recusa).
+  await writeFile(g("lista.mp4"), Buffer.from("ffconcat version 1.0\nfile 'ed-1.video'\n"));
+  await writeFile(g("ftyp-quebrado.mp4"), Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from("ftypisom"), Buffer.alloc(200, 7)]));
   const saida: Record<string, Buffer> = {};
-  for (const nome of ["bom", "quatro-k", "mudo", "curto", "longo", "girado", "falso"]) saida[nome] = await readFile(g(`${nome}.mp4`));
+  for (const nome of ["bom", "quatro-k", "mudo", "curto", "longo", "girado", "falso", "lista", "ftyp-quebrado"]) saida[nome] = await readFile(g(`${nome}.mp4`));
   return saida;
 }
 
@@ -425,7 +428,9 @@ describe("vídeo recusado", () => {
     { nome: "mais de 3 minutos", video: "longo", codigo: "longo" },
     { nome: "curto demais", video: "curto", codigo: "curto" },
     { nome: "sem som", video: "mudo", codigo: "sem-som" },
-    { nome: "um arquivo que não é vídeo", video: "falso", codigo: "nao-abriu" },
+    { nome: "um arquivo que não é vídeo", video: "falso", codigo: "arquivo-tipo" },
+    { nome: "uma lista do ffmpeg com extensão de vídeo", video: "lista", codigo: "arquivo-tipo" },
+    { nome: "começa como MP4 mas o ffprobe não abre", video: "ftyp-quebrado", codigo: "nao-abriu" },
   ];
 
   for (const caso of casos) {
