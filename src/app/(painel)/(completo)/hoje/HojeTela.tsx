@@ -14,7 +14,6 @@ import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
 import { textosRoteiro } from "@/textos/roteiro";
 import { textosVersoesNoHoje } from "@/textos/versoes";
-import { useVersoesEscrevendo } from "./useVersoesEscrevendo";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { CartaoDeData } from "@/ui/componentes/CartaoDeData";
 import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
@@ -36,6 +35,7 @@ import { HojeCabecalho } from "./HojeCabecalho";
 import styles from "./HojeTela.module.css";
 import { MenuAcoesAgenda } from "./MenuAcoesAgenda";
 import { useDesfazerArquivar } from "./useDesfazerArquivar";
+import { useVersoesEscrevendo } from "./useVersoesEscrevendo";
 
 export type AvisoBriefingAgenda = { nota: string; meta: string };
 export type ProximoMarcado = { quando: string; rotuloFormato: string };
