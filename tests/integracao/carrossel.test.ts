@@ -295,6 +295,32 @@ describe("gerarCarrossel", () => {
     expect(await db().select().from(carrosseis).where(eq(carrosseis.clienteId, clienteId))).toHaveLength(0);
   });
 
+  it("T80: fato inventado nas duas tentativas é consertado pelo reparo (só o campo apontado), e o reparo que não resolve continua falhando", async () => {
+    const clienteId = await criarCliente();
+    await criarVideo("ev-fato", "mancha de vinho no estofado");
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-fato-sempre]"));
+    expect(c.slides).toHaveLength(7);
+    expect(JSON.stringify(c.slides)).not.toContain("mock:fato-inventado");
+    // O resto do slide fica como a IA escreveu.
+    expect(c.slides[1].texto).toBe("Olhe com calma o que importa e faça um passo de cada vez.");
+    const geracoes = await db().select().from(geracoesIA).where(and(eq(geracoesIA.clienteId, clienteId)));
+    const por = (t: string) => geracoes.filter((g) => g.tarefa === t);
+    expect(por("carrossel")).toHaveLength(3);
+    expect(por("repararFato")).toHaveLength(1);
+    expect(por("carrossel").map((g) => g.modelo)).toContain("reparo");
+    // A 2ª tentativa recebeu a ordem de tirar a frase e não inventar outra coisa.
+    expect(JSON.stringify(por("carrossel").map((g) => g.entradas))).toContain("tire só a frase apontada");
+    // Só na 1ª tentativa: a 2ª já sai limpa, sem reparo.
+    await db().delete(carrosseis);
+    await db().delete(geracoesIA);
+    await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-fato-na-1a]"));
+    expect((await db().select().from(geracoesIA)).filter((g) => g.tarefa === "repararFato")).toHaveLength(0);
+    // O reparo que não muda nada: reprova de vez, sem carrossel gravado.
+    await db().delete(carrosseis);
+    await expect(gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-fato-sempre] [mock:reparo-nao-resolve]"))).rejects.toThrow();
+    expect(await db().select().from(carrosseis).where(eq(carrosseis.clienteId, clienteId))).toHaveLength(0);
+  });
+
   it("de um roteiro que não é da marca: não acha", async () => {
     const clienteId = await criarCliente();
     await expect(gerarCarrossel(clienteId, { quantidade: 5, de: { origem: "roteiro", roteiroId: 999999 } })).rejects.toThrow(/roteiro/);

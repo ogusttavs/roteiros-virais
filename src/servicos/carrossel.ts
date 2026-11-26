@@ -153,6 +153,31 @@ function conformidadeDoCarrossel(slides: SlideDoCarrossel[], contexto: { fontes:
   );
 }
 
+/**
+ * T80: o reparo dirigido troca só os campos que reprovaram por fato sem apoio (ou por promessa em saúde). Os campos têm o nome "slide N campo K" (a ordem de `textoDoSlide`, como em `extrairCampos`);
+ * cada troca volta ao campo cru da saída da IA que tem exatamente aquele texto (os textos que o código monta, como o contexto da fala e o número com unidade, nunca casam e ficam como estão).
+ */
+export function aplicarTrocasNosCampos(d: carrosselIA.SaidaCarrossel, trocas: Record<string, string>, ramoSaude: boolean): carrosselIA.SaidaCarrossel {
+  const slides = d.slides.map((s) => ({ ...s, linhas: [...s.linhas], acoes: [...s.acoes] }));
+  const campos = ["rotulo", "titulo", "texto", "antes", "depois", "quem", "contexto", "fonte", "valor"] as const;
+  slidesDaSaida(d.slides, { ramoSaude }).forEach((feito, i) => {
+    textoDoSlide(feito)
+      .filter((t) => t !== feito.referencia)
+      .forEach((original, k) => {
+        const novo = trocas[`slide ${i + 1} campo ${k + 1}`];
+        if (novo === undefined) return;
+        const cru = slides[i];
+        const chave = campos.find((c) => cru[c].trim() === original);
+        if (chave) cru[chave] = novo;
+        else {
+          cru.linhas = cru.linhas.map((l) => (l.trim() === original ? novo : l));
+          cru.acoes = cru.acoes.map((l) => (l.trim() === original ? novo : l));
+        }
+      });
+  });
+  return { ...d, slides, legenda: trocas.legenda ?? d.legenda };
+}
+
 /** A primeira parte do par da trava de aviso do Postgres (cada família de trava tem a sua; ver `lib/reserva-de-envio.ts`). */
 export const TRAVA_DA_GERACAO_DO_CARROSSEL = 6500;
 
@@ -288,6 +313,8 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     }),
     fontesDosFatos,
     conferirNumerosNasFontes: true,
+    // T80: o que sobra reprovado depois das duas tentativas por fato sem apoio ou promessa em saúde é consertado por um reparo barato, só nos campos apontados.
+    repararFato: { aplicarCampos: (d, trocas) => aplicarTrocasNosCampos(d, trocas, ramoSaude), motivoReparavel: (m) => m.includes("em saúde o slide não pode prometer") },
     lembreteFinal: carrosselIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,
     citarProibicaoVale: origem.temaDaPessoa,
