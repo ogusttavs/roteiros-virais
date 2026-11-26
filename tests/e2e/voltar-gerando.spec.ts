@@ -145,6 +145,8 @@ test.describe("E74 PR 1: o voltar funciona enquanto o roteiro é escrito", () =>
     await expect.poll(() => estado.liberada, { timeout: ESPERA_MS + 5000 }).toBe(true);
     await page.waitForTimeout(1500);
     await expect(page).toHaveURL(/\/hoje$/);
+    // O Hoje conferiu a escrita enquanto ela corria (de 5 em 5 s) e nada pediu a escrita de novo: continuam só as três versões (uma escrita paga uma vez).
+    expect(await versoesDaMarca()).toHaveLength(3);
   });
 
   test("o voltar do navegador funciona durante a espera e a resposta tardia não puxa a pessoa de volta", async ({ page }) => {
@@ -260,5 +262,29 @@ test.describe("E74 PR 1: o voltar funciona enquanto o roteiro é escrito", () =>
     expect(page.url()).not.toContain("/criar/versoes/");
     expect(page.url()).toContain("/criar/objetivo?tema=0");
     expect(versoesDoOutro).toContain("/criar/versoes/");
+  });
+
+  test("o Hoje mostra que as versões estão sendo escritas e o cartão muda sozinho para 'prontas', sem recarregar", async ({ page }) => {
+    test.setTimeout(60_000);
+    const [marca] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, "e2e-voltar-gerando"));
+    const linha = (ordem: number) => ({
+      clienteId: marca.id,
+      grupo: "escrevendo-1",
+      ordem,
+      parametros: {},
+      valores: { tema: "tema de teste 1", objetivo: "alcance", formato: "reels", estilo: "falado", conteudo: {} },
+    });
+    try {
+      // O servidor já gravou a primeira versão e ainda escreve as outras duas.
+      await db().insert(versoesDoRoteiro).values(linha(1));
+      await entrar(page);
+      await expect(page.locator("[data-versoes-escrevendo]")).toBeVisible();
+      await expect(page.locator("[data-versoes-prontas]")).toHaveCount(0);
+      await db().insert(versoesDoRoteiro).values([linha(2), linha(3)]);
+      await expect(page.locator("[data-versoes-prontas]")).toContainText("Três versões prontas", { timeout: 20_000 });
+      await expect(page.locator("[data-versoes-escrevendo]")).toHaveCount(0);
+    } finally {
+      await db().delete(versoesDoRoteiro).where(and(eq(versoesDoRoteiro.clienteId, marca.id), like(versoesDoRoteiro.grupo, "escrevendo-%")));
+    }
   });
 });

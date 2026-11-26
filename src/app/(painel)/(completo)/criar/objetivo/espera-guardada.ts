@@ -61,3 +61,32 @@ export function tomarDesfecho(chaveDoTema: string, agora = Date.now()): Desfecho
     return null;
   }
 }
+
+/** Alguma escrita de versões (de qualquer tema) guardada e dentro do prazo? É o que o Hoje usa para mostrar "escrevendo" antes de a primeira versão existir no servidor. */
+export function haEsperaGuardada(agora = Date.now()): boolean {
+  try {
+    for (let i = 0; i < window.sessionStorage.length; i += 1) {
+      const chave = window.sessionStorage.key(i);
+      if (!chave?.startsWith(`${CHAVE_ESPERA}:`)) continue;
+      const lido = Number(window.sessionStorage.getItem(chave));
+      if (Number.isFinite(lido) && lido > 0 && agora - lido <= ESPERA_MAXIMA_MS) return true;
+    }
+  } catch {
+    // sem sessionStorage
+  }
+  return false;
+}
+
+/** As versões ficaram prontas: o que estava guardado como "escrevendo" não vale mais. */
+export function limparEsperasGuardadas() {
+  try {
+    const velhas: string[] = [];
+    for (let i = 0; i < window.sessionStorage.length; i += 1) {
+      const chave = window.sessionStorage.key(i);
+      if (chave?.startsWith(`${CHAVE_ESPERA}:`)) velhas.push(chave);
+    }
+    for (const chave of velhas) window.sessionStorage.removeItem(chave);
+  } catch {
+    // idem
+  }
+}

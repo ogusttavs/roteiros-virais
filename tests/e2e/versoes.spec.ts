@@ -201,21 +201,26 @@ test.describe("as versões do roteiro", () => {
     await entrar(page, "d");
     await page.goto("/criar/objetivo?tema=0");
     await page.locator("[data-fichas]").getByRole("radio", { name: /Que me chamem/ }).click();
-    // O pedido fica parado por uns segundos, para a pessoa sair na espera ("Voltar depois"); o servidor escreve as versões quando o pedido chega.
+    // A resposta fica parada por uns segundos, para a pessoa sair na espera ("Voltar depois"); o servidor recebe o pedido na hora e escreve as versões. (Antes o teste segurava o PEDIDO,
+    // e o "Voltar depois" só navegava quando o servidor terminava; agora o Hoje abre durante a escrita, e um reload cancelaria um pedido ainda parado no navegador.)
     await page.route("**/criar/objetivo*", async (rota) => {
-      if (rota.request().method() === "POST") await new Promise((resolver) => setTimeout(resolver, 4000));
+      if (rota.request().method() === "POST" && (rota.request().postData() ?? "").includes('"origem"')) {
+        const resposta = await rota.fetch();
+        await new Promise((resolver) => setTimeout(resolver, 8000));
+        await rota.fulfill({ response: resposta }).catch(() => undefined);
+        return;
+      }
       await rota.continue();
     });
+    const pedido = page.waitForRequest((r) => r.method() === "POST" && (r.postData() ?? "").includes('"origem"'));
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
+    await pedido;
     await page.getByRole("button", { name: "Voltar depois" }).click({ timeout: 12_000 });
     await expect(page).toHaveURL(/\/hoje$/);
 
-    // Recarrega até as três ficarem prontas: antes disso não há cartão (a pessoa não cai numa comparação pela metade).
+    // Sem recarregar: o Hoje avisa que está escrevendo e o cartão muda sozinho para "prontas" (antes disso não há cartão de comparação: a pessoa não cai numa comparação pela metade).
     const cartao = page.locator("[data-versoes-prontas]");
-    await expect(async () => {
-      await page.reload();
-      await expect(cartao).toContainText("Três versões prontas", { timeout: 3000 });
-    }).toPass({ timeout: 60_000 });
+    await expect(cartao).toContainText("Três versões prontas", { timeout: 30_000 });
     await page.unroute("**/criar/objetivo*");
     await expect(cartao).toContainText("Suas versões estão prontas");
     await expect(cartao).toContainText("o erro que faz a mancha voltar");
