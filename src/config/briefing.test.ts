@@ -1,14 +1,53 @@
 import { describe, expect, it } from "vitest";
 
-import { dadosFixosDoBriefing, perguntasDoBriefing } from "./briefing";
+import {
+  dadosFixosDoBriefing,
+  ENUNCIADO_P12_ANTES_DA_SEPARACAO,
+  perguntasDoBriefing,
+  TOTAL_PERGUNTAS,
+  VERSAO_P12_SEPARADA,
+} from "./briefing";
 
 const TIPOS = ["negocio", "pessoa"] as const;
 
 /** brief-frontend.md 6.2, "Ajuste de 06/09/2026": a lista de notas precisa de um rótulo curto por pergunta. */
 describe("perguntasDoBriefing", () => {
-  it("cada tipo tem doze perguntas", () => {
+  it("cada tipo tem treze perguntas (E76 PR 2: a P12 virou duas)", () => {
     for (const tipo of TIPOS) {
-      expect(perguntasDoBriefing(tipo)).toHaveLength(12);
+      expect(perguntasDoBriefing(tipo)).toHaveLength(13);
+    }
+    expect(TOTAL_PERGUNTAS).toBe(13);
+  });
+
+  it("a soma dos pesos continua 16: a P12 e a P13 dividem o peso 1 da P12 antiga, e a média e a meta não mudam", () => {
+    for (const tipo of TIPOS) {
+      expect(perguntasDoBriefing(tipo).reduce((soma, p) => soma + p.peso, 0)).toBe(16);
+    }
+  });
+
+  /** E76 PR 2: os concorrentes (ou os perfis parecidos, na pessoa) na P12, os admirados na P13, cada um com a sua lista de @. */
+  it("a lista de @ dos concorrentes fica na P12 e a dos admirados na P13; nenhuma outra pergunta tem lista", () => {
+    for (const tipo of TIPOS) {
+      const comLista = perguntasDoBriefing(tipo).filter((p) => p.perfisCitados);
+      expect(comLista.map((p) => [p.id, p.perfisCitados])).toEqual([
+        ["p12", "concorrente"],
+        ["p13", "admira"],
+      ]);
+      for (const p of comLista) expect(p.enunciadoCampo?.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("a P12 nova leva a versão da separação, e o enunciado de antes fica guardado para ler a resposta antiga", () => {
+    for (const tipo of TIPOS) {
+      const p12 = perguntasDoBriefing(tipo).find((p) => p.id === "p12")!;
+      expect(p12.versao).toBe(VERSAO_P12_SEPARADA);
+      expect(p12.enunciado).not.toBe(ENUNCIADO_P12_ANTES_DA_SEPARACAO[tipo]);
+      expect(p12.enunciado.toLowerCase()).not.toContain("admira");
+      const p13 = perguntasDoBriefing(tipo).find((p) => p.id === "p13")!;
+      expect(p13.enunciado.toLowerCase()).toContain("admira");
+      expect(p13.versao).toBeUndefined();
+      // Só a P12 mudou de sentido; as outras nunca levam versão.
+      expect(perguntasDoBriefing(tipo).filter((p) => p.versao !== undefined).map((p) => p.id)).toEqual(["p12"]);
     }
   });
 
@@ -36,7 +75,7 @@ describe("perguntasDoBriefing", () => {
     }
   });
 
-  it("peso 2 exatamente em P1, P5, P9 e P11, nos dois tipos", () => {
+  it("peso 2 exatamente em P1, P5, P9 e P11, meio na P12 e na P13, nos dois tipos", () => {
     const pesoEsperado = {
       p1: 2,
       p2: 1,
@@ -49,7 +88,8 @@ describe("perguntasDoBriefing", () => {
       p9: 2,
       p10: 1,
       p11: 2,
-      p12: 1,
+      p12: 0.5,
+      p13: 0.5,
     };
     for (const tipo of TIPOS) {
       const pesos = Object.fromEntries(perguntasDoBriefing(tipo).map((p) => [p.id, p.peso]));
@@ -71,7 +111,8 @@ describe("perguntasDoBriefing", () => {
       p9: "suas frases",
       p10: "o que nunca diria",
       p11: "o que dá para mostrar",
-      p12: "referências e concorrentes",
+      p12: "concorrentes",
+      p13: "perfis que admira",
     });
   });
 
@@ -90,19 +131,19 @@ describe("perguntasDoBriefing", () => {
       p9: "suas frases e o tom",
       p10: "o que fica fora",
       p11: "a sua semana na câmera",
-      p12: "referências",
+      p12: "perfis parecidos",
+      p13: "perfis que admira",
     });
   });
 
   /** P1: os enunciados da pessoa batem literalmente com briefing-e-rubricas.md, secao 2b. */
-  it("os enunciados da pessoa são exatamente os do documento, para P1 e P12", () => {
+  it("os enunciados da pessoa são exatamente os do documento, para P1, P12 e P13", () => {
     const enunciados = Object.fromEntries(perguntasDoBriefing("pessoa").map((p) => [p.id, p.enunciado]));
     expect(enunciados.p1).toBe(
       "Quem é você e o que você faz hoje? Conte como se fosse para alguém que nunca ouviu falar de você: o que você faz de verdade no dia, há quanto tempo, de onde você vem.",
     );
-    expect(enunciados.p12).toBe(
-      "Cite os perfis parecidos e os perfis que você admira, e em uma frase o que gosta em cada um.",
-    );
+    expect(enunciados.p12).toBe("Quais perfis são parecidos com o seu, e o que eles fazem que você faria diferente?");
+    expect(enunciados.p13).toBe("Quais são os perfis que você admira, e o que gosta em cada um?");
   });
 
   /**

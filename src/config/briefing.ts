@@ -591,7 +591,7 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     oQueAIAProcura:
       "Perfis admirados com o @ na lista acima do campo e, para cada um, do que ela gosta ali: o jeito de falar, de explicar, de mostrar ou de editar. Viram referência de tom.",
     oQueUmaBoaRespostaTem:
-      "Uma frase por perfil: o que você gosta em cada um que admira, como o jeito de falar, de explicar ou de editar. Os @ vão na lista acima.",
+      "Uma frase por perfil: o que você gosta em cada um que admira, como o jeito de falar, de contar a própria história ou de editar. Os @ vão na lista acima.",
   },
 ];
 

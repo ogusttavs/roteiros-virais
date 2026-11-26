@@ -41,14 +41,19 @@ Gustavo daria a ela, e o ponto principal do porquê:
 ]
 ```
 
-- `perguntaId`: um dos ids de `src/config/briefing.ts` (`p1` a `p12`).
+- `perguntaId`: um dos ids de `src/config/briefing.ts` (`p1` a `p13`; desde a E76 PR 2, 26/11/2026, a P12 é só dos
+  concorrentes e a P13, dos perfis admirados).
 - `resposta`: o texto que entra em `avaliarResposta` como se fosse a resposta do cliente.
 - `notaEsperada`: de 0 a 10, a nota que o Gustavo dá para essa resposta.
 - `pontoPrincipal`: uma frase dizendo o que mais pesa na nota (serve para ler o resultado
   do script sem abrir o caso de novo).
 
 `briefing-e-rubricas.md`, seção 8, pede 15 casos no conjunto real. `briefing.exemplo.json`
-tem 15 casos fictícios só para o script ter o que rodar antes do arquivo real existir.
+tem casos fictícios só para o script ter o que rodar antes do arquivo real existir. Desde a E76
+PR 2 ele traz também a restrição declarada com o porquê ("nesta fase não trabalho com preço fixo:
+cada orçamento sai depois de ver a foto", nota esperada 9) e a resposta que foge do dado sem o
+porquê ("depende", nota esperada 3): a régua nova da seção 3 tem de dar as duas notas certas, e é
+o que a rodada com a chave real confere antes de o prompt 1.8.0 ir para o ar.
 
 ## Como rodar
 

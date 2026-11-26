@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { MARCA_DA_FONTE, montarEntrada, montarSistemaEstavel } from "./avaliarResposta";
+import { MARCA_DA_FONTE, montarEntrada, montarSistemaEstavel, versao } from "./avaliarResposta";
 
 describe("montarSistemaEstavel, criterio Concreto e a regra dura do H2", () => {
   const sistema = montarSistemaEstavel();
@@ -83,5 +83,41 @@ segunda linha`;
     const linha = entrada.split(String.fromCharCode(10)).find((l) => l.startsWith("- E: "))!;
     expect(linha.length).toBeLessThan(520);
     expect(linha.endsWith("...")).toBe(true);
+  });
+});
+
+/**
+ * E76 PR 2: a régua empurrava a inventar (o 9 a 10 pedia número, e quem não tem o número ficava abaixo da meta por dizer a
+ * verdade). A restrição declarada com o porquê pontua tanto quanto o dado; "depende" sem o porquê continua vago.
+ */
+describe("1.8.0, a restrição declarada vale tanto quanto o dado", () => {
+  const sistema = montarSistemaEstavel().replace(/\s+/g, " ");
+
+  it("a versão sobe a partir da 1.7.0 dos fatos travados", () => {
+    expect(versao).toBe("1.8.0");
+  });
+
+  it("a restrição com o porquê cumpre Concreto e Específico e pontua tanto quanto um número", () => {
+    expect(sistema).toContain("Uma restrição declarada com o porquê também cumpre");
+    expect(sistema).toContain("Restrição declarada vale tanto quanto o dado.");
+    expect(sistema).toContain('"não trabalhamos com pedido mínimo nesta fase; cada projeto é avaliado');
+    expect(sistema).toContain('cumprem "Concreto" e "Específico" e pontuam tanto quanto um número');
+    expect(sistema).toContain("Nunca baixe a nota por faltar um número que a pessoa explicou que não existe");
+    expect(sistema).toContain("nunca peça que ela invente um");
+  });
+
+  it("a âncora de 9 a 10 aceita o número ou a restrição com o porquê", () => {
+    expect(sistema).toContain("- 9 a 10: cumpre os quatro critérios, com pelo menos um exemplo ou número real, ou com uma restrição declarada e o porquê dela.");
+    expect(sistema).toContain("- 7 a 8: clara e específica, mas falta exemplo, número ou o porquê em um ponto.");
+  });
+
+  it("a resposta vaga sem o porquê continua de 3 a 4", () => {
+    expect(sistema).toContain('Continua vaga a resposta que foge do dado sem dizer o porquê: "depende", "varia"');
+    expect(sistema).toContain('- 3 a 4: vaga, curta demais, cheia de termo do ramo sem explicação, ou "depende" sem dizer de quê.');
+  });
+
+  it("o exemplo mantém a restrição em vez de trocar por um número (coerente com os fatos travados)", () => {
+    expect(sistema).toContain("o exemplo mantém a restrição em vez de trocar por um número");
+    expect(sistema).toContain("Fatos travados no exemplo");
   });
 });
