@@ -11,6 +11,7 @@ import { BLOCOS_FALADOS, marcadoParaOsParagrafos, paragrafosMarcados, type FalaD
 import { textosConexao } from "@/textos/conexao";
 import { textosGravacao } from "@/textos/gravacao";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
+import { TextoComColchetes } from "@/ui/componentes/Colchetes";
 import { FalaMarcada } from "@/ui/componentes/FalaMarcada";
 import { LinhaMarcasDeFala } from "@/ui/componentes/LinhaMarcasDeFala";
 import { Toast } from "@/ui/componentes/Toast";
@@ -229,14 +230,15 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca, 
           </div>
           {bloco.paragrafos.map((paragrafo, indice) => (
             <p key={indice} className={styles.fala}>
-              {paragrafosMarcadosDoBloco ? <FalaMarcada marcado={paragrafosMarcadosDoBloco[indice]} /> : paragrafo}
+              {/* 26/11/2026: o trecho entre colchetes (o espaço para completar) fica destacado também aqui, na letra grande. */}
+              {paragrafosMarcadosDoBloco ? <FalaMarcada marcado={paragrafosMarcadosDoBloco[indice]} comColchetes /> : <TextoComColchetes texto={paragrafo} />}
             </p>
           ))}
           {bloco.mostrar && bloco.mostrar.length > 0 ? (
             <div className={styles.mostrar}>
               {bloco.mostrar.map((linha, indice) => (
                 <p key={indice} className={styles.mostrarLinha}>
-                  {linha}
+                  <TextoComColchetes texto={linha} />
                 </p>
               ))}
             </div>
@@ -244,7 +246,9 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca, 
           {primeiroParagrafoProximo ? (
             <div className={styles.proximo}>
               <span className={styles.rotuloProximo}>{textosGravacao.depoisVem}</span>
-              <p className={styles.falaProxima}>{primeiroParagrafoProximo}</p>
+              <p className={styles.falaProxima}>
+                <TextoComColchetes texto={primeiroParagrafoProximo} />
+              </p>
             </div>
           ) : null}
           {temChaveDeMarcas ? (

@@ -60,6 +60,12 @@ export const textosRoteiro = {
   },
   /** E40, item 1: o botão que libera o texto de cada bloco para a pessoa editar, sem chamar IA. */
   editar: "Editar",
+  /** 26/11/2026: o aviso no alto do roteiro quando a fala tem trecho entre colchetes (um dado que a IA não pode inventar, como telefone ou horário); o botão abre a edição. */
+  completarColchetes: {
+    aviso: "Complete os espaços marcados antes de gravar.",
+    explicacao: "Troque cada trecho entre colchetes pelo dado certo, como o telefone ou o horário.",
+    botao: "Completar o roteiro",
+  },
   editando: {
     titulo: "Editando",
     avisoOriginal: "O texto original fica guardado.",
