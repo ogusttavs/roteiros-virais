@@ -74,6 +74,8 @@ let roteiroA2: number;
 let roteiroB: number;
 let roteiroLongoA: number;
 let roteiroSemTextoA: number;
+let roteiroComColcheteA: number;
+let roteiroGrandeA: number;
 const anterior = { pasta: process.env.EDICAO_PASTA, ativa: process.env.ANIMACAO_ATIVA, contas: process.env.ANIMACAO_CONTAS };
 
 const CONTEUDO = {
@@ -181,9 +183,11 @@ beforeAll(async () => {
       { ...base, clienteId: marcaB },
       { ...base, clienteId: marcaA, duracaoDoVideo: "longo" },
       { ...base, clienteId: marcaA, conteudo: { ...CONTEUDO, gancho: " ", corpo: "", fechamento: "", chamadaFinal: "" } },
+      { ...base, clienteId: marcaA, conteudo: { ...CONTEUDO, corpo: "O primeiro erro é deixar de molho a noite toda.\n[conte aqui o caso de uma paciente sua, com o resultado que ela teve]" } },
+      { ...base, clienteId: marcaA, conteudo: { ...CONTEUDO, corpo: Array.from({ length: 80 }, (_, i) => `Passo numero ${i} do corpo que explica um detalhe do assunto com calma.`).join("\n") } },
     ])
     .returning({ id: roteiros.id });
-  [roteiroA, roteiroA2, roteiroB, roteiroLongoA, roteiroSemTextoA] = inseridos.map((r) => r.id);
+  [roteiroA, roteiroA2, roteiroB, roteiroLongoA, roteiroSemTextoA, roteiroComColcheteA, roteiroGrandeA] = inseridos.map((r) => r.id);
 }, 120_000);
 
 afterAll(async () => {
@@ -274,6 +278,42 @@ describe("pedir", () => {
     // A tela nem mostra o chamado onde não serve.
     const [longo] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroLongoA));
     expect(await visaoDaAnimacao({ clienteId: marcaA, roteiro: longo, verComo: false })).toBeNull();
+  });
+
+  it("roteiro com espaço para completar entre colchetes é recusado, e a tela sabe quantos faltam; depois de completar, o pedido sai", async () => {
+    expect(await pedirAnimacao({ clienteId: marcaA, usuarioId: "an-dono-a", roteiroId: roteiroComColcheteA })).toMatchObject({ ok: false, codigo: "colchete", status: 409 });
+    expect(fraseDaAnimacao("colchete")).toContain("colchetes");
+    expect(await db().select().from(animacoes)).toEqual([]);
+    expect(estado.enfileirados).toHaveLength(0);
+    const [r] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroComColcheteA));
+    expect(await visaoDaAnimacao({ clienteId: marcaA, roteiro: r, verComo: false })).toMatchObject({ colchetes: 1, animacao: null });
+    // A ação da tela devolve a mesma frase.
+    expect(await pedirAnimacaoAction(roteiroComColcheteA)).toEqual({ ok: false, erro: fraseDaAnimacao("colchete") });
+    // A pessoa completa o texto (o salvar da edição troca o conteúdo) e o pedido passa, sem nenhum colchete nas cenas.
+    await db().update(roteiros).set({ conteudo: { ...CONTEUDO, corpo: "O primeiro erro é deixar de molho a noite toda.\nUma paciente minha trocou de esponja e o prato saiu limpo." } }).where(eq(roteiros.id, roteiroComColcheteA));
+    const id = await pedir(marcaA, "an-dono-a", roteiroComColcheteA);
+    expect((await linha(id)).cenas.some((c) => c.texto.includes("[") || c.texto.includes("]"))).toBe(false);
+  });
+
+  it("roteiro grande que passa dos limites guarda as frases que ficaram de fora, e a vista da prévia entrega a lista (nada de corte mudo)", async () => {
+    const r = await pedirAnimacao({ clienteId: marcaA, usuarioId: "an-dono-a", roteiroId: roteiroGrandeA });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const a = await linha(r.animacao.id);
+    expect(a.foraDoVideo.length).toBeGreaterThan(0);
+    // Cada frase está ou no vídeo ou na lista de fora, nunca nos dois e nunca em lugar nenhum.
+    const nasCenas = a.cenas.map((c) => c.texto).join(" ");
+    for (let i = 0; i < 80; i++) {
+      const frase = `Passo numero ${i} do corpo que explica um detalhe do assunto com calma.`;
+      const noVideo = nasCenas.includes(frase);
+      const fora = a.foraDoVideo.some((x) => x.includes(frase));
+      expect(noVideo !== fora).toBe(true);
+    }
+    expect(r.animacao.foraDoVideo).toEqual(a.foraDoVideo);
+    // O pedido que coube inteiro não tem lista.
+    await db().delete(animacoes);
+    const pequeno = await pedirAnimacao({ clienteId: marcaA, usuarioId: "an-dono-a", roteiroId: roteiroA });
+    expect(pequeno.ok && pequeno.animacao.foraDoVideo).toEqual([]);
   });
 
   it("uma animação em andamento por marca: o segundo pedido recebe a frase, e o banco também não deixa", async () => {

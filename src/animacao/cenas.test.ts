@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { LIMITES_DA_ANIMACAO } from "@/config/animacao";
 
 import { animacaoLiberadaParaMarca, contasDaAnimacao } from "./acesso";
-import { cenasDosParagrafos } from "./cenas";
+import { cenasDosParagrafos, montarCenasDosParagrafos } from "./cenas";
 import { montarLinhaDoTempo } from "./montador";
 
 describe("cenasDosParagrafos", () => {
@@ -76,5 +76,18 @@ describe("acesso à animação", () => {
     } finally {
       restaurar();
     }
+  });
+});
+
+describe("montarCenasDosParagrafos", () => {
+  it("devolve o texto das cenas que o corte tirou, na ordem do roteiro, e nada quando cabe tudo", () => {
+    const paragrafos = ["GANCHO do video que prende a pessoa nos primeiros segundos de tela.", ...Array.from({ length: 80 }, (_, i) => `Frase de numero ${i} do corpo que explica um passo do assunto com calma.`), "CHAMADA final: chame no WhatsApp hoje."];
+    const { cenas, deFora } = montarCenasDosParagrafos(paragrafos);
+    expect(deFora.length).toBeGreaterThan(0);
+    expect(cenas.length + deFora.length).toBe(82);
+    const numeros = deFora.map((t) => Number(/numero (\d+)/.exec(t)?.[1]));
+    expect(numeros).toEqual([...numeros].sort((a, b) => a - b));
+    expect(deFora.some((t) => t.includes("GANCHO") || t.includes("CHAMADA"))).toBe(false);
+    expect(montarCenasDosParagrafos(["Você erra isso todo dia? Pare agora."]).deFora).toEqual([]);
   });
 });

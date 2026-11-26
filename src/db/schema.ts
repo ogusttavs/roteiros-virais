@@ -3366,6 +3366,8 @@ export const animacoes = pgTable(
     estado: text("estado").$type<EstadoDaAnimacao>().notNull().default("pedida"),
     molde: text("molde").notNull(),
     cenas: jsonb("cenas").$type<CenaDeEntrada[]>().notNull(),
+    /** O texto das cenas que ficaram de fora por o roteiro passar dos limites do vídeo (a tela da prévia lista, nunca em silêncio). */
+    foraDoVideo: jsonb("fora_do_video").$type<string[]>().notNull().default([]),
     /** A duração do vídeo, em segundos, como o montador calculou ao pedir (para a tela dizer quanto tempo costuma levar). */
     duracaoS: numeric("duracao_s", { precision: 8, scale: 3 }).notNull(),
     caminhoPrevia: text("caminho_previa"),

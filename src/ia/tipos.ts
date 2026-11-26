@@ -46,6 +46,8 @@ export type TarefaIA =
   /** E66: de 3 a 5 títulos para a capa de notícia (uma imagem única), modelo forte. */
   | "capaNoticia"
   | "verificarTexto"
+  /** T80 (26/11/2026): o reparo dirigido, em modelo barato, dos campos que ainda reprovam por fato sem apoio ou promessa em saúde depois das duas tentativas. */
+  | "repararFato"
   | "aprenderCliente"
   | "classificarAbertura"
   | "lerMomento"

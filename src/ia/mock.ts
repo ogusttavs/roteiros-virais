@@ -113,6 +113,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockRoteiroLongo(entrada);
     case "verificarTexto":
       return mockVerificarTexto(entrada, sistemaEstavel);
+    case "repararFato":
+      return mockRepararFato(entrada);
     case "temasDoDia":
       return mockTemasDoDia(entrada);
     case "extrairVideo":
@@ -724,6 +726,8 @@ function mockCarrossel(entrada: string) {
   if (entrada.includes("[mock:carrossel-capa-errada-sempre]")) slides[0].titulo = `9 erros que estragam ${tema}`.split(" ").slice(0, 10).join(" ");
   if (marcado("carrossel-capa-vaga")) slides[0].titulo = `Tudo sobre ${tema}`.split(" ").slice(0, 10).join(" ");
   if (marcado("carrossel-capa-sem-promessa")) slides[0].titulo = `Estofado bonito`;
+  // T80: um fato inventado que o verificador pega nas DUAS tentativas (o reparo é quem tira): `[mock:carrossel-fato-sempre]`; `[mock:carrossel-fato-na-1a]` só na 1ª tentativa.
+  if (entrada.includes("[mock:carrossel-fato-sempre]") || marcado("carrossel-fato-na-1a")) slides[1].texto = "Olhe com calma o que importa e faça um passo de cada vez. {mock:fato-inventado}";
   if (marcado("carrossel-promessa")) slides[1].texto = "Com o clareamento, o dente volta ao branco em uma sessão.";
   if (marcado("carrossel-resumo")) slides[1] = { ...vazio, tipo: "resumo", titulo: "Para guardar", linhas: ["Deixe agir antes", "Um produto por vez", "Banheiro aberto"] };
   if (marcado("carrossel-resumo")) slides[0].titulo = `${quantidade - 3} dicas sobre ${tema}`.split(" ").slice(0, 10).join(" ");
@@ -866,6 +870,18 @@ function textoSemInstrucoes(entrada: string): string {
   const corpo = /Texto a conferir:\n([\s\S]*?)\n\nProibicoes do cliente:/.exec(entrada)?.[1] ?? extrairCampo(entrada, "Texto a conferir:");
   const inicio = corpo.indexOf("INSTRUÇÕES PARA A PESSOA");
   return inicio === -1 ? corpo : corpo.slice(0, inicio);
+}
+
+/** T80: o reparo tira o marcador de fato inventado dos campos (e o espaço que ficou); só devolve os campos que mudaram. `[mock:reparo-nao-resolve]` não conserta nada, para o teste da recusa. */
+function mockRepararFato(entrada: string) {
+  if (entrada.includes("[mock:reparo-nao-resolve]")) return { campos: [] };
+  const linhas = /Campos do texto, um por linha[^\n]*\n([\s\S]*?)\n\nFONTES/.exec(entrada)?.[1] ?? "";
+  const campos = linhas
+    .split(String.fromCharCode(10))
+    .map((l) => /^([^:]+): (.*)$/.exec(l))
+    .filter((m): m is RegExpExecArray => m !== null && m[2].includes("{mock:fato-inventado}"))
+    .map((m) => ({ campo: m[1], texto: m[2].replace("{mock:fato-inventado}", "").replace(/ {2,}/g, " ").trim() }));
+  return { campos };
 }
 
 function mockVerificarTexto(entrada: string, sistemaEstavel = "") {

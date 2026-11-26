@@ -41,8 +41,16 @@ function duracaoDe(cenas: CenaDeEntrada[]): number | null {
   }
 }
 
+/** As cenas de um roteiro e o texto das cenas que ficaram de fora por passar dos limites (para a tela dizer, nunca em silêncio). */
+export type CenasMontadas = { cenas: CenaDeEntrada[]; deFora: string[] };
+
 /** As cenas de um roteiro, a partir dos parágrafos na ordem de leitura. Devolve lista vazia se não há texto. */
 export function cenasDosParagrafos(paragrafos: string[]): CenaDeEntrada[] {
+  return montarCenasDosParagrafos(paragrafos).cenas;
+}
+
+/** O mesmo que `cenasDosParagrafos`, e também o que o miolo perdeu: cada texto tirado, na ordem do roteiro. */
+export function montarCenasDosParagrafos(paragrafos: string[]): CenasMontadas {
   const L = LIMITES_DA_ANIMACAO;
   const cenas: string[] = [];
   for (const paragrafo of paragrafos) {
@@ -59,12 +67,15 @@ export function cenasDosParagrafos(paragrafos: string[]): CenaDeEntrada[] {
     }
     if (atual) cenas.push(atual);
   }
-  const lista: CenaDeEntrada[] = cenas.map((texto) => ({ texto }));
+  // Cada cena guarda a posição de origem, para listar o que sair na ordem do roteiro.
+  const lista = cenas.map((texto, origem) => ({ texto, origem }));
+  const tiradas: { texto: string; origem: number }[] = [];
   // Passou dos limites: tira cenas do miolo (o gancho e a chamada ficam), uma por vez, de trás do meio para a frente.
   while (lista.length > 2) {
     const duracao = duracaoDe(lista);
     if (lista.length <= L.maxCenas && duracao !== null) break;
-    lista.splice(Math.max(1, Math.floor(lista.length * 0.6)), 1);
+    const [tirada] = lista.splice(Math.max(1, Math.floor(lista.length * 0.6)), 1);
+    tiradas.push(tirada);
   }
-  return lista;
+  return { cenas: lista.map(({ texto }) => ({ texto })), deFora: tiradas.sort((a, b) => a.origem - b.origem).map((t) => t.texto) };
 }

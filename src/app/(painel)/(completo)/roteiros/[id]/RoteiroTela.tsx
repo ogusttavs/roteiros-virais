@@ -1191,7 +1191,7 @@ export function RoteiroTela({
                   />
                 ))}
                 {editar ? <ChamadoEditarMeuVideo estado={edicaoViva?.estado ?? null} aoAbrir={() => setPainel("editar")} /> : null}
-                {animacao ? <ChamadoAnimacao roteiroId={roteiro.id} visao={animacao} /> : null}
+                {animacao ? <ChamadoAnimacao roteiroId={roteiro.id} visao={animacao} aoCompletar={iniciarEdicao} /> : null}
               </>
             ) : (
               /*
@@ -1204,7 +1204,7 @@ export function RoteiroTela({
                   <BlocoEdicao titulo={ehLongo ? textosRoteiro.capitulos.comoEditarOVideoInteiro : textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
                   {/* E47: o chamado de "Editar o meu vídeo" à vista, logo depois de "Como editar" (o item do menu "Mais opções" continua). Não vem no vídeo longo nem no sem fala: `editar` é nulo neles. */}
                   {editar ? <ChamadoEditarMeuVideo estado={edicaoViva?.estado ?? null} aoAbrir={() => setPainel("editar")} /> : null}
-                {animacao ? <ChamadoAnimacao roteiroId={roteiro.id} visao={animacao} /> : null}
+                {animacao ? <ChamadoAnimacao roteiroId={roteiro.id} visao={animacao} aoCompletar={iniciarEdicao} /> : null}
                   {/* Hotfix de 05/10/2026: no Reels falado "Por que assim" vem junto de "Como editar", na MESMA caixa do lado (eram dois `.ladoGrudado` na mesma área da grade, uma por cima da outra). */}
                   {corpo.porQueAssim.length > 0 ? <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} /> : null}
                 </div>

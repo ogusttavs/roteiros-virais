@@ -1,0 +1,22 @@
+{
+  "marca": "Clinica Exemplo Sorriso",
+  "ramo": "odontologia",
+  "tipo": "negocio",
+  "plano": "sem_limite",
+  "cortesia": true,
+  "pessoas": [{ "nome": "Pessoa Exemplo", "email": "pessoa@exemplo.com.br" }],
+  "comecar": {
+    "onde": "local",
+    "regiao": "Campinas e regiao",
+    "site": "exemplo.com.br",
+    "objetivo": "negocio",
+    "perfis": { "instagram": "@clinica.exemplo" },
+    "quemGrava": "propria_pessoa"
+  },
+  "briefing": {
+    "p1": "Somos uma clinica odontologica de bairro, com dez anos, focada em familias.",
+    "p2": "Atendemos moradores do bairro, principalmente mães com filhos pequenos."
+  },
+  "foco": "Cuidado com os dentes da familia inteira, para maes e pais de uma cidade media",
+  "cor": "#1f6feb"
+}
