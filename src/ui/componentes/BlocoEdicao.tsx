@@ -12,7 +12,7 @@ export type ItemEdicao = {
   /** E50 parte 2, PR 4: as chaves de bloco do "Por quê" deste item (as frases na tela); o botão e o painel só aparecem dentro de `PorQuesProvider` e se houver por quê. */
   porQueChaves?: string[];
   /**
-   * T112: o mesmo conteúdo de `texto`, uma linha por parte (o "Texto na tela": o tempo como rótulo, a frase e, embaixo, a posição). Quando existe, aparece no lugar de `texto`,
+   * T112: o mesmo dado de `texto`, uma linha por parte (o "Texto na tela": o tempo como rótulo, a frase e, embaixo, a posição). Quando existe, aparece no lugar de `texto`,
    * que continua sendo o texto inteiro do item.
    */
   lista?: { quando?: string; texto: string; detalhe?: string }[];
