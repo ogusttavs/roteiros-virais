@@ -1,8 +1,7 @@
-/* O aviso dos espaços para completar (26/11/2026): o mesmo desenho do "Atenção" da pesquisa (`RoteiroTela.module.css`, `.atencaoRoteiro`), logo antes dos blocos. Sem margem própria: o espaço em volta é o ritmo da coluna (`.corpoComLado > * + *`, T112). */
+/* O aviso dos espaços para completar (26/11/2026): o mesmo desenho do "Atenção" da pesquisa (`RoteiroTela.module.css`, `.atencaoRoteiro`), logo antes dos blocos. Sem margem própria (nem zero, que empataria com o ritmo e dependeria da ordem dos módulos no pacote): o espaço em volta é o ritmo da coluna (`.corpoComLado > * + *`, T112). */
 .aviso {
   display: grid;
   gap: var(--espaco-2);
-  margin-block: 0;
   padding: var(--espaco-4) var(--espaco-5);
   border-left: 3px solid var(--cor-atencao);
   border-radius: 0 var(--raio-md) var(--raio-md) 0;
