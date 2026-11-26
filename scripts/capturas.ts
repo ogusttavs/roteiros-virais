@@ -227,7 +227,7 @@ async function main(): Promise<void> {
     /**
      * O seed grava notaGeral, completo e perfil do cliente de limpeza direto
      * (`semear.ts`), sem respostas nem avaliacoes por pergunta: sem isto, a
-     * captura de Briefing mostrava as doze perguntas abertas, sem nenhuma
+     * captura de Briefing mostrava as perguntas todas abertas, sem nenhuma
      * linha ".resposta" fechada, o que a tela nem desenha para o cliente ja
      * liberado (achado revisando a propria captura desta rodada).
      */
@@ -295,8 +295,8 @@ async function main(): Promise<void> {
       async (page, tamanho, modo) => {
         await page.goto(`${baseUrl}/comecar`);
         await page.waitForLoadState("networkidle");
-        await page.getByRole("button", { name: "as doze notas" }).click();
-        await page.getByRole("dialog", { name: "as doze notas" }).waitFor({ state: "visible" });
+        await page.getByRole("button", { name: "as treze notas" }).click();
+        await page.getByRole("dialog", { name: "as treze notas" }).waitFor({ state: "visible" });
         const nomeArquivo = `Comecar.Folha.${tamanho.rotulo}.${modo.rotulo}.png`;
         await page.screenshot({ path: path.join(pastaDestino, nomeArquivo) });
         arquivosGravados.push(
@@ -311,26 +311,28 @@ async function main(): Promise<void> {
      * instante em que a ultima pergunta pendente e avaliada (`ComecarWizard`,
      * `aoAtualizarPergunta`); com o briefing ja completo no banco,
      * `comecar/page.tsx` redireciona para `/hoje` antes mesmo de renderizar.
-     * Por isso onze das doze ficam prontas (nota alta, mas abaixo da meta
-     * geral) e a ultima (P12) e respondida e avaliada pela tela de verdade,
-     * deixando o cliente cruzar a meta ao vivo.
+     * Por isso todas menos a ultima ficam prontas (nota alta, mas abaixo da meta
+     * geral) e a ultima (a P13 desde a E76 PR 2) e respondida e avaliada pela
+     * tela de verdade, deixando o cliente cruzar a meta ao vivo.
      */
     const respostasQuaseCompletas: Record<string, string> = {};
     const avaliacoesQuaseCompletas: Record<string, AvaliacaoResposta> = {};
+    const ultimaPergunta = perguntasDoBriefing("negocio").at(-1)!;
     for (const pergunta of perguntasDoBriefing("negocio")) {
-      if (pergunta.id === "p12") continue;
+      if (pergunta.id === ultimaPergunta.id) continue;
       respostasQuaseCompletas[pergunta.id] = `Resposta de exemplo para ${pergunta.id}, com um numero 42 e um caso real.`;
-      avaliacoesQuaseCompletas[pergunta.id] = avaliacaoExemplo(8.2);
+      // A P12 avaliada depois da separação (E76 PR 2): sem a versão, ela cobriria a P13 e a nota já passaria da meta.
+      avaliacoesQuaseCompletas[pergunta.id] = { ...avaliacaoExemplo(8.2), ...(pergunta.versao ? { versaoPergunta: pergunta.versao } : {}) };
     }
     await paraCadaTelaDe(clienteComecar.id, EMAIL_SEED_COMECAR, async (page, tamanho, modo) => {
       // Refeito a cada largura e modo: a captura anterior deixa o briefing completo no banco.
       await db()
         .update(briefings)
-        .set({ respostas: respostasQuaseCompletas, avaliacoes: avaliacoesQuaseCompletas, notaGeral: "7.69", completo: false })
+        .set({ respostas: respostasQuaseCompletas, avaliacoes: avaliacoesQuaseCompletas, notaGeral: "7.94", completo: false })
         .where(eq(briefings.clienteId, clienteComecar.id));
       await page.goto(`${baseUrl}/comecar`);
-      await page.getByLabel(perguntasDoBriefing("negocio").at(-1)!.enunciado).fill(
-        'Admiro @perfilexemplo pela didatica, com quem aprendi a testar antes de aplicar. Concorrente direto e a Clinica Exemplo, na Rua das Flores, 42.',
+      await page.getByLabel(ultimaPergunta.enunciado).fill(
+        'Admiro @perfilexemplo pela didatica, com quem aprendi a testar antes de aplicar, e @outroexemplo pelos 42 cortes rapidos de cada video.',
       );
       await page.getByRole("button", { name: "Avaliar esta resposta" }).click();
       await page.getByRole("heading", { name: "Seu painel está aberto" }).waitFor({ state: "visible" });

@@ -3,6 +3,7 @@
 import { CircleAlert, Copy, Mic, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { temColchete } from "@/carrossel/colchetes";
 import type { PerguntaBriefing } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
 import { ehFalhaDeRede } from "@/lib/offline";
@@ -12,6 +13,7 @@ import { textosComuns } from "@/textos/comuns";
 import { AnaliseQuatroPartes } from "@/ui/componentes/AnaliseQuatroPartes";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
+import { intervalosDeColchetes } from "@/ui/componentes/Colchetes";
 import { Nota } from "@/ui/componentes/Nota";
 import { Progresso } from "@/ui/componentes/Progresso";
 import { SugestaoResposta } from "@/ui/componentes/SugestaoResposta";
@@ -232,6 +234,8 @@ export function PerguntaCampo({
    */
   const transcricaoBrutaPendenteRef = useRef<string | undefined>(undefined);
   const caixaAlta = pergunta.peso === 2 ? "longa" : "padrao";
+  /** E76 PR 1: ainda tem trecho entre colchetes no campo (a sugestão aceita sem completar): avaliar fica desligado, com o motivo escrito. */
+  const faltaCompletar = temColchete(texto);
 
   /**
    * Manda o texto de agora para o servidor se ele ainda nao foi. Um lugar so para o debounce, o
@@ -340,12 +344,19 @@ export function PerguntaCampo({
    * só mostra a resposta, só leitura) e leva o foco para lá, para a pessoa
    * editar em cima em vez de ler o exemplo como se fosse a resposta dela.
    * Guarda o texto de antes para o "desfazer" do toast.
+   *
+   * E76 PR 1: com um trecho entre colchetes (o dado que só a pessoa sabe), o primeiro trecho já vem
+   * selecionado, para ela digitar o dado verdadeiro por cima.
    */
   function usarSugestaoEAbrirEdicao(exemplo: string) {
     setSugestaoAplicada({ anterior: textoRef.current, tipo: "sugestao" });
     aoMudarTexto(exemplo);
     setEditando(true);
-    requestAnimationFrame(() => areaRef.current?.focus());
+    const primeiro = intervalosDeColchetes(exemplo)[0];
+    requestAnimationFrame(() => {
+      areaRef.current?.focus();
+      if (primeiro) areaRef.current?.setSelectionRange(primeiro.inicio, primeiro.fim);
+    });
   }
 
   function desfazerSugestao() {
@@ -391,6 +402,8 @@ export function PerguntaCampo({
         : erroCopia;
 
   async function avaliar() {
+    // E76 PR 1: a sugestão aceita sem completar (com trecho entre colchetes) nunca vai para avaliação; o botão já fica desligado.
+    if (temColchete(textoRef.current)) return;
     /**
      * Sem isto, um clique no botao "avaliar" que tambem tira o foco da area
      * de texto dispara aoSairDoCampo e o onClick quase juntos, antes do
@@ -430,9 +443,15 @@ export function PerguntaCampo({
     // Sem rede o botao de avaliar fica desabilitado com o motivo escrito; avaliar sozinho ao sair do
     // campo so traria o erro na cara de quem so tocou fora (V7, item 8 do PROXIMO.md).
     if (semConexao) return;
-    if (texto.trim().length === 0 || texto === textoAvaliado) return;
+    if (texto.trim().length === 0 || texto === textoAvaliado || faltaCompletar) return;
     void avaliar();
   }
+
+  const avisoCompletar = faltaCompletar ? (
+    <p className={styles.dicaFalar} role="status">
+      {t.completeOsColchetes}
+    </p>
+  ) : null;
 
   const indicadorRascunho = (
     <span className={rascunhoComErro ? styles.rascunhoComErro : styles.indicadorSalvo}>
@@ -470,9 +489,9 @@ export function PerguntaCampo({
     return (
       <div className={styles.linhaVivo}>
         <p className={styles.enunciado}>{pergunta.enunciado}</p>
-        {pergunta.id === "p12" ? (
+        {pergunta.perfisCitados ? (
           <>
-            <BlocoPerfisCitados />
+            <BlocoPerfisCitados tipo={pergunta.perfisCitados} />
             {pergunta.enunciadoCampo ? <p className={styles.campoDica}>{pergunta.enunciadoCampo}</p> : null}
           </>
         ) : null}
@@ -504,16 +523,19 @@ export function PerguntaCampo({
                 aviso={t.avisoSugestao}
                 botaoUsar={sugestaoDaAnalise.botaoUsar}
                 onUsar={sugestaoDaAnalise.onUsar}
+                avisoColchete={t.avisoSugestaoComColchete}
+                botaoUsarComColchete={t.usarECompletar}
               />
             ) : null}
           </>
         )}
+        {avisoCompletar}
         <div className={styles.acoesVivo}>
           <Botao
             variante="secundario"
             onClick={() => void avaliar()}
             carregando={avaliando}
-            disabled={avaliando || texto.trim().length === 0}
+            disabled={avaliando || texto.trim().length === 0 || faltaCompletar}
             precisaDeRede
           >
             {t.botaoAvaliarDeNovo}
@@ -557,6 +579,8 @@ export function PerguntaCampo({
             aviso={t.avisoSugestao}
             botaoUsar={sugestaoDaAnalise.botaoUsar}
             onUsar={sugestaoDaAnalise.onUsar}
+            avisoColchete={t.avisoSugestaoComColchete}
+            botaoUsarComColchete={t.usarECompletar}
           />
         ) : null}
         <p className={styles.fraseAjuste}>{t.fraseAjuste}</p>
@@ -588,9 +612,9 @@ export function PerguntaCampo({
     <div className={styles.cartaoAberto}>
       <Chip pergunta={pergunta} />
       {pergunta.ajuda ? <p className={styles.campoDica}>{pergunta.ajuda}</p> : null}
-      {pergunta.id === "p12" ? (
+      {pergunta.perfisCitados ? (
         <>
-          <BlocoPerfisCitados />
+          <BlocoPerfisCitados tipo={pergunta.perfisCitados} />
           {pergunta.enunciadoCampo ? <p className={styles.campoDica}>{pergunta.enunciadoCampo}</p> : null}
         </>
       ) : null}
@@ -619,14 +643,17 @@ export function PerguntaCampo({
             {erro.frase}
           </p>
           {explicacaoDoErro ? <p className={styles.erroExplicacao}>{explicacaoDoErro}</p> : null}
-          <Botao onClick={() => void avaliar()} precisaDeRede>
+          <Botao onClick={() => void avaliar()} disabled={faltaCompletar} precisaDeRede>
             {t.botaoTentarDeNovo}
           </Botao>
         </div>
       ) : (
-        <Botao onClick={() => void avaliar()} disabled={texto.trim().length === 0} precisaDeRede>
-          {t.botaoAvaliar}
-        </Botao>
+        <>
+          {avisoCompletar}
+          <Botao onClick={() => void avaliar()} disabled={texto.trim().length === 0 || faltaCompletar} precisaDeRede>
+            {t.botaoAvaliar}
+          </Botao>
+        </>
       )}
       <Toast
         texto={textoToast}

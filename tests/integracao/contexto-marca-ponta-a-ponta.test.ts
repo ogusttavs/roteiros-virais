@@ -56,7 +56,7 @@ function siteFalso(texto: string): ResultadoLeituraSite {
   };
 }
 
-/** Uma marca com site e o briefing completo (as doze respostas concretas liberam, e o perfil é compilado). */
+/** Uma marca com site e o briefing completo (as respostas concretas liberam, e o perfil é compilado). */
 async function criarMarcaComBriefing(): Promise<number> {
   sequencia += 1;
   const id = `ponta-a-ponta-${sequencia}`;

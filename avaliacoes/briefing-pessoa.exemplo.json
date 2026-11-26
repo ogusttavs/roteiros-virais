@@ -67,8 +67,14 @@
   },
   {
     "perguntaId": "p12",
-    "resposta": "Admiro o @cyriaco.oficial pela didática e o @flaviotreinador pela consistência. Um perfil parecido com o que eu quero é o @donodeacademia, que também mistura bastidor de negócio com treino.",
-    "notaEsperada": 8,
-    "pontoPrincipal": "handles validos, admirados e parecidos"
+    "resposta": "Um perfil parecido com o meu é o @donodeacademia, que também mistura bastidor de negócio com treino. Ele só mostra o resultado; eu mostraria a conta e o erro do mês também.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "E76 PR 2: a P12 da pessoa so dos parecidos, com o que ela faria diferente"
+  },
+  {
+    "perguntaId": "p13",
+    "resposta": "Admiro o @cyriaco.oficial pela didática, explica treino como quem conversa, e o @flaviotreinador pela consistência de postar todo dia às 6h.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "E76 PR 2: a P13 so dos admirados, com o que gosta em cada um"
   }
 ]

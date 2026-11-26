@@ -1,16 +1,24 @@
 /**
- * Dados fixos (secao 1 e 1b) e as doze perguntas do briefing (secao 2 e 2b),
+ * Dados fixos (secao 1 e 1b) e as treze perguntas do briefing (secao 2 e 2b),
  * copiados literalmente de estrategia/briefing-e-rubricas.md. As telas de
  * /comecar e /briefing leem daqui; nunca reescrever o enunciado ou o "o que
  * a IA procura" na tela ou no servico.
  *
  * P1 (briefing-e-rubricas.md, secao 2b): a marca do tipo pessoa tem as
- * proprias doze perguntas, com os mesmos ids, blocos e pesos do negocio (a
+ * proprias perguntas, com os mesmos ids, blocos e pesos do negocio (a
  * lista de notas, a barra de blocos e as avaliacoes guardadas por id
  * continuam iguais); so o enunciado, o "o que a IA procura" e o rotulo curto
  * mudam. `perguntasDoBriefing(tipo)` decide qual das duas listas usar.
+ *
+ * E76 PR 2 (avaliação externa de um cadastro real, 26/11/2026): eram doze; a P12 misturava os
+ * concorrentes (ou os perfis parecidos, na pessoa) com os perfis admirados, que geram conteúdo
+ * diferente. Agora a P12 é só dos concorrentes e a P13, nova, só dos admirados, cada uma com a sua
+ * lista de @. As duas pesam 0,5: juntas valem o peso 1 da P12 antiga, e a média e a meta de 8 não
+ * mudam por causa da separação. A marca que já tinha a P12 respondida não perde nota: o texto antigo
+ * vale para a P12 e cobre a P13 até a pessoa editar a P12 ou responder a P13
+ * (`p13CobertaPelaP12Antiga`, em `servicos/briefing-regras.ts`).
  */
-import type { Alcance, Persona, QuemGrava, TipoMarca } from "@/db/schema";
+import type { Alcance, Persona, QuemGrava, TipoMarca, TipoPerfilCitado } from "@/db/schema";
 
 export type PersonaOpcao = { valor: Persona; rotulo: string };
 export type QuemGravaOpcao = { valor: QuemGrava; rotulo: string };
@@ -174,9 +182,36 @@ export type PerguntaBriefing = {
   oQueUmaBoaRespostaTem: string;
   /**
    * V12c, item 7, a E37b (design v2, `Briefing.dc.html`, `.campo-pergunta` de cima do campo de
-   * texto): só a P12 tem, logo acima do campo, depois das duas listas de perfis citados.
+   * texto): logo acima do campo, depois da lista de perfis citados. E76 PR 2: a P12 e a P13 têm.
    */
   enunciadoCampo?: string;
+  /**
+   * E76 PR 2: a lista de @ que fica acima do campo (desde a V12c, item 7, a E37b, as duas ficavam na
+   * P12): os concorrentes na P12, os perfis admirados na P13.
+   */
+  perfisCitados?: TipoPerfilCitado;
+  /**
+   * E76 PR 2: a versão do enunciado, quando ele mudou de sentido depois de já ter respostas guardadas.
+   * A avaliação feita depois leva o número em `versaoPergunta` (`AvaliacaoResposta`), e é assim que
+   * a nota sabe se a avaliação guardada é do texto antigo. Sem o campo, a pergunta nunca mudou.
+   */
+  versao?: number;
+};
+
+/**
+ * E76 PR 2: a versão da P12 depois da separação (concorrentes na P12, admirados na P13). Uma avaliação
+ * da P12 sem `versaoPergunta`, ou com um número menor, é do texto antigo, que cobria as duas.
+ */
+export const VERSAO_P12_SEPARADA = 2;
+
+/**
+ * E76 PR 2: o enunciado da P12 antes da separação, palavra por palavra (briefing-e-rubricas.md, seção
+ * 2 e 2b, até 26/11/2026). A resposta antiga é lida com ele (o perfil compilado e as fontes da
+ * sugestão), para a IA não ler como só de concorrentes um texto que também fala dos admirados.
+ */
+export const ENUNCIADO_P12_ANTES_DA_SEPARACAO: Record<TipoMarca, string> = {
+  negocio: "Cite os concorrentes e os perfis que você admira, e em uma frase o que gosta em cada um.",
+  pessoa: "Cite os perfis parecidos e os perfis que você admira, e em uma frase o que gosta em cada um.",
 };
 
 const AJUDA_PADRAO_NEGOCIO = "Escreva como se fosse para alguém que nunca ouviu falar do seu ramo.";
@@ -339,19 +374,36 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
   },
   {
     id: "p12",
-    rotuloCurto: "referências e concorrentes",
+    rotuloCurto: "concorrentes",
     bloco: 5,
     blocoNome: "O que dá para mostrar, referências e concorrentes",
-    peso: 1,
-    /** V12c, item 7, a E37b (design v2, `Briefing.dc.html`): os @ saíram daqui para as duas listas acima do campo. */
-    enunciado: "Cite os concorrentes e os perfis que você admira, e em uma frase o que gosta em cada um.",
-    enunciadoCampo:
-      "Em uma frase, o que você gosta em cada perfil que admira e o que os concorrentes fazem que você faria diferente.",
+    /** E76 PR 2: a P12 e a P13 pesam 0,5 cada, o peso 1 da P12 antiga dividido entre as duas. */
+    peso: 0.5,
+    versao: VERSAO_P12_SEPARADA,
+    perfisCitados: "concorrente",
+    /** E76 PR 2: só os concorrentes; os perfis admirados foram para a P13. Os @ ficam na lista acima do campo (V12c, item 7, a E37b). */
+    enunciado: "Quem são os seus concorrentes, e o que eles fazem que você faria diferente?",
+    enunciadoCampo: "Em uma frase por concorrente, o que ele faz que você faria diferente.",
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
-      "Handles válidos. Perfis admirados viram referência de tom; concorrentes entram na camada exclusiva de pesquisa (escopo 5.6).",
+      "Concorrentes com o @ na lista acima do campo e, para cada um, o que este negócio faria diferente. Os concorrentes entram na camada exclusiva de pesquisa (escopo 5.6); a diferença mostra o espaço que só ele ocupa.",
+    oQueUmaBoaRespostaTem: "Uma frase por concorrente: o que ele faz que você faria diferente. Os @ vão na lista acima.",
+  },
+  {
+    id: "p13",
+    rotuloCurto: "perfis que admira",
+    bloco: 5,
+    blocoNome: "O que dá para mostrar, referências e concorrentes",
+    peso: 0.5,
+    perfisCitados: "admira",
+    /** E76 PR 2: nova, separada da P12. Os @ ficam na lista acima do campo. */
+    enunciado: "Quais são os perfis que você admira, e o que gosta em cada um?",
+    enunciadoCampo: "Em uma frase por perfil, o que você gosta nele.",
+    ajuda: AJUDA_PADRAO_NEGOCIO,
+    oQueAIAProcura:
+      "Perfis admirados com o @ na lista acima do campo e, para cada um, do que ele gosta ali: o jeito de falar, de explicar, de mostrar ou de editar. Viram referência de tom.",
     oQueUmaBoaRespostaTem:
-      "Uma frase por perfil: o que você gosta em cada um que admira e o que os concorrentes fazem que você faria diferente. Os @ vão nas listas acima.",
+      "Uma frase por perfil: o que você gosta em cada um que admira, como o jeito de falar, de explicar ou de editar. Os @ vão na lista acima.",
   },
 ];
 
@@ -510,19 +562,36 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
   },
   {
     id: "p12",
-    rotuloCurto: "referências",
+    rotuloCurto: "perfis parecidos",
     bloco: 5,
     blocoNome: "O seu dia na câmera, referências",
-    peso: 1,
-    /** V12c, item 7, a E37b (design v2, `Briefing.dc.html`): os @ saíram daqui para as duas listas acima do campo. */
-    enunciado: "Cite os perfis parecidos e os perfis que você admira, e em uma frase o que gosta em cada um.",
-    enunciadoCampo:
-      "Em uma frase, o que você gosta em cada perfil que admira e o que os parecidos com você fazem que você faria diferente.",
+    /** E76 PR 2: a P12 e a P13 pesam 0,5 cada, o peso 1 da P12 antiga dividido entre as duas. */
+    peso: 0.5,
+    versao: VERSAO_P12_SEPARADA,
+    perfisCitados: "concorrente",
+    /** E76 PR 2: só os perfis parecidos; os admirados foram para a P13. Os @ ficam na lista acima do campo (V12c, item 7, a E37b). */
+    enunciado: "Quais perfis são parecidos com o seu, e o que eles fazem que você faria diferente?",
+    enunciadoCampo: "Em uma frase por perfil, o que ele faz que você faria diferente.",
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
-      "Handles válidos. Admirados viram referência de tom; os parecidos entram na camada exclusiva de pesquisa no lugar dos concorrentes (uma pessoa não tem concorrente, tem vizinho de assunto).",
+      "Perfis parecidos com o @ na lista acima do campo e, para cada um, o que a pessoa faria diferente. Os parecidos entram na camada exclusiva de pesquisa no lugar dos concorrentes (uma pessoa não tem concorrente, tem vizinho de assunto).",
+    oQueUmaBoaRespostaTem: "Uma frase por perfil parecido com o seu: o que ele faz que você faria diferente. Os @ vão na lista acima.",
+  },
+  {
+    id: "p13",
+    rotuloCurto: "perfis que admira",
+    bloco: 5,
+    blocoNome: "O seu dia na câmera, referências",
+    peso: 0.5,
+    perfisCitados: "admira",
+    /** E76 PR 2: nova, separada da P12. Os @ ficam na lista acima do campo. */
+    enunciado: "Quais são os perfis que você admira, e o que gosta em cada um?",
+    enunciadoCampo: "Em uma frase por perfil, o que você gosta nele.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      "Perfis admirados com o @ na lista acima do campo e, para cada um, do que ela gosta ali: o jeito de falar, de explicar, de mostrar ou de editar. Viram referência de tom.",
     oQueUmaBoaRespostaTem:
-      "Uma frase por perfil: o que você gosta em cada um que admira e o que os parecidos com você fazem que você faria diferente. Os @ vão nas listas acima.",
+      "Uma frase por perfil: o que você gosta em cada um que admira, como o jeito de falar, de contar a própria história ou de editar. Os @ vão na lista acima.",
   },
 ];
 
@@ -531,6 +600,9 @@ export function perguntasDoBriefing(tipo: TipoMarca): PerguntaBriefing[] {
 }
 
 export const TOTAL_BLOCOS = 5;
+
+/** Quantas perguntas o briefing tem (o mesmo nos dois tipos): treze desde a E76 PR 2, que separou a P12 em duas. */
+export const TOTAL_PERGUNTAS = PERGUNTAS_NEGOCIO.length;
 
 export function perguntaPorId(id: string, tipo: TipoMarca): PerguntaBriefing | undefined {
   return perguntasDoBriefing(tipo).find((p) => p.id === id);

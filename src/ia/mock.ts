@@ -20,6 +20,9 @@ const USO_ZERO = {
   tokensCacheEscrita: 0,
 };
 
+/** E76 PR 1: na resposta do briefing, faz a sugestão do mock afirmar dois números que a resposta não tem ("5 empresas", "6 meses"). Sem colchete: a resposta com colchete não vai para avaliação. */
+export const MARCADOR_SUGESTAO_INVENTADA = "mock:sugestao-inventada";
+
 /**
  * "[mock:erro-credito]", "[mock:erro-sobrecarga]" e "[mock:erro-chave]" em qualquer texto que entra na chamada (o momento que a pessoa conta, o tema livre): a API da IA recusa pela causa
  * dita, como a real faria (o erro leva a causa; só o admin a lê na tela). Só no mock, nunca em produção (o provedor real nem passa por aqui).
@@ -260,8 +263,10 @@ function mockAvaliarResposta(entrada: string) {
       ? "Poderia trazer mais um numero ou exemplo."
       : "Falta um exemplo real, com numero ou nome.",
     como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo, com um caso real.",
-    exemplo:
-      "Eu vendo o meu produto principal por um preco fixo, e mostro para o cliente exatamente o que ele leva junto, com um exemplo real de quem comprou essa semana.",
+    // E76 PR 1: o marcador na resposta simula o modelo que inventa dado na sugestão, para os testes provarem a conferência por código do serviço.
+    exemplo: resposta.includes(MARCADOR_SUGESTAO_INVENTADA)
+      ? "Com a gente, 5 empresas importaram nos últimos 6 meses, e eu explico cada etapa do pedido."
+      : "Eu vendo o meu produto principal por um preco fixo, e mostro para o cliente exatamente o que ele leva junto, com um exemplo real de quem comprou essa semana.",
     impacto: "Uma resposta mais concreta gera um roteiro mais parecido com você.",
   };
 }

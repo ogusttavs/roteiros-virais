@@ -20,6 +20,7 @@ import type { TipoMarca } from "../src/db/schema";
 import * as avaliarRespostaIA from "../src/ia/prompts/avaliarResposta";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
 import { verificarLocalmente } from "../src/ia/verificador";
+import { conferirSugestao } from "../src/servicos/briefing-sugestao";
 
 import { custoDoResultado, gerarVariosOuErro } from "./golden-lote";
 
@@ -58,6 +59,11 @@ export type ResultadoAvaliarBriefing = {
    * tentativa (rodada de acabamento de 06/09, item 1: meta e zero).
    */
   reprovadosNoVerificador: number;
+  /**
+   * E76 PR 1: quantos exemplos (a sugestão de resposta) afirmam um dado que a resposta do caso não tem, medido pela mesma
+   * conferência por código do serviço (`conferirSugestao`), antes de ela trocar o dado por colchete. Meta: zero.
+   */
+  sugestoesComDadoSemFonte: number;
   /** Soma do custo de todas as chamadas (avaliarResposta e verificarTexto), em dolares. */
   custoTotalUsd: number;
   /** Casos que o lote devolveu com falha (ou cujo verificador falhou): pulados com o motivo, e os outros seguem. */
@@ -81,6 +87,7 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
   let somaDiferencas = 0;
   let casosAvaliados = 0;
   let reprovadosNoVerificador = 0;
+  let sugestoesComDadoSemFonte = 0;
   let casosFalhos = 0;
   let custoTotalUsd = 0;
 
@@ -176,10 +183,15 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
     }
     if (!verificacao.aprovado) reprovadosNoVerificador += 1;
 
+    // E76 PR 1: a sugestão afirma algum dado que a resposta do caso não tem? (Aqui a única fonte é a resposta: o golden set não traz o resto do briefing nem o site.)
+    const conferida = conferirSugestao(resultado.dados.exemplo, caso.resposta);
+    if (conferida.trocados.length > 0) sugestoesComDadoSemFonte += 1;
+
     console.log(
       `${caso.perguntaId}: IA deu ${resultado.dados.nota}, esperado ${caso.notaEsperada} ` +
         `(diferenca ${diferenca.toFixed(1)}) - ${caso.pontoPrincipal}` +
-        (verificacao.aprovado ? "" : ` [REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`),
+        (verificacao.aprovado ? "" : ` [REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`) +
+        (conferida.trocados.length > 0 ? ` [SUGESTAO COM DADO SEM FONTE: ${conferida.trocados.join("; ")}${conferida.descartada ? ", descartada" : ""}]` : ""),
     );
   }
 
@@ -190,6 +202,7 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
     console.log("acima da meta de 1,0 (plano de execucao, etapa 5).");
   }
   console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${casosAvaliados}`);
+  console.log(`sugestoes com dado sem fonte (antes da conferencia por codigo): ${sugestoesComDadoSemFonte} de ${casosAvaliados}`);
   if (casosFalhos > 0) console.log(`casos que falharam no lote: ${casosFalhos} de ${conjunto.length}`);
   console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
@@ -200,6 +213,7 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
     diferencaMedia,
     acimaDaMeta,
     reprovadosNoVerificador,
+    sugestoesComDadoSemFonte,
     casosFalhos,
     custoTotalUsd,
   };

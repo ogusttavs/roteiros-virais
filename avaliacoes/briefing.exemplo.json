@@ -24,6 +24,18 @@
     "pontoPrincipal": "sem item, sem preco e sem beneficio, so vago"
   },
   {
+    "perguntaId": "p2",
+    "resposta": "O mais pedido e a limpeza de sofa com impermeabilizacao. Nesta fase nao trabalho com preco fixo: cada orcamento sai depois de ver a foto do estofado, porque o tamanho, o tecido e o tipo de mancha mudam tudo. Quem contrata para de se preocupar com mancha de crianca e de bicho.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "E76 PR 2: restricao declarada com o porque (sem preco fixo, orcamento pela foto) vale tanto quanto o numero; item nomeado e beneficio na fala do cliente"
+  },
+  {
+    "perguntaId": "p2",
+    "resposta": "O preco depende, cada caso e um caso.",
+    "notaEsperada": 3,
+    "pontoPrincipal": "E76 PR 2: foge do dado sem dizer o porque; a regua nova nao aceita resposta vaga, so a restricao explicada"
+  },
+  {
     "perguntaId": "p3",
     "resposta": "A maioria so limpa a superficie. Eu abro o forro e limpo por dentro tambem, porque foi ai que achei um colchao com mofo escondido numa casa em Osasco.",
     "notaEsperada": 10,
@@ -103,8 +115,20 @@
   },
   {
     "perguntaId": "p12",
-    "resposta": "Admiro o perfil arrumadeiraprofissional, porque explica bem o passo a passo. Concorrente direto e a empresa Limpa Tudo Express, que atende no mesmo bairro.",
-    "notaEsperada": 8,
-    "pontoPrincipal": "handles e nomes citados, falta so o motivo do segundo perfil"
+    "resposta": "Concorrente direto e a empresa Limpa Tudo Express, que atende no mesmo bairro. Eles cobram por peca e somem depois do servico; eu volto em 30 dias para ver se a mancha nao voltou.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "E76 PR 2: a P12 so dos concorrentes; nome citado e o que ele faria diferente, com um numero"
+  },
+  {
+    "perguntaId": "p12",
+    "resposta": "Nao tenho concorrente direto na cidade nesta fase: sou o unico que faz lavagem a seco na casa do cliente, os outros levam o sofa para a loja. Quem chega perto e a Limpa Tudo Express, que so faz carpete.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "E76 PR 2: restricao declarada com o porque (sem concorrente direto) vale como resposta completa"
+  },
+  {
+    "perguntaId": "p13",
+    "resposta": "Admiro o perfil arrumadeiraprofissional, porque explica o passo a passo sem pressa e mostra o antes e depois no fim de cada video.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "E76 PR 2: a P13 so dos admirados; perfil citado e o que ele gosta ali, vira referencia de tom"
   }
 ]

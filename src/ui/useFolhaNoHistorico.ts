@@ -16,7 +16,7 @@ const ESPERA_POPSTATE_MS = 4000;
 /**
  * O botão voltar (do Android, o gesto do iPhone, o do navegador) fecha a folha
  * em vez de sair da tela (V7, item 1 do PROXIMO.md). Vale para toda folha ou
- * painel que cobre a tela: Folha, PainelFlutuante, as doze notas, as marcas.
+ * painel que cobre a tela: Folha, PainelFlutuante, as treze notas, as marcas.
  *
  * Como funciona: ao abrir, empurra uma entrada no histórico do navegador
  * (`history.pushState`, o Next 15 aceita e a URL não muda). Voltar desfaz essa

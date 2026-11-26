@@ -228,7 +228,7 @@ async function garantirTemasDeHoje(nichoId: number): Promise<void> {
   await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas });
 }
 
-/** As doze respostas do briefing preenchidas com nota alta, para a folha não mostrar "sem nota" em toda linha. */
+/** As respostas do briefing preenchidas com nota alta, para a folha não mostrar "sem nota" em toda linha. */
 async function preencherBriefingCompleto(clienteId: number): Promise<void> {
   const respostas: Record<string, string> = {};
   const avaliacoes: Record<string, AvaliacaoResposta> = {};
@@ -354,13 +354,13 @@ async function main(): Promise<void> {
       TAMANHOS.filter((t) => t.largura < 768),
     );
 
-    // Briefing.Folha: "as doze notas" so abre como dialogo abaixo de 1180px (vira cartao fixo acima disso).
+    // Briefing.Folha: "as treze notas" so abre como dialogo abaixo de 1180px (vira cartao fixo acima disso).
     await paraCadaTela(
       EMAIL_SEED,
       "/briefing",
       async (page, tamanho, modo) => {
-        await page.getByRole("button", { name: "as doze notas" }).click();
-        await page.getByRole("dialog", { name: "as doze notas" }).waitFor({ state: "visible" });
+        await page.getByRole("button", { name: "as treze notas" }).click();
+        await page.getByRole("dialog", { name: "as treze notas" }).waitFor({ state: "visible" });
         const nomeArquivo = `Briefing.Folha.${tamanho.rotulo}.${modo.rotulo}.png`;
         await page.screenshot({ path: path.join(pastaDestino, nomeArquivo) });
         arquivosGravados.push(
