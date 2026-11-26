@@ -134,19 +134,40 @@ test.describe("E42a: onde está o seu público, fora do Brasil", () => {
     await expect(page.getByLabel("Quem é você e o que você faz hoje")).toBeVisible();
   });
 
-  test("Começar: 'Em mais de um país' pede quais países", async ({ page }) => {
+  test("Começar: 'Em mais de um país' pede quais países e a estratégia de idioma (E76 PR 3), e grava os dois", async ({ page }) => {
     await entrar(page, EMAIL_COMECAR_2);
     await expect(page).toHaveURL(/\/comecar/);
     await page.getByRole("button", { name: "Começar", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Sobre você" })).toBeVisible();
+    // A pergunta do idioma só existe para quem fala com mais de um país.
+    await expect(page.getByRole("heading", { name: "Em que idioma saem os seus vídeos e posts?" })).toHaveCount(0);
     await page.getByRole("radio", { name: "Em mais de um país" }).click();
 
     await expect(page.getByLabel("Quais países?")).toBeVisible();
     await page.getByLabel("Quais países?").fill("Estados Unidos e México");
+
+    // Sem a estratégia de idioma, "Continuar" não passa e diz o que falta.
+    await expect(page.getByRole("heading", { name: "Em que idioma saem os seus vídeos e posts?" })).toBeVisible();
+    await page.getByRole("button", { name: "Continuar", exact: true }).click();
+    await expect(page.getByText("Escolha em que idioma saem os seus vídeos")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sobre você" })).toBeVisible();
+
+    // O principal com uma linha no outro: pede os dois idiomas.
+    await page.getByRole("radio", { name: "Um idioma principal, com uma linha no outro" }).click();
+    await page.getByRole("group", { name: "Qual é o idioma principal?" }).getByRole("button", { name: "Português", exact: true }).click();
+    await page.getByRole("button", { name: "Continuar", exact: true }).click();
+    await expect(page.getByText("Escolha o outro idioma, diferente do principal")).toBeVisible();
+    await page.getByRole("group", { name: "E o outro idioma?" }).getByRole("button", { name: "Inglês", exact: true }).click();
     await page.getByRole("button", { name: "Continuar", exact: true }).click();
 
     await expect(page.getByLabel("Quem é você e o que você faz hoje")).toBeVisible();
+    const [gravado] = await db()
+      .select({ paises: clientes.paises, estrategiaIdioma: clientes.estrategiaIdioma })
+      .from(clientes)
+      .where(eq(clientes.usuarioId, "e2e-publico-fora-brasil-comecar-2"));
+    expect(gravado?.paises).toBe("Estados Unidos e México");
+    expect(gravado?.estrategiaIdioma).toEqual({ modo: "linha_no_outro", principal: "portugues", segundo: "ingles", comoOutro: null });
   });
 
   test("Conta: troca de 'No Brasil inteiro' para 'Em outro país', salva, e continua depois de recarregar", async ({ page }) => {
