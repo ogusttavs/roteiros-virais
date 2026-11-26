@@ -59,3 +59,10 @@ odontotech.srv1953618.hstgr.cloud {
 		redir https://odontotech.app{uri} permanent
 	}
 }
+
+# roteiros: dominio novo klaki.app (26/11/2026, pedido do Gustavo). Por enquanto so leva para o
+# endereco atual, com 302 de proposito: um 301 ficaria guardado nos navegadores e daria volta
+# infinita quando o klaki.app virar o endereco principal depois da reuniao de sexta.
+klaki.app, www.klaki.app {
+	redir https://klaki.getorbita.com.br{uri} 302
+}
