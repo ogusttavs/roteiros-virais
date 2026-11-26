@@ -11,6 +11,7 @@ import { AJUSTES_DO_RENDER, LIMITES_DA_CONFERENCIA as L } from "@/config/edicao"
 import { executarComLimite, type ExecutorDeProcesso } from "@/jobs/processo";
 
 import { ESTILO_DA_LEGENDA, ESTILO_DO_TITULO, linhasDoTitulo, textoSeguroDoAss, TELA_DO_ASS } from "./ass";
+import { OPCOES_DE_ENTRADA_SEGURA } from "./entrada-segura";
 import { larguraDoTexto, medidasDaFonteEmbutida, type MedidasDaFonte } from "./medida-de-texto";
 import type { PerfilDeRender } from "./render-grafo";
 import type { BlocoLegenda } from "./tipos";
@@ -181,7 +182,7 @@ export function lerSaidaDoFfmpeg(saida: string, duracaoS: number | null): Pick<M
 
 /** Roda o ffprobe e uma passada do ffmpeg no arquivo. Lança se o arquivo não abre. */
 export async function medirVideo(caminho: string, executar?: ExecutorDeProcesso): Promise<MedidasDoVideo> {
-  const sonda = await executarComLimite("ffprobe", ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", caminho], 30_000, executar);
+  const sonda = await executarComLimite("ffprobe", ["-v", "error", ...OPCOES_DE_ENTRADA_SEGURA, "-print_format", "json", "-show_format", "-show_streams", caminho], 30_000, executar);
   const dados = JSON.parse(sonda.stdout) as { format?: { duration?: string }; streams?: { codec_type?: string; width?: number; height?: number }[] };
   const video = dados.streams?.find((s) => s.codec_type === "video");
   const temAudio = (dados.streams ?? []).some((s) => s.codec_type === "audio");
@@ -191,7 +192,7 @@ export async function medirVideo(caminho: string, executar?: ExecutorDeProcesso)
 
   const filtroDeVideo = `blackdetect=d=${L.pretoLeveS}:pix_th=0.10,freezedetect=n=0.001:d=${L.paradoLeveS}`;
   const filtroDeAudio = `ebur128=framelog=quiet,silencedetect=n=${L.limiarDoMudoDb}dB:d=${L.mudoLongoS}`;
-  const argumentos = ["-nostdin", "-v", "info", "-nostats", "-i", caminho];
+  const argumentos = ["-nostdin", "-v", "info", "-nostats", ...OPCOES_DE_ENTRADA_SEGURA, "-i", caminho];
   if (video) argumentos.push("-vf", filtroDeVideo);
   else argumentos.push("-vn");
   if (temAudio) argumentos.push("-af", filtroDeAudio);

@@ -13,14 +13,49 @@
 	email {$CADDY_EMAIL:gustavs.silvs@gmail.com}
 }
 
-# roteiros
+# roteiros: o endereco antigo leva para o novo (22/10/2026)
 app.srv1953618.hstgr.cloud {
+	redir https://klaki.getorbita.com.br{uri} permanent
+}
+
+# roteiros, endereco provisorio com dominio proprio (22/10/2026, decisao do Gustavo)
+klaki.getorbita.com.br {
 	encode zstd gzip
-	# R2a: o video de referencia toca dentro do aplicativo (YouTube, TikTok e Instagram pelos
-	# incorporados oficiais, nunca baixado nem hospedado por nos); frame-src libera so os tres.
-	header Content-Security-Policy "frame-src 'self' https://www.youtube-nocookie.com https://www.tiktok.com https://www.instagram.com"
+	# 26/11/2026 (T97, auditoria de seguranca A1 e M1): o app nao usa next/image, entao a rota
+	# do otimizador de imagem some no proxy; e cabecalhos de seguranca basicos.
+	@otimizadorImagem path /_next/image /_next/image/*
+	respond @otimizadorImagem 404
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Content-Security-Policy "frame-ancestors 'none'"
+	}
 	reverse_proxy roteiros-app:3000
 }
 
 # odontotech
-# (bloco do OdontoTech entra aqui quando o produto fizer o deploy)
+# 22/10/2026: dominio proprio odontotech.app (F10.7-f-dominio). O endereco antigo segue servindo
+# enquanto BETTER_AUTH_URL e os webhooks da Meta e do Stripe migram.
+odontotech.app {
+	encode zstd gzip
+	reverse_proxy odontotech-app:3000
+}
+
+www.odontotech.app {
+	redir https://odontotech.app{uri} permanent
+}
+
+# Endereco antigo: os webhooks (Meta, Stripe) continuam aqui ate a URL mudar nos paineis; o resto vai
+# para o dominio proprio.
+odontotech.srv1953618.hstgr.cloud {
+	encode zstd gzip
+	@webhooks path /api/webhooks/*
+	handle @webhooks {
+		reverse_proxy odontotech-app:3000
+	}
+	handle {
+		redir https://odontotech.app{uri} permanent
+	}
+}

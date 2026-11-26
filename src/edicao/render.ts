@@ -14,6 +14,7 @@ import { limiteDoRenderMs } from "@/config/edicao";
 import { executarComLimite, ErroTempoLimite, type ExecutorDeProcesso } from "@/jobs/processo";
 
 import { montarAss } from "./ass";
+import { OPCOES_DE_ENTRADA_SEGURA } from "./entrada-segura";
 import { montarGrafoDoRender, type HdrDoBruto, type PerfilDeRender } from "./render-grafo";
 import type { BlocoLegenda, Edl } from "./tipos";
 
@@ -40,7 +41,7 @@ export async function lerHdrDoBruto(caminho: string, executar?: ExecutorDeProces
   try {
     const { stdout } = await executarComLimite(
       "ffprobe",
-      ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=color_transfer", "-of", "default=nw=1:nk=1", caminho],
+      ["-v", "error", ...OPCOES_DE_ENTRADA_SEGURA, "-select_streams", "v:0", "-show_entries", "stream=color_transfer", "-of", "default=nw=1:nk=1", caminho],
       30_000,
       executar,
     );
