@@ -112,7 +112,7 @@ export function formatoDoCarrossel(slides: { tipo: TipoDeSlide; rotulo?: string 
 }
 
 /** A ordem e a forma da lista: quantidade, capa primeiro, chamada por último, nunca três do mesmo tipo seguidos. */
-export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide }[], quantidade: number): string[] {
+export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide; rotulo?: string }[], quantidade: number): string[] {
   const motivos: string[] = [];
   if (slides.length !== quantidade) motivos.push(`carrossel: ${slides.length} slides, o pedido era de exatamente ${quantidade}`);
   if (slides.length > 0 && !ehCapa(slides[0].tipo)) motivos.push('carrossel: o primeiro slide precisa ser uma capa (capa-foto ou capa-texto)');
@@ -121,9 +121,11 @@ export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide }[], quantid
     if (i > 0 && ehCapa(s.tipo)) motivos.push(`slide ${i + 1}: o tipo "${s.tipo}" só pode ser o primeiro`);
     if (i < slides.length - 1 && s.tipo === "chamada") motivos.push(`slide ${i + 1}: o tipo "chamada" só pode ser o último`);
   });
+  // O slide "O problema" (regra C do prompt 2.2.0) sai como item, mas conta como um tipo à parte na mistura: problema, item, item não são três itens seguidos.
+  const tipoNaMistura = (x: { tipo: TipoDeSlide; rotulo?: string }) => (ehOProblema(x) ? "problema" : x.tipo);
   let seguidos = 1;
   for (let i = 1; i < slides.length; i += 1) {
-    seguidos = slides[i].tipo === slides[i - 1].tipo ? seguidos + 1 : 1;
+    seguidos = tipoNaMistura(slides[i]) === tipoNaMistura(slides[i - 1]) ? seguidos + 1 : 1;
     if (seguidos > MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO) {
       motivos.push(`slides ${i - seguidos + 2} a ${i + 1}: ${seguidos} slides seguidos do tipo "${slides[i].tipo}", misture os tipos`);
       break;
