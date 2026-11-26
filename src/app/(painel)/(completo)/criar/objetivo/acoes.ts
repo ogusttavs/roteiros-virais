@@ -15,6 +15,7 @@ import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { filtroDeFormatosDaMarca } from "@/servicos/formatos";
+import { criarPedido, ErroPedido, falharPedido, pedidoDaMarca } from "@/servicos/pedidos";
 import { evidenciaParaRoteiro, exemplosPorFicha, setoresComPiso } from "@/servicos/pesquisa";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import {
@@ -28,7 +29,6 @@ import {
   validarQuemAparece,
   type OrigemRoteiro,
 } from "@/servicos/roteiro";
-import { criarPedido, ErroPedido, falharPedido, pedidoDaMarca } from "@/servicos/pedidos";
 import { apagarRascunhoSeForDoTexto } from "@/servicos/temas";
 import { conferirFolgaDoDia, gerarVersoes, VERSOES_POR_GERACAO } from "@/servicos/versoes";
 import { textosPedidos } from "@/textos/pedidos";

@@ -18,9 +18,9 @@ import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoSubindoParaAviso } from "@/servicos/curva";
 import { ramosDaMarcaParaDatasSemFalha } from "@/servicos/datas";
 import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
+import { versoesNoHoje } from "@/servicos/pedidos-estado";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { agendaDoDia, atrasados, proximoDiaMarcado, somarDiasISO, semanaDaAgenda } from "@/servicos/roteiro";
-import { versoesNoHoje } from "@/servicos/pedidos-estado";
 import { textosHoje } from "@/textos/hoje";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
