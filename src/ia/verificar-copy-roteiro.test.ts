@@ -581,6 +581,9 @@ describe("R-COPY-26: fórmula de texto de máquina (onda 1 de texto)", () => {
   it("onda 2: o reaviso do meio do corpo e a pergunta com objeto não reprovam", () => {
     expect(com(reprovam({ corpo: "O box estava opaco. Olha só o que muda agora: o rodo vai de cima para baixo." }), "R-COPY-26")).toBe(false);
     expect(com(reprovam({ fechamento: "Faz sentido para o seu box? Me chama no WhatsApp." }), "R-COPY-26")).toBe(false);
+    // Ajuste da segunda opinião sobre o #300: o apontar da câmera no começo do corpo passa; com pontuação logo depois, reprova.
+    expect(com(reprovam({ corpo: "Olha só a diferença no box da Neusa: antes opaco, depois brilhando." }), "R-COPY-26")).toBe(false);
+    expect(com(reprovam({ corpo: "Olha só: o box da Neusa tinha calcário de três anos." }), "R-COPY-26")).toBe(true);
   });
 
   it("R-COPY-28 e R-COPY-29 só avisam, nunca reprovam", () => {

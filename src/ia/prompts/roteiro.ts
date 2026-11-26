@@ -320,6 +320,9 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * título do bloco diz que ela manda no assunto e no público. Sem foco confirmado o bloco é o da 2.23.0, palavra por palavra, fora o título. O schema de saída não muda.
  */
 /**
+ * 2.28.0 (ajustes da segunda opinião sobre a onda 2, 26/11/2026): o bloco de regras de texto (gerado da seção 11 das rubricas 1.6.0) muda três regras da 2.27.0. `R-ROTEIRO-21`: a lente deixa de ser obrigatória em dica, tutorial ou opinião (só a 3 ou nenhuma), a lente 5 fala com quem assiste na segunda pessoa ("você talvez ache que...", nunca "todo mundo acha") e, em saúde, o desfecho das lentes de virada é a decisão ou o cuidado, nunca o resultado clínico. `R-COPY-30`: em saúde, o caso é a dúvida do paciente ou a cena do atendimento, nunca número de resultado nem prazo. `R-COPY-31`: a ponte não repete o elemento do ramo que o gancho já tem por `R-COPY-27`, e em saúde a pessoa pública entra só pelo assunto. O detector da `R-COPY-26` só conta "olha" e "olha só" no começo do bloco com pontuação logo depois. O schema de saída não muda. Precisa de prova com chave real.
+ */
+/**
  * 2.27.0 (onda 2 de texto, 26/11/2026, decisão do Gustavo: os roteiros saíam "meio genéricos", por exemplo a analogia de filme de super-herói com a página de produto, sem cliente, número nem cena): o bloco de regras de texto (`regras-copy-roteiro-uso.ts`, gerado da seção 11 das rubricas 1.5.0) ganha `R-COPY-30` (o corpo tem um caso concreto, ou um colchete para a pessoa completar), `R-COPY-31` (o gancho de fora do ramo tem a ponte no corpo, com fato da marca) e `R-ROTEIRO-21` (uma lente narrativa só, do gancho ao fechamento, entre seis). O detector da `R-COPY-26` ganha duas famílias (muleta de abertura de bloco e fecho com pergunta de confirmação), que reprovam na 1ª tentativa e avisam na 2ª. O schema de saída não muda. Precisa de prova com chave real.
  */
 /**
@@ -329,7 +332,7 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * 2.25.0 (onda 1 de texto, 25/11/2026): o bloco de regras de texto (`regras-copy-roteiro-uso.ts`, gerado da seção 11 das rubricas 1.3.0) ganha `R-COPY-26` (nenhuma fórmula de texto de máquina) e `R-COPY-27`
  * (o título e o gancho têm um elemento só desta marca ou deste ramo), e `R-COPY-19` passa a pedir o contraste só com os dois lados em fatos. O schema de saída não muda. Precisa de prova com chave real.
  */
-export const versao = "2.27.0";
+export const versao = "2.28.0";
 
 /**
  * E59: o bloco da entrada que liga a prova visual com imagem de outro (`R-ROTEIRO-20`). Só entra quando `motivosDaProvaVisualDeOutro` devolve algum motivo; sem motivo, nada entra e a regra do sistema

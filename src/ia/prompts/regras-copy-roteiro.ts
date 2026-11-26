@@ -8,7 +8,7 @@
  * que a tela mostrará por código (PR 3), nunca escrita pelo modelo.
  */
 
-export const versao = "1.5.0";
+export const versao = "1.6.0";
 
 export type RegraCopyRoteiro = {
   numero: string;
@@ -331,7 +331,7 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
   {
     "numero": "R-COPY-26",
     "grupo": "COPY",
-    "texto": "Nenhuma fórmula de texto de máquina: não negue uma coisa para afirmar outra (\"não é A, é B\"), não anuncie a virada (\"e isso muda tudo\"), não abra preparando o assunto (\"hoje vou falar de\", \"neste vídeo\"), não se despeça com cortesia vazia (\"espero que tenha gostado\"), não encha de intensificador sem fato (\"incrível\", \"poderoso\", \"transformador\"), não abra o corpo nem o fechamento com muleta (\"cara, é o seguinte\", \"olha só\"), não termine perguntando se a pessoa concordou (\"sabe?\", \"né?\", \"faz sentido?\"), não use \"cada vez mais\" nem \"nos dias de hoje\", nem o slogan \"menos A, mais B\". Diga a coisa direto, uma vez, com o fato da ficha, do momento ou da evidência.",
+    "texto": "Nenhuma fórmula de texto de máquina: não negue uma coisa para afirmar outra (\"não é A, é B\"), não anuncie a virada (\"e isso muda tudo\"), não abra preparando o assunto (\"hoje vou falar de\", \"neste vídeo\"), não se despeça com cortesia vazia (\"espero que tenha gostado\"), não encha de intensificador sem fato (\"incrível\", \"poderoso\", \"transformador\"), não abra o corpo nem o fechamento com muleta (\"cara, é o seguinte\", \"olha só:\"), não termine perguntando se a pessoa concordou (\"sabe?\", \"né?\", \"faz sentido?\"), não use \"cada vez mais\" nem \"nos dias de hoje\", nem o slogan \"menos A, mais B\". Diga a coisa direto, uma vez, com o fato da ficha, do momento ou da evidência.",
     "porQue": "Texto que parece escrito por máquina perde a confiança de quem assiste na primeira frase.",
     "bloco": "todos",
     "forca": "media",
@@ -379,26 +379,26 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
   {
     "numero": "R-COPY-30",
     "grupo": "COPY",
-    "texto": "O corpo tem pelo menos um caso que só existe nesta marca: um cliente, uma cena, um número ou uma fala, tirado da ficha, do momento ou da evidência. Afirmação vaga de experiência (\"nos meus anos fazendo isso, o que funcionou foi aquilo\") não conta como caso. Se a ficha não traz nenhum, deixe um colchete para a pessoa completar (\"[o caso de um cliente que...]\"), nunca um fato inventado (`R-CONF-02`).",
+    "texto": "O corpo tem pelo menos um caso que só existe nesta marca: um cliente, uma cena, um número ou uma fala, tirado da ficha, do momento ou da evidência. Afirmação vaga de experiência (\"nos meus anos fazendo isso, o que funcionou foi aquilo\") não conta como caso. Em ramo de saúde (`R-CONF-07`), o caso é a dúvida que um paciente trouxe ou uma cena do atendimento fora do procedimento (a explicação, o equipamento, a equipe), nunca número de resultado nem prazo de tratamento. Se a ficha não traz nenhum, deixe um colchete para a pessoa completar (\"[o caso de um cliente que...]\"; em saúde, \"[a dúvida que um paciente trouxe...]\"), nunca um fato inventado (`R-CONF-02`).",
     "porQue": "Um caso de verdade convence mais do que a explicação, e só você tem o seu.",
     "bloco": "corpo",
     "forca": "media",
     "forcaNoDocumento": "média",
     "conferePorCodigo": "nao",
     "confereNoDocumento": "não (é critério do prompt e da leitura da Central; sem caso concreto no corpo, o texto cai na analogia genérica)",
-    "fonte": "decisão do Gustavo de 25/11/2026 (onda 2 de texto, depois do roteiro da conta dele que saiu genérico: analogia de filme, nenhum cliente, número ou cena); `pesquisa/lacunas-kits-versus-app.md` seção 7 (concretude como método, já coberta por `R-COPY-08` no gancho e `R-COPY-15`, que não olhavam o corpo)"
+    "fonte": "decisão do Gustavo de 25/11/2026 (onda 2 de texto, depois do roteiro da conta dele que saiu genérico: analogia de filme, nenhum cliente, número ou cena); `pesquisa/lacunas-kits-versus-app.md` seção 7 (concretude como método, já coberta por `R-COPY-08` no gancho e `R-COPY-15`, que não olhavam o corpo); segunda opinião sobre o PR #300 (26/11/2026: em saúde o caso puxava número de resultado)"
   },
   {
     "numero": "R-COPY-31",
     "grupo": "COPY",
-    "texto": "Quando o gancho vem de filme, futebol, celebridade, notícia ou outro assunto de fora do ramo, a primeira frase do corpo liga o assunto ao negócio com um fato da marca (um cliente, uma cena, um número). A analogia que só compara as duas coisas, sem caso real fazendo a ponte, não vale.",
+    "texto": "Quando o gancho vem de filme, futebol, celebridade, notícia ou outro assunto de fora do ramo, a primeira frase do corpo liga o assunto ao negócio com um fato da marca (um cliente, uma cena, um número). A ponte traz esse fato novo e não repete o elemento do ramo que o gancho já tem por `R-COPY-27`. A analogia que só compara as duas coisas, sem caso real fazendo a ponte, não vale. Em ramo de saúde (`R-CONF-07`), a pessoa pública entra só pelo assunto (o que ela contou, o que virou conversa), nunca como exemplo de resultado que o paciente também teria.",
     "porQue": "Assunto de fora só prende quando você mostra o que ele tem a ver com o seu negócio, com um caso seu.",
     "bloco": "gancho, corpo",
     "forca": "media",
     "forcaNoDocumento": "média",
     "conferePorCodigo": "nao",
     "confereNoDocumento": "não (é critério do prompt; o gancho de fora do ramo e a ponte no corpo ficam para a leitura da Central)",
-    "fonte": "decisão do Gustavo de 25/11/2026 (onda 2 de texto, mesmo roteiro: o gancho do trailer de filme de super-herói ligado à página de produto só por comparação); `R-COPY-07` (o que mudou e quando, quando o tema é notícia)"
+    "fonte": "decisão do Gustavo de 25/11/2026 (onda 2 de texto, mesmo roteiro: o gancho do trailer de filme de super-herói ligado à página de produto só por comparação); `R-COPY-07` (o que mudou e quando, quando o tema é notícia); segunda opinião sobre o PR #300 (26/11/2026: a ponte repetia o elemento do ramo e, em saúde, a pessoa famosa sugeria resultado comparável)"
   },
   {
     "numero": "R-ROTEIRO-01",
@@ -643,14 +643,14 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
   {
     "numero": "R-ROTEIRO-21",
     "grupo": "ROTEIRO",
-    "texto": "Escolha UMA lente narrativa para o roteiro inteiro e siga-a do gancho ao fechamento, sem misturar duas. As seis, em palavras nossas: (1) situação, virada e desfecho: alguém numa situação, algo muda, o resultado; (2) começar no meio da cena: abre já no momento de tensão e volta só o necessário para entender; (3) fato, obstáculo e consequência: um fato, o que atrapalha e o que acontece por causa disso; (4) o cliente como herói e a marca como guia: o cliente tem o objetivo e o obstáculo, a marca mostra o caminho; (5) a crença que muda antes do serviço: a ideia errada que todo mundo tem, o que se vê de fato, e só depois o serviço; (6) a virada de alguém comum: uma pessoa como quem assiste e o ponto em que algo muda para ela. Escolha pela evidência, pelo tema e pelo objetivo da pessoa: protagonista com virada pede a (6) ou a (1); tensão forte pede a (2); notícia ou prazo pede a (3); objetivo de chamarem para comprar pede a (4); tema que desfaz um mito do ramo pede a (5). Não há campo novo na saída: a lente é uma escolha de quem escreve, e o roteiro curto não tem folga na gramática da API para registrá-la.",
+    "texto": "Escolha UMA lente narrativa para o roteiro inteiro e siga-a do gancho ao fechamento, sem misturar duas. As seis, em palavras nossas: (1) situação, virada e desfecho: alguém numa situação, algo muda, o resultado; (2) começar no meio da cena: abre já no momento de tensão e volta só o necessário para entender; (3) fato, obstáculo e consequência: um fato, o que atrapalha e o que acontece por causa disso; (4) o cliente como herói e a marca como guia: o cliente tem o objetivo e o obstáculo, a marca mostra o caminho; (5) a crença que muda antes do serviço: a ideia errada que quem assiste costuma ter, dita a ele (\"você talvez ache que...\", nunca \"todo mundo acha\"); o que se vê de fato; e só depois o serviço; (6) a virada de alguém comum: uma pessoa como quem assiste e o ponto em que algo muda para ela. Escolha pela evidência, pelo tema e pelo objetivo da pessoa: protagonista com virada pede a (6) ou a (1); tensão forte pede a (2); notícia ou prazo pede a (3); objetivo de chamarem para comprar pede a (4); tema que desfaz um mito do ramo pede a (5). A exceção é dica, tutorial ou opinião: aí a lente não é obrigatória; use só a (3) ou nenhuma, e siga o passo a passo ou o argumento, sem transformar a dica em história. Em ramo de saúde (`R-CONF-07`), o desfecho das lentes de virada, a (1), a (4) e a (6), é a decisão ou o cuidado que a pessoa tomou (marcar a avaliação, tirar a dúvida, mudar o hábito), nunca o resultado clínico nem o depoimento do paciente sobre o tratamento. Não há campo novo na saída: a lente é uma escolha de quem escreve, e o roteiro curto não tem folga na gramática da API para registrá-la.",
     "porQue": "Um vídeo que conta uma história só, do começo ao fim, é mais fácil de seguir e de lembrar.",
     "bloco": "todos",
     "forca": "media",
     "forcaNoDocumento": "média",
     "conferePorCodigo": "nao",
     "confereNoDocumento": "não (é critério do prompt; a lente é escolha do modelo e a Central confere na leitura)",
-    "fonte": "decisão do Gustavo de 25/11/2026 (onda 2 de texto); `pesquisa/lacunas-kits-versus-app.md` seção 7 (as seis lentes são ideias de domínio comum atribuídas a autores públicos pelo próprio kit; aqui só a ideia, escrita por nós, sem texto nem exemplo dele); casa com `R-ROTEIRO-07`, `-09`, `-16`, `-17` e `-18`"
+    "fonte": "decisão do Gustavo de 25/11/2026 (onda 2 de texto); `pesquisa/lacunas-kits-versus-app.md` seção 7 (as seis lentes são ideias de domínio comum atribuídas a autores públicos pelo próprio kit; aqui só a ideia, escrita por nós, sem texto nem exemplo dele); casa com `R-ROTEIRO-07`, `-09`, `-16`, `-17` e `-18`; segunda opinião sobre o PR #300 (26/11/2026: a lente obrigatória empurrava dica e tutorial para história, quando o banco dá à dica 16,1 contra 7,7 do caso; a lente 5 com \"todo mundo\" acendia o aviso da `R-COPY-21`; em saúde a virada virava depoimento)"
   },
   {
     "numero": "R-CONF-01",

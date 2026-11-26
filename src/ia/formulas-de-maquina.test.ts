@@ -32,6 +32,9 @@ describe("formulas-de-maquina: o que PEGA", () => {
     ["muleta-de-abertura", { corpo: "Cara, é o seguinte: o trailer mostra uma cena e para." }],
     ["muleta-de-abertura", { corpo: "Olha só: o anúncio que andou foi outro." }],
     ["muleta-de-abertura", { corpo: "Então, olha, a loja vendia pouco." }],
+    // Ajuste da segunda opinião sobre o #300 (26/11/2026): "olha só" com pontuação logo depois continua muleta.
+    ["muleta-de-abertura", { corpo: "Olha só, o box da Neusa tinha calcário de três anos." }],
+    ["muleta-de-abertura", { fechamento: "Bom, olha só: chama no direct." }],
     ["muleta-de-abertura", { fechamento: "Seguinte: chama no direct." }],
     ["fecho-de-confirmacao", { fechamento: "Tem que fazer sentido, sabe? O trailer prova que vale assistir." }],
     ["fecho-de-confirmacao", { chamada: "Chama no direct, né?" }],
@@ -99,6 +102,10 @@ describe("formulas-de-maquina: o que NÃO pode pegar", () => {
     ["'quem sabe?' no meio", { fechamento: "Quem sabe? Só testando." }],
     ["'sabe' como verbo", { fechamento: "Quem sabe quanto custa fala com o cliente primeiro." }],
     ["muleta fora de corpo e fecho, no gancho", { gancho: "Olha só o que a loja fez." }],
+    // Ajuste da segunda opinião sobre o #300: "olha só" seguido de palavra no começo do corpo é o apontar da câmera do antes e depois.
+    ["'olha só a diferença' no começo do corpo", { corpo: "Olha só a diferença no box da Neusa: antes opaco, depois brilhando." }],
+    ["'então, olha só o antes' no começo do corpo", { corpo: "Então, olha só o antes e depois do sofá da Dona Lúcia." }],
+    ["'olha o rejunte' no começo do corpo", { corpo: "Olha o rejunte depois da primeira passada." }],
     ["pergunta de confirmação no corpo (só vale no fecho)", { corpo: "A venda subiu, sabe? Foi a foto." }],
     ["revelação com algarismo", { gancho: "Você sabia que 7 em cada 10 manchas de sofá vêm de bebida?" }],
   ];

@@ -298,13 +298,14 @@ function acharRevelacao(texto: string): string | null {
 // --- 9. Muleta de abertura de bloco (onda 2, 25/11/2026) --------------------------------------
 
 // Só no COMEÇO do bloco: "olha o que muda agora" no meio do corpo é o reaviso que a R-ROTEIRO-10 pede.
+// "olha" e "olha só" só são muleta com pontuação logo depois ("olha só:", "então, olha,"): seguidos de palavra
+// ("olha só a diferença", "então, olha o antes e depois") são o apontar da câmera do antes e depois, e passam
+// (ajuste da segunda opinião sobre o PR #300, 26/11/2026).
 const MULETA = new RegExp(
   [
     // "cara, e o seguinte:", "gente, o seguinte:", "seguinte:" (com ":" ou "," depois, para "o seguinte caso" passar)
     "^[^a-z0-9]*(?:(?:cara|gente|pessoal|galera|bom|bem|entao|ai|olha)[ ,]+)*(?:e |eh )?(?:o )?seguinte(?=[ ]*[:,.;!?]|$)",
-    "^[^a-z0-9]*(?:entao|bom|bem|ai)[ ,]+olha(?![a-z])",
-    "^[^a-z0-9]*olha so(?![a-z])",
-    "^[^a-z0-9]*olha[ ]*,",
+    "^[^a-z0-9]*(?:(?:entao|bom|bem|ai)[ ,]+)?olha(?: so)?(?=[ ]*[:,.;!?]|$)",
   ].join("|"),
 );
 
@@ -383,7 +384,7 @@ const FAMILIAS: Familia[] = [
   },
   {
     id: "muleta-de-abertura",
-    nome: "muleta de abertura de bloco (\"cara, é o seguinte\", \"olha só\")",
+    nome: "muleta de abertura de bloco (\"cara, é o seguinte\", \"olha só:\")",
     conselho: "comece a frase pelo fato ou pela cena, sem a muleta que só ganha tempo",
     blocos: ["corpo", "fechamento"],
     achar: acharMuleta,

@@ -9,8 +9,8 @@ const QUEBRA = String.fromCharCode(10);
 const RETORNO = String.fromCharCode(13);
 const PADRAO_LINHA = /^[|][ ]*(R-(?:COPY|ROTEIRO|CONF)-[0-9]{2})[ ]*[|]/;
 
-/** A versão das regras (o `checar-versao-prompt` exige versão nova quando um arquivo de `src/ia/prompts/` muda). Subir junto com qualquer mudança da seção 11. 1.0.0: as 53 regras (PR 1); 1.1.0: R-COPY-21 como indício (PR 2); 1.2.0: R-ROTEIRO-20 e R-CONF-10 (E59, 22/10/2026); 1.3.0: R-COPY-26 a 29 e R-COPY-19 reescrita (onda 1 de texto, 25/11/2026); 1.4.0: R-CONF-07 reescrita com o conselho de odontologia (saúde sem preço, sem grátis, sem procedimento em andamento, 25/11/2026); 1.5.0: R-COPY-30 e R-COPY-31 e R-ROTEIRO-21 (onda 2 de texto: o caso concreto no corpo, a ponte do gancho de fora do ramo e a lente narrativa, 26/11/2026). */
-export const VERSAO_DAS_REGRAS = "1.5.0";
+/** A versão das regras (o `checar-versao-prompt` exige versão nova quando um arquivo de `src/ia/prompts/` muda). Subir junto com qualquer mudança da seção 11. 1.0.0: as 53 regras (PR 1); 1.1.0: R-COPY-21 como indício (PR 2); 1.2.0: R-ROTEIRO-20 e R-CONF-10 (E59, 22/10/2026); 1.3.0: R-COPY-26 a 29 e R-COPY-19 reescrita (onda 1 de texto, 25/11/2026); 1.4.0: R-CONF-07 reescrita com o conselho de odontologia (saúde sem preço, sem grátis, sem procedimento em andamento, 25/11/2026); 1.5.0: R-COPY-30 e R-COPY-31 e R-ROTEIRO-21 (onda 2 de texto: o caso concreto no corpo, a ponte do gancho de fora do ramo e a lente narrativa, 26/11/2026); 1.6.0: os ajustes da segunda opinião sobre a onda 2 (a lente sem obrigação em dica, tutorial e opinião, a lente 5 na segunda pessoa, a ponte sem repetir o elemento do ramo da R-COPY-27 e os limites de saúde nas três, 26/11/2026). */
+export const VERSAO_DAS_REGRAS = "1.6.0";
 
 export const TOTAL_ESPERADO = { COPY: 31, ROTEIRO: 21, CONF: 10 } as const;
 
