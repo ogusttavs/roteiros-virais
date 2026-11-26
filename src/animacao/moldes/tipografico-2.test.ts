@@ -6,8 +6,9 @@ import { LIMITES_DA_ANIMACAO } from "@/config/animacao";
 import { montarLinhaDoTempo, resolverMarca } from "../montador";
 import { montarHtmlDaAnimacao } from "../render";
 
-import { MOLDE_PADRAO, MOLDES } from "./index";
 import { AREA_SEGURA, ESCALA_DA_LETRA, LARGURA_DA_COLUNA, moldeTipografico2, passoEntrePalavras, TEMPOS, tamanhoDaLetra, tamanhoDoArroba } from "./tipografico-2";
+
+import { MOLDE_PADRAO, MOLDES } from "./index";
 
 const MALICIOSO = `</p><script>window.hackeado=1</script><img src=x onerror="window.hackeado=2"> "'\``;
 

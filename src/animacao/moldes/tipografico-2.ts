@@ -16,9 +16,9 @@
  * Tudo depende do tempo: a página não tem relógio próprio, o render chama `irPara(t)` antes de cada foto. Regra que não muda: texto do cliente só passa por `escaparTexto`; em atributo ou CSS vai só
  * número ou cor `#rrggbb` (validada por `montador.ts` e saída das contas de `cores.ts`). Sem rede: a letra é `data:`, e a política de conteúdo fecha o resto.
  */
-import { escaparTexto } from "../montador";
 import { canais, coresDaAnimacao } from "../cores";
 import { palavraEmDestaque } from "../destaque";
+import { escaparTexto } from "../montador";
 import type { EntradaDoMolde, Molde } from "../tipos";
 
 /** A área segura do Reels, em pixels da cena de 1080 por 1920 (o que fica fora dela pode ser coberto pela interface do Instagram). */
