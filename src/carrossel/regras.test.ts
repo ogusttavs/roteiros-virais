@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { LINHA_FIXA_ANTES_DEPOIS_SAUDE, type SlideDoCarrossel } from "@/config/carrossel";
 
+import { verificarPromessaDaCapa } from "./metodo";
 import { excessoDoCampo, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComExcessoPequeno, slidesComFoto, slidesDaSaida, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides, type SlideDaSaida } from "./regras";
 
 const s = (tipo: SlideDoCarrossel["tipo"], extra: Partial<SlideDoCarrossel> = {}): SlideDoCarrossel => {
@@ -37,6 +38,35 @@ describe("verificarOrdemDosSlides", () => {
   it("aceita dois seguidos e reprova três seguidos do mesmo tipo", () => {
     expect(verificarOrdemDosSlides([s("capa-texto"), s("item"), s("item"), s("passo"), s("chamada")], 5)).toEqual([]);
     expect(verificarOrdemDosSlides([s("capa-texto"), s("item"), s("item"), s("item"), s("chamada")], 5).join("|")).toMatch(/3 slides seguidos do tipo "item"/);
+  });
+
+  // T114 (ensaio de 26/11/2026): "3 sinais" em 5 slides falhava sempre, porque só cabem 3 slides no meio e a regra dos três seguidos obrigava a trocar um item por outro tipo.
+  it("os itens da lista que a capa promete podem vir seguidos: a escova em 5 slides sai sem nenhum motivo", () => {
+    const vazio = { rotulo: "", titulo: "", texto: "", antes: "", depois: "", valor: "", unidade: "", fonte: "", referencia: "", quem: "", contexto: "", linhas: [] as string[], acoes: [] as string[] };
+    const saida: SlideDaSaida[] = [
+      { ...vazio, tipo: "capa-texto", titulo: "Escova de dente: 3 sinais de que está na hora de trocar", texto: "Para você conferir a sua hoje" },
+      { ...vazio, tipo: "item", rotulo: "Sinal", titulo: "As cerdas abriram", texto: "Cerda aberta para os lados não alcança a linha da gengiva e deixa a placa no lugar." },
+      { ...vazio, tipo: "item", rotulo: "Sinal", titulo: "Faz três meses", texto: "Mesmo com cara de nova, a escova usada todo dia perde a firmeza das cerdas com o tempo." },
+      { ...vazio, tipo: "item", rotulo: "Sinal", titulo: "Você ficou gripado", texto: "Depois de uma gripe ou de uma dor de garganta, troque a escova para começar do zero." },
+      { ...vazio, tipo: "chamada", titulo: "Marque a sua avaliação", texto: "Mande uma mensagem pelo botão do perfil.", acoes: ["Salve para lembrar", "Mande para alguém"] },
+    ];
+    const slides = slidesDaSaida(saida, { ramoSaude: true });
+    expect(verificarOrdemDosSlides(slides, 5)).toEqual([]);
+    expect(verificarPromessaDaCapa(slides)).toEqual([]);
+    expect(verificarLimitesDosSlides(slides, { ramoSaude: true, fotosPrometidas: 0, fotosDePacientePrometidas: 0 })).toEqual([]);
+    expect(slides.slice(1, 4).map((x) => x.rotulo)).toEqual(["Sinal 1 de 3", "Sinal 2 de 3", "Sinal 3 de 3"]);
+  });
+  it("vale para os passos e para a lista de 7 slides, com o slide que sobra fora da lista", () => {
+    const quatroCoisas = s("capa-texto", { titulo: "Gengiva que sangra: 4 coisas que você precisa saber" });
+    expect(verificarOrdemDosSlides([quatroCoisas, s("item"), s("item"), s("item"), s("item"), s("resumo"), s("chamada")], 7)).toEqual([]);
+    const passos = s("capa-texto", { titulo: "Um título curto", sub: "Cinco passos para escovar certo" });
+    expect(verificarOrdemDosSlides([passos, s("passo"), s("passo"), s("passo"), s("passo"), s("passo"), s("chamada")], 7)).toEqual([]);
+  });
+  it("a regra dos três seguidos continua valendo para os outros tipos, para a capa sem número e para o que passa do número da capa", () => {
+    const tresSinais = s("capa-texto", { titulo: "Escova de dente: 3 sinais de que está na hora de trocar" });
+    expect(verificarOrdemDosSlides([tresSinais, s("dado"), s("dado"), s("dado"), s("chamada")], 5).join("|")).toMatch(/3 slides seguidos do tipo "dado"/);
+    expect(verificarOrdemDosSlides([s("capa-texto", { titulo: "Sinais de que está na hora de trocar a escova" }), s("item"), s("item"), s("item"), s("chamada")], 5).join("|")).toMatch(/3 slides seguidos do tipo "item"/);
+    expect(verificarOrdemDosSlides([tresSinais, s("item"), s("item"), s("item"), s("item"), s("resumo"), s("chamada")], 7).join("|")).toMatch(/slides 2 a 5: 4 slides seguidos do tipo "item"/);
   });
 });
 
@@ -248,5 +278,18 @@ describe("promessaEmSaude", () => {
     const slide = s("item", { texto: "Volta ao branco em uma sessão" });
     expect(verificarLimitesDosSlides([slide], { ramoSaude: true }).join()).toMatch(/não pode prometer resultado, cura, garantia nem prazo; tire "Volta ao branco"/);
     expect(verificarLimitesDosSlides([slide], { ramoSaude: false })).toEqual([]);
+  });
+});
+
+describe("slidesDaSaida: o responsável técnico", () => {
+  const vazio = { rotulo: "", titulo: "", texto: "", antes: "", depois: "", valor: "", unidade: "", fonte: "", referencia: "", quem: "", contexto: "", linhas: [] as string[], acoes: [] as string[] };
+  const chamada: SlideDaSaida = { ...vazio, tipo: "chamada", titulo: "Salve", texto: "Mande", acoes: ["Salve", "Mande"] };
+  it("entra só na chamada, em ramo de saúde, quando preenchido", () => {
+    expect(slidesDaSaida([chamada], { ramoSaude: true, responsavelTecnico: "Dra. Ana, CRO-SP 1" })[0].responsavel).toBe("Dra. Ana, CRO-SP 1");
+  });
+  it("vazio, ausente ou fora da saúde, não entra", () => {
+    expect(slidesDaSaida([chamada], { ramoSaude: true, responsavelTecnico: "" })[0].responsavel).toBeUndefined();
+    expect(slidesDaSaida([chamada], { ramoSaude: true })[0].responsavel).toBeUndefined();
+    expect(slidesDaSaida([chamada], { ramoSaude: false, responsavelTecnico: "Dra. Ana, CRO-SP 1" })[0].responsavel).toBeUndefined();
   });
 });

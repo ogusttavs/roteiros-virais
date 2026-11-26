@@ -62,11 +62,13 @@ export function motivoDoTitulo(titulo: string): string | null {
 
 /**
  * O que o servidor confere nos títulos que a IA devolveu: a quantidade (de 3 a 5), o limite de cada um, nenhum igual à manchete (a manchete é do veículo), nenhum repetido, nenhum número fora da notícia
- * e, em ramo de saúde, nenhuma promessa de resultado. Cada motivo é uma frase que a segunda tentativa recebe para corrigir.
+ * e, em ramo de saúde, nenhuma promessa de resultado. Cada motivo é uma frase que a segunda tentativa recebe para corrigir. `minimo` (T114) baixa o piso da quantidade: na 2ª tentativa e na conferência
+ * título a título vale 1, porque o título que reprova sai da lista em vez de derrubar a capa.
  */
-export function verificarTitulosDaCapa(titulos: string[], noticia: { titulo: string; resumo: string | null; angulo: string | null }, opcoes: { ramoSaude: boolean }): string[] {
+export function verificarTitulosDaCapa(titulos: string[], noticia: { titulo: string; resumo: string | null; angulo: string | null }, opcoes: { ramoSaude: boolean; minimo?: number }): string[] {
   const motivos: string[] = [];
-  if (titulos.length < TITULOS_DA_CAPA.min || titulos.length > TITULOS_DA_CAPA.max) motivos.push(`capa: ${titulos.length} títulos, o pedido é de ${TITULOS_DA_CAPA.min} a ${TITULOS_DA_CAPA.max}`);
+  const minimo = opcoes.minimo ?? TITULOS_DA_CAPA.min;
+  if (titulos.length < minimo || titulos.length > TITULOS_DA_CAPA.max) motivos.push(`capa: ${titulos.length} títulos, o pedido é de ${minimo} a ${TITULOS_DA_CAPA.max}`);
   const textoDaNoticia = [noticia.titulo, noticia.resumo, noticia.angulo].filter(Boolean).join(" ");
   const vistos = new Set<string>();
   titulos.forEach((bruto, i) => {

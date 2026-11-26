@@ -164,6 +164,29 @@ describe("gerarCarrossel", () => {
     expect(comum.slides.find((x) => x.tipo === "antes-depois")?.rodape).toBeUndefined();
   });
 
+  it("o responsável técnico: marca de saúde com a linha preenchida leva na chamada, sem a linha não leva, e uma marca nunca vê a linha da outra", async () => {
+    const { definirResponsavelTecnico, clientePorId } = await import("@/servicos/clientes");
+    // O índice único de `ramo_catalogo` impede um segundo nicho de odontologia: reaproveita o que o teste anterior criou, ou cria.
+    const [existente] = await db().select().from(nichos).where(eq(nichos.ramoCatalogo, "odontologia"));
+    const nichoSaude = existente ?? (await db().insert(nichos).values({ slug: "carrossel-saude-resp", nome: "Odontologia resp", termos: [], ramoCatalogo: "odontologia" }).returning())[0];
+    const comLinha = await criarCliente(nichoSaude.id);
+    const semLinha = await criarCliente(nichoSaude.id);
+    const outroRamo = await criarCliente();
+    await definirResponsavelTecnico(comLinha, "Dra. Maria Souza, CRO-SP 12345");
+    await definirResponsavelTecnico(outroRamo, "Dr. Fora do ramo, CRO-RJ 1");
+    expect((await clientePorId(comLinha))?.responsavelTecnico).toBe("Dra. Maria Souza, CRO-SP 12345");
+    expect((await clientePorId(semLinha))?.responsavelTecnico).toBeNull();
+    const a = await gerarCarrossel(comLinha, pedidoLivre("cuidados com o aparelho", 5));
+    expect(a.slides.find((x) => x.tipo === "chamada")?.responsavel).toBe("Dra. Maria Souza, CRO-SP 12345");
+    const b = await gerarCarrossel(semLinha, pedidoLivre("cuidados com o aparelho", 5));
+    expect(b.slides.find((x) => x.tipo === "chamada")?.responsavel).toBeUndefined();
+    // Fora do ramo de saúde o dado guardado não entra no slide.
+    const c = await gerarCarrossel(outroRamo, pedidoLivre("mancha de vinho no estofado", 5));
+    expect(c.slides.find((x) => x.tipo === "chamada")?.responsavel).toBeUndefined();
+    await definirResponsavelTecnico(comLinha, null);
+    expect((await clientePorId(comLinha))?.responsavelTecnico).toBeNull();
+  });
+
   it("o prompt de saúde proíbe preço, promessa e procedimento em andamento, e a versão subiu", async () => {
     const { montarSistemaEstavel, versao } = await import("@/ia/prompts/carrossel");
     const texto = montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", ramoSaude: true });
@@ -173,7 +196,7 @@ describe("gerarCarrossel", () => {
     expect(montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", ramoSaude: false })).not.toMatch(/Este ramo é de saúde/);
     // A regra R-CONF-07 do banco de regras entra nos dois, mas condicionada ("Nos ramos de saúde"); o bloco próprio do carrossel é só da saúde.
     expect(texto).toMatch(/nunca com foto ou texto do procedimento em andamento/);
-    expect(versao).toBe("2.1.0");
+    expect(versao).toBe("2.2.0");
   });
 
   it("ramo alternativo de saúde também conta: a linha fixa entra e o depoimento é reprovado e refeito", async () => {
@@ -759,7 +782,7 @@ describe("o fluxo da tela contra as rotas", () => {
     const deOutra = ((await (await raiz.POST(json("/api/carrossel", "POST", { quantidade: 5, cor: "#0e5a6a", de: { origem: "tema", texto: "tema da outra marca" } }))).json()) as { id: number }).id;
 
     como(dona);
-    const lista = (await (await raiz.GET()).json()) as { carrosseis: { id: number; tema: string; quantidade: number; criadoEm: string }[] };
+    const lista = (await (await raiz.GET(json("/api/carrossel", "GET"))).json()) as { carrosseis: { id: number; tema: string; quantidade: number; criadoEm: string }[] };
     expect(lista.carrosseis.map((c) => c.id)).toEqual([segundo, primeiro]);
     expect(lista.carrosseis.map((c) => c.id)).not.toContain(deOutra);
     expect(lista.carrosseis[0]).toMatchObject({ quantidade: 7 });
@@ -814,7 +837,7 @@ describe("a chave desligada", () => {
     const pedido = () => new Request("http://localhost/api/carrossel", { method: "POST", body: "{}" });
     const id = { params: Promise.resolve({ id: "1", fotoId: "1", n: "1" }) };
     const respostas = [
-      await rotaPrincipal.GET(),
+      await rotaPrincipal.GET(new Request("http://localhost/api/carrossel")),
       await rotaPrincipal.POST(pedido()),
       await rotaDoCarrossel.GET(pedido(), id),
       await rotaDoCarrossel.PATCH(pedido(), id),

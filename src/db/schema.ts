@@ -244,6 +244,8 @@ export const clientes = pgTable("clientes", {
   nichoId: integer("nicho_id").references(() => nichos.id),
   /** E65: a cor da marca ("#rrggbb"), escolhida no primeiro carrossel e trocável depois; nula usa o neutro escuro do produto. */
   corMarca: text("cor_marca"),
+  /** Migração 0125: a linha do responsável técnico de marca de saúde ("Dra. Maria Souza, CRO-SP 12345"), no último slide do carrossel. Nula: o slide não desenha a linha. O app nunca inventa. */
+  responsavelTecnico: text("responsavel_tecnico"),
   /** V12c, item 1: ficam no banco, sem uso na tela desde que `alcance` existe. */
   cidade: text("cidade"),
   bairro: text("bairro"),

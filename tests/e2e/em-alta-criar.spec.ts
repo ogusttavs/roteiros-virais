@@ -122,6 +122,11 @@ test.describe("o assunto em alta no Criar", () => {
     await expect(page.locator("[data-em-alta]")).toHaveCount(0);
     const bloco = page.locator("[data-sem-encaixe]");
     await expect(bloco).toBeVisible();
+    // T111: primeiro só a linha calma, sem lista nem botão de trazer; a lista abre a pedido.
+    await expect(bloco).toContainText("Hoje nada do que está em alta no Brasil combina com o seu ramo.");
+    await expect(bloco.getByRole("listitem")).toHaveCount(0);
+    await expect(bloco.getByRole("button", { name: /^Trazer para o meu ramo/ })).toHaveCount(0);
+    await bloco.getByRole("button", { name: "Ver o que está em alta mesmo assim" }).click();
     await expect(bloco.getByRole("heading", { name: "Nada disso cabe bem no seu ramo hoje" })).toBeVisible();
     // Até três, na ordem da lista, sem o delicado.
     await expect(bloco.getByRole("listitem")).toHaveCount(3);
