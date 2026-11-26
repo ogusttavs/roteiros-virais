@@ -962,6 +962,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                 </p>
               ) : null}
               {slideAtual.rodape ? <p className={estilos.ajuda}>{t.linhaFixaNaoEdita}</p> : null}
+              {dados?.ilustracoes?.includes(escolhido) ? <p className={estilos.ajuda}>{t.slideIlustrado}</p> : null}
               {t.metodo.dicasDeFoto[slideAtual.tipo] && !(ramoSaude && slideAtual.tipo === "passo") ? <p className={estilos.ajuda}>{t.metodo.dicasDeFoto[slideAtual.tipo]}</p> : null}
               <div className={estilos.acoesSlide}>
                 <Botao type="button" variante="secundario" onClick={() => setFolhaTexto(true)}>
@@ -973,6 +974,12 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                   />
                   {t.trocarTexto}
                 </Botao>
+                {dados?.ilustracoes?.includes(escolhido) && !(TIPOS_COM_FOTO.has(slideAtual.tipo) && slideAtual.tipo !== "noticia") && !["antes-depois", "prova-resultado"].includes(slideAtual.tipo) ? (
+                  <Botao type="button" variante="secundario" onClick={() => setFolhaFoto(true)} data-testid="trocar-pela-minha-foto">
+                    <RefreshCw className={estilos.icone} size={18} strokeWidth={1.75} aria-hidden="true" />
+                    {t.trocarPelaMinhaFoto}
+                  </Botao>
+                ) : null}
                 {TIPOS_COM_FOTO.has(slideAtual.tipo) && slideAtual.tipo !== "noticia" ? (
                   <Botao type="button" variante="secundario" onClick={() => setFolhaFoto(true)}>
                     <RefreshCw
@@ -985,7 +992,9 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                       ? slideAtual.tipo === "antes-depois"
                         ? t.trocarFotos
                         : t.trocarFoto
-                      : t.porFoto}
+                      : dados?.ilustracoes?.includes(escolhido)
+                        ? t.trocarPelaMinhaFoto
+                        : t.porFoto}
                   </Botao>
                 ) : null}
               </div>
@@ -1142,7 +1151,7 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
           indice={escolhido}
           slide={slideAtual}
           fotos={dados.fotos}
-          atual={dados.fotosDosSlides[escolhido] ?? { foto: null, fotoDepois: null }}
+          atual={dados.fotosDosSlides[escolhido]?.foto ? dados.fotosDosSlides[escolhido] : { foto: slideAtual.fotoId && slideAtual.fotoId > 0 ? slideAtual.fotoId : null, fotoDepois: null }}
           ramoSaude={ramoSaude}
           aoMandar={async () => void (await carregarDados(carrossel.id))}
           aoSalvar={(novo) => void depoisDeTrocar(novo, escolhido + 1, "foto")}

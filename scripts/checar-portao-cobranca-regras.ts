@@ -41,6 +41,8 @@ export const ACOES_LIVRES: Record<string, string> = {
 
 /** Rotas `/api` livres, por caminho do arquivo. */
 export const ROTAS_LIVRES: Record<string, string> = {
+  "src/app/api/admin/carrossel/[id]/slides/route.ts": "E69: rota do admin (adminDaRota: chave, sessão e papel), nunca de um cliente; ler os slides para o script do Codex não gasta nada do cliente",
+  "src/app/api/admin/carrossel/[id]/ilustracao/[n]/route.ts": "E69: rota do admin (adminDaRota: chave, sessão e papel), nunca de um cliente; guardar a ilustração gerada no computador do admin não gasta nada do cliente",
   "src/app/api/auth/[...all]/route.ts": "entrar e sair (better-auth): antes de existir marca ou assinatura",
   "src/app/api/cadastro/confirmar/route.ts": "E63: é o link do e-mail de confirmar, aberto sem sessão (às vezes em outro aparelho); o código de uso único e com prazo é a prova, e confirmar não gasta nada",
   "src/app/api/capa/[videoId]/route.ts": "capa de vídeo é dado público da plataforma, igual para todas as marcas, sem gasto (só serve a quem está logado)",

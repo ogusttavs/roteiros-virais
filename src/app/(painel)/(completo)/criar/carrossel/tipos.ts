@@ -9,6 +9,8 @@ export type DadosDoCarrossel = {
   /** Qual foto cai em qual slide (a mesma conta do render). */
   fotosDosSlides: { foto: number | null; fotoDepois: number | null }[];
   slidesComFoto: boolean[];
+  /** E69: os indices (a partir de 0) dos slides que tem ilustracao gerada. */
+  ilustracoes?: number[];
 };
 export type PreviaDoSlide = { n: number; imagem: string; precisaEncurtar: boolean; semFoto: boolean };
 

@@ -21,7 +21,6 @@ type Props = {
   noticia: { id: number; titulo: string; veiculo: string; data: string };
   corMarca: string | null;
   arroba: string;
-  ramoSaude: boolean;
   /** A capa pronta aberta pelo endereço (`?id=`): a tela abre direto no pronto, carregando por este id. */
   capaInicialId?: number;
 };
@@ -52,7 +51,7 @@ function useEtapa(ativa: boolean): number {
  * A tela da capa de notícia (E66). O desenho não tem uma tela própria: monta com as peças da tela do carrossel (mesmas classes, mesmos estados: escolher, montando, pronto, erro, limite). Fala com
  * `/api/carrossel/capa/titulos` (os títulos), `/api/carrossel/capa` (cria a capa, um carrossel de um slide) e as rotas de sempre do carrossel (foto, prévia, baixar, trocar o título).
  */
-export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }: Props) {
+export function CapaTela({ noticia, corMarca, arroba, capaInicialId }: Props) {
   const router = useRouter();
   const [fase, setFase] = useState<Fase>(capaInicialId ? "abrindo" : "titulos");
   const [sugeridos, setSugeridos] = useState<Titulos | null>(null);
@@ -60,7 +59,6 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
   const [titulo, setTitulo] = useState("");
   const [foto, setFoto] = useState<{ arquivo: File; url: string } | null>(null);
   const [avisoDeFoto, setAvisoDeFoto] = useState<string | null>(null);
-  const [autorizado, setAutorizado] = useState(false);
   const [cor, setCor] = useState(corMarca ?? "");
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -174,7 +172,6 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
   async function mandarFoto(id: number, arquivo: File): Promise<number | null> {
     const corpo = new FormData();
     corpo.append("foto", arquivo);
-    if (ramoSaude) corpo.append("autorizacaoDoPaciente", "true");
     try {
       const { foto: enviada } = await pedir<{ foto: { id: number } }>(`/api/carrossel/${id}/fotos`, { method: "POST", body: corpo }, tc.fotoNaoValida);
       return enviada.id;
@@ -341,20 +338,6 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
   const passouCaracteres = Math.max(0, titulo.trim().length - LIMITE.caracteres);
   const tituloCabe = titulo.trim() !== "" && passouPalavras === 0 && passouCaracteres === 0;
 
-  const caixaDeAutorizacao = ramoSaude ? (
-    <div className={estilos.bloco}>
-      <h3 className={estilos.subtitulo}>{tc.pacienteTitulo}</h3>
-      <p className={estilos.ajuda}>{tc.pacienteAjuda}</p>
-      <label className={estilos.autorizacao}>
-        <input type="checkbox" checked={autorizado} onChange={(e) => setAutorizado(e.target.checked)} />
-        <span>
-          <strong>{tc.autorizacaoPaciente}</strong>
-          <span>{tc.autorizacaoPacienteAjuda}</span>
-        </span>
-      </label>
-    </div>
-  ) : null;
-
   const entradasDeArquivo = (
     <>
       <input
@@ -505,7 +488,6 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
           <section className={estilos.bloco} aria-labelledby="c-foto">
             <h2 id="c-foto">{t.fotoTitulo}</h2>
             <p className={estilos.ajuda}>{t.fotoAjuda}</p>
-            {caixaDeAutorizacao}
             <div className={estilos.fotos}>
               {foto ? (
                 <div className={estilos.fotoMini}>
@@ -518,14 +500,13 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
                   </button>
                 </div>
               ) : (
-                <button type="button" className={estilos.adicionar} disabled={ramoSaude && !autorizado} onClick={() => entradaDeFoto.current?.click()}>
+                <button type="button" className={estilos.adicionar} onClick={() => entradaDeFoto.current?.click()}>
                   <Plus size={22} strokeWidth={1.75} aria-hidden="true" />
                   {t.mandarFoto}
                 </button>
               )}
             </div>
             {entradasDeArquivo}
-            {ramoSaude && !autorizado ? <p className={estilos.miudo}>{tc.autorizacaoPrecisa}</p> : null}
             {avisoDeFoto ? (
               <p className={estilos.erroCampo} role="alert">
                 <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
@@ -550,7 +531,7 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
           </section>
 
           <div className={estilos.enviar}>
-            <Botao type="button" onClick={() => void criar()} disabled={!tituloCabe || (precisaDeCor && !corValida) || (ramoSaude && Boolean(foto) && !autorizado)}>
+            <Botao type="button" onClick={() => void criar()} disabled={!tituloCabe || (precisaDeCor && !corValida)}>
               {t.criar}
             </Botao>
             <p className={estilos.miudo}>{t.criarAjuda}</p>
@@ -666,13 +647,12 @@ export function CapaTela({ noticia, corMarca, arroba, ramoSaude, capaInicialId }
                     <Pencil className={estilos.icone} size={18} strokeWidth={1.75} aria-hidden="true" />
                     {t.mudarTitulo}
                   </Botao>
-                  <Botao type="button" variante="secundario" disabled={ramoSaude && !autorizado} onClick={() => entradaDeFotoDepois.current?.click()}>
+                  <Botao type="button" variante="secundario" onClick={() => entradaDeFotoDepois.current?.click()}>
                     <RefreshCw className={estilos.icone} size={18} strokeWidth={1.75} aria-hidden="true" />
                     {dados?.fotosDosSlides[0]?.foto ? t.trocarFoto : t.porFoto}
                   </Botao>
                 </div>
               )}
-              {caixaDeAutorizacao}
               {entradasDeArquivo}
             </div>
 

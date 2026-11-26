@@ -1,0 +1,119 @@
+.caixa {
+  display: grid;
+  gap: var(--espaco-3);
+  max-width: 34ch;
+}
+
+@media (min-width: 768px) {
+  .caixa {
+    max-width: 48ch;
+  }
+}
+
+.topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+}
+
+.titulo {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto-suave);
+}
+
+.link {
+  background: none;
+  border: 0;
+  padding: var(--espaco-2) 0;
+  font: inherit;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-destaque);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.item {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3);
+  border-radius: var(--raio-md);
+  border: var(--largura-borda) solid var(--cor-borda);
+}
+
+.valendo {
+  background: var(--cor-selecao-suave);
+  border-color: var(--cor-selecao-borda);
+}
+
+.rotuloDoItem {
+  font: var(--peso-semibold) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  line-height: var(--altura-corpo);
+  color: var(--cor-titulo);
+}
+
+.etiquetas {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.etiqueta {
+  padding: var(--espaco-1) var(--espaco-2);
+  border-radius: var(--raio-sm);
+  background: var(--cor-selecao-suave);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  font: var(--peso-semibold) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-destaque);
+}
+
+.usando {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-destaque);
+}
+
+.erro {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+  color: var(--cor-erro);
+}
