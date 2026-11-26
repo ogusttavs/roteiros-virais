@@ -83,3 +83,24 @@ describe("o espaço para completar (trecho entre colchetes)", () => {
     expect(screen.queryByTestId("confirma-copiar")).toBeNull();
   });
 });
+
+describe("avisos do método", () => {
+  it("aparecem como dica recolhida, sem papel de alerta, abaixo dos slides", async () => {
+    const d = dados("Texto limpo de colchete com mais de oito palavras aqui", "Legenda limpa.");
+    (d.carrossel.avisos as string[]) = ["A capa não tem número, pergunta nem verbo de ação."];
+    vi.mocked(fetch).mockImplementation(async (url) => (String(url).endsWith("/previa") ? json(previa) : json(d)));
+    render(<CarrosselTela temasDeHoje={[]} corMarca="#0e5a6a" arroba="@clinica.exemplo" ramoSaude idInicial={9} />);
+    const dica = await screen.findByTestId("dicas-do-metodo");
+    expect(dica.tagName).toBe("DETAILS");
+    expect((dica as HTMLDetailsElement).open).toBe(false);
+    expect(dica.getAttribute("role")).toBeNull();
+    expect(dica.textContent).toContain("A capa não tem número");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("sem avisos, nada aparece", async () => {
+    abrir("Texto limpo de colchete com mais de oito palavras aqui", "Legenda limpa.");
+    await screen.findByText("Copiar a legenda");
+    expect(screen.queryByTestId("dicas-do-metodo")).toBeNull();
+  });
+});

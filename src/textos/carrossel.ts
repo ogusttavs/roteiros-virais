@@ -88,6 +88,7 @@ export const textosCarrossel = {
   // Pronto
   prontoData: (n: number) => `Pronto · ${n} slides`,
   prontoTitulo: "O seu carrossel está pronto",
+  dicaDoMetodoRotulo: "Uma ideia para melhorar",
   prontoAjuda: "Arraste para ver todos. Toque num slide para trocar o texto ou as fotos.",
   faixaAria: (n: number) => `Os ${n} slides`,
   slideAria: (n: number, total: number) => `Slide ${n} de ${total}`,
