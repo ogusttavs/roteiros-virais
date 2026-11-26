@@ -9,16 +9,27 @@ import { textosAuth } from "@/textos/auth";
 export const VALIDADE_DO_CONVITE_EM_SEGUNDOS = 60 * 60 * 48;
 
 /**
+ * Como o plugin do link mágico guarda o código em `verification` desde o better-auth 1.7.7: o identificador leva o prefixo `magic-link:` e o valor é
+ * `{"type":"magic-link","email":...}`, sem nenhum campo a mais (o plugin confere com um schema estrito). Até a 1.7.6 o identificador era o código puro e o valor só
+ * `{"email":...}`; a mudança é a correção do GHSA-965c-763c-88jm (o `state` de um login social valia como link mágico, porque os dois caíam no mesmo identificador).
+ * Um convite gravado no formato antigo volta "INVALID_TOKEN" na 1.7.7 em diante; `tests/integracao/convite.test.ts` compara este formato com o do próprio plugin.
+ */
+export function identificadorDoLinkMagico(token: string): string {
+  return `magic-link:${token}`;
+}
+
+/**
  * Cria o link do convite: o mesmo valor de verificação do link mágico do better-auth (uso único, o `magicLinkVerify` apaga ao usar; preso ao e-mail dentro do valor;
  * sem usuário com esse e-mail, recusa, porque `disableSignUp` continua ligado), só que com o prazo próprio. O plugin não deixa escolher o prazo por pedido, e aceitar o
- * prazo vindo do corpo de `/sign-in/magic-link` deixaria qualquer um pedir link longo; por isso o valor nasce aqui, no servidor, sem endpoint novo.
+ * prazo vindo do corpo de `/sign-in/magic-link` deixaria qualquer um pedir link longo; por isso o valor nasce aqui, no servidor, sem endpoint novo. O formato do valor é
+ * o do plugin (ver `identificadorDoLinkMagico`).
  */
 export async function gerarLinkDeConvite(email: string): Promise<string> {
   const contexto = await auth.$context;
   const token = randomBytes(24).toString("base64url");
   await contexto.internalAdapter.createVerificationValue({
-    identifier: token,
-    value: JSON.stringify({ email }),
+    identifier: identificadorDoLinkMagico(token),
+    value: JSON.stringify({ type: "magic-link", email }),
     expiresAt: new Date(Date.now() + VALIDADE_DO_CONVITE_EM_SEGUNDOS * 1000),
   });
   const url = new URL("/api/auth/magic-link/verify", config.auth.url);
