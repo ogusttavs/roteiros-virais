@@ -36,8 +36,8 @@ describe("chavesDeBlocos", () => {
 });
 
 describe("numerosCitaveis", () => {
-  it("o curto cita as 32 que o prompt mostra; o longo, só conformidade e texto", () => {
-    expect(numerosCitaveis("curto").size).toBe(32);
+  it("o curto cita as 35 que o prompt mostra (32 mais R-COPY-30, R-COPY-31 e R-ROTEIRO-21, todas de força média); o longo, só conformidade e texto", () => {
+    expect(numerosCitaveis("curto").size).toBe(35);
     const longo = numerosCitaveis("longo");
     expect([...longo].some((n) => n.startsWith("R-ROTEIRO-"))).toBe(false);
     expect(longo.has("R-COPY-13")).toBe(true);
