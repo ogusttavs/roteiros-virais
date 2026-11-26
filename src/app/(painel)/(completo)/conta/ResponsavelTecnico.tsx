@@ -57,7 +57,12 @@ export function ResponsavelTecnico({ inicial, desligadoVerComo }: { inicial: str
           setEstado("parado");
         }}
       />
-      <Botao type="button" onClick={() => void salvar()} disabled={Boolean(desligadoVerComo) || estado === "salvando" || linha === guardado}>
+      <Botao
+        type="button"
+        aria-label={t.nomeDoBotao[estado === "salvando" ? "salvando" : estado === "salvo" ? "salvo" : "salvar"]}
+        onClick={() => void salvar()}
+        disabled={Boolean(desligadoVerComo) || estado === "salvando" || linha === guardado}
+      >
         {estado === "salvando" ? t.salvando : estado === "salvo" ? t.salvo : t.salvar}
       </Botao>
     </section>

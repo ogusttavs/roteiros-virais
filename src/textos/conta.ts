@@ -105,6 +105,12 @@ export const textosConta = {
     salvar: "salvar",
     salvando: "salvando",
     salvo: "salvo",
+    /** Nome do botão para o leitor de tela: a Conta já tem o "salvar" do formulário, e os dois não podem ter o mesmo nome. */
+    nomeDoBotao: {
+      salvar: "salvar o responsável técnico",
+      salvando: "salvando o responsável técnico",
+      salvo: "responsável técnico salvo",
+    },
     erro: "não conseguimos salvar agora; tente de novo em um minuto",
     longo: (maximo: number) => `escreva em até ${maximo} caracteres`,
     link: "tire links e arrobas: a linha é só o nome e o registro",
