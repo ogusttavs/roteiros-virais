@@ -357,6 +357,10 @@ Entra desligado: sem os quatro dados abaixo no `.env` da VPS, ninguem consegue c
 
 - **Um processo web so.** A avaliacao do tema livre nao paga duas vezes o toque repetido porque a chamada em curso fica num `Map` na memoria do processo (`AVALIACOES_EM_CURSO` em `src/app/(painel)/(completo)/criar/tema-livre/acoes.ts`). Hoje ha um unico container `web` em producao, entao basta. Se um dia houver mais de um (ou uma troca de container no meio de uma avaliacao), o toque repetido pode pagar duas vezes: a saida e trocar o `Map` por uma trava no banco (`pg_advisory_xact_lock` ou uma linha com a chave e o prazo), como o webhook do Stripe ja faz.
 
+## Chaves de funcao do carrossel (E65 a E69)
+
+Todas entram desligadas e so o valor `1` liga; as tres sao lidas a cada chamada, sem rebuild: `CARROSSEL_ATIVO` (o carrossel e a capa de noticia), `ANIMACAO_ATIVA` (o video de animacao, com `ANIMACAO_CONTAS`) e `ILUSTRACAO_ATIVA` (a ilustracao por slide, E69 PR A, so admin envia; precisa do carrossel ligado). `ILUSTRACAO_ATIVA` vem do `.env` pelo `env_file` do app e do worker, que sao quem desenha o carrossel; o `roteiros-render` nao a recebe de proposito (nao desenha carrossel e nao usa `env_file`), por isso nao ha linha dela no `compose.prod.yml`.
+
 ## O que nunca fazer
 
 Build na VPS; publicar porta; mexer em `/srv/odontotech` ou no bloco do OdontoTech no
