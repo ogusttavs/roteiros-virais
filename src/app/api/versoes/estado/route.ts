@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { rotuloParaQue } from "@/config/fichas";
+import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { grupoEmAberto } from "@/servicos/versoes";
@@ -19,6 +20,8 @@ export async function GET() {
   const sessao = await sessaoAtual();
   const cliente = sessao ? await clienteAtivoDoUsuario(sessao.user.id) : null;
   if (!cliente) return NextResponse.json({ erro: "nao autenticado" }, { status: 401, headers: SEM_CACHE });
+  const recusa = await recusaDaCobranca();
+  if (recusa) return recusa;
   const grupo = await grupoEmAberto(cliente.id);
   let corpo: EstadoDasVersoes = { estado: "nenhum" };
   if (grupo?.emEscrita) corpo = { estado: "escrevendo" };
