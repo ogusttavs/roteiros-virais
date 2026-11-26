@@ -988,11 +988,11 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
    * mesma posição, sobrepostos, quando `.ladoGrudado` não atravessava a linha certa).
    *
    * R1, acabamento (achado do Gustavo, repassado pela Fable): os dois ficavam colados, sem
-   * respiro nenhum; o vazio certo é `--espaco-6` (1.5rem), não zero nem o `VAZIO_MAXIMO_COLUNA_PX`
-   * de folga geral da coluna.
+   * respiro nenhum; o vazio certo é `--espaco-8` (2rem, o ritmo único entre os blocos da tela desde a T112, 26/11/2026; era
+   * `--espaco-6`), não zero nem o `VAZIO_MAXIMO_COLUNA_PX` de folga geral da coluna.
    */
   for (const largura of [1024, 1280, 1920]) {
-    test(`Roteiro: "Como editar" vem logo abaixo de "De onde veio", com o respiro de --espaco-6, em ${largura}px`, async ({
+    test(`Roteiro: "Como editar" vem logo abaixo de "De onde veio", com o respiro de --espaco-8, em ${largura}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: largura, height: 900 });
@@ -1008,10 +1008,10 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       expect(vazio, `vazio de ${vazio}px entre "De onde veio" e "Como editar"`).toBeLessThanOrEqual(
         VAZIO_MAXIMO_COLUNA_PX,
       );
-      const ESPACO_6_PX = 24;
+      const ESPACO_8_PX = 32;
       expect(
-        Math.abs(vazio - ESPACO_6_PX),
-        `vazio de ${vazio}px, esperado perto de --espaco-6 (${ESPACO_6_PX}px)`,
+        Math.abs(vazio - ESPACO_8_PX),
+        `vazio de ${vazio}px, esperado perto de --espaco-8 (${ESPACO_8_PX}px)`,
       ).toBeLessThanOrEqual(2);
     });
   }

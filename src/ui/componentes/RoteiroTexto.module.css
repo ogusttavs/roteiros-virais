@@ -1,7 +1,8 @@
 .roteiro {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-7);
+  /* T112: o mesmo ritmo dos blocos da tela do roteiro (`RoteiroTela.module.css`, `--espaco-8` entre um bloco e outro). */
+  gap: var(--espaco-8);
   max-width: 34ch;
 }
 
@@ -46,7 +47,10 @@
   color: var(--cor-titulo);
 }
 
-/* A fala e a cena do mesmo bloco, juntas (a leitura do roteiro): empilhadas no celular, lado a lado do tablet para cima. */
+/*
+ * A fala e a cena do mesmo bloco, juntas (a leitura do roteiro): a cena logo abaixo da fala, na largura do bloco, em toda largura de tela. T112 (26/11/2026): do tablet para cima
+ * elas ficavam lado a lado, e "O que mostrar" ficava espremido numa coluna de uns 230 px ao lado da fala, mais estreito que todo o resto da coluna do texto.
+ */
 .fala {
   display: flex;
   flex-direction: column;
@@ -56,8 +60,9 @@
 .cena {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-1);
-  padding: var(--espaco-3);
+  gap: var(--espaco-2);
+  margin-top: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
   border-radius: var(--raio-md);
   background: var(--cor-selecao-suave);
   border-left: 2px solid var(--cor-selecao-borda);
@@ -83,24 +88,10 @@
   color: var(--cor-destaque);
 }
 
-@media (min-width: 1024px) {
+/* Do tablet para cima, o roteiro com as cenas ocupa a coluna do texto inteira (a mesma largura de "Outros ganchos" e dos outros cartões da coluna). */
+@media (min-width: 768px) {
   .roteiro:has(.comCena) {
     max-width: none;
-  }
-
-  .comCena {
-    display: grid;
-    grid-template-columns: minmax(0, 34ch) minmax(0, 1fr);
-    column-gap: var(--espaco-6);
-    align-items: start;
-  }
-
-  .comCena > .rotuloELinha {
-    grid-column: 1 / -1;
-  }
-
-  .comCena > :global([data-porque-aberto]) {
-    grid-column: 1 / -1;
   }
 }
 

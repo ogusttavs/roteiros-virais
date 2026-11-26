@@ -4,9 +4,10 @@
   max-width: 34ch;
 }
 
+/* T112: do tablet para cima, a largura da coluna do texto inteira, igual aos blocos da fala logo abaixo (era 48ch, mais estreito que eles). */
 @media (min-width: 768px) {
   .caixa {
-    max-width: 48ch;
+    max-width: none;
   }
 }
 
