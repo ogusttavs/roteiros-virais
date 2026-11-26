@@ -13,3 +13,6 @@ coverage/
 playwright-report/
 test-results/
 .vercel
+
+# Saida das rodadas do golden set do carrossel (avaliar:carrossel)
+avaliacoes-saida/
