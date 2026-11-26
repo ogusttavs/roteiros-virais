@@ -101,4 +101,7 @@ export const textosCapa = {
   limiteAjuda: "As capas que você já fez continuam aqui para baixar.",
   verOpcoes: "Ver as opções",
   agoraNao: "Agora não",
+  recentesTitulo: "As suas capas",
+  recentesAjuda: "Toque em uma para abrir de novo, trocar o que quiser e baixar.",
+  recenteDetalhe: (data: string) => `Feita em ${data}`,
 } as const;
