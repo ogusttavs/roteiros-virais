@@ -641,7 +641,18 @@ function mockGanchosAlternativos(entrada: string) {
   const curto = tema.split(/\s+/).slice(0, 6).join(" ").slice(0, 50).trim();
   const tipos = ["cena", "resultado", "objeto", "fala_direta", "numero", "contraste", "pergunta"].filter((t) => t !== tipoAtual);
   const emocoes = ["curiosidade", "espanto", "identificacao", "desejo", "alerta"] as const;
-  const frases = [`Olhe o que acontece com ${curto} na sua frente`, `Foi assim que ${curto} ficou resolvido`, `Esta é a ferramenta que muda ${curto}`, `Eu faço ${curto} assim todos os dias`, `Três erros comuns em ${curto}`];
+  // O detalhe concreto vem do corpo do roteiro (as primeiras palavras dele), como um modelo de verdade faria; cada frase combina com o tipo de abertura que leva (pergunta com "?", número com número).
+  const detalhe = extrairCampo(entrada, "Corpo:").split(/\s+/).slice(0, 4).join(" ").replace(/[.,;:!?]+$/, "");
+  const fraseDoTipo: Record<string, string> = {
+    cena: `Olhe ${curto} acontecer: ${detalhe}`,
+    resultado: `Foi assim que ${curto} ficou resolvido com ${detalhe}`,
+    objeto: `Esta é a ferramenta que muda ${curto}: ${detalhe}`,
+    fala_direta: `Eu faço ${curto} assim todos os dias: ${detalhe}`,
+    numero: `Três erros comuns em ${curto}, e um é este: ${detalhe}`,
+    contraste: `Antes ${curto} dava trabalho, agora basta ${detalhe}`,
+    pergunta: `Você sabe ${curto}? Comece com ${detalhe}`,
+  };
+  const frases = tipos.slice(0, 5).map((t) => fraseDoTipo[t]);
   const ganchos = frases.map((texto, i) => ({ texto, tipoAbertura: tipos[i] as "cena", emocao: emocoes[i] }));
   if (marcado("ganchos-tipo-igual")) ganchos[1].tipoAbertura = ganchos[0].tipoAbertura;
   if (marcado("ganchos-tipo-do-original") && tipoAtual && tipoAtual !== "não registrado") ganchos[2].tipoAbertura = tipoAtual as "cena";
@@ -651,6 +662,8 @@ function mockGanchosAlternativos(entrada: string) {
   if (marcado("ganchos-poucos")) return { ganchos: ganchos.slice(0, 2) };
   if (entrada.includes("[mock:ganchos-sempre-poucos]")) return { ganchos: ganchos.slice(0, 2) };
   // Fórmula de máquina nas duas tentativas: a 2a só avisa, e o servidor tira da lista o gancho que a tem (três de cinco: sobram dois e não dá; um de cinco: sobram quatro).
+  // Nenhum gancho com detalhe do roteiro, nas duas tentativas: o servidor tira todos e diz que não deu.
+  if (entrada.includes("[mock:ganchos-sempre-todos-sem-detalhe]")) return { ganchos: ganchos.map((x) => ({ ...x, texto: "Um jeito simples que ninguém conta ainda" + ((x.tipoAbertura as string) === "pergunta" ? "?" : (x.tipoAbertura as string) === "numero" ? " em 3 passos" : "") })) };
   const comFormula = entrada.includes("[mock:ganchos-sempre-formula-tres]") ? 3 : entrada.includes("[mock:ganchos-sempre-formula-um]") ? 1 : 0;
   if (comFormula > 0) return { ganchos: ganchos.map((x, i) => (i < comFormula ? { ...x, texto: `Um resultado incrível para você ${["hoje", "amanhã", "agora"][i]}` } : x)) };
   return { ganchos };
