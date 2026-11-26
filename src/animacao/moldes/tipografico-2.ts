@@ -7,7 +7,8 @@
  *   esquerda, 96 de margem (a mesma do carrossel). O andamento fica na linha de 220; o texto, na faixa de 300 a 1540, numa coluna de 844.
  * - Letra: a do projeto (Mona Sans, embutida), 800 no texto e 700 no @, numa escala de razão 1,25: 120, 96, 76 e 60, escolhida pelo tamanho da cena e pela palavra mais longa, que tem de caber
  *   inteira na coluna. Entrelinha 1,08, espaço entre letras -0,025 em. Se ainda assim passar da coluna (uma letra mais larga que a conta), a página diminui 8% por vez até caber.
- * - Cor: uma só, a da marca (`cores.ts`): fundo, texto quase branco com 7 para 1 e o destaque com 4,5 para 1, conferidos por código. O destaque é o único acento: a palavra da cena e a pílula do @.
+ * - Cor: uma só, a da marca (`cores.ts`): o fundo é a marca afundada no quase preto, o texto quase branco com 7 para 1, e o destaque é a própria cor da marca (clareada sem perder a força, se
+ *   precisar) com 4,5 para 1, conferidos por código. O destaque é o único acento: a palavra da cena e a pílula do @.
  * - Tempo: a primeira cena já está inteira no primeiro quadro (o gancho se lê na hora e o quadro serve de capa); nas outras, as palavras sobem e aparecem uma depois da outra (0,45 s cada, com no
  *   máximo 0,9 s de escada), a palavra de destaque acende do branco para a cor 0,2 s depois de aparecer, e a cena sai inteira em 0,3 s subindo um pouco. O fundo nunca muda: nada pisca entre as
  *   cenas. A última não sai: fica até o fim, 2 s a mais que o tempo de leitura (`seguraDoFinalS`), e o @ aparece embaixo dela quando o texto termina de entrar.
@@ -32,7 +33,7 @@ export const LARGURA_DA_COLUNA = 1080 - AREA_SEGURA.esquerda - AREA_SEGURA.direi
 export const ESCALA_DA_LETRA = [120, 96, 76, 60] as const;
 /** A menor letra que a conta aceita para uma palavra comprida demais (a página ainda pode reduzir, se a letra real for mais larga). */
 export const MENOR_LETRA = 44;
-/** Largura média de uma letra da Mona Sans 800 em "em", com folga (medida no Chromium em 26/11/2026: 0,58 nas palavras do português). */
+/** Largura de uma letra da Mona Sans 800 em "em", com folga: a média medida no Chromium em 26/11/2026 é 0,49 nas palavras do português; 0,62 cobre as palavras cheias de "m" e "w". */
 const LARGURA_MEDIA_DA_LETRA = 0.62;
 
 /** O tamanho da letra de uma cena: pelo número de caracteres e, depois, descendo a escala até a palavra mais longa caber inteira na coluna. */
