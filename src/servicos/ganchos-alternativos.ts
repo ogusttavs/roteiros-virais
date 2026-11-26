@@ -15,8 +15,8 @@ import { geracoesIA, roteiros, type ConteudoRoteiro, type GanchoAlternativo, typ
 import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 import * as ganchosIA from "@/ia/prompts/ganchosAlternativos";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
-import { gerarComVerificacao } from "@/ia/verificador";
-import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
+import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
+import { acharResultadoOuMedoEmSaude, temNumeroNoTexto, verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 
@@ -87,7 +87,48 @@ type Contexto = {
   tipoAtual: TipoAbertura | null;
   fontes: string;
   ramoSaude: boolean;
+  /** O que o roteiro e o perfil têm de concreto (corpo, fechamento, chamada, perfil, camada exclusiva). Ausente, a conferência do detalhe não roda. */
+  detalhes?: string;
+  /** O que o gancho não pode ser só: o tema e o gancho atual (repetir isso não é detalhe). */
+  jaDito?: string;
 };
+
+/**
+ * Palavras comuns demais para valer como detalhe (sem acento, como `palavrasDeConteudo` devolve): a lista curta de palavras de ligação do verificador não pega "você", "fazer" nem "precisa", que
+ * aparecem em qualquer perfil e deixariam passar o gancho genérico. Só o que casaria por acaso; palavra do ramo nunca entra aqui.
+ */
+const PALAVRAS_COMUNS_DEMAIS = new Set([
+  "voce", "voces", "tambem", "tenha", "tenho", "temos", "tinha", "ficar", "fica", "ficam", "ficou", "fazer", "faco", "fazem", "feito", "pode", "podem", "possa", "podemos", "precisa", "precisam",
+  "saber", "sabe", "sabem", "coisa", "coisas", "jeito", "jeitos", "forma", "formas", "vezes", "gente", "pessoa", "pessoas", "algum", "alguma", "alguns", "algumas", "nenhum", "nenhuma", "tudo",
+  "nada", "qualquer", "assim", "aquele", "aquela", "aquilo", "dessa", "desse", "dessas", "desses", "naquele", "seguir", "segue", "falar", "fala", "falei", "disse", "dizem", "diz", "dizer", "veja",
+  "vale", "valem", "ficaria", "queria", "quero", "quer", "querem", "vamos", "vamo", "ainda", "apenas", "sempre", "nunca", "mesmo", "mesma", "depois", "antes", "durante", "entre", "ate", "alem",
+  "mundo", "vida", "tempo", "melhor", "melhores", "pior", "grande", "grandes", "bom", "boa", "bons", "boas", "novo", "nova", "novos", "novas", "verdade", "motivo", "motivos", "razao", "problema",
+  "problemas", "ajuda", "ajudar", "trabalho", "trabalhando", "trabalha", "trabalhar", "mostrar", "mostra", "conta", "contar", "aprender", "entender", "conhecer", "descobrir", "esperar", "espera",
+]);
+
+/** A raiz de cinco letras de cada palavra de conteúdo (junta "remova" e "remover", "selar" e "sele"). */
+const raizes = (texto: string): Set<string> => new Set(palavrasDeConteudo(texto).filter((p) => !PALAVRAS_COMUNS_DEMAIS.has(p)).map((p) => p.slice(0, 5)));
+
+/**
+ * O gancho precisa de pelo menos uma palavra de conteúdo que esteja no corpo, no fechamento, na chamada ou no perfil e que NÃO seja só do tema nem do gancho atual (R-COPY-27: um detalhe que só este vídeo
+ * ou este cliente tem). Palavra curta, de ligação e comum não conta (`palavrasDeConteudo`). Devolve verdadeiro quando o gancho passa.
+ */
+export function ganchoTemDetalheConcreto(texto: string, detalhes: string, jaDito: string): boolean {
+  const nosDetalhes = raizes(detalhes);
+  const jaDitas = raizes(jaDito);
+  return [...raizes(texto)].some((r) => nosDetalhes.has(r) && !jaDitas.has(r));
+}
+
+/** Se o rótulo do tipo de abertura bate com o texto: pergunta termina em "?", número tem número, e quem abre com pergunta é do tipo pergunta. Devolve o motivo ou nulo. */
+export function motivoDoTipoMalRotulado(texto: string, tipo: TipoAbertura): string | null {
+  const t = texto.trim();
+  const primeiraFrase = /^[^.!?]*[.!?]?/.exec(t)?.[0] ?? "";
+  const abrePerguntando = primeiraFrase.endsWith("?");
+  if (tipo === "pergunta" && !t.includes("?")) return `o tipo é "pergunta" e o texto não tem pergunta (termine com "?") ou troque o tipo`;
+  if (tipo !== "pergunta" && abrePerguntando) return `o texto abre com uma pergunta e o tipo é "${tipo}"; use o tipo "pergunta" ou abra de outro jeito`;
+  if (tipo === "numero" && !temNumeroNoTexto(t)) return `o tipo é "numero" e o texto não tem número (algarismo ou por extenso); ponha o número do roteiro ou troque o tipo`;
+  return null;
+}
 
 /** As fórmulas de texto de máquina (R-COPY-26) por gancho, com o número do gancho no motivo, e os números dos ganchos que têm alguma. */
 function formulasDosGanchos(ganchos: GanchoAlternativo[], fontes: string): { motivos: string[]; comFormula: Set<number> } {
@@ -113,31 +154,67 @@ export function problemasDosGanchos(ganchos: GanchoAlternativo[], contexto: Cont
   }
   const vistosTipo = new Map<TipoAbertura, number>();
   const vistosTexto = new Map<string, number>();
-  const atualNormal = semAcentoEmMinuscula(contexto.ganchoAtual);
   ganchos.forEach((g, i) => {
     const n = i + 1;
-    const texto = limparGancho(g.texto);
-    if (texto.length < 8) motivos.push(`gancho ${n}: curto demais`);
-    if (g.texto.trim().length > ganchosIA.TAMANHO_MAXIMO_DO_GANCHO) motivos.push(`gancho ${n}: comprido demais`);
-    if (contexto.tipoAtual && contexto.tipoAtual !== "outro" && g.tipoAbertura === contexto.tipoAtual) {
-      motivos.push(`gancho ${n}: o tipo de abertura "${g.tipoAbertura}" é o mesmo do gancho atual, escolha outro tipo`);
-    }
+    motivos.push(...problemasDoGancho(g, contexto).map((m) => `gancho ${n}: ${m}`));
     const tipoRepetidoCom = vistosTipo.get(g.tipoAbertura);
     if (tipoRepetidoCom !== undefined) motivos.push(`gancho ${n}: o tipo de abertura "${g.tipoAbertura}" já foi usado no gancho ${tipoRepetidoCom}, cada gancho precisa de um tipo diferente`);
     else vistosTipo.set(g.tipoAbertura, n);
-    const normal = semAcentoEmMinuscula(texto);
-    if (normal !== "" && normal === atualNormal) motivos.push(`gancho ${n}: é igual ao gancho atual`);
+    const normal = semAcentoEmMinuscula(limparGancho(g.texto));
     const textoRepetidoCom = vistosTexto.get(normal);
     if (normal !== "" && textoRepetidoCom !== undefined) motivos.push(`gancho ${n}: é igual ao gancho ${textoRepetidoCom}`);
     else vistosTexto.set(normal, n);
-    // R-CONF (preço, serviço grátis, promessa, fato inventado): cada gancho faz o papel do gancho do roteiro.
-    motivos.push(...verificarConformidadeDoLongo({ gancho: texto, chamadaFinal: "", capitulos: [], edicao: { textoNaTela: [] } }, { fontes: contexto.fontes, ramoSaude: contexto.ramoSaude }).map((m) => `gancho ${n}: ${m}`));
-    if (contexto.ramoSaude) {
-      const promessa = promessaEmSaude(texto);
-      if (promessa) motivos.push(`gancho ${n}: em saúde o conselho da profissão não deixa prometer resultado, tire "${promessa}"`);
-    }
   });
   return motivos;
+}
+
+/**
+ * O que reprova UM gancho sozinho (sem olhar os outros da lista): tamanho, tipo igual ao do roteiro, texto igual ao atual, tipo mal rotulado, sem detalhe concreto do roteiro ou do perfil, a conformidade
+ * do roteiro (`R-CONF`: preço, grátis, promessa) e, em ramo de saúde, a promessa de resultado, o resultado que ninguém contou e o medo sobre o filho ou a família. Sem o número do gancho no motivo.
+ */
+export function problemasDoGancho(g: GanchoAlternativo, contexto: Contexto): string[] {
+  const motivos: string[] = [];
+  const texto = limparGancho(g.texto);
+  if (texto.length < 8) motivos.push("curto demais");
+  if (g.texto.trim().length > ganchosIA.TAMANHO_MAXIMO_DO_GANCHO) motivos.push("comprido demais");
+  if (contexto.tipoAtual && contexto.tipoAtual !== "outro" && g.tipoAbertura === contexto.tipoAtual) {
+    motivos.push(`o tipo de abertura "${g.tipoAbertura}" é o mesmo do gancho atual, escolha outro tipo`);
+  }
+  const normal = semAcentoEmMinuscula(texto);
+  if (normal !== "" && normal === semAcentoEmMinuscula(contexto.ganchoAtual)) motivos.push("é igual ao gancho atual");
+  const tipoMal = motivoDoTipoMalRotulado(texto, g.tipoAbertura);
+  if (tipoMal) motivos.push(tipoMal);
+  if (contexto.detalhes !== undefined && !ganchoTemDetalheConcreto(texto, contexto.detalhes, contexto.jaDito ?? "")) {
+    motivos.push("não leva nenhum detalhe concreto do roteiro ou do perfil (um objeto, um número, um lugar, uma frase da pessoa); só repete o tema ou serviria para qualquer ramo, refaça com um detalhe do corpo do roteiro");
+  }
+  // R-CONF (preço, serviço grátis, promessa, fato inventado): cada gancho faz o papel do gancho do roteiro.
+  motivos.push(...verificarConformidadeDoLongo({ gancho: texto, chamadaFinal: "", capitulos: [], edicao: { textoNaTela: [] } }, { fontes: contexto.fontes, ramoSaude: contexto.ramoSaude }));
+  if (contexto.ramoSaude) {
+    const promessa = promessaEmSaude(texto);
+    if (promessa) motivos.push(`em saúde o conselho da profissão não deixa prometer resultado, tire "${promessa}"`);
+    const semFonte = acharResultadoOuMedoEmSaude(texto);
+    if (semFonte) motivos.push(semFonte);
+  }
+  return motivos;
+}
+
+/**
+ * O que sobra da lista depois da 2a tentativa: tira o gancho que ainda reprova sozinho e os repetidos (mesmo tipo de abertura ou mesmo texto de um que já ficou), na ordem do modelo. Nunca vai para a
+ * pessoa um gancho reprovado; se sobram menos de três, a tela mostra os que passaram.
+ */
+export function ganchosQuePassam(ganchos: GanchoAlternativo[], contexto: Contexto): GanchoAlternativo[] {
+  const tipos = new Set<TipoAbertura>();
+  const textos = new Set<string>();
+  const ficam: GanchoAlternativo[] = [];
+  for (const g of ganchos) {
+    if (problemasDoGancho(g, contexto).length > 0) continue;
+    const normal = semAcentoEmMinuscula(limparGancho(g.texto));
+    if (tipos.has(g.tipoAbertura) || textos.has(normal)) continue;
+    tipos.add(g.tipoAbertura);
+    textos.add(normal);
+    ficam.push(g);
+  }
+  return ficam;
 }
 
 /** Tira da lista os ganchos com fórmula de máquina (o que a 2a tentativa só avisa); o que sobra vai para a pessoa. */
@@ -230,7 +307,8 @@ async function pedirSemTrava(clienteId: number, roteiroId: number, agora: Date):
   );
   const corpo: ConteudoRoteiro = roteiro.conteudo;
   const fontes = `${montarFontesDosFatos({ perfilCompilado, camadaExclusiva, tema: roteiro.tema, objetivoDoVideo: roteiro.objetivoDoVideo })}\nO roteiro (o que o vídeo diz): ${corpo.gancho} ${corpo.corpo} ${corpo.fechamento} ${corpo.chamadaFinal}`;
-  const contexto: Contexto = { ganchoAtual: corpo.gancho, tipoAtual: roteiro.tipoAbertura ?? null, fontes, ramoSaude };
+  const detalhes = [perfilCompilado, camadaExclusiva, corpo.corpo, corpo.fechamento, corpo.chamadaFinal].join("\n");
+  const contexto: Contexto = { ganchoAtual: corpo.gancho, tipoAtual: roteiro.tipoAbertura ?? null, fontes, ramoSaude, detalhes, jaDito: `${roteiro.tema}\n${corpo.gancho}` };
 
   let saida;
   try {
@@ -263,7 +341,8 @@ async function pedirSemTrava(clienteId: number, roteiroId: number, agora: Date):
       extrairEvidencias: () => [],
       extrairCampos: (d) => Object.fromEntries(d.ganchos.map((g, i) => [`gancho ${i + 1}`, g.texto])),
       // R-COPY-26 (texto com cara de máquina): reprova na 1a tentativa; na 2a o gancho com fórmula sai da lista (abaixo), nunca vai para a pessoa.
-      verificarExtra: (d, tentativa) => [...problemasDosGanchos(d.ganchos, contexto), ...(tentativa === 1 ? formulasDosGanchos(d.ganchos, fontes).motivos : [])],
+      // 1a tentativa: tudo reprova e volta para o modelo uma vez. 2a: nada derruba a geração, o servidor tira da lista, gancho por gancho, o que continua reprovado (abaixo).
+      verificarExtra: (d, tentativa) => (tentativa === 1 ? [...problemasDosGanchos(d.ganchos, contexto), ...formulasDosGanchos(d.ganchos, fontes).motivos] : []),
     }));
   } catch (erro) {
     if (erro instanceof ErroGanchos) throw erro;
@@ -272,8 +351,10 @@ async function pedirSemTrava(clienteId: number, roteiroId: number, agora: Date):
     throw new ErroGanchos("a IA nao entregou ganchos validos", "ia-fora");
   }
 
-  const lista = ganchosParaGuardar(semFormulasDeMaquina(saida.ganchos, fontes));
-  if (lista.length < ganchosIA.MINIMO_DE_GANCHOS) throw new ErroGanchos("sobraram menos de tres ganchos depois de tirar os de texto de maquina", "ia-fora");
+  // Nunca vai para a pessoa um gancho reprovado; com menos de três a tela mostra os que passaram (sem inventar), e sem nenhum diz que não deu.
+  const lista = ganchosParaGuardar(semFormulasDeMaquina(ganchosQuePassam(saida.ganchos, contexto), fontes));
+  if (lista.length < ganchosIA.MINIMO_DE_GANCHOS) logger.warn({ clienteId, roteiroId, vieram: saida.ganchos.length, ficaram: lista.length }, "ganchos alternativos: sobraram menos de tres depois da conferencia");
+  if (lista.length === 0) throw new ErroGanchos("nenhum gancho passou na conferencia", "ia-fora");
 
   const guardados: GanchosDoRoteiro = {
     original: { texto: corpo.gancho, tipoAbertura: roteiro.tipoAbertura ?? null },
