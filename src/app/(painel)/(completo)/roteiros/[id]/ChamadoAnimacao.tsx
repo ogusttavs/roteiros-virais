@@ -14,6 +14,12 @@ import styles from "./ChamadoAnimacao.module.css";
 
 const t = textosAnimacao;
 
+/**
+ * O vídeo abre parado no primeiro quadro: sem isto o Safari do iPhone mostra um retângulo preto até a pessoa tocar. O primeiro quadro do molde já tem o gancho inteiro. O trecho depois do `#` não
+ * vai para o servidor.
+ */
+const PRIMEIRO_QUADRO = "#t=0.1";
+
 /** Perguntar de novo a cada 3 segundos enquanto o vídeo está sendo montado. */
 const ESPERA_DA_CONSULTA_MS = 3000;
 const ESTADOS_DE_ESPERA = new Set(["pedida", "fazendo_previa", "fazendo_final"]);
@@ -133,7 +139,7 @@ export function ChamadoAnimacao({ roteiroId, visao, aoCompletar }: Props) {
 
       {animacao && estado === "previa_pronta" && !visao.verComo ? (
         <>
-          <video className={styles.video} controls playsInline preload="metadata" src={`/api/animacao/${animacao.id}/previa`} onError={() => setVideoQuebrou(true)} data-previa-da-animacao />
+          <video className={styles.video} controls playsInline preload="metadata" src={`/api/animacao/${animacao.id}/previa${PRIMEIRO_QUADRO}`} onError={() => setVideoQuebrou(true)} data-previa-da-animacao />
           {videoQuebrou ? <p className={styles.erro}>{t.aviso.videoQuebrou}</p> : null}
           {animacao.foraDoVideo.length > 0 ? (
             <div className={styles.foraDoVideo} data-fora-do-video>
@@ -151,7 +157,7 @@ export function ChamadoAnimacao({ roteiroId, visao, aoCompletar }: Props) {
 
       {animacao && estado === "final_pronta" && !visao.verComo ? (
         <>
-          <video className={styles.video} controls playsInline preload="metadata" src={`/api/animacao/${animacao.id}/final`} onError={() => setVideoQuebrou(true)} data-final-da-animacao />
+          <video className={styles.video} controls playsInline preload="metadata" src={`/api/animacao/${animacao.id}/final${PRIMEIRO_QUADRO}`} onError={() => setVideoQuebrou(true)} data-final-da-animacao />
           {videoQuebrou ? <p className={styles.erro}>{t.aviso.videoQuebrou}</p> : null}
         </>
       ) : null}
@@ -193,10 +199,15 @@ export function ChamadoAnimacao({ roteiroId, visao, aoCompletar }: Props) {
           ) : null}
 
           {animacao && estado === "final_pronta" ? (
-            <a className={styles.botaoLink} href={`/api/animacao/${animacao.id}/final?baixar=1`} download="video-em-animacao.mp4" data-baixar-animacao>
-              <Download size={18} strokeWidth={1.5} aria-hidden="true" />
-              {t.acoes.baixar}
-            </a>
+            <>
+              <a className={styles.botaoLink} href={`/api/animacao/${animacao.id}/final?baixar=1`} download="video-em-animacao.mp4" data-baixar-animacao>
+                <Download size={18} strokeWidth={1.5} aria-hidden="true" />
+                {t.acoes.baixar}
+              </a>
+              <p className={styles.nota} data-baixar-no-iphone>
+                {t.aviso.baixarNoIphone}
+              </p>
+            </>
           ) : null}
 
           {animacao && estado === "falhou" ? (

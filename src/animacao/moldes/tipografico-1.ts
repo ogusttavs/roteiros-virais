@@ -2,7 +2,7 @@
  * E68 A1: o molde tipográfico provisório (nosso, feito do zero). O texto do roteiro em blocos curtos que entram palavra por palavra e saem juntos, sobre um fundo calmo (cor chapada com um brilho
  * fixo do destaque, que comprime bem), com uma barra fina de andamento embaixo. Tudo depende do tempo: a página não tem relógio próprio, o render chama `irPara(t)` antes de cada foto.
  *
- * O molde definitivo vem do desenho da Central e entra trocando só este arquivo (ou somando outro em `moldes/index.ts`). Regra que não muda: texto do cliente só passa por `escaparTexto`, e
+ * O definitivo é o `tipografico-2` (26/11/2026), o padrão dos pedidos novos; este fica para os pedidos gravados com ele, para a prévia e o final saírem iguais. Regra que não muda: texto do cliente só passa por `escaparTexto`, e
  * o que vai em atributo ou em CSS é número ou cor `#rrggbb` já validados por `montador.ts`.
  */
 import { LIMITES_DA_ANIMACAO } from "@/config/animacao";

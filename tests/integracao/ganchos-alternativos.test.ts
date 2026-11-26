@@ -267,6 +267,20 @@ describe("as regras que mandam a lista de volta ao modelo", () => {
     expect((await roteiroPorId(r.id, marcaA))!.ganchosAlternativos).toBeNull();
   });
 
+  it("o verificador de fato reprova a lista nas duas tentativas por causa de um gancho: confere um a um e mostra os que passam (T75)", async () => {
+    const r = await novoRoteiro(marcaA, { tema: "tirar mancha do sofá [mock:ganchos-sempre-fato-em-um]" });
+    const visao = await pedirGanchosAlternativos(marcaA, r.id, AGORA);
+    expect(visao.alternativas!.length).toBeGreaterThanOrEqual(3);
+    expect(visao.alternativas!.some((g) => g.texto.includes("fato-inventado"))).toBe(false);
+    expect((await roteiroPorId(r.id, marcaA))!.ganchosAlternativos!.alternativas).toHaveLength(visao.alternativas!.length);
+  });
+
+  it("o verificador de fato reprova todos os ganchos um a um: não guarda nada e diz que não deu (T75)", async () => {
+    const r = await novoRoteiro(marcaA, { tema: "tirar mancha do sofá [mock:ganchos-sempre-fato-em-todos]" });
+    await expect(pedirGanchosAlternativos(marcaA, r.id, AGORA)).rejects.toMatchObject({ motivo: "ia-fora" });
+    expect((await roteiroPorId(r.id, marcaA))!.ganchosAlternativos).toBeNull();
+  });
+
   it("a lista reprovada duas vezes e a IA fora do ar não guardam nada e deixam o roteiro como está", async () => {
     for (const marcador of ["ganchos-fora"]) {
       const r = await novoRoteiro(marcaA, { tema: `tirar mancha do sofá [mock:${marcador}]` });

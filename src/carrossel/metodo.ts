@@ -15,6 +15,7 @@ const EXTENSO: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, tres:
 const COISAS_QUE_SE_CONTAM = [
   "erros", "dicas", "passos", "sinais", "motivos", "causas", "jeitos", "formas", "maneiras", "coisas", "segredos", "cuidados", "mitos", "truques", "ideias", "habitos", "razoes", "sintomas", "regras",
   "perguntas", "exemplos", "etapas", "licoes", "beneficios", "vantagens", "opcoes", "ingredientes", "produtos", "tipos", "receitas", "curiosidades", "verdades", "hacks", "alertas", "atitudes",
+  "problemas", "duvidas", "mudancas", "pontos",
 ];
 
 const PROMESSA = new RegExp(`(?:^|[^a-z0-9])(\\d{1,2}|${Object.keys(EXTENSO).join("|")})\\s+(?:[a-z]+\\s+)?(${COISAS_QUE_SE_CONTAM.join("|")})(?![a-z])`);

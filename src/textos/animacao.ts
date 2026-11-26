@@ -42,11 +42,11 @@ export const textosAnimacao = {
     botaoCompletar: "Completar o roteiro",
   },
   estados: {
-    pedida: (tempo: string) => `Estamos montando a prévia do seu vídeo. Costuma levar ${tempo}. Pode ficar nesta tela.`,
-    fazendo_previa: (tempo: string) => `Estamos montando a prévia do seu vídeo. Costuma levar ${tempo}. Pode ficar nesta tela.`,
-    previa_pronta: "A prévia está pronta. Veja como ficou e, se gostar, faça o vídeo final.",
-    fazendo_final: (tempo: string) => `Estamos fazendo o vídeo final. Costuma levar ${tempo}. Pode sair desta tela, ele fica guardado aqui.`,
-    final_pronta: "Seu vídeo está pronto. Ele fica guardado por 7 dias.",
+    pedida: (tempo: string) => `Estamos montando a prévia do seu vídeo. Costuma levar ${tempo}. Ela aparece aqui mesmo quando ficar pronta.`,
+    fazendo_previa: (tempo: string) => `Estamos montando a prévia do seu vídeo. Costuma levar ${tempo}. Ela aparece aqui mesmo quando ficar pronta.`,
+    previa_pronta: "A prévia está pronta, numa qualidade menor, só para você conferir. Se gostar, faça o vídeo final, em alta qualidade.",
+    fazendo_final: (tempo: string) => `Estamos fazendo o vídeo final, em alta qualidade. Costuma levar ${tempo}. Pode sair desta tela, ele fica guardado aqui.`,
+    final_pronta: "Seu vídeo está pronto. O vídeo não tem som: ao postar, escolha uma música em alta no próprio Instagram. Ele fica guardado aqui por 7 dias.",
     falhou: "Não conseguimos montar o vídeo desta vez.",
   },
   acoes: {
@@ -59,6 +59,7 @@ export const textosAnimacao = {
   aviso: {
     verComo: "Você está vendo como a pessoa. Aqui só dá para ler: pedir, aprovar e baixar são dela.",
     videoQuebrou: "Não foi possível tocar o vídeo aqui. Atualize a tela.",
+    baixarNoIphone: "No iPhone, o vídeo baixado vai para o app Arquivos. Abra o vídeo por lá e toque em compartilhar e em Salvar vídeo para ele ir para a galeria.",
     foraDoVideo: (quantas: number) => (quantas === 1 ? "O vídeo tem no máximo 1 minuto, então 1 frase do meio ficou de fora:" : `O vídeo tem no máximo 1 minuto, então ${quantas} frases do meio ficaram de fora:`),
     foraDoVideoDica: "Se alguma faz falta, encurte o roteiro, escolha \"Agora não\" e peça o vídeo de novo.",
     andamento: (porcento: number) => `${porcento}% pronto`,

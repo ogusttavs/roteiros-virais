@@ -18,6 +18,10 @@ describe("promessaDeContagem", () => {
     expect(promessaDeContagem("Cinco passos para escovar certo")).toEqual({ quantidade: 5, coisa: "passos" });
     expect(promessaDeContagem("Três dicas simples")).toEqual({ quantidade: 3, coisa: "dicas" });
     expect(promessaDeContagem("7 principais erros de quem limpa o box")).toEqual({ quantidade: 7, coisa: "erros" });
+    expect(promessaDeContagem("3 problemas que a escova errada causa")).toEqual({ quantidade: 3, coisa: "problemas" });
+    expect(promessaDeContagem("Quatro dúvidas sobre clareamento")).toEqual({ quantidade: 4, coisa: "duvidas" });
+    expect(promessaDeContagem("2 mudanças que salvam o seu sorriso")).toEqual({ quantidade: 2, coisa: "mudancas" });
+    expect(promessaDeContagem("5 pontos para conferir no box")).toEqual({ quantidade: 5, coisa: "pontos" });
     expect(promessaDeContagem("Uma das causas do mau hálito")).toBeNull();
     expect(promessaDeContagem("Um dos sinais de cárie que você ignora")).toBeNull();
     expect(promessaDeContagem("Escove por 2 minutos")).toBeNull();
