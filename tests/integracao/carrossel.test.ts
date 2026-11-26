@@ -166,7 +166,9 @@ describe("gerarCarrossel", () => {
 
   it("o responsável técnico: marca de saúde com a linha preenchida leva na chamada, sem a linha não leva, e uma marca nunca vê a linha da outra", async () => {
     const { definirResponsavelTecnico, clientePorId } = await import("@/servicos/clientes");
-    const [nichoSaude] = await db().insert(nichos).values({ slug: "carrossel-saude-resp", nome: "Odontologia resp", termos: [], ramoCatalogo: "odontologia" }).returning();
+    // O índice único de `ramo_catalogo` impede um segundo nicho de odontologia: reaproveita o que o teste anterior criou, ou cria.
+    const [existente] = await db().select().from(nichos).where(eq(nichos.ramoCatalogo, "odontologia"));
+    const nichoSaude = existente ?? (await db().insert(nichos).values({ slug: "carrossel-saude-resp", nome: "Odontologia resp", termos: [], ramoCatalogo: "odontologia" }).returning())[0];
     const comLinha = await criarCliente(nichoSaude.id);
     const semLinha = await criarCliente(nichoSaude.id);
     const outroRamo = await criarCliente();
