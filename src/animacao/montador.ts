@@ -46,8 +46,11 @@ function arredondar(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
 
-/** Monta a linha do tempo. Lança `ErroDaAnimacao("entrada")` se não há cena, se há demais, se uma cena é longa demais ou se o vídeo passaria do teto. */
-export function montarLinhaDoTempo(cenas: CenaDeEntrada[]): LinhaDoTempo {
+/**
+ * Monta a linha do tempo. Lança `ErroDaAnimacao("entrada")` se não há cena, se há demais, se uma cena é longa demais ou se o vídeo passaria do teto. `seguraDoFinalS` estica a última cena (a chamada
+ * fica na tela) até onde o teto deixar: nunca é o motivo de um vídeo ser recusado.
+ */
+export function montarLinhaDoTempo(cenas: CenaDeEntrada[], opcoes: { seguraDoFinalS?: number } = {}): LinhaDoTempo {
   const L = LIMITES_DA_ANIMACAO;
   const limpas = cenas
     .map((c) => ({ ...c, texto: limparTexto(String(c.texto ?? "")) }))
@@ -72,14 +75,38 @@ export function montarLinhaDoTempo(cenas: CenaDeEntrada[]): LinhaDoTempo {
     cursor += duracao;
     return cena;
   });
-  const duracaoS = arredondar(cursor);
-  if (duracaoS > L.duracaoMaximaTotalS)
+  if (cursor > L.duracaoMaximaTotalS + 0.0005)
     throw new ErroDaAnimacao("o vídeo passaria do tempo máximo", "entrada");
-  return { cenas: saida, duracaoS };
+  const pedidaNoFinal = opcoes.seguraDoFinalS;
+  const segura =
+    typeof pedidaNoFinal === "number" && Number.isFinite(pedidaNoFinal) && pedidaNoFinal > 0
+      ? Math.min(pedidaNoFinal, Math.max(0, L.duracaoMaximaTotalS - cursor))
+      : 0;
+  if (segura > 0) {
+    cursor += segura;
+    saida[saida.length - 1].fimS = arredondar(cursor);
+  }
+  return { cenas: saida, duracaoS: arredondar(cursor) };
 }
 
 const COR = /^#[0-9a-fA-F]{6}$/;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+/** O @ como o Instagram aceita: letras sem acento, algarismos, ponto e sublinhado, até 30. Só isso vai para o HTML (e ainda escapado). */
+const ARROBA = /^@[A-Za-z0-9._]{1,30}$/;
+
+/**
+ * O @ a partir do que a marca guardou em `perfis.instagram` (o nome, o @ ou o endereço do perfil). A mesma regra de `arrobaDaMarca` do carrossel, repetida aqui para o contêiner de render não
+ * carregar o serviço do carrossel (que puxa a IA). Fora do formato, `null`.
+ */
+export function arrobaDoPerfil(instagram: string | null | undefined): string | null {
+  const bruto = (instagram ?? "")
+    .trim()
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/^@+/, "");
+  const arroba = `@${bruto}`;
+  return ARROBA.test(arroba) ? arroba : null;
+}
 
 /** Os padrões são os tokens do painel (`src/ui/tokens.css`, tema escuro): fundo quase preto, texto quase branco e a luz dourada da identidade como destaque. */
 export const MARCA_PADRAO: MarcaResolvida = {
@@ -87,6 +114,7 @@ export const MARCA_PADRAO: MarcaResolvida = {
   corTexto: "#f7f7f5",
   corDestaque: "#e8c15a",
   fonteBase64: null,
+  arroba: null,
 };
 
 /** A marca que o cliente pode ter (cores e letra); valor fora do formato cai no padrão, nunca vai para o CSS. */
@@ -105,5 +133,6 @@ export function resolverMarca(marca?: MarcaDaAnimacao): MarcaResolvida {
     corTexto: cor(marca?.corTexto, MARCA_PADRAO.corTexto),
     corDestaque: cor(marca?.corDestaque, MARCA_PADRAO.corDestaque),
     fonteBase64: fonte,
+    arroba: typeof marca?.arroba === "string" && ARROBA.test(marca.arroba) ? marca.arroba : null,
   };
 }

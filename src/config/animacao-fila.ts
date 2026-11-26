@@ -26,10 +26,14 @@ export const ANIMACAO_PARADA_APOS_MS = 40 * 60 * 1000;
 /** O arquivo sem dono só sai depois disto (o que acabou de ser renomeado ainda não teve o caminho gravado). */
 export const IDADE_MINIMA_DO_ARQUIVO_SEM_DONO_MS = 10 * 60 * 1000;
 
-/** O tempo que a tela diz que leva, em segundos: a prévia (fase 0: 30 a 45 s em 1 CPU) e o final (3 a 5 minutos no servidor, a conta é da duração). */
+/**
+ * O tempo que a tela diz que leva, em segundos. A fase 0 mediu o render sozinho num processador de notebook; com a espera da vez, a abertura do navegador e o servidor 1,5 a 2 vezes mais lento, o
+ * pedido inteiro fica em 2 a 3 minutos para um vídeo de 30 s (medição de 26/11/2026). A tela promete o lado de cima: a prévia em "uns 2 minutos" e o final em "uns 3 minutos" até 30 s de vídeo,
+ * subindo com a duração (um vídeo de 1 minuto: 3 e 5 minutos). Melhor chegar antes do prometido do que depois.
+ */
 export function tempoEsperadoDaPreviaS(duracaoS: number): number {
-  return Math.max(30, Math.round(duracaoS * 1.5));
+  return Math.max(90, Math.round(duracaoS * 3));
 }
 export function tempoEsperadoDoFinalS(duracaoS: number): number {
-  return Math.max(120, Math.round(duracaoS * 10));
+  return Math.max(150, Math.round(duracaoS * 5));
 }

@@ -55,7 +55,7 @@ export function montarHtmlDaAnimacao(
 ): { html: string; duracaoS: number } {
   const molde = MOLDES[entrada.molde ?? MOLDE_PADRAO];
   if (!molde) throw new ErroDaAnimacao("molde desconhecido", "entrada");
-  const linha = montarLinhaDoTempo(entrada.cenas);
+  const linha = montarLinhaDoTempo(entrada.cenas, { seguraDoFinalS: molde.seguraDoFinalS });
   const marca = resolverMarca(entrada.marca);
   if (!marca.fonteBase64) marca.fonteBase64 = lerFonteDoProjeto();
   return {
