@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { lerFormularioComTeto } from "@/lib/formulario-com-teto";
 import { logger } from "@/lib/log";
 import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { sessaoAtual } from "@/lib/sessao";
@@ -64,7 +65,10 @@ export async function POST(request: Request) {
 
   let forma: FormData;
   try {
-    forma = await request.formData();
+    // M5 (26/11/2026): o corpo é lido em fluxo, com teto (o áudio mais o resto do formulário); nunca inteiro na memória antes de conferir.
+    const lido = await lerFormularioComTeto(request, LIMITE_TAMANHO_AUDIO_BYTES + 1_000_000);
+    if (lido === "grande-demais") return NextResponse.json({ erro: "esse audio e maior do que conseguimos ouvir, grave um pedaco mais curto" }, { status: 413 });
+    forma = lido;
   } catch {
     return NextResponse.json({ erro: "corpo da requisicao invalido" }, { status: 400 });
   }

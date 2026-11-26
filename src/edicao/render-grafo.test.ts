@@ -31,7 +31,7 @@ describe("montarGrafoDoRender", () => {
     const a = grafo.argumentos;
     expect(a.filter((x) => x === "-i")).toHaveLength(3);
     // `-ss` no começo do trecho no bruto; `-t` é o trecho mais a transição que vem depois e meio segundo de folga.
-    expect(a.slice(a.indexOf("-ss"), a.indexOf("-ss") + 6)).toEqual(["-ss", "1", "-t", expect.any(String), "-i", "/v/bruto.video"]);
+    expect(a.slice(a.indexOf("-ss"), a.indexOf("-ss") + 10)).toEqual(["-ss", "1", "-t", expect.any(String), "-protocol_whitelist", "file", "-f", "mov", "-i", "/v/bruto.video"]);
     expect(grafo.duracaoDaSaidaS).toBeCloseTo(11.2, 5);
     expect(grafo.quadros).toBe(336);
     expect(a[a.indexOf("-t", a.indexOf("-map")) + 1]).toBe("11.2");

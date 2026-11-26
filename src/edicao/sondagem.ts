@@ -9,6 +9,8 @@ import { LIMITES_DA_EDICAO } from "@/config/edicao";
 import { executarComLimite, type ExecutorDeProcesso } from "@/jobs/processo";
 import type { CodigoDaEdicao } from "@/textos/edicao";
 
+import { OPCOES_DE_ENTRADA_SEGURA } from "./entrada-segura";
+
 export class ErroDeSondagem extends Error {
   constructor(mensagem: string) {
     super(mensagem);
@@ -75,7 +77,7 @@ export function recusaDaSondagem(s: Sondagem): CodigoDaEdicao | null {
 }
 
 export function argumentosDoFfprobe(caminho: string): string[] {
-  return ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", caminho];
+  return ["-v", "error", ...OPCOES_DE_ENTRADA_SEGURA, "-print_format", "json", "-show_format", "-show_streams", caminho];
 }
 
 const LIMITE_DO_FFPROBE_MS = 30_000;
