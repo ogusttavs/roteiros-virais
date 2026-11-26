@@ -137,6 +137,26 @@
   -webkit-backdrop-filter: var(--vidro-desfoque);
   box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--sombra-controle);
   color: var(--cor-titulo);
+  position: relative;
+}
+
+/* T89: o aviso "Já estava em dia" é uma pílula de uma linha, fora do botão redondo (abaixo dele). */
+.avisoEmDia {
+  position: absolute;
+  top: calc(100% + var(--espaco-2));
+  right: 0;
+  z-index: 1;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: var(--largura-borda) solid var(--vidro-borda);
+  border-radius: var(--raio-pill);
+  background: var(--vidro-fundo-forte);
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--sombra-controle);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .botaoBarra .cede {

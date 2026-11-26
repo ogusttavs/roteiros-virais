@@ -92,7 +92,7 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
             aria-hidden="true"
             className={atualizando ? styles.girando : undefined}
           />
-          <span className={styles.cede}>{emDia ? textosNav.jaEstavaEmDia : textosNav.atualizar}</span>
+          <span className={emDia ? styles.avisoEmDia : styles.cede}>{emDia ? textosNav.jaEstavaEmDia : textosNav.atualizar}</span>
         </button>
         {/* A região viva fica FORA do botão (dentro dele o leitor de tela a lê como parte do nome) e existe desde o começo: só o texto muda. */}
         <span className="so-leitor" role="status" aria-live="polite">
