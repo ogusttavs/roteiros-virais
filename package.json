@@ -85,12 +85,12 @@
     "@sentry/nextjs": "^10.73.0",
     "@sentry/node": "^10.73.0",
     "apify-client": "^2.25.0",
-    "better-auth": "^1.7.2",
+    "better-auth": "^1.7.28",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "groq-sdk": "^1.6.0",
     "lucide-react": "^1.39.0",
-    "next": "^15.5.25",
+    "next": "^15.5.29",
     "parse5": "^8.0.1",
     "pg": "^8.23.0",
     "pg-boss": "^12.29.0",
@@ -101,9 +101,9 @@
     "resend": "^6.25.0",
     "rss-parser": "^3.13.0",
     "stripe": "23.0.0",
-    "undici": "^7.30.0",
+    "undici": "^7.30.2",
     "web-push": "^3.6.7",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

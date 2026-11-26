@@ -8,6 +8,12 @@
  * configuracao real e compara campo a campo com as tabelas do Drizzle. Se
  * uma atualizacao do better-auth acrescentar, remover ou mudar um campo,
  * este teste quebra antes de quebrar em producao.
+ *
+ * Coluna a mais so entra em COLUNAS_LEGADAS, com o motivo, e precisa ser
+ * opcional ou ter padrao: o better-auth nunca a escreve, e desde a 1.7.3 a
+ * conferencia que ele roda ao iniciar recusa autenticar quando acha coluna
+ * obrigatoria que ele nao escreve. O ultimo bloco roda essa mesma conferencia
+ * do pacote contra o schema inteiro passado ao adaptador.
  */
 import { getSchema } from "better-auth/db";
 import { admin } from "better-auth/plugins/admin";
@@ -20,6 +26,16 @@ import { account, session, user, verification } from "./schema";
 const CONFIGURACAO_REAL = {
   emailAndPassword: { enabled: true },
   plugins: [magicLink({ sendMagicLink: async () => {} }), admin()],
+};
+
+/**
+ * Colunas que o Drizzle tem e o better-auth instalado nao tem. `account.issuer`
+ * veio do better-auth 1.7.0 a 1.7.2 e saiu do pacote na 1.7.3; ficou no banco
+ * ate a migracao que a torna opcional ou a apaga (ver o comentario dela em
+ * schema.ts).
+ */
+const COLUNAS_LEGADAS: Record<string, string[]> = {
+  account: ["issuer"],
 };
 
 /** better-auth chama de "type"; Drizzle chama de "dataType". */
@@ -66,11 +82,21 @@ describe("schema do better-auth bate com a versao instalada", () => {
         });
       }
 
-      it("nao tem coluna a mais (fora id)", () => {
+      it("nao tem coluna a mais (fora id e as legadas)", () => {
         const nomesEsperados = new Set(camposEsperados.map(([campo]) => campo));
-        const extras = Object.keys(camposReais).filter((campo) => !nomesEsperados.has(campo));
+        const legadas = new Set(COLUNAS_LEGADAS[nomeTabela] ?? []);
+        const extras = Object.keys(camposReais).filter((campo) => !nomesEsperados.has(campo) && !legadas.has(campo));
         expect(extras).toEqual([]);
       });
+
+      for (const campo of COLUNAS_LEGADAS[nomeTabela] ?? []) {
+        it(`coluna legada "${campo}" existe e o better-auth consegue gravar sem ela`, () => {
+          const coluna = camposReais[campo];
+          expect(coluna, `coluna legada "${campo}" saiu da tabela "${nomeTabela}"; tire-a de COLUNAS_LEGADAS`).toBeDefined();
+          if (!coluna) return;
+          expect(!coluna.notNull || coluna.hasDefault, `coluna "${campo}" e obrigatoria e sem padrao`).toBe(true);
+        });
+      }
     });
   }
 });

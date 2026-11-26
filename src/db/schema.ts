@@ -87,9 +87,21 @@ export const session = pgTable("session", {
   impersonatedBy: text("impersonatedBy"),
 });
 
+/** O valor que o better-auth 1.7.2 gravava em `account.issuer` para a conta de senha, o mesmo que `criarUsuarioComSenhaGerada` e o cadastro gravam. */
+export const EMISSOR_DA_CONTA_LEGADO = "local:credential";
+
 export const account = pgTable("account", {
   id: text("id").primaryKey(),
-  issuer: text("issuer").notNull(),
+  /**
+   * Sobra do better-auth 1.7.0 a 1.7.2, que criou esta coluna obrigatória; da 1.7.3 em diante o pacote voltou ao schema da 1.6 e nunca mais a escreve (guia de
+   * atualização da 1.7, "Account identity keeps the provider key"). Obrigatória e sem padrão, ela quebrava toda escrita de conta feita pelo pacote e a conferência
+   * do schema que ele roda ao iniciar recusava entrar no aplicativo. O `$defaultFn` só existe no Drizzle (não muda o banco, não gera migração): preenche a coluna
+   * quando quem grava não manda o valor, e conta como padrão para a conferência. A limpeza de vez (tornar a coluna opcional ou apagá-la) é uma migração que altera
+   * coluna e espera o sim do Gustavo; até lá, `schema.auth.test.ts` aceita esta coluna a mais e confere que ela tem o padrão.
+   */
+  issuer: text("issuer")
+    .notNull()
+    .$defaultFn(() => EMISSOR_DA_CONTA_LEGADO),
   accountId: text("accountId").notNull(),
   providerId: text("providerId").notNull(),
   userId: text("userId")
