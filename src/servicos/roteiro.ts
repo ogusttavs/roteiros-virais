@@ -617,6 +617,7 @@ export async function filtrarEvidenciaPelaMarca(
   if (evidencias.length === 0) return evidencias;
   try {
     const resultado = await gerarEstruturado({
+      clienteId: clienteId,
       tarefa: "filtrarEvidenciaPorMarca",
       nivel: filtrarEvidenciaPorMarca.nivel,
       effort: filtrarEvidenciaPorMarca.esforco,
@@ -2481,6 +2482,7 @@ export async function conferirAindaVale(roteiroId: number): Promise<AindaValeRes
   if (candidatos.length > 0) {
     const geracaoInicio = Date.now();
     const saida = await gerarEstruturado({
+      clienteId: atual.clienteId,
       tarefa: "aindaValeRoteiro",
       nivel: aindaValeIA.nivel,
       effort: aindaValeIA.esforco,

@@ -137,6 +137,7 @@ export async function derivarBuscaDoFoco(clienteId: number, foco: string, agora:
   let saida;
   try {
     saida = await gerarEstruturado({
+      clienteId: clienteId,
       tarefa: "derivarBuscaDoFoco",
       nivel: derivarIA.nivel,
       effort: derivarIA.esforco,

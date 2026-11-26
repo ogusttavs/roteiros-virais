@@ -430,6 +430,7 @@ export async function organizarFalaBriefing(pergunta: string, textoFalado: strin
   }
 
   const resultado = await gerarEstruturado({
+    clienteId: clienteId,
     tarefa: "organizarFalaBriefing",
     nivel: organizarFalaBriefingIA.nivel,
     effort: organizarFalaBriefingIA.esforco,

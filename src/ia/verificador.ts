@@ -653,7 +653,6 @@ function verificarCartoesSemFala(
 
 export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   versaoPrompt: string;
-  clienteId?: number;
   proibicoes?: string[];
   exigeEvidencia?: boolean;
   /** Os ids que entraram na entrada, para o verificador reprovar qualquer id citado fora daqui. */
@@ -838,6 +837,7 @@ async function repararOQueSobrou<T>(
     const campos = params.extrairCampos(atual.dados);
     const inicio = Date.now();
     const resposta = await gerarEstruturado({
+      clienteId: params.clienteId,
       tarefa: "repararFato",
       nivel: repararFato.nivel,
       effort: repararFato.esforco,
@@ -986,6 +986,7 @@ async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, dadosDaS
     // 1.9.0: com a conferência de fato (com fontes), as instruções de gravação e de edição vão num bloco à parte, que o critério manda nunca conferir como fato (`montarTextoParaConferir`).
     const textoJunto = verificarTexto.montarTextoParaConferir(campos, Boolean(params.fontesDosFatos));
     const verificacao = await gerarEstruturado({
+      clienteId: params.clienteId,
       tarefa: "verificarTexto",
       nivel: verificarTexto.nivel,
       effort: verificarTexto.esforco,

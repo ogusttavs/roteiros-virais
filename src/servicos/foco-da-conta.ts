@@ -142,6 +142,7 @@ export async function sugerirFoco(clienteId: number, agora: Date = new Date()): 
     let saida;
     try {
       saida = await gerarEstruturado({
+        clienteId: clienteId,
         tarefa: "sugerirFoco",
         nivel: sugerirIA.nivel,
         effort: sugerirIA.esforco,

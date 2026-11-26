@@ -156,6 +156,7 @@ async function planejarUmDia(
   dia: DiaAgenda,
 ): Promise<planejarDiaIA.SaidaPlanejarDia["sugestoes"]> {
   const resultado = await gerarEstruturado({
+    clienteId: cliente.id,
     tarefa: "planejarDia",
     nivel: planejarDiaIA.nivel,
     effort: planejarDiaIA.esforco,

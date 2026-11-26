@@ -7,6 +7,8 @@
  * "Uma vez por dia": a trava é uma linha de `configuracao_admin` por causa, e é TOMADA antes de enviar, num `INSERT ... ON CONFLICT ... WHERE` atômico. Várias falhas ao mesmo tempo (os temas de vários setores
  * falham juntos) disputam a linha e só uma ganha, então ninguém recebe o aviso em dobro. Se nenhum envio chegar a sair, a trava volta ao valor de antes e a próxima falha tenta de novo.
  * Destinatários: os mesmos de `avisarLeituraParada` (`destinatariosDoAviso`).
+ *
+ * Achado A4 da auditoria de 26/11/2026: o mesmo alarme avisa quando uma marca passa do freio de gasto da IA (`avisarFreioDeGasto`, chamado por `src/ia/freio.ts`), com a mesma trava, uma linha por marca.
  */
 import { eq, sql } from "drizzle-orm";
 
@@ -16,6 +18,7 @@ import { config, hojeISO } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { logger } from "@/lib/log";
 import { textosAvisoDaIA, type FalhaParaOAviso } from "@/textos/aviso-ia";
+import { textosFreioDaIA, type FreioParaOAviso } from "@/textos/freio-ia";
 
 import { destinatariosDoAviso } from "./aviso-de-leitura";
 
@@ -28,8 +31,52 @@ export async function avisarFalhaDaIA(
   agora: Date = new Date(),
   enviar: typeof enviarEmail = enviarEmail,
 ): Promise<ResultadoDoAvisoDaIA> {
-  const chave = chaveDoAvisoDaIA(falha.causa);
-  const hoje = hojeISO(agora);
+  return avisarUmaVezPorDia({
+    chave: chaveDoAvisoDaIA(falha.causa),
+    agora,
+    enviar,
+    assunto: () => textosAvisoDaIA.assunto(falha),
+    html: () => textosAvisoDaIA.corpo(falha, `${config.appUrl}/admin`),
+    semDestinatario: () => logger.warn({ causa: falha.causa }, "a IA esta trancada, mas nao ha admin nem EMAIL_ACOMPANHAMENTO para receber o aviso"),
+    falhaNoEnvio: (erro) => logger.error({ err: erro }, "nao foi possivel enviar o aviso da falha da IA"),
+  });
+}
+
+/** Achado A4 da auditoria de 26/11/2026: uma linha por marca, para a marca que passa do freio hoje não calar o aviso de outra. */
+export const chaveDoAvisoDoFreio = (clienteId: number) => `aviso_ia_freio_${clienteId}_enviado_em`;
+
+/**
+ * O e-mail do alarme da IA quando uma marca passa do freio de gasto (`src/ia/freio.ts`). Mesmo caminho e mesma trava do aviso da IA trancada: os mesmos destinatários, no máximo um por dia,
+ * só que por marca (o freio é de uma marca, não da IA inteira).
+ */
+export async function avisarFreioDeGasto(
+  freio: FreioParaOAviso,
+  agora: Date = new Date(),
+  enviar: typeof enviarEmail = enviarEmail,
+): Promise<ResultadoDoAvisoDaIA> {
+  return avisarUmaVezPorDia({
+    chave: chaveDoAvisoDoFreio(freio.clienteId),
+    agora,
+    enviar,
+    assunto: () => textosFreioDaIA.aviso.assunto(freio),
+    html: () => textosFreioDaIA.aviso.corpo(freio, `${config.appUrl}/admin/clientes/${freio.clienteId}`),
+    semDestinatario: () => logger.warn({ clienteId: freio.clienteId }, "uma marca passou do freio de gasto da IA, mas nao ha admin nem EMAIL_ACOMPANHAMENTO para receber o aviso"),
+    falhaNoEnvio: (erro) => logger.error({ err: erro, clienteId: freio.clienteId }, "nao foi possivel enviar o aviso do freio de gasto da IA"),
+  });
+}
+
+/** A trava de "um por dia" e o envio, iguais para os dois avisos (descritos no alto do arquivo). */
+async function avisarUmaVezPorDia(aviso: {
+  chave: string;
+  agora: Date;
+  enviar: typeof enviarEmail;
+  assunto: () => string;
+  html: () => string;
+  semDestinatario: () => void;
+  falhaNoEnvio: (erro: unknown) => void;
+}): Promise<ResultadoDoAvisoDaIA> {
+  const { chave } = aviso;
+  const hoje = hojeISO(aviso.agora);
 
   // Guarda o que havia, para devolver se o envio falhar por inteiro.
   const [antes] = await db().select({ valor: configuracaoAdmin.valor }).from(configuracaoAdmin).where(eq(configuracaoAdmin.chave, chave));
@@ -37,7 +84,7 @@ export async function avisarFalhaDaIA(
 
   const para = await destinatariosDoAviso();
   if (para.length === 0) {
-    logger.warn({ causa: falha.causa }, "a IA esta trancada, mas nao ha admin nem EMAIL_ACOMPANHAMENTO para receber o aviso");
+    aviso.semDestinatario();
     return { enviado: false, motivo: "sem destinatario" };
   }
 
@@ -49,11 +96,11 @@ export async function avisarFalhaDaIA(
     .returning({ chave: configuracaoAdmin.chave });
   if (tomou.length === 0) return { enviado: false, motivo: "ja enviado hoje" };
 
-  const assunto = textosAvisoDaIA.assunto(falha);
-  const html = textosAvisoDaIA.corpo(falha, `${config.appUrl}/admin`);
-  const resultados = await Promise.allSettled(para.map((email) => enviar({ para: email, assunto, html })));
+  const assunto = aviso.assunto();
+  const html = aviso.html();
+  const resultados = await Promise.allSettled(para.map((email) => aviso.enviar({ para: email, assunto, html })));
   const enviados = resultados.filter((r) => r.status === "fulfilled").length;
-  for (const r of resultados) if (r.status === "rejected") logger.error({ err: r.reason }, "nao foi possivel enviar o aviso da falha da IA");
+  for (const r of resultados) if (r.status === "rejected") aviso.falhaNoEnvio(r.reason);
 
   if (enviados === 0) {
     // Nada saiu: devolve a trava para a próxima falha tentar de novo.

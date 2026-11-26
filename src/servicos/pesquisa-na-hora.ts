@@ -516,6 +516,7 @@ export async function executarPesquisa(pesquisaId: number, deps: DepsDaPesquisa 
         entrada: pesquisaIA.montarEntrada({ pedido: pesquisa.pedido, tema: pesquisa.tema, hoje: hojePorExtenso(agora) }),
         maxBuscas,
         dominios: dominiosPermitidos(),
+        clienteId: pesquisa.clienteId,
       });
     } catch (erro) {
       if (erro instanceof ErroDaBusca && (erro.usoParcial.buscasNaWeb ?? 0) > 0) {
@@ -564,6 +565,7 @@ export async function executarPesquisa(pesquisaId: number, deps: DepsDaPesquisa 
     try {
       const t0 = Date.now();
       const resultado = await gerarEstruturado({
+        clienteId: pesquisa.clienteId,
         tarefa: "conferirPremissa",
         nivel: conferirPremissaIA.nivel,
         effort: conferirPremissaIA.esforco,

@@ -149,6 +149,7 @@ export async function rodarAnalisarPerfil(payload: PayloadAnalisarPerfil): Promi
   let custoUsd = 0;
 
   const leituraResultado = await gerarEstruturado({
+    clienteId: payload.clienteId,
     tarefa: "analisarPerfilCitado",
     nivel: analisarPerfilCitado.nivel,
     effort: analisarPerfilCitado.esforco,

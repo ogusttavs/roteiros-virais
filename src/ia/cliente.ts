@@ -11,6 +11,7 @@ import { config } from "@/lib/config";
 
 import { causaDoErroDaApi, ErroIA, FRASE_GENERICA_DO_CLIENTE } from "./erro";
 import { registrarFalhaDaIA } from "./falha-da-ia";
+import { comFreioDeGasto } from "./freio";
 import { gerarMock } from "./mock";
 import type { EsforcoIA, ImagemEntrada, NivelIA, ResultadoGeracao, TarefaIA } from "./tipos";
 
@@ -37,19 +38,27 @@ export type ParametrosGeracao<T> = {
   imagens?: ImagemEntrada[];
   maxTokens?: number;
   effort?: EsforcoIA;
+  /**
+   * A marca que paga esta chamada (achado A4 da auditoria de 26/11/2026): com ela a chamada passa pelo freio de gasto (`freio.ts`), que recusa quando a marca passou do limite da hora ou
+   * do dia. Sem ela (tarefa do setor ou do sistema), não há freio. Quem registra a geração com `clienteId` passa o mesmo aqui.
+   */
+  clienteId?: number;
 };
 
 export async function gerarEstruturado<T>(
   params: ParametrosGeracao<T>,
 ): Promise<ResultadoGeracao<T>> {
-  try {
-    if (config.ia.provedor === "mock") return await gerarMock(params);
-    return await gerarReal(params);
-  } catch (erro) {
-    // A causa conhecida (crédito, sobrecarga, chave) fica anotada para o Início do admin; a anotação nunca muda o erro que sobe.
-    if (erro instanceof ErroIA && erro.causa) await registrarFalhaDaIA(erro.causa, params.tarefa);
-    throw erro;
-  }
+  // O freio vale também no simulador (custo zero, então só freia quando o teste grava gasto de propósito): é assim que o teste prova o caminho inteiro.
+  return comFreioDeGasto(params.clienteId, params.tarefa, async () => {
+    try {
+      if (config.ia.provedor === "mock") return await gerarMock(params);
+      return await gerarReal(params);
+    } catch (erro) {
+      // A causa conhecida (crédito, sobrecarga, chave) fica anotada para o Início do admin; a anotação nunca muda o erro que sobe.
+      if (erro instanceof ErroIA && erro.causa) await registrarFalhaDaIA(erro.causa, params.tarefa);
+      throw erro;
+    }
+  });
 }
 
 async function gerarReal<T>(params: ParametrosGeracao<T>): Promise<ResultadoGeracao<T>> {
