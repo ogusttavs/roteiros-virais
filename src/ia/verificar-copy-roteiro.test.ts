@@ -565,6 +565,24 @@ describe("R-COPY-26: fórmula de texto de máquina (onda 1 de texto)", () => {
     expect(com(reprovam({ gancho: "Não é calcário, é sabão seco: o box da Neusa em 5 minutos.", fontes }), "R-COPY-26")).toBe(false);
   });
 
+  it("onda 2: a muleta de abertura do corpo e o fecho com pergunta de confirmação reprovam na 1ª e viram aviso na 2ª", () => {
+    const muleta = { corpo: "Cara, é o seguinte: o box da Neusa tinha calcário de três anos." };
+    const fecho = { fechamento: "O box da Neusa ficou limpo em cinco minutos, sabe? Foi o rodo." };
+    for (const texto of [muleta, fecho]) {
+      expect(com(reprovam(texto), "R-COPY-26")).toBe(true);
+      const r2 = verificarRegrasCopyRoteiro(entrada({ ...texto, tentativa: 2 }));
+      expect(com(r2.reprovam, "R-COPY-26")).toBe(false);
+      expect(com(r2.avisos, "R-COPY-26")).toBe(true);
+    }
+    expect(reprovam(muleta).join(" ")).toContain("muleta de abertura");
+    expect(reprovam(fecho).join(" ")).toContain("pergunta de confirmação");
+  });
+
+  it("onda 2: o reaviso do meio do corpo e a pergunta com objeto não reprovam", () => {
+    expect(com(reprovam({ corpo: "O box estava opaco. Olha só o que muda agora: o rodo vai de cima para baixo." }), "R-COPY-26")).toBe(false);
+    expect(com(reprovam({ fechamento: "Faz sentido para o seu box? Me chama no WhatsApp." }), "R-COPY-26")).toBe(false);
+  });
+
   it("R-COPY-28 e R-COPY-29 só avisam, nunca reprovam", () => {
     const a = verificarRegrasCopyRoteiro(entrada({ corpo: "Molhe o vidro. Passe o rodo. Pronto. Sai tudo com 10x menos esforço." }));
     expect(com(a.avisos, "R-COPY-28")).toBe(true);
