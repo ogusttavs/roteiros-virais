@@ -4,8 +4,11 @@
  * manda algo para fora, gasta ou muda dado em nome de outra pessoa por esquecimento. Vê `export async function`, `export default async function` e `export const x = async ...`, em `.ts` e
  * `.tsx`, com ou sem comentário antes da diretiva, e ignora comentários ao procurar o `await` (um `// await exigirForaDoVerComo()` não vale). `"use server"` dentro de uma função
  * (Server Action inline) reprova: tem de morar num arquivo de ações. Sem I/O de escrita nem process.exit aqui, para dar para testar; o ponto de entrada fica em checar-ver-como.ts.
+ *
+ * Desde o M3 da auditoria de segurança de 26/11/2026, a mesma regra vale para as rotas `/api` que escrevem (a segunda metade deste arquivo, a partir de `PADRAO_ROTAS`).
  */
 import { globSync, readFileSync } from "node:fs";
+import { posix, sep } from "node:path";
 
 export const PADRAO = "src/app/**/*.{ts,tsx}";
 
@@ -173,4 +176,194 @@ export function verificarConteudo(caminho: string, conteudo: string): Problema[]
 
 export function verificarArquivo(caminho: string): Problema[] {
   return verificarConteudo(caminho, readFileSync(caminho, "utf8"));
+}
+
+/**
+ * As rotas `/api` (M3 da auditoria de segurança de 26/11/2026): a regra 5 do "ver como" também para elas. Toda `route.ts` de `src/app/api/` (fora de `api/admin/`, que age como o
+ * próprio admin e tem o `checar-admin-protegido`) que exporta POST, PUT, PATCH ou DELETE recusa o modo como PRIMEIRO `await` do método, num destes três jeitos:
+ *  1. `if (await modoVerComoLigado()) return ...`;
+ *  2. `const x = await <porta>(); if (x instanceof NextResponse) return x;`, com a porta em PORTAS_DE_ROTA (a porta também é conferida: o primeiro `await` dela é o jeito 1);
+ *  3. `const s = await sessaoDoPainel();` e, antes do `await` seguinte, `if (s.verComo !== null) return ...`.
+ * Ou o método está em ROTAS_LIVRES, por `arquivo:MÉTODO`, com o motivo. Uma reexportação (`export { POST } from "..."`) vale se aponta para outra rota conferida aqui. Um método que escreve
+ * exportado de um jeito que esta conferência não lê (desestruturado, `export function` sem `async`, embrulhado noutra função) só passa pela lista. Uma entrada da lista que aponta para algo
+ * que não existe mais reprova. O GET fica de fora: ler no modo é o propósito do modo (as rotas GET que mexem em algo, como `/api/meta/conectar`, recusam à mão).
+ */
+export const PADRAO_ROTAS = "src/app/api/**/route.ts";
+
+export const METODOS_QUE_ESCREVEM = ["POST", "PUT", "PATCH", "DELETE"] as const;
+
+/** Os únicos métodos que escrevem e que o modo deixa passar, por `arquivo:MÉTODO`: nenhum deles é a pessoa vista mexendo na própria conta. */
+export const ROTAS_LIVRES: Record<string, string> = {
+  "src/app/api/auth/[...all]/route.ts:POST": "é o better-auth da sessão REAL (entrar, sair): o modo mora num cookie à parte, que ele não lê, e nada aqui age em nome da pessoa vista",
+  "src/app/api/jobs/[nome]/route.ts:POST": "autenticação própria por chave (cron e admin), sem a sessão do painel",
+  "src/app/api/meta/exclusao/route.ts:POST": "é a Meta avisando uma exclusão de dados (signed_request conferido), sem a sessão do painel",
+  "src/app/api/webhooks/stripe/route.ts:POST": "é o aviso do Stripe (assinatura do corpo conferida), sem a sessão do painel",
+};
+
+/** As portas comuns que recusam o modo pelas rotas que as chamam, com o arquivo onde moram (onde esta conferência confere que elas continuam recusando). */
+export const PORTAS_DE_ROTA: Record<string, string> = {
+  marcaDoCarrossel: "src/lib/porta-do-carrossel.ts",
+};
+
+export function listarRotas(): string[] {
+  return globSync(PADRAO_ROTAS)
+    .map((c) => c.split(sep).join("/"))
+    .filter((c) => !c.startsWith("src/app/api/admin/"))
+    .sort();
+}
+
+export type MetodoDaRota = { metodo: string; linha: number; corpo: string | null; reexportaDe: string | null };
+
+const ehDeEscrita = (nome: string) => (METODOS_QUE_ESCREVEM as readonly string[]).includes(nome);
+
+/** Os nomes exportados de uma lista `{ A, B as C }` (vale o nome de fora, o depois do `as`; numa desestruturação `{ A: b }`, vale o `b`). */
+function nomesDaLista(lista: string): string[] {
+  return lista
+    .split(",")
+    .map((parte) => parte.trim())
+    .filter(Boolean)
+    .map((parte) => {
+      const comAs = /\bas\s+(\w+)$/.exec(parte);
+      if (comAs) return comAs[1];
+      const comDoisPontos = /:\s*(\w+)$/.exec(parte);
+      return comDoisPontos ? comDoisPontos[1] : parte.replace(/=.*$/, "").trim();
+    });
+}
+
+/** Os métodos que escrevem exportados pela rota (código já sem comentários): com corpo (as formas de `funcoesExportadas`), reexportados de outro arquivo, ou de um jeito sem corpo legível (nulo). */
+export function metodosQueEscrevem(codigoSemComentarios: string): MetodoDaRota[] {
+  const codigo = codigoSemComentarios;
+  const linhaDe = (indice: number) => codigo.slice(0, indice).split("\n").length;
+  const metodos: MetodoDaRota[] = funcoesExportadas(codigo)
+    .filter((f) => ehDeEscrita(f.nome))
+    .map((f) => ({ metodo: f.nome, linha: f.linhaDaAssinatura, corpo: f.corpo, reexportaDe: null }));
+  const jaVistos = new Set(metodos.map((m) => m.metodo));
+  const semCorpo = (nome: string, indice: number, reexportaDe: string | null = null) => {
+    if (!ehDeEscrita(nome) || jaVistos.has(nome)) return;
+    jaVistos.add(nome);
+    metodos.push({ metodo: nome, linha: linhaDe(indice), corpo: null, reexportaDe });
+  };
+
+  const reReexporta = /^export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/gm;
+  for (let m = reReexporta.exec(codigo); m; m = reReexporta.exec(codigo)) for (const nome of nomesDaLista(m[1])) semCorpo(nome, m.index, m[2]);
+
+  const reDesestruturada = /^export\s+(?:const|let|var)\s*\{([^}]*)\}\s*=/gm;
+  for (let m = reDesestruturada.exec(codigo); m; m = reDesestruturada.exec(codigo)) for (const nome of nomesDaLista(m[1])) semCorpo(nome, m.index);
+
+  const reListaLocal = /^export\s*\{([^}]*)\}\s*;?\s*$/gm;
+  for (let m = reListaLocal.exec(codigo); m; m = reListaLocal.exec(codigo)) for (const nome of nomesDaLista(m[1])) semCorpo(nome, m.index);
+
+  // `export const POST = algo(...)` (sem `async` logo depois do `=`) e `export function POST(` (sem `async`): a conferência não lê o corpo, só a lista os deixa passar.
+  const reOutraForma = /^export\s+(?:(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?=(?!\s*async\b)|function\s+(\w+)\b)/gm;
+  for (let m = reOutraForma.exec(codigo); m; m = reOutraForma.exec(codigo)) semCorpo(m[1] ?? m[2], m.index);
+  return metodos;
+}
+
+/** O primeiro `await` do corpo é a recusa do modo, num dos três jeitos do cabeçalho desta seção? */
+export function recusaComoPrimeiroAwait(corpo: string): boolean {
+  const primeiro = /\bawait\s+([\w.]+)\(/.exec(corpo);
+  if (!primeiro) return false;
+  const nome = primeiro[1];
+  const antes = corpo.slice(0, primeiro.index);
+  const depois = corpo.slice(primeiro.index);
+
+  // Jeito 1: `if (await modoVerComoLigado()) return`.
+  if (nome === "modoVerComoLigado") return /\bif\s*\(\s*$/.test(antes) && /^await\s+modoVerComoLigado\(\)\s*\)\s*return\b/.test(depois);
+
+  const variavel = /\b(?:const|let)\s+(\w+)\s*=\s*$/.exec(antes)?.[1];
+  if (!variavel) return false;
+
+  // Jeito 2: a porta comum, com a resposta dela devolvida.
+  if (nome in PORTAS_DE_ROTA) {
+    const m = /^await\s+\w+\(\)\s*;\s*if\s*\(\s*(\w+)\s+instanceof\s+NextResponse\s*\)\s*return\s+(\w+)\s*;/.exec(depois);
+    return m !== null && m[1] === variavel && m[2] === variavel;
+  }
+
+  // Jeito 3: a sessão do painel, com a recusa do `verComo` antes do `await` seguinte.
+  if (nome === "sessaoDoPainel") {
+    const resto = depois.slice(primeiro[0].length);
+    const proximoAwait = resto.search(/\bawait\b/);
+    const trecho = proximoAwait === -1 ? resto : resto.slice(0, proximoAwait);
+    const m = /\bif\s*\(\s*(\w+)\.verComo\s*!==?\s*null\s*\)\s*return\b/.exec(trecho);
+    return m !== null && m[1] === variavel;
+  }
+  return false;
+}
+
+/** Resolve o caminho de uma reexportação relativa (`../../transcrever/route`) para o arquivo da rota, como o glob o devolve. */
+export function caminhoDaReexportacao(caminhoDaRota: string, alvo: string): string | null {
+  if (!alvo.startsWith(".")) return null;
+  const resolvido = posix.normalize(posix.join(posix.dirname(caminhoDaRota), alvo));
+  return resolvido.endsWith(".ts") ? resolvido : `${resolvido}.ts`;
+}
+
+/** Os problemas de uma rota. `rotas` são as rotas conferidas (a reexportação só vale para uma delas). */
+export function verificarRota(caminho: string, conteudo: string, rotas: ReadonlySet<string>): Problema[] {
+  const problemas: Problema[] = [];
+  for (const m of metodosQueEscrevem(semComentarios(conteudo))) {
+    if (`${caminho}:${m.metodo}` in ROTAS_LIVRES) continue;
+    if (m.reexportaDe !== null) {
+      const alvo = caminhoDaReexportacao(caminho, m.reexportaDe);
+      if (alvo !== null && alvo !== caminho && rotas.has(alvo)) continue;
+      problemas.push({ arquivo: caminho, linha: m.linha, motivo: `${m.metodo}: reexporta de "${m.reexportaDe}", que não é outra rota /api conferida pelo checar-ver-como (aponte para a rota ou ponha em ROTAS_LIVRES, com o motivo)` });
+      continue;
+    }
+    if (m.corpo === null) {
+      problemas.push({ arquivo: caminho, linha: m.linha, motivo: `${m.metodo}: exportado de um jeito que o checar-ver-como não lê; escreva export async function ${m.metodo} com a recusa do modo, ou ponha em ROTAS_LIVRES de scripts/checar-ver-como-regras.ts, com o motivo` });
+      continue;
+    }
+    if (recusaComoPrimeiroAwait(m.corpo)) continue;
+    problemas.push({
+      arquivo: caminho,
+      linha: m.linha,
+      motivo: `${m.metodo}: a rota /api que escreve precisa recusar o "ver como" como primeiro await (if (await modoVerComoLigado()) return ..., uma porta de PORTAS_DE_ROTA com a resposta devolvida, ou sessaoDoPainel com o verComo recusado logo depois), ou entrar em ROTAS_LIVRES de scripts/checar-ver-como-regras.ts com o motivo`,
+    });
+  }
+  return problemas;
+}
+
+/** A porta continua recusando o modo como primeiro `await` (jeito 1)? Se deixar de recusar, todas as rotas que a usam ficam abertas sem aviso. */
+export function verificarPorta(nome: string, caminho: string, conteudo: string): Problema[] {
+  const funcao = funcoesExportadas(semComentarios(conteudo)).find((f) => f.nome === nome);
+  if (!funcao) return [{ arquivo: caminho, linha: 1, motivo: `a porta ${nome} de PORTAS_DE_ROTA não existe mais neste arquivo` }];
+  const primeiro = /\bawait\s+([\w.]+)\(/.exec(funcao.corpo)?.[1];
+  if (primeiro === "modoVerComoLigado" && recusaComoPrimeiroAwait(funcao.corpo)) return [];
+  return [{ arquivo: caminho, linha: funcao.linhaDaAssinatura, motivo: `${nome}: a porta das rotas precisa chamar if (await modoVerComoLigado()) return ... como primeiro await; as rotas que a usam confiam nela` }];
+}
+
+/** As entradas de ROTAS_LIVRES que apontam para uma rota ou um método que não existe mais (a licença não apodrece). */
+export function entradasPodres(metodosPorRota: ReadonlyMap<string, ReadonlySet<string>>): Problema[] {
+  const problemas: Problema[] = [];
+  for (const chave of Object.keys(ROTAS_LIVRES)) {
+    const corte = chave.lastIndexOf(":");
+    const arquivo = chave.slice(0, corte);
+    const metodo = chave.slice(corte + 1);
+    if (!metodosPorRota.get(arquivo)?.has(metodo)) problemas.push({ arquivo, linha: 1, motivo: `a entrada ${chave} de ROTAS_LIVRES aponta para uma rota ou um método que não existe mais` });
+  }
+  return problemas;
+}
+
+/** Tudo das rotas de uma vez, lendo do disco (a partir da raiz de `plataforma/`). */
+export function verificarRotasDoRepositorio(): { problemas: Problema[]; rotas: number } {
+  const rotas = listarRotas();
+  const conjunto = new Set(rotas);
+  const problemas: Problema[] = [];
+  const metodosPorRota = new Map<string, Set<string>>();
+  for (const r of rotas) {
+    const conteudo = readFileSync(r, "utf8");
+    problemas.push(...verificarRota(r, conteudo, conjunto));
+    metodosPorRota.set(r, new Set(metodosQueEscrevem(semComentarios(conteudo)).map((m) => m.metodo)));
+  }
+  for (const [nome, arquivo] of Object.entries(PORTAS_DE_ROTA)) {
+    let conteudo: string;
+    try {
+      conteudo = readFileSync(arquivo, "utf8");
+    } catch {
+      problemas.push({ arquivo, linha: 1, motivo: `o arquivo da porta ${nome} de PORTAS_DE_ROTA não existe mais` });
+      continue;
+    }
+    problemas.push(...verificarPorta(nome, arquivo, conteudo));
+  }
+  problemas.push(...entradasPodres(metodosPorRota));
+  return { problemas, rotas: rotas.length };
 }

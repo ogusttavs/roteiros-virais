@@ -193,7 +193,7 @@ describe("editar um roteiro longo marcado", () => {
   it("editar os pontos de um capítulo não apaga as marcas (os pontos não são fala)", async () => {
     const id = await criarLongo();
     await marcarFalaDoRoteiro(clienteId, id);
-    await editarRoteiro(id, { capitulo: { indice: 1, pontos: ["Um ponto novo", "Outro ponto novo"] } });
+    await editarRoteiro(id, clienteId, { capitulo: { indice: 1, pontos: ["Um ponto novo", "Outro ponto novo"] } });
     expect(await marcasGuardadas(id)).not.toBeNull();
     const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, id));
     expect(falaDoRoteiro(linha, false).marcas?.blocos).toHaveLength(3);
@@ -202,7 +202,7 @@ describe("editar um roteiro longo marcado", () => {
   it("editar a frase que segura até o próximo apaga as marcas, e a edição pede as novas", async () => {
     const id = await criarLongo();
     await marcarFalaDoRoteiro(clienteId, id);
-    await editarRoteiro(id, { capitulo: { indice: 1, ganchoParaOProximo: "E o erro seguinte pega até quem já sabe.", pontos: CAPITULOS[1].pontos } });
+    await editarRoteiro(id, clienteId, { capitulo: { indice: 1, ganchoParaOProximo: "E o erro seguinte pega até quem já sabe.", pontos: CAPITULOS[1].pontos } });
     expect(await marcasGuardadas(id)).toBeNull();
     const r = await marcarFalaDoRoteiro(clienteId, id);
     expect(r.ok && r.novas).toBe(true);
@@ -212,10 +212,10 @@ describe("editar um roteiro longo marcado", () => {
   it("editar o gancho do vídeo ou a chamada final também apaga", async () => {
     const id = await criarLongo();
     await marcarFalaDoRoteiro(clienteId, id);
-    await editarRoteiro(id, { gancho: "Um gancho novo para o vídeo inteiro." });
+    await editarRoteiro(id, clienteId, { gancho: "Um gancho novo para o vídeo inteiro." });
     expect(await marcasGuardadas(id)).toBeNull();
     await marcarFalaDoRoteiro(clienteId, id);
-    await editarRoteiro(id, { chamadaFinal: "Chama no direct agora." });
+    await editarRoteiro(id, clienteId, { chamadaFinal: "Chama no direct agora." });
     expect(await marcasGuardadas(id)).toBeNull();
   });
 
