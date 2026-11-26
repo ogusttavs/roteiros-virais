@@ -248,14 +248,27 @@ describe("as regras que mandam a lista de volta ao modelo", () => {
     expect(visao.alternativas!.some((g) => /resultado incrível/i.test(g.texto))).toBe(false);
   });
 
-  it("se depois de tirar as fórmulas sobram menos de três, não guarda nada e diz que não deu", async () => {
+  it("se depois de tirar as fórmulas sobram menos de três, mostra os que passaram (sem inventar) e nunca o reprovado", async () => {
     const r = await novoRoteiro(marcaA, { tema: "tirar mancha do sofá [mock:ganchos-sempre-formula-tres]" });
+    const visao = await pedirGanchosAlternativos(marcaA, r.id, AGORA);
+    expect(visao.alternativas).toHaveLength(2);
+    expect(visao.alternativas!.some((g) => /resultado incrível/i.test(g.texto))).toBe(false);
+  });
+
+  it("a lista com só dois ganchos nas duas tentativas mostra os dois, sem completar com um terceiro", async () => {
+    const r = await novoRoteiro(marcaA, { tema: "tirar mancha do sofá [mock:ganchos-sempre-poucos]" });
+    const visao = await pedirGanchosAlternativos(marcaA, r.id, AGORA);
+    expect(visao.alternativas).toHaveLength(2);
+  });
+
+  it("quando nenhum gancho passa nas duas tentativas, não guarda nada e diz que não deu", async () => {
+    const r = await novoRoteiro(marcaA, { tema: "tirar mancha do sofá [mock:ganchos-sempre-todos-sem-detalhe]" });
     await expect(pedirGanchosAlternativos(marcaA, r.id, AGORA)).rejects.toMatchObject({ motivo: "ia-fora" });
     expect((await roteiroPorId(r.id, marcaA))!.ganchosAlternativos).toBeNull();
   });
 
   it("a lista reprovada duas vezes e a IA fora do ar não guardam nada e deixam o roteiro como está", async () => {
-    for (const marcador of ["ganchos-sempre-poucos", "ganchos-fora"]) {
+    for (const marcador of ["ganchos-fora"]) {
       const r = await novoRoteiro(marcaA, { tema: `tirar mancha do sofá [mock:${marcador}]` });
       await expect(pedirGanchosAlternativos(marcaA, r.id, AGORA), marcador).rejects.toMatchObject({ motivo: "ia-fora" });
       const depois = (await roteiroPorId(r.id, marcaA))!;

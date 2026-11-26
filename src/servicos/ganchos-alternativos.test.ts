@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { GanchoAlternativo, TipoAbertura } from "@/db/schema";
 import * as prompt from "@/ia/prompts/ganchosAlternativos";
 
-import { ganchosParaGuardar, limparGancho, problemasDosGanchos, roteiroTemGanchoParaTrocar, semFormulasDeMaquina, visaoDosGanchos } from "./ganchos-alternativos";
+import { ganchosParaGuardar, ganchosQuePassam, ganchoTemDetalheConcreto, limparGancho, motivoDoTipoMalRotulado, problemasDoGancho, problemasDosGanchos, roteiroTemGanchoParaTrocar, semFormulasDeMaquina, visaoDosGanchos } from "./ganchos-alternativos";
 import type { RoteiroLinha } from "./roteiro";
 
 const FONTES = "Perfil do cliente: lava sofá em Campinas.\nTema: tirar mancha de café do sofá.";
@@ -79,6 +79,86 @@ describe("problemasDosGanchos", () => {
   it("o preço ou o 'grátis' no gancho de uma marca de saúde reprova pela conformidade (R-CONF)", () => {
     const gratis = [g("Faça sua avaliação grátis e veja o antes e depois", "contraste"), BOA_LISTA[0], BOA_LISTA[2]];
     expect(problemasDosGanchos(gratis, { ...CONTEXTO, ramoSaude: true }).some((m) => m.startsWith("gancho 1:"))).toBe(true);
+  });
+});
+
+// T74 (26/11/2026): os três defeitos que a prova com chave real achou.
+const DETALHES_ODONTO = "Clínica odontológica de bairro. Cliente ideal é pai ou mãe de criança de 8 a 14 anos.\nIsso é mito. O aparelho movimenta o dente de lugar, ele não segura o crescimento. A avaliação olha a boca da criança, não a idade no papel.\nAntes de acreditar no que ouviu por aí, vem entender com calma.\nChame no direct.";
+const JA_DITO_ODONTO = "mito ou verdade: aparelho dentário atrasa o crescimento do dente\nDizem que aparelho atrasa o crescimento do dente do seu filho.";
+const CONTEXTO_ODONTO = { ganchoAtual: "Dizem que aparelho atrasa o crescimento do dente do seu filho.", tipoAtual: "fala_direta" as TipoAbertura | null, fontes: `${DETALHES_ODONTO}\n${JA_DITO_ODONTO}`, ramoSaude: true, detalhes: DETALHES_ODONTO, jaDito: JA_DITO_ODONTO };
+
+describe("o detalhe concreto do roteiro ou do perfil (defeito 1)", () => {
+  it("o gancho que só repete o tema, ou serviria para qualquer ramo, é recusado; o que traz um detalhe do corpo ou do perfil passa", () => {
+    const detalhes = "Marca própria de limpeza. Remova o mofo, deixe secar por completo e só então sele o rejunte. A umidade do banheiro traz o mofo de volta.";
+    const jaDito = "por que o mofo volta no rejunte do banheiro mesmo depois de limpar\nVocê limpou o rejunte e o mofo voltou em uma semana.";
+    expect(ganchoTemDetalheConcreto("Por que o mofo volta no rejunte mesmo após você limpar tudo direitinho?", detalhes, jaDito)).toBe(false);
+    expect(ganchoTemDetalheConcreto("Você acha que o consultório fecha quando o último paciente sai? Aqui a gente segue trabalhando.", "Clínica de bairro. Passo pano nas bancadas e confiro a esterilização.", "a rotina depois de fechar o consultório\nDepois que o último paciente sai, eu faço dez minutos.")).toBe(false);
+    expect(ganchoTemDetalheConcreto("Seque o rejunte por completo antes de selar, senão a umidade traz o mofo de volta", detalhes, jaDito)).toBe(true);
+    expect(ganchoTemDetalheConcreto("Pano nas bancadas e esterilização conferida: dez minutos que ninguém vê", "Passo pano nas bancadas e confiro a esterilização do material.", "a rotina de fechar\nDez minutos que ninguém vê.")).toBe(true);
+  });
+
+  it("palavra comum, curta ou de ligação não conta como detalhe, e a raiz junta as formas do verbo", () => {
+    expect(ganchoTemDetalheConcreto("Isso aqui você precisa saber, mas ainda não sabe", "Isso aqui você precisa saber agora, para fazer em casa", "outro tema")).toBe(false);
+    expect(ganchoTemDetalheConcreto("Remover o mofo é fácil", "Remova o mofo, depois sele", "remova mofo\nfácil")).toBe(false);
+    expect(ganchoTemDetalheConcreto("Sele logo depois", "Remova o mofo e só então sele o rejunte", "outro")).toBe(true);
+  });
+
+  it("problemasDoGancho reprova o gancho sem detalhe quando o contexto traz o corpo, e não confere quando ele não traz", () => {
+    const generico = g("Por que o aparelho atrasa o dente crescer, será mesmo?", "pergunta");
+    expect(problemasDoGancho(generico, CONTEXTO_ODONTO).some((m) => m.includes("nenhum detalhe concreto"))).toBe(true);
+    expect(problemasDoGancho(generico, { ...CONTEXTO_ODONTO, detalhes: undefined }).some((m) => m.includes("nenhum detalhe concreto"))).toBe(false);
+    const concreto = g("Aparelho não segura o crescimento, só movimenta o dente de lugar: a avaliação mostra", "contraste");
+    expect(problemasDoGancho(concreto, CONTEXTO_ODONTO)).toEqual([]);
+  });
+});
+
+describe("saúde: resultado que ninguém contou e medo sobre o filho (defeito 2)", () => {
+  it("'o resultado que a gente vê todo dia' e 'o dente crescendo normalmente para o seu lugar' reprovam em saúde, com a R-CONF-07", () => {
+    const caso = g("O resultado que a gente vê todo dia: criança com aparelho e o dente crescendo normalmente para o seu lugar.", "resultado", "desejo");
+    const motivos = problemasDoGancho(caso, CONTEXTO_ODONTO);
+    expect(motivos.some((m) => m.startsWith("R-CONF-07") && m.includes("resultado"))).toBe(true);
+    expect(problemasDoGancho(g("Todo dia a gente vê criança com aparelho e o dente crescendo normalmente", "cena"), CONTEXTO_ODONTO).some((m) => m.startsWith("R-CONF-07"))).toBe(true);
+    // Fora da saúde a regra não roda.
+    expect(problemasDoGancho(caso, { ...CONTEXTO_ODONTO, ramoSaude: false }).some((m) => m.startsWith("R-CONF-07"))).toBe(false);
+  });
+
+  it("'Seu filho vai ficar sem dente se colocar aparelho agora?' reprova em saúde com a R-CONF-06; a dúvida do pai sem ameaça passa", () => {
+    const medo = g("Seu filho vai ficar sem dente se colocar aparelho agora? Mãe e pai ficam com essa dúvida.", "pergunta", "identificacao");
+    expect(problemasDoGancho(medo, CONTEXTO_ODONTO).some((m) => m.startsWith("R-CONF-06"))).toBe(true);
+    expect(problemasDoGancho(medo, { ...CONTEXTO_ODONTO, ramoSaude: false }).some((m) => m.startsWith("R-CONF-06"))).toBe(false);
+    const duvida = g("Mãe e pai perguntam se o aparelho muda o lugar do dente de verdade, e a avaliação responde", "contraste");
+    expect(problemasDoGancho(duvida, CONTEXTO_ODONTO).some((m) => m.startsWith("R-CONF"))).toBe(false);
+  });
+});
+
+describe("o tipo de abertura que bate com o texto (defeito 3)", () => {
+  it("pergunta termina em '?'; quem abre com pergunta não pode estar rotulado de outro tipo; número tem número", () => {
+    expect(motivoDoTipoMalRotulado("Mofo volta em uma semana? O rejunte não foi selado.", "resultado")).toContain("abre com uma pergunta");
+    expect(motivoDoTipoMalRotulado("O rejunte não foi selado depois de limpar.", "pergunta")).toContain("não tem pergunta");
+    expect(motivoDoTipoMalRotulado("O mofo volta porque o rejunte não foi selado.", "numero")).toContain("não tem número");
+    expect(motivoDoTipoMalRotulado("Mofo volta em uma semana? Sele o rejunte.", "pergunta")).toBeNull();
+    expect(motivoDoTipoMalRotulado("Sete dias depois o mofo voltou", "numero")).toBeNull();
+    expect(motivoDoTipoMalRotulado("Em 7 dias o mofo voltou", "numero")).toBeNull();
+    expect(motivoDoTipoMalRotulado("Um passo que ninguém conta. Você já pulou?", "objeto")).toBeNull();
+  });
+
+  it("entra em problemasDosGanchos com o número do gancho", () => {
+    const lista = [g("O sofá voltou? Olhe a mancha de café", "resultado"), BOA_LISTA[0], BOA_LISTA[2]];
+    expect(problemasDosGanchos(lista, CONTEXTO).some((m) => m.startsWith("gancho 1:") && m.includes("abre com uma pergunta"))).toBe(true);
+  });
+});
+
+describe("ganchosQuePassam: nunca mostra um reprovado", () => {
+  it("tira o que reprova sozinho e os repetidos, na ordem, e devolve menos de três sem inventar", () => {
+    const lista: GanchoAlternativo[] = [
+      g("Mofo? O removedor de mofo não é o problema", "resultado"),
+      g("Aparelho não segura o crescimento, só movimenta o dente de lugar: a avaliação mostra", "contraste"),
+      g("O resultado que a gente vê todo dia: o dente crescendo normalmente", "resultado", "desejo"),
+      g("A avaliação olha a boca da criança, não a idade no papel", "cena"),
+      g("A avaliação olha a boca da criança, não a idade no papel, de verdade", "cena"),
+    ];
+    const ficam = ganchosQuePassam(lista, CONTEXTO_ODONTO);
+    expect(ficam.map((x) => x.tipoAbertura)).toEqual(["contraste", "cena"]);
   });
 });
 

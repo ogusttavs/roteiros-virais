@@ -277,6 +277,24 @@ describe("gerarCarrossel", () => {
     expect(JSON.stringify(geracoes.map((g) => g.entradas))).toContain("A tentativa anterior foi reprovada.");
   });
 
+  it("T77: na 2ª tentativa, passar do tamanho por pouco sai pronto (o slide vai para encurtar); por muito, ou junto com fato inventado, continua falhando", async () => {
+    const clienteId = await criarCliente();
+    await criarVideo("ev-excesso", "mancha de vinho no estofado");
+    const c = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-excesso-pequeno-sempre]"));
+    expect(c.slides).toHaveLength(7);
+    expect((c.slides[1].texto ?? "").split(" ")).toHaveLength(32);
+    const geracoes = await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, clienteId)));
+    expect(geracoes).toHaveLength(2);
+    // Na 1ª tentativa nada muda: o excesso pequeno volta para a IA refazer (e a 2ª sai com o texto certo).
+    await db().delete(carrosseis);
+    const refeito = await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-excesso-pequeno]"));
+    expect((refeito.slides[1].texto ?? "").split(" ").length).toBeLessThanOrEqual(30);
+    await db().delete(carrosseis);
+    await expect(gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-excesso-grande-sempre]"))).rejects.toThrow();
+    await expect(gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado [mock:carrossel-excesso-pequeno-com-fato-sempre]"))).rejects.toThrow();
+    expect(await db().select().from(carrosseis).where(eq(carrosseis.clienteId, clienteId))).toHaveLength(0);
+  });
+
   it("de um roteiro que não é da marca: não acha", async () => {
     const clienteId = await criarCliente();
     await expect(gerarCarrossel(clienteId, { quantidade: 5, de: { origem: "roteiro", roteiroId: 999999 } })).rejects.toThrow(/roteiro/);

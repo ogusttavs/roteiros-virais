@@ -35,6 +35,7 @@ import { HojeCabecalho } from "./HojeCabecalho";
 import styles from "./HojeTela.module.css";
 import { MenuAcoesAgenda } from "./MenuAcoesAgenda";
 import { useDesfazerArquivar } from "./useDesfazerArquivar";
+import { useVersoesEscrevendo } from "./useVersoesEscrevendo";
 
 export type AvisoBriefingAgenda = { nota: string; meta: string };
 export type ProximoMarcado = { quando: string; rotuloFormato: string };
@@ -65,6 +66,8 @@ type Props = {
   emAlta: DadosEmAlta | null;
   /** E26 4b: as versões prontas e não escolhidas (só em hoje). */
   versoesProntas: VersoesProntasHoje | null;
+  /** E74 PR 1: o servidor ainda escreve as versões do grupo mais novo. */
+  versoesEscrevendo?: boolean;
   /** E60: as datas de hoje e as dos próximos 7 dias que valem para a marca (só em hoje); nulo em outro dia. */
   datas: { hoje: DataMarcada[]; proximas: DataProxima[] } | null;
   marcaAtiva: MarcaResumo;
@@ -387,13 +390,16 @@ export function HojeTela({
   avisoBriefing,
   avisoVideoSubindo,
   emAlta,
-  versoesProntas,
+  versoesProntas: versoesProntasDoServidor,
+  versoesEscrevendo: versoesEscrevendoNoServidor = false,
   datas,
   marcaAtiva,
   marcas,
   nomePessoa,
 }: Props) {
   const router = useRouter();
+  const { escrevendo: versoesEscrevendo, prontasAoVivo } = useVersoesEscrevendo(versoesEscrevendoNoServidor, Boolean(versoesProntasDoServidor));
+  const versoesProntas: VersoesProntasHoje | null = versoesProntasDoServidor ?? prontasAoVivo;
   const { trocando, marcaAlvo } = useTrocaMarca();
   const { avisarFalhaDeRede } = useConexao();
   const [ocupado, iniciarTransicao] = useTransition();
@@ -607,6 +613,16 @@ export function HojeTela({
           </section>
 
           {ehHoje && datas ? <CartaoDeData hoje={datas.hoje} proximas={datas.proximas} variante="hoje" /> : null}
+
+          {ehHoje && versoesEscrevendo ? (
+            <section className={styles.secaoDia} aria-labelledby="t-versoes-escrevendo" data-versoes-escrevendo>
+              <h2 id="t-versoes-escrevendo">{textosVersoesNoHoje.escrevendoTitulo}</h2>
+              <article className={styles.cartaoVersoes} role="status" aria-live="polite">
+                <span className={styles.seloVersoes}>{textosVersoesNoHoje.escrevendoSelo}</span>
+                <p>{textosVersoesNoHoje.escrevendoTexto}</p>
+              </article>
+            </section>
+          ) : null}
 
           {ehHoje && versoesProntas ? (
             <section className={styles.secaoDia} aria-labelledby="t-versoes-prontas" data-versoes-prontas>

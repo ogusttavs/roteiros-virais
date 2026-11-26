@@ -9,7 +9,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { larguraDaImagem } from "@/carrossel/fotos";
 import { avisosDoMetodo, verificarCapaVaga, verificarPromessaDaCapa } from "@/carrossel/metodo";
 import { corValida, garantirLeitura } from "@/carrossel/modelos";
-import { formulasDeMaquinaDosSlides, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFotoDasFotos, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
+import { formulasDeMaquinaDosSlides, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFotoDasFotos, slidesComExcessoPequeno, slidesDaSaida, textoDoSlide, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides } from "@/carrossel/regras";
 import {
   CAMPOS_DO_TIPO,
   COR_NEUTRA,
@@ -308,9 +308,10 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     },
     verificarExtra: (d, tentativa) => {
       const slidesDeTexto = slidesDaSaida(d.slides, { ramoSaude });
+      // Na 2ª tentativa, passar do tamanho por pouco (até 3 palavras, 20% de caracteres) não derruba o carrossel: sai pronto e o slide fica marcado para encurtar (a conferência do render mede o texto de verdade).
       return [
         ...verificarOrdemDosSlides(slidesDeTexto, quantidade),
-        ...verificarLimitesDosSlides(slidesDeTexto, { ramoSaude, fotosPrometidas, fotosDePacientePrometidas, falasDoCliente }),
+        ...verificarLimitesDosSlides(slidesDeTexto, { ramoSaude, fotosPrometidas, fotosDePacientePrometidas, falasDoCliente, tolerarExcessoPequeno: tentativa === 2 }),
         ...verificarLegenda(d.legenda, d.hashtags),
         // A promessa da capa, a capa vaga e as fórmulas de máquina (R-COPY-26) reprovam na 1ª tentativa e só avisam na 2ª (como o roteiro): senão brigam com a regra de "nunca três do mesmo tipo seguidos"; o aviso sai em `avisarExtra`.
         ...(tentativa === 1 ? [...verificarPromessaDaCapa(slidesDeTexto), ...verificarCapaVaga(slidesDeTexto), ...formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos)] : []),
@@ -325,6 +326,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
   });
 
   const slides: SlideDoCarrossel[] = slidesDaSaida(saida.slides, { ramoSaude });
+  const slidesParaEncurtar = slidesComExcessoPequeno(slides, { ramoSaude, fotosPrometidas, fotosDePacientePrometidas });
   const [criado] = await db()
     .insert(carrosseis)
     .values({
@@ -343,7 +345,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     .returning();
   if (pedido.cor !== undefined && pedido.cor !== cliente.corMarca) await db().update(clientes).set({ corMarca: pedido.cor }).where(eq(clientes.id, clienteId));
   // Os avisos da IA (o motivo escrito para o modelo, com o código da regra) ficam só no log: `avisos` do carrossel é o que a pessoa lê.
-  logger.info({ clienteId, carrosselId: criado.id, quantidade, avisosDaIA }, "carrossel gerado");
+  logger.info({ clienteId, carrosselId: criado.id, quantidade, avisosDaIA, slidesParaEncurtar }, "carrossel gerado");
   return criado;
 }
 

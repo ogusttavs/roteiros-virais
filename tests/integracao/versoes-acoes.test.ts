@@ -153,6 +153,9 @@ describe("grupoRecenteDesdeAction", () => {
     const { grupo } = await gerarVersoes(marcaA.id, pedido("tapete que desbota"), 3);
 
     expect(await grupoRecenteDesdeAction(desde)).toEqual({ grupo });
+    // E74 PR 1: com o tema, só vale o grupo desse tema (o mais novo da marca pode ser de outro assunto).
+    expect(await grupoRecenteDesdeAction(desde, "Tapete que desbota ")).toEqual({ grupo });
+    expect(await grupoRecenteDesdeAction(desde, "cortina que amarela")).toBeNull();
     // Uma espera que começou depois (e mais que a margem do relógio): o grupo é de antes, não é o que a pessoa esperava.
     expect(await grupoRecenteDesdeAction(Date.now() + 60 * 60 * 1000)).toBeNull();
     // O de outra marca nunca aparece.

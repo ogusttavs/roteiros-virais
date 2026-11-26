@@ -201,25 +201,36 @@ test.describe("as versões do roteiro", () => {
     await entrar(page, "d");
     await page.goto("/criar/objetivo?tema=0");
     await page.locator("[data-fichas]").getByRole("radio", { name: /Que me chamem/ }).click();
-    // O pedido fica parado por uns segundos, para a pessoa sair na espera ("Voltar depois"); o servidor escreve as versões quando o pedido chega.
+    // O pedido fica parado no navegador por uns segundos (a IA simulada responde na hora), para a pessoa sair na espera ("Voltar depois"); depois segue UMA vez para o servidor, que escreve as versões.
+    // Nada de `rota.fetch()` + `rota.fulfill()`: o Playwright pede ao servidor por conta própria e o navegador repete o pedido quando a resposta chega, e a ação de escrita, que gasta a IA, rodava duas vezes
+    // (um segundo grupo de versões, nunca escolhido, e o cartão do Hoje que não some). Aqui `continue()` deixa o pedido original seguir uma só vez.
     await page.route("**/criar/objetivo*", async (rota) => {
-      if (rota.request().method() === "POST") await new Promise((resolver) => setTimeout(resolver, 4000));
+      if (rota.request().method() === "POST" && (rota.request().postData() ?? "").includes('"origem"')) {
+        await new Promise((resolver) => setTimeout(resolver, 8000));
+        await rota.continue().catch(() => undefined);
+        return;
+      }
       await rota.continue();
     });
+    const pedido = page.waitForRequest((r) => r.method() === "POST" && (r.postData() ?? "").includes('"origem"'));
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
+    await pedido;
     await page.getByRole("button", { name: "Voltar depois" }).click({ timeout: 12_000 });
     await expect(page).toHaveURL(/\/hoje$/);
 
-    // Recarrega até as três ficarem prontas: antes disso não há cartão (a pessoa não cai numa comparação pela metade).
+    // Sem recarregar: o Hoje avisa que está escrevendo e o cartão muda sozinho para "prontas" (antes disso não há cartão de comparação: a pessoa não cai numa comparação pela metade).
     const cartao = page.locator("[data-versoes-prontas]");
-    await expect(async () => {
-      await page.reload();
-      await expect(cartao).toContainText("Três versões prontas", { timeout: 3000 });
-    }).toPass({ timeout: 60_000 });
+    await expect(cartao).toContainText("Três versões prontas", { timeout: 30_000 });
     await page.unroute("**/criar/objetivo*");
     await expect(cartao).toContainText("Suas versões estão prontas");
     await expect(cartao).toContainText("o erro que faz a mancha voltar");
     await expect(cartao).toContainText("Para que te chamem");
+    // Um pedido, uma escrita: um grupo só e três versões (a IA gasta a cada escrita; uma segunda escrita aqui era o que fazia o cartão voltar depois de escolher).
+    const clienteD = await clienteDe("d");
+    const grupos = await db().selectDistinct({ grupo: versoesDoRoteiro.grupo }).from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, clienteD.id));
+    expect(grupos).toHaveLength(1);
+    const [{ total: versoesDoD }] = await db().select({ total: count() }).from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, clienteD.id));
+    expect(versoesDoD).toBe(3);
     await cartao.getByRole("button", { name: "Escolher uma" }).click();
     await expect(page).toHaveURL(/\/criar\/versoes\/[0-9a-f-]{36}$/);
     await expect(page.locator("article[data-versao]")).toHaveCount(3);

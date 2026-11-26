@@ -26,6 +26,16 @@ describe("ConteudoTelaEscrevendo", () => {
     expect(html).not.toContain(textosComuns.esperaVoltarDepois);
   });
 
+  /** E74 PR 1: o recado de que dá para sair vem desde o começo, e só onde o botão de voltar depois existe. */
+  it("com Voltar depois: mostra o recado de que pode sair desde o começo; sem ele, nada disso", () => {
+    const base = { erro: null, fraseDemorando: "demora", demorando: false, frase: textosComuns.espera[0], segundosDecorridos: 0 };
+    const com = renderToStaticMarkup(createElement(ConteudoTelaEscrevendo, { ...base, aoVoltarDepois: vi.fn() }));
+    expect(com).toContain(textosComuns.esperaPodeSair);
+    expect(com).toContain(textosComuns.esperaVoltarDepois);
+    const sem = renderToStaticMarkup(createElement(ConteudoTelaEscrevendo, base));
+    expect(sem).not.toContain(textosComuns.esperaPodeSair);
+  });
+
   /** R1, item 0b: "0:00" subindo de segundo em segundo, com zero à esquerda nos segundos, nunca nos minutos. */
   it("o contador formata minutos sem zero à esquerda e segundos com (1:05, não 01:05 nem 1:5)", () => {
     const html = renderToStaticMarkup(

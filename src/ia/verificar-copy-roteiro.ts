@@ -168,6 +168,42 @@ function confSaude(e: EntradaCopyRoteiro): string | null {
   return `R-CONF-07: em ramo de saúde o roteiro não promete cura, resultado garantido nem diagnóstico à distância; tire "${achado.replace(/^[^a-z0-9]+/, "")}"`;
 }
 
+/**
+ * R-CONF-07 e R-CONF-06 nos ganchos alternativos de ramo de saúde (26/11/2026, prova com chave real): resultado que ninguém contou ("o que a gente vê todo dia", "o dente crescendo normalmente"), que é quase
+ * promessa, e medo dirigido ao filho, à criança ou a um familiar. Mesma régua e mesma normalização de `confSaude`; só os ganchos usam (o roteiro continua com as conferências de sempre).
+ */
+const RESULTADO_CONTADO_SEM_FONTE = COM_FRONTEIRA([
+  "(o )?(resultado )?que (a gente|eu|nos|nossa equipe) (ve|vemos|vejo|vimos|entrego|entregamos) (todo dia|todos os dias|sempre|toda semana)",
+  "(a gente|eu|nos) (ve|vemos|vejo) (todo dia|todos os dias|sempre|toda semana)",
+  "(o|os) resultados? que (a gente|eu|nos|voce|os pacientes|pacientes|clientes|nossos|nossas|meus|minhas)",
+  "resultados? (real|reais|comprovad[oa]s?|visivel|visiveis|que aparece|que voce vai (ter|ver))",
+  "(dente|dentes|sorriso|crianca|criancas|filho|filha|paciente|pacientes)[^.?!]{0,40}(crescendo|ficando|voltando|alinhando|nascendo|crescem|ficam|voltam)[^.?!]{0,25}(normal|normalmente|no lugar|para o (seu )?lugar|certinho|perfeito|bonito)",
+]);
+
+const FAMILIAR_NO_GANCHO = /(^|[^a-z0-9])(filh[oa]s?|criancas?|bebes?|netos?|netas?|maes?|pais|esposa|marido|familia)([^a-z0-9]|$)/;
+const AMEACA_NO_GANCHO = /(vai|vao|pode|podem|corre|correm|corre o risco de)( ate| mesmo)? (ficar|perder|sofrer|parar|estragar|quebrar|morrer|nunca|ter (dor|problema|prejuizo))|sem (dente|dentes|sorriso)|(perde|perdeu|perder|perdem) (o|os|a|as|seu|seus|sua|suas) |arrisc|prejudic|irreversive|para sempre|vai doer|doer|nunca mais|estrag|medo de (ouvir|perder)|(vai|vao) parar de/;
+
+/** Devolve o motivo (com o trecho achado) ou nulo. Só chame em ramo de saúde. */
+export function acharResultadoOuMedoEmSaude(texto: string): string | null {
+  const resultado = achar(texto, RESULTADO_CONTADO_SEM_FONTE);
+  if (resultado) {
+    return `R-CONF-07: em ramo de saúde o gancho não afirma resultado que o roteiro e o perfil não contam (é quase promessa, o conselho não deixa); tire "${resultado.replace(/^[^a-z0-9]+/, "")}" e fale do que o roteiro de fato mostra`;
+  }
+  for (const frase of frases(texto)) {
+    const n = normalizar(frase);
+    if (FAMILIAR_NO_GANCHO.test(n) && AMEACA_NO_GANCHO.test(n)) {
+      return `R-CONF-06: em ramo de saúde o gancho não assusta sobre o filho, a criança ou um familiar ("${frase.trim().slice(0, 60)}"); fale de uma dúvida ou de um cuidado, nunca de uma perda`;
+    }
+  }
+  return null;
+}
+
+/** Tem algarismo ou número por extenso (para conferir o gancho rotulado como "número"). */
+export function temNumeroNoTexto(texto: string): boolean {
+  const n = emUmaLinha(normalizar(texto));
+  return /[0-9]/.test(n) || NUMERO_POR_EXTENSO.test(n) || /(^|[^a-z])(onze|doze|treze|quatorze|quinze|quarenta|cinquenta|sessenta)([^a-z]|$)/.test(n);
+}
+
 const CALAO = COM_FRONTEIRA([
   "porra",
   "caralho",

@@ -45,6 +45,15 @@
   color: var(--cor-texto-dica);
 }
 
+/** E74 PR 1: "pode sair desta tela", logo acima do botão de voltar depois. */
+.recado {
+  margin: var(--espaco-2) 0 0;
+  max-width: 30ch;
+  font-size: var(--tamanho-legenda);
+  line-height: 1.5;
+  color: var(--cor-texto-suave);
+}
+
 .demorando {
   margin: var(--espaco-2) 0 0;
   padding-top: var(--espaco-4);

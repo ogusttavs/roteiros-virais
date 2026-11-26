@@ -112,6 +112,8 @@ export default async function Hoje({ searchParams }: Props) {
 
   // Enquanto o servidor ainda escreve as versões, não há cartão: ele aparece quando as três ficam prontas.
   const grupoAberto = grupoAbertoBruto && !grupoAbertoBruto.emEscrita ? grupoAbertoBruto : null;
+  /** E74 PR 1: o servidor ainda escreve as versões deste grupo (o Hoje mostra "escrevendo" e se atualiza sozinho). */
+  const versoesEscrevendo = Boolean(grupoAbertoBruto?.emEscrita);
   const versoesProntas: VersoesProntasHoje | null = grupoAberto
     ? {
         grupo: grupoAberto.grupo,
@@ -195,6 +197,7 @@ export default async function Hoje({ searchParams }: Props) {
       avisoVideoSubindo={avisoVideoSubindo}
       emAlta={emAlta}
       versoesProntas={versoesProntas}
+      versoesEscrevendo={versoesEscrevendo}
       datas={datas}
       marcaAtiva={cliente}
       marcas={marcas}
