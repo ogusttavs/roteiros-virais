@@ -34,10 +34,10 @@ function formatarDiaMesPorExtenso(data: Date): string {
 export const textosBriefing = {
   /** E37a, item 3: no topo do briefing e do /comecar, acima das perguntas. */
   tresJeitos: "Três jeitos de responder: escrever, falar no microfone ou levar a pergunta para a IA que você já usa.",
-  /** V12c, item 7, a E37b (design v2, `Briefing.dc.html`, `.perfis-citados`): as duas listas da P12. */
+  /** V12c, item 7, a E37b (design v2, `Briefing.dc.html`, `.perfis-citados`): as duas listas de @, os concorrentes na P12 e os admirados na P13 (E76 PR 2). */
   perfisCitados: {
     concorrentes: "Concorrentes",
-    ajudaConcorrentes: "Só o nome do perfil. Se colar o link, a gente tira o nome dele.",
+    ajudaPerfil: "Só o nome do perfil. Se colar o link, a gente tira o nome dele.",
     admira: "Perfis que você admira",
     adicionarOutro: "Adicionar outro:",
     tirar: (endereco: string) => `Tirar ${endereco}`,
@@ -52,8 +52,8 @@ export const textosBriefing = {
      */
     introducao: (tipo: TipoMarca) =>
       tipo === "pessoa"
-        ? "São doze perguntas sobre você e sobre quem te acompanha. É com elas que a gente escreve roteiro do seu jeito, e não um texto que serviria para qualquer um."
-        : "São doze perguntas sobre o seu negócio e sobre quem você atende. É com elas que a gente escreve roteiro do seu jeito, e não um texto que serviria para qualquer um.",
+        ? "São treze perguntas sobre você e sobre quem te acompanha. É com elas que a gente escreve roteiro do seu jeito, e não um texto que serviria para qualquer um."
+        : "São treze perguntas sobre o seu negócio e sobre quem você atende. É com elas que a gente escreve roteiro do seu jeito, e não um texto que serviria para qualquer um.",
     promessas: [
       {
         titulo: "Leva cerca de 20 minutos",
@@ -206,7 +206,7 @@ export const textosBriefing = {
     rotuloMeta: (meta: number) => `meta ${meta}`,
     dica: (perguntaId: string) => `a ${perguntaId.toUpperCase()} é a que mais ajuda agora`,
     semNota: "sem nota",
-    tituloFolha: "as doze notas",
+    tituloFolha: "as treze notas",
     rotuloPergunta: (perguntaId: string, rotuloCurto: string) => `${perguntaId.toUpperCase()} · ${rotuloCurto}`,
   },
   liberacao: {
@@ -220,7 +220,7 @@ export const textosBriefing = {
     `A sua nota caiu para ${formatarNota(notaAtual)}; o roteiro fica melhor se você reforçar a ${perguntaId.toUpperCase()}`,
   briefing: {
     titulo: "O seu briefing",
-    introducao: "As suas doze respostas, com a nota de cada uma. Você pode editar quando quiser.",
+    introducao: "As suas treze respostas, com a nota de cada uma. Você pode editar quando quiser.",
     perfilTitulo: "Como o sistema te entende",
     perfilRodape: "É isto que entra em todo roteiro. Se algo aqui estiver errado, edite a resposta correspondente.",
     perfilOQueVende: "O que você vende",
@@ -231,7 +231,7 @@ export const textosBriefing = {
     /** So marca do tipo pessoa (P1, item 4, briefing-e-rubricas.md, secao 2b). */
     perfilHistoria: "A virada",
     perfilPosicionamentos: "No que acredita",
-    /** V12c, item 8, a E37b: os perfis citados nas duas listas da P12, só guardados e mostrados (a conferência é a E38). */
+    /** V12c, item 8, a E37b: os perfis citados nas listas de @ da P12 e da P13, só guardados e mostrados (a conferência é a E38). */
     perfilConcorrentes: "Concorrentes",
     perfilAdmira: "Perfis que você admira",
   },

@@ -26,6 +26,7 @@ import { db, getPool } from "@/db";
 import { clientes, membrosMarca, user, type Cliente, type PlanoMarca, type TipoMarca } from "@/db/schema";
 import { config } from "@/lib/config";
 import { avaliarResposta, lerBriefing, salvarRascunho } from "@/servicos/briefing";
+import { p13CobertaPelaP12Antiga } from "@/servicos/briefing-regras";
 import {
   criarMarcaDoCatalogo,
   darAcesso,
@@ -62,7 +63,7 @@ export const entradaSchema = z
     cortesia: z.boolean().default(false),
     pessoas: z.array(z.object({ nome: z.string().trim().min(1), email: z.string().trim().toLowerCase().email() }).strict()).default([]),
     comecar: comecarSchema.optional(),
-    /** O texto de cada resposta, pelo id da pergunta (p1 a p12). */
+    /** O texto de cada resposta, pelo id da pergunta (p1 a p13; a P13, dos perfis admirados, existe desde a E76 PR 2). */
     briefing: z.record(z.string(), z.string().trim().min(1)).default({}),
     foco: z.string().optional(),
     cor: z.string().optional(),
@@ -284,7 +285,10 @@ export async function cadastrarMarca(entrada: EntradaMarca, opcoes: OpcoesDoScri
     const texto = entrada.briefing[pergunta.id];
     if (texto === undefined) {
       const jaTem = briefingAtual?.respostas[pergunta.id];
-      if (!jaTem) relatorio.faltando.push(`briefing ${pergunta.id}: sem resposta.`);
+      // E76 PR 2: a marca com a P12 de antes da separação tem a P13 coberta por ela (a nota não cai); só avisa, não falta.
+      if (!jaTem && briefingAtual && pergunta.id === "p13" && p13CobertaPelaP12Antiga(briefingAtual.avaliacoes)) {
+        dizer("briefing p13: sem resposta, coberta pela P12 de antes da separacao ate a P12 ser editada.");
+      } else if (!jaTem) relatorio.faltando.push(`briefing ${pergunta.id}: sem resposta.`);
       else relatorio.notas.push({ id: pergunta.id, nota: briefingAtual?.avaliacoes[pergunta.id]?.nota ?? null, situacao: "ja avaliada" });
       continue;
     }

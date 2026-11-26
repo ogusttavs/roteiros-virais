@@ -489,9 +489,9 @@ export function PerguntaCampo({
     return (
       <div className={styles.linhaVivo}>
         <p className={styles.enunciado}>{pergunta.enunciado}</p>
-        {pergunta.id === "p12" ? (
+        {pergunta.perfisCitados ? (
           <>
-            <BlocoPerfisCitados />
+            <BlocoPerfisCitados tipo={pergunta.perfisCitados} />
             {pergunta.enunciadoCampo ? <p className={styles.campoDica}>{pergunta.enunciadoCampo}</p> : null}
           </>
         ) : null}
@@ -612,9 +612,9 @@ export function PerguntaCampo({
     <div className={styles.cartaoAberto}>
       <Chip pergunta={pergunta} />
       {pergunta.ajuda ? <p className={styles.campoDica}>{pergunta.ajuda}</p> : null}
-      {pergunta.id === "p12" ? (
+      {pergunta.perfisCitados ? (
         <>
-          <BlocoPerfisCitados />
+          <BlocoPerfisCitados tipo={pergunta.perfisCitados} />
           {pergunta.enunciadoCampo ? <p className={styles.campoDica}>{pergunta.enunciadoCampo}</p> : null}
         </>
       ) : null}

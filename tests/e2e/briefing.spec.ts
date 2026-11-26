@@ -629,14 +629,14 @@ test.describe("briefing pela tela", () => {
   /**
    * brief-frontend.md 6.2, "Ajuste de 06/09/2026" (revisao do PR #27, item
    * 1): no celular a folha (BarraNotaGeral.module.css, `.folha`) tem altura
-   * menor que a lista das doze notas, entao a lista rola por dentro. Sem
+   * menor que a lista das treze notas, entao a lista rola por dentro. Sem
    * `overscroll-behavior: contain`, rolar a lista ate o fim encadeava o
    * scroll para o documento, e o `scroll` da window fechava a folha com o
    * cliente ainda lendo. Viewport de celular so neste bloco (`test.use`),
    * as outras tres tests deste arquivo continuam no viewport padrao.
    */
   /**
-   * O cliente das doze notas (um briefing completo, com "melhorar" grande em cada resposta) e a folha aberta
+   * O cliente das treze notas (um briefing completo, com "melhorar" grande em cada resposta) e a folha aberta
    * pela barra fina do topo. Um id por teste: cada teste cria o proprio usuario, sem depender dos outros.
    */
   async function prepararCliente(id: string) {
@@ -706,8 +706,8 @@ test.describe("briefing pela tela", () => {
     await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
 
     // barra fina fixa no topo (barraCelular): abre a folha ao tocar.
-    await page.getByRole("button", { name: "as doze notas" }).click();
-    const folha = page.getByRole("dialog", { name: "as doze notas" });
+    await page.getByRole("button", { name: "as treze notas" }).click();
+    const folha = page.getByRole("dialog", { name: "as treze notas" });
     await expect(folha).toBeVisible();
 
     const caixa = await folha.boundingBox();

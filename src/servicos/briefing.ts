@@ -28,7 +28,7 @@ import { modoVerComoLigado } from "@/lib/ver-como";
 
 import { perguntaPorId, perguntasDoBriefing } from "../config/briefing";
 
-import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial } from "./briefing-regras";
+import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial, enunciadoParaLer } from "./briefing-regras";
 import { conferirSugestao, montarFontesDaSugestao } from "./briefing-sugestao";
 import { clientePorId } from "./clientes";
 import { contextoConfirmadoDoCliente, enfileirarEntenderMarca, lidoDaMarcaParaSugestao, marcaTemFonteParaLer } from "./contexto-marca";
@@ -183,11 +183,13 @@ function fontesDaPergunta(
   perguntaId: string,
   resposta: string,
   respostas: Record<string, string>,
+  avaliacoes: Record<string, AvaliacaoResposta>,
   tipo: TipoMarca,
 ): FontesDaSugestao {
+  // E76 PR 2: a P12 antiga, que ainda cobre a P13, entra com o enunciado de antes da separação.
   const outrasRespostas = perguntasDoBriefing(tipo)
     .filter((p) => p.id !== perguntaId)
-    .map((p) => ({ enunciado: p.enunciado, resposta: respostas[p.id] ?? "" }))
+    .map((p) => ({ enunciado: enunciadoParaLer(p, avaliacoes, tipo), resposta: respostas[p.id] ?? "" }))
     .filter((r) => r.resposta.trim().length > 0);
   const texto = montarFontesDaSugestao({ resposta, outrasRespostas, lidoDaMarca: base.lidoDaMarca, dadosFixos: base.dadosFixos });
   return { ...base, outrasRespostas, texto };
@@ -218,7 +220,7 @@ export async function avaliacoesParaMostrar(
   const base = await carregarBaseDasFontes(clienteId);
   const resultado = { ...briefing.avaliacoes };
   for (const [perguntaId, avaliacao] of comSugestao) {
-    const fontes = fontesDaPergunta(base, perguntaId, briefing.respostas[perguntaId] ?? "", briefing.respostas, tipo);
+    const fontes = fontesDaPergunta(base, perguntaId, briefing.respostas[perguntaId] ?? "", briefing.respostas, briefing.avaliacoes, tipo);
     resultado[perguntaId] = comSugestaoConferida(avaliacao, fontes.texto);
   }
   return resultado;
@@ -267,7 +269,14 @@ export async function avaliarResposta(
   const avaliacaoGuardada = briefing.avaliacoes[perguntaId];
   const respostaGuardada = briefing.respostas[perguntaId];
   // E76 PR 1: as FONTES DA MARCA desta pergunta, com a resposta nova no lugar da guardada (o prompt e a conferência leem as mesmas).
-  const fontes = fontesDaPergunta(await carregarBaseDasFontes(clienteId), perguntaId, resposta, { ...briefing.respostas, [perguntaId]: resposta }, tipo);
+  const fontes = fontesDaPergunta(
+    await carregarBaseDasFontes(clienteId),
+    perguntaId,
+    resposta,
+    { ...briefing.respostas, [perguntaId]: resposta },
+    briefing.avaliacoes,
+    tipo,
+  );
 
   let avaliacao: AvaliacaoResposta;
   let reusada = false;
@@ -311,11 +320,14 @@ export async function avaliarResposta(
       );
       avaliacao = { ...avaliacao, exemplo: conferida.texto };
     }
+    // E76 PR 2: a avaliação nova diz qual enunciado leu (a P12 depois da separação), para a nota saber que ela não cobre mais a P13.
+    if (pergunta.versao !== undefined) avaliacao = { ...avaliacao, versaoPergunta: pergunta.versao };
   }
 
   const {
     avaliacao: avaliacaoFinal,
     respostas,
+    avaliacoes: avaliacoesGravadas,
     notaGeral,
     completo,
     deveCompilarPerfil,
@@ -354,6 +366,7 @@ export async function avaliarResposta(
     return {
       avaliacao: avaliacoes[perguntaId] ?? avaliacao,
       respostas,
+      avaliacoes,
       notaGeral,
       completo,
       deveCompilarPerfil,
@@ -362,7 +375,7 @@ export async function avaliarResposta(
   });
 
   if (deveCompilarPerfil) {
-    await compilarEGravarPerfil(clienteId, briefing.id, respostas, tipo);
+    await compilarEGravarPerfil(clienteId, briefing.id, respostas, avaliacoesGravadas, tipo);
   }
 
   /**
@@ -397,11 +410,13 @@ async function compilarEGravarPerfil(
   clienteId: number,
   briefingId: number,
   respostas: Record<string, string>,
+  avaliacoes: Record<string, AvaliacaoResposta>,
   tipo: TipoMarca,
 ): Promise<void> {
+  // E76 PR 2: a P12 antiga, que ainda cobre a P13, vai com o enunciado de antes, para os admirados dela não virarem concorrentes.
   const respostasPorEnunciado: Record<string, string> = {};
   for (const pergunta of perguntasDoBriefing(tipo)) {
-    respostasPorEnunciado[pergunta.enunciado] = respostas[pergunta.id] ?? "";
+    respostasPorEnunciado[enunciadoParaLer(pergunta, avaliacoes, tipo)] = respostas[pergunta.id] ?? "";
   }
 
   const { dados: perfil } = await gerarComVerificacao({
