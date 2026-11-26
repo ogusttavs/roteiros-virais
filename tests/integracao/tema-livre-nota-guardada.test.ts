@@ -244,3 +244,37 @@ describe("a nota do tema não reprova à toa e a falha vira frase calma (item 4)
     expect(await db().select().from(rascunhosTemaLivre)).toHaveLength(0);
   });
 });
+
+describe("a nota não se perde quando o salvamento automático chega depois da avaliação (E77 PR 2)", () => {
+  it("avaliar o texto B com o rascunho ainda no texto A guarda a nota de B, e o salvamento automático de B que chega depois não a zera", async () => {
+    await descartarTemaLivreAction();
+    const textoA = "primeiro rascunho sobre limpeza de cortina";
+    const textoB = "como lavar cortina de blackout sem estragar";
+    await salvarRascunhoAction(textoA);
+
+    // A pessoa colou o texto B e clicou em avaliar antes do salvamento automático rodar: o rascunho do banco ainda é o A.
+    const avaliada = await avaliarTemaAction(textoB);
+    expect(avaliada.ok).toBe(true);
+
+    // Agora o salvamento automático de B, que ficou na fila atrás da avaliação, chega.
+    await salvarRascunhoAction(textoB);
+
+    const rascunho = await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id);
+    expect(rascunho?.texto).toBe(textoB);
+    expect(rascunho?.nota).not.toBeNull();
+    expect(rascunho?.nota?.nota).toBe(avaliada.ok ? avaliada.dado.nota : -1);
+    expect(await notaGuardadaDoTexto("nota-guardada-dono", marca.id, textoB)).not.toBeNull();
+  });
+
+  it("um salvamento com texto DIFERENTE do avaliado continua zerando a nota", async () => {
+    const texto = "o segredo para tirar cheiro de mofo do sofá";
+    await salvarRascunhoAction(texto);
+    await avaliarTemaAction(texto);
+    expect((await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id))?.nota).not.toBeNull();
+
+    await salvarRascunhoAction("o segredo para tirar cheiro de mofo do sofá de couro");
+    const depois = await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id);
+    expect(depois?.texto).toBe("o segredo para tirar cheiro de mofo do sofá de couro");
+    expect(depois?.nota).toBeNull();
+  });
+});
