@@ -6,10 +6,11 @@
  *
  * Aqui também moram as contas de cor (mistura em oklab como o `color-mix` do navegador, contraste, a cor que escurece até ler bem) e a ordem dos modos num carrossel. Funções puras, testadas sem navegador.
  */
-import { ALTURA_DO_SLIDE, LARGURA_DO_SLIDE, TEXTO_FIXO_DA_AUTORIZACAO, ehCapa, type SlideDoCarrossel, type TipoDeSlide } from "@/config/carrossel";
+import { ALTURA_DO_SLIDE, LARGURA_DO_SLIDE, TEXTO_FIXO_DA_AUTORIZACAO, TEXTO_IMAGEM_ILUSTRATIVA, ehCapa, type SlideDoCarrossel, type TipoDeSlide } from "@/config/carrossel";
 import { escaparHtml } from "@/lib/chromium-de-impressao";
 
 import { ESTILO_DOS_SLIDES } from "./estilo";
+import { TIPOS_ILUSTRADOS_COMO_FUNDO, veuDaIlustracao, type EstiloDaIlustracao } from "./ilustracao";
 
 export type FotoParaOModelo = { tipo: string; base64: string };
 export type ModoDoSlide = "claro" | "escuro" | "marca";
@@ -26,6 +27,15 @@ export type DadosDoModelo = {
   modo: ModoDoSlide;
   foto?: FotoParaOModelo | null;
   fotoDepois?: FotoParaOModelo | null;
+  /**
+   * E69: a imagem de fundo de um slide de texto (a ilustracao, ou a foto da pessoa no lugar dela), com o estilo (leve ou forte) e o reforco do veu (0 e o base; o render sobe quando o contraste medido no pixel
+   * nao passa). Ausente, o slide leva o fundo abstrato como antes.
+   */
+  ilustracao?: (FotoParaOModelo & { estilo: EstiloDaIlustracao; reforco: number }) | null;
+  /** E69: a ilustracao entrou como foto de uma capa ou noticia; o reforco escurece a protecao do titulo quando o contraste medido no pixel nao passa. */
+  reforcoDaProtecao?: number;
+  /** E69: em marca de saude, o slide com ilustracao leva a linha fixa "Imagem ilustrativa" no pe. */
+  ilustrativa?: boolean;
   /** Os seis fundos abstratos (JPEG em base64), na ordem; o slide leva um deles quando `fundoDoSlide` diz. Ausente, sem fundo. */
   fundos?: string[] | null;
   /** As letras em base64 (woff2), ou nulas: sem elas, a letra do sistema. */
@@ -344,12 +354,24 @@ export function slideHTML(d: DadosDoModelo): string {
   const modo: ModoDoSlide = tipo === "capa-texto" && d.slide.tipo === "capa-foto" ? "marca" : semFotoDaNoticia ? "claro" : d.modo;
   const comFotoNoTopo = (tipo === "capa-foto" || tipo === "noticia") && temFoto;
   const fotoTopo = (comFotoNoTopo && modo === "claro") || semFotoDaNoticia;
-  const qual = fundoDoSlide(tipo, modo, d.numero, temFoto);
+  // E69: a imagem de fundo de um slide de texto (a ilustracao ou a foto da pessoa no lugar dela) no lugar do fundo abstrato. O passo com foto usa o modelo de foto e fica de fora.
+  const ilus = d.ilustracao && TIPOS_ILUSTRADOS_COMO_FUNDO.has(tipo) && !(tipo === "passo" && temFoto) ? d.ilustracao : null;
+  const qual = ilus ? null : fundoDoSlide(tipo, modo, d.numero, temFoto);
   const fundo = d.fundos && qual !== null ? (d.fundos[qual] ?? null) : null;
-  const classes = ["slide", fundo ? "fundo" : "", comFotoNoTopo && !fotoTopo ? "foto-cheia" : "", fotoTopo ? "foto-topo" : "", tipo === "passo" && temFoto ? "com-foto" : ""].filter(Boolean).join(" ");
-  const pe = tipo === "chamada" ? `<footer class="s-pe"><span></span>${progresso(d.numero, d.total)}</footer>` : `<footer class="s-pe"><span class="s-arroba">${esc(d.arroba)}</span>${progresso(d.numero, d.total)}</footer>`;
+  const veu = ilus ? veuDaIlustracao(ilus.estilo, modo, ilus.reforco) : null;
+  const cobre = (v: number) => `color-mix(in srgb,var(--s-fundo) ${v}%,transparent)`;
+  const camadasDaIlustracao = ilus && veu ? (ilus.estilo === "leve" ? `linear-gradient(180deg,${cobre(veu.bordas)} 0,${cobre(0)} 230px),linear-gradient(0deg,${cobre(veu.bordas)} 0,${cobre(0)} 230px),linear-gradient(${cobre(veu.geral)},${cobre(veu.geral)}),url(data:${ilus.tipo};base64,${ilus.base64})` : `linear-gradient(${cobre(veu.geral)},${cobre(veu.geral)}),url(data:${ilus.tipo};base64,${ilus.base64})`) : null;
+  const protecao = comFotoNoTopo && !fotoTopo && d.reforcoDaProtecao ? `;--prot-extra:${Math.min(0.6, d.reforcoDaProtecao * 0.12).toFixed(2)}` : "";
+  const classes = ["slide", fundo || ilus ? "fundo" : "", ilus?.estilo === "leve" ? "veu-leve" : "", ilus ? "ilustrado" : "", comFotoNoTopo && !fotoTopo ? "foto-cheia" : "", fotoTopo ? "foto-topo" : "", tipo === "passo" && temFoto ? "com-foto" : ""].filter(Boolean).join(" ");
+  const meio = d.ilustrativa ? `<span class="s-ilustrativa">${esc(TEXTO_IMAGEM_ILUSTRATIVA)}</span>` : "";
+  const pe = tipo === "chamada" ? `<footer class="s-pe"><span></span>${meio}${progresso(d.numero, d.total)}</footer>` : `<footer class="s-pe"><span class="s-arroba">${esc(d.arroba)}</span>${meio}${progresso(d.numero, d.total)}</footer>`;
   const sobre = tintaSobre(d.cor);
-  return `<article class="${classes}" data-tipo="${tipo}" data-modo="${modo}" data-pos="${d.numero}" data-total="${d.total}" style="--marca:${d.cor};--sobre-marca:${sobre}${fundo ? `;background-image:linear-gradient(color-mix(in srgb,var(--s-fundo) ${Math.round(VEU_DO_FUNDO * 100)}%,transparent),color-mix(in srgb,var(--s-fundo) ${Math.round(VEU_DO_FUNDO * 100)}%,transparent)),linear-gradient(color-mix(in srgb,var(--marca) 55%,transparent),color-mix(in srgb,var(--marca) 55%,transparent)),url(data:image/jpeg;base64,${fundo});background-blend-mode:normal,color,normal` : ""}">${miolo(d, tipo, fotoTopo)}${pe}</article>`;
+  const imagemDeFundo = camadasDaIlustracao
+    ? `;background-image:${camadasDaIlustracao}${ilus?.estilo === "leve" && veu ? `;--painel:${veu.painel}%` : ""}`
+    : fundo
+      ? `;background-image:linear-gradient(color-mix(in srgb,var(--s-fundo) ${Math.round(VEU_DO_FUNDO * 100)}%,transparent),color-mix(in srgb,var(--s-fundo) ${Math.round(VEU_DO_FUNDO * 100)}%,transparent)),linear-gradient(color-mix(in srgb,var(--marca) 55%,transparent),color-mix(in srgb,var(--marca) 55%,transparent)),url(data:image/jpeg;base64,${fundo});background-blend-mode:normal,color,normal`
+      : "";
+  return `<article class="${classes}" data-tipo="${tipo}" data-modo="${modo}" data-pos="${d.numero}" data-total="${d.total}" style="--marca:${d.cor};--sobre-marca:${sobre}${protecao}${imagemDeFundo}">${miolo(d, tipo, fotoTopo)}${pe}</article>`;
 }
 
 function letras(fontes: DadosDoModelo["fontes"]): string {

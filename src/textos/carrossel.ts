@@ -110,6 +110,9 @@ export const textosCarrossel = {
   trocarFoto: "Trocar a foto",
   trocarFotos: "Trocar as fotos",
   porFoto: "Pôr uma foto",
+  /** E69: o slide tem uma ilustração; a foto da pessoa sempre vence. */
+  trocarPelaMinhaFoto: "Trocar pela minha foto",
+  slideIlustrado: "Este slide tem uma imagem ilustrativa. Se você tiver uma foto sua parecida, troque: a sua sempre vale mais.",
   precisaEncurtar: "O texto deste slide não coube. Toque em Trocar o texto e encurte.",
   precisaEncurtarAviso: (n: number) => (n === 1 ? "Um slide tem texto grande demais e precisa ser encurtado antes de postar." : `${n} slides têm texto grande demais e precisam ser encurtados antes de postar.`),
   precisaEncurtarCurto: "Encurtar",

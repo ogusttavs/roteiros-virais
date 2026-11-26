@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 
 import { distribuirFotos } from "@/carrossel/fotos";
 import { slidesComFotoDasFotos } from "@/carrossel/regras";
+import { ilustracaoAtiva } from "@/config/carrossel";
 import { idDoParametro, marcaDoCarrossel, respostaDeErro, respostaDoErroDoCarrossel, SEM_CACHE } from "@/lib/porta-do-carrossel";
 import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { carrosselDaMarca, fotosDoCarrossel, marcaEhDeSaude, trocarCor, trocarSlide } from "@/servicos/carrossel";
+import { indicesComIlustracao } from "@/servicos/ilustracoes-do-carrossel";
 import { textosCarrossel } from "@/textos/carrossel";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +24,9 @@ export async function GET(_request: Request, contexto: { params: Promise<{ id: s
   const saude = await marcaEhDeSaude(marca.clienteId);
   // Quais fotos caem em quais slides (a mesma conta do render): a tela mostra a foto de cada slide e usa o limite menor nos que levam foto.
   const fotosDosSlides = distribuirFotos(carrossel.slides, fotos, saude);
-  return NextResponse.json({ carrossel, fotos, fotosDosSlides, slidesComFoto: slidesComFotoDasFotos(carrossel.slides, fotos, saude) }, { headers: SEM_CACHE });
+  // E69: quais slides tem ilustracao (so os indices): a tela mostra o botao "Trocar pela minha foto" neles.
+  const ilustracoes = ilustracaoAtiva() ? await indicesComIlustracao(marca.clienteId, carrossel.id) : [];
+  return NextResponse.json({ carrossel, fotos, fotosDosSlides, slidesComFoto: slidesComFotoDasFotos(carrossel.slides, fotos, saude), ilustracoes }, { headers: SEM_CACHE });
 }
 
 const CHAVES_DE_TEXTO = ["rotulo", "titulo", "sub", "texto", "antes", "depois", "valor", "unidade", "frase", "fonte", "referencia", "citacao", "quem", "contexto", "veiculo", "data"] as const;

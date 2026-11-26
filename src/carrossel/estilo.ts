@@ -153,6 +153,8 @@ export const ESTILO_DOS_SLIDES = `
 .slide.foto-cheia::after {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background:
+    linear-gradient(180deg, rgba(0,0,0,var(--prot-extra,0)) 0, rgba(0,0,0,0) 360px),
+    linear-gradient(rgba(0,0,0,calc(var(--prot-extra,0) * .5)), rgba(0,0,0,calc(var(--prot-extra,0) * .5))),
     linear-gradient(180deg, rgba(0,0,0,.46) 0, rgba(0,0,0,0) 220px),
     linear-gradient(0deg, rgba(0,0,0,.86) 0, rgba(0,0,0,.78) 34%, rgba(0,0,0,.30) 62%, rgba(0,0,0,0) 78%);
 }
@@ -280,6 +282,12 @@ export const ESTILO_DOS_SLIDES = `
   background-size: cover;
   background-position: center;
 }
+
+/* ---------- A ilustracao por slide (E69) ----------
+   A imagem de fundo e as camadas de veu entram inline em cada slide (modelos.ts). No estilo leve ha um painel arredondado com a cor do modo atras do bloco de texto; a margem negativa e o
+   preenchimento iguais deixam o texto na mesma coluna de sempre, e a altura maxima do painel e a da caixa do corpo, entao a regra de "precisa encurtar" continua valendo. */
+.slide.veu-leve .s-corpo { align-self: center; max-height: 100%; padding: 48px 28px; margin: 0 -28px; border-radius: 36px; background: color-mix(in srgb, var(--s-fundo) var(--painel, 93%), transparent); }
+.s-ilustrativa { font: 600 22px/1 "JetBrains Mono", Consolas, monospace; letter-spacing: .04em; color: var(--s-titulo-cor); text-align: center; }
 
 /* ---------- Responsavel tecnica (so o lugar: sem campo nem tela por enquanto) ---------- */
 .s-resp { font: 500 24px/1.3 "JetBrains Mono", Consolas, monospace; color: var(--s-suave); }

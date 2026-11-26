@@ -3322,6 +3322,32 @@ export const carrosselFotos = pgTable(
 export type CarrosselFoto = typeof carrosselFotos.$inferSelect;
 
 /**
+ * E69 PR A: a ilustracao de um slide do carrossel, gerada fora do aplicativo (o Codex da maquina do Gustavo, por enquanto) e mandada pelo admin. Uma por slide (`indice` a partir de 0, indice unico por
+ * carrossel: mandar de novo troca a anterior), sempre em JPEG de 1080 por 1350. Presa a marca duas vezes (`cliente_id` e o carrossel), como as fotos. Nunca entra em antes e depois nem em resultado; a foto
+ * da pessoa sempre vence. `generica` marca a imagem que nao e sobre o assunto do slide (recepcao, bancada): o render a desenha no estilo forte.
+ */
+export const carrosselIlustracoes = pgTable(
+  "carrossel_ilustracoes",
+  {
+    id: id(),
+    carrosselId: integer("carrossel_id")
+      .notNull()
+      .references(() => carrosseis.id, { onDelete: "cascade" }),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    indice: integer("indice").notNull(),
+    tipo: text("tipo").notNull(),
+    bytes: bytea("bytes").notNull(),
+    tamanho: integer("tamanho").notNull(),
+    generica: boolean("generica").notNull().default(false),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("carrossel_ilustracoes_slide").on(t.carrosselId, t.indice)],
+);
+export type CarrosselIlustracao = typeof carrosselIlustracoes.$inferSelect;
+
+/**
  * E68 A2: o vídeo de animação de texto de um roteiro (sem ninguém na tela), o plano B do dia em que a pessoa não consegue gravar. Sempre preso a uma marca (`cliente_id`): nenhuma consulta lê uma
  * animação sem filtrar pela marca da sessão. Estados em `config/animacao-fila.ts`. `cenas` é o texto do roteiro (já passou pelo verificador) cortado em blocos curtos; `progresso` nulo quer dizer
  * "esperando a vez na fila", um número é "sendo montado agora". `codigoDoErro` é só um código curto (o erro técnico vai para o log), `motivo` é a frase para a pessoa. Os arquivos são relativos ao

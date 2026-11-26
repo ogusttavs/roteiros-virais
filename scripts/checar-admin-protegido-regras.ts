@@ -103,3 +103,32 @@ export function verificarAcoes(caminho: string, conteudo: string): Problema[] {
 export function verificarArquivoDeAcoes(caminho: string): Problema[] {
   return verificarAcoes(caminho, readFileSync(caminho, "utf8"));
 }
+
+// ---------------------------------------------------------------------------
+// Rotas de API do admin (E69 PR A): `src/app/api/admin/**/route.ts`
+// ---------------------------------------------------------------------------
+
+export const PADRAO_ROTAS = "src/app/api/admin/**/route.ts";
+
+/** Toda funcao exportada (GET, PUT, ...) de uma rota de API do admin chama `adminDaRota()` antes de qualquer outro await (so `await params` e `await contexto.params` podem vir antes). */
+export function verificarRota(caminho: string, conteudo: string): Problema[] {
+  const funcoes = separarFuncoes(conteudo).filter((f) => f.exportada && /^[A-Z]+$/.test(f.nome));
+  if (funcoes.length === 0) return [{ arquivo: caminho, linha: 1, motivo: "a rota do admin nao exporta nenhuma funcao de metodo (GET, POST, ...)" }];
+  const problemas: Problema[] = [];
+  for (const f of funcoes) {
+    let confere = false;
+    for (const linha of f.corpo) {
+      if (linha.includes("adminDaRota(")) {
+        confere = true;
+        break;
+      }
+      if (/\bawait\s+/.test(linha) && !ehAwaitDeParams(linha) && !/\bawait\s+\w+\.params\b/.test(linha)) break;
+    }
+    if (!confere) problemas.push({ arquivo: caminho, linha: f.linhaInicial, motivo: `a rota ${f.nome} do admin nao chama adminDaRota() antes do primeiro await` });
+  }
+  return problemas;
+}
+
+export function verificarArquivoDeRota(caminho: string): Problema[] {
+  return verificarRota(caminho, readFileSync(caminho, "utf8"));
+}

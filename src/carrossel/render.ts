@@ -12,12 +12,77 @@ import { LARGURA_DO_SLIDE, ALTURA_DO_SLIDE, type SlideDoCarrossel } from "@/conf
 import { comLimiteDeChromium, comTempoLimite } from "@/lib/chromium-de-impressao";
 import { logger } from "@/lib/log";
 
-import { distribuirFotos } from "./fotos";
+import { distribuirFotos, fotoDeFundoDoSlide } from "./fotos";
+import { PASSOS_DE_REFORCO, TIPOS_ILUSTRADOS_COMO_FOTO, TIPOS_ILUSTRADOS_COMO_FUNDO, aceitaIlustracao, estilosDaMistura, textosReprovados, type EstiloDaIlustracao, type TextoMedido } from "./ilustracao";
 import { CONFERIR_TEXTO, faltaFoto, htmlDoSlide, modosDosSlides, type FotoParaOModelo } from "./modelos";
 
 export { distribuirFotos } from "./fotos";
 
 export type FotoDoCarrossel = { id: number; tipo: string; bytes: Buffer; dePaciente?: boolean };
+/** E69: a ilustracao de um slide (indice a partir de 0), ja em JPEG 1080 por 1350. `generica` pede o estilo forte. */
+export type IlustracaoDoCarrossel = { indice: number; tipo: string; bytes: Buffer; generica?: boolean };
+
+/**
+ * Le, no navegador, cada texto do slide: a cor da letra (o canvas converte qualquer cor do CSS para RGB), o tamanho e a caixa de cada linha. Roda dentro da pagina.
+ */
+const COLETAR_TEXTOS = `(() => {
+  const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const rgb = (css) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = css; ctx.fillRect(0, 0, 1, 1); const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; };
+  const saida = [];
+  const andar = (el) => {
+    const temTexto = Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim());
+    if (temTexto) {
+      const estilo = getComputedStyle(el);
+      const caixas = [];
+      for (const n of el.childNodes) {
+        if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+        const r = document.createRange(); r.selectNodeContents(n);
+        for (const c of r.getClientRects()) if (c.width > 1 && c.height > 1) caixas.push([c.x, c.y, c.width, c.height]);
+      }
+      if (caixas.length) saida.push({ cor: rgb(estilo.color), tamanho: parseFloat(estilo.fontSize), caixas, trecho: el.textContent.trim().slice(0, 24) });
+    }
+    for (const f of el.children) andar(f);
+  };
+  andar(document.querySelector('.slide'));
+  return saida;
+})()`;
+
+/** Le os pixels de uma imagem nas caixas dos textos (a imagem pode estar em escala menor que o slide). Roda dentro da pagina. */
+const AMOSTRAR_PIXELS = `(async ({ png, textos, largura }) => {
+  const img = await createImageBitmap(await (await fetch('data:image/png;base64,' + png)).blob());
+  const tela = document.createElement('canvas'); tela.width = img.width; tela.height = img.height;
+  const ctx = tela.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0);
+  const k = img.width / largura;
+  return textos.map((t) => {
+    const pixels = [];
+    for (const [x, y, w, h] of t.caixas) {
+      const passo = Math.max(1, Math.round(Math.sqrt((w * h * k * k) / 120)));
+      for (let py = Math.max(0, Math.floor(y * k)); py < Math.min(img.height, Math.ceil((y + h) * k)); py += passo)
+        for (let px = Math.max(0, Math.floor(x * k)); px < Math.min(img.width, Math.ceil((x + w) * k)); px += passo) {
+          const d = ctx.getImageData(px, py, 1, 1).data; pixels.push([d[0], d[1], d[2]]);
+        }
+    }
+    return { cor: t.cor, tamanho: t.tamanho, pixels, trecho: t.trecho };
+  });
+})`;
+
+/** O contraste do texto no pixel de verdade: com a letra escondida, fotografa o slide e le o que fica atras de cada linha de texto. Reprovado, o render reforca o veu e tenta de novo. */
+export async function contrasteDaPaginaPassa(pagina: import("playwright").Page): Promise<boolean> {
+  const textos = (await comTempoLimite(pagina.evaluate(COLETAR_TEXTOS), "tempo esgotado lendo os textos")) as { cor: [number, number, number]; tamanho: number; caixas: number[][]; trecho: string }[];
+  const estilo = await pagina.addStyleTag({ content: ".slide, .slide * { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; }" });
+  try {
+    const vazio = await comTempoLimite(pagina.screenshot({ type: "png", clip: { x: 0, y: 0, width: LARGURA_DO_SLIDE, height: ALTURA_DO_SLIDE } }), "tempo esgotado fotografando o fundo");
+    const amostras = (await comTempoLimite(
+      pagina.evaluate(`${AMOSTRAR_PIXELS}(${JSON.stringify({ png: vazio.toString("base64"), textos, largura: LARGURA_DO_SLIDE })})`),
+      "tempo esgotado medindo o fundo",
+    )) as TextoMedido[];
+    const reprovados = textosReprovados(amostras);
+    if (reprovados.length > 0) logger.debug({ reprovados }, "carrossel: contraste da ilustracao abaixo do piso, o veu sera reforcado");
+    return reprovados.length === 0;
+  } finally {
+    await estilo.evaluate((e) => (e as Element).remove());
+  }
+}
 
 let fundosEmBase64: string[] | undefined;
 
@@ -48,7 +113,15 @@ function letraDoProjeto(arquivo: string): string | null {
   return fontesEmBase64[arquivo];
 }
 
-export type SlideRenderizado = { png: Buffer; /** O texto não coube nem um passo abaixo: a pessoa precisa encurtar. */ precisaEncurtar: boolean; /** O tipo pede uma foto e o slide não tem. */ semFoto: boolean };
+export type SlideRenderizado = {
+  png: Buffer;
+  /** O texto não coube nem um passo abaixo: a pessoa precisa encurtar. */
+  precisaEncurtar: boolean;
+  /** O tipo pede uma foto e o slide não tem. */
+  semFoto: boolean;
+  /** E69: como a imagem entrou (foto, ou fundo no estilo leve ou forte), de quem era e quantos reforços de véu o contraste pediu; nulo sem imagem de ilustração. */
+  imagem: { como: "foto" | "fundo"; origem: "ilustracao" | "pessoa"; estilo: EstiloDaIlustracao | null; reforco: number } | null;
+};
 export type ResultadoDoRender = { png: Buffer[]; slides: SlideRenderizado[]; avisos: string[] };
 
 export async function renderizarSlides(entrada: {
@@ -58,6 +131,10 @@ export async function renderizarSlides(entrada: {
   separarFotoDePaciente?: boolean;
   cor: string;
   arroba?: string;
+  /** E69: as ilustrações por slide (quem chama já filtra pela chave `ILUSTRACAO_ATIVA`). Ausente, os slides saem como antes. */
+  ilustracoes?: IlustracaoDoCarrossel[];
+  /** E69: marca de saúde, o slide com ilustração leva a linha fixa "Imagem ilustrativa". */
+  marcarIlustrativa?: boolean;
   /** Só este slide (índice a partir de 0); ausente, todos. */
   somente?: number;
   /** 1 é o PNG final de 1080 por 1350; menor, a prévia da tela (0,4 dá 432 por 540). */
@@ -70,7 +147,23 @@ export async function renderizarSlides(entrada: {
     return f ? { tipo: f.tipo, base64: f.bytes.toString("base64") } : null;
   };
   const escolhidas = distribuirFotos(entrada.slides, entrada.fotos, entrada.separarFotoDePaciente === true);
-  const modos = modosDosSlides(entrada.slides.map((s, i) => ({ tipo: s.tipo, comFoto: escolhidas[i].foto !== null })));
+  const ilustracaoDe = new Map((entrada.ilustracoes ?? []).map((i) => [i.indice, i] as const));
+  const modeloDeBytes = (tipo: string, bytes: Buffer): FotoParaOModelo => ({ tipo, base64: bytes.toString("base64") });
+  type Imagem = { como: "foto" | "fundo"; origem: "ilustracao" | "pessoa"; modelo: FotoParaOModelo; generica: boolean };
+  // E69: a imagem de cada slide. A foto da pessoa SEMPRE vence a ilustração; antes e depois e resultado nunca recebem ilustração. Nos tipos de foto (capa com foto, notícia) a ilustração entra como foto; nos de texto,
+  // como fundo do slide inteiro (a foto da pessoa que o slide aponta entra do mesmo jeito, no lugar dela).
+  const imagens: (Imagem | null)[] = entrada.slides.map((s, i) => {
+    if (!aceitaIlustracao(s.tipo)) return null;
+    const ilus = ilustracaoDe.get(i);
+    if (TIPOS_ILUSTRADOS_COMO_FOTO.has(s.tipo)) return escolhidas[i].foto === null && ilus ? { como: "foto", origem: "ilustracao", modelo: modeloDeBytes(ilus.tipo, ilus.bytes), generica: false } : null;
+    if (!TIPOS_ILUSTRADOS_COMO_FUNDO.has(s.tipo) || (s.tipo === "passo" && escolhidas[i].foto !== null)) return null;
+    const idDaPessoa = fotoDeFundoDoSlide(s, entrada.fotos, entrada.separarFotoDePaciente === true);
+    const daPessoa = idDaPessoa === null ? null : paraModelo(idDaPessoa);
+    if (daPessoa) return { como: "fundo", origem: "pessoa", modelo: daPessoa, generica: false };
+    return ilus ? { como: "fundo", origem: "ilustracao", modelo: modeloDeBytes(ilus.tipo, ilus.bytes), generica: ilus.generica === true } : null;
+  });
+  const modos = modosDosSlides(entrada.slides.map((s, i) => ({ tipo: s.tipo, comFoto: escolhidas[i].foto !== null || imagens[i]?.como === "foto" })));
+  const estilos = estilosDaMistura(entrada.slides.map((s, i) => ({ tipo: s.tipo, comFundo: imagens[i]?.como === "fundo", generica: imagens[i]?.generica })));
   const fontes = { mona: letraDoProjeto("monasans-latin.woff2"), mono: letraDoProjeto("jetbrainsmono-latin.woff2") };
   const fundos = fundosDoProjeto();
   const escala = Math.min(1, Math.max(0.1, entrada.escala ?? 1));
@@ -83,25 +176,41 @@ export async function renderizarSlides(entrada: {
       const feitos: SlideRenderizado[] = [];
       for (let i = 0; i < entrada.slides.length; i += 1) {
         if (entrada.somente !== undefined && entrada.somente !== i) continue;
-        const foto = paraModelo(escolhidas[i].foto);
-        const html = htmlDoSlide({
-          slide: entrada.slides[i],
-          numero: i + 1,
-          total: entrada.slides.length,
-          cor: entrada.cor,
-          arroba: entrada.arroba ?? "",
-          modo: modos[i],
-          foto,
-          fotoDepois: paraModelo(escolhidas[i].fotoDepois),
-          fundos,
-          fontes,
-        });
-        await comTempoLimite(pagina.setContent(html, { waitUntil: "load" }), "tempo esgotado montando o slide");
-        await comTempoLimite(pagina.evaluate("document.fonts.ready.then(() => true)"), "tempo esgotado esperando a letra");
-        const conferencia = JSON.parse(String(await comTempoLimite(pagina.evaluate(CONFERIR_TEXTO), "tempo esgotado medindo o texto"))) as { estourou: boolean };
+        const imagem = imagens[i];
+        const foto = imagem?.como === "foto" ? imagem.modelo : paraModelo(escolhidas[i].foto);
+        let reforco = 0;
+        let conferencia: { estourou: boolean };
+        for (;;) {
+          const html = htmlDoSlide({
+            slide: entrada.slides[i],
+            numero: i + 1,
+            total: entrada.slides.length,
+            cor: entrada.cor,
+            arroba: entrada.arroba ?? "",
+            modo: modos[i],
+            foto,
+            fotoDepois: paraModelo(escolhidas[i].fotoDepois),
+            ilustracao: imagem?.como === "fundo" && estilos[i] ? { ...imagem.modelo, estilo: estilos[i]!, reforco } : null,
+            reforcoDaProtecao: imagem?.como === "foto" ? reforco : 0,
+            ilustrativa: entrada.marcarIlustrativa === true && imagem?.origem === "ilustracao",
+            fundos,
+            fontes,
+          });
+          await comTempoLimite(pagina.setContent(html, { waitUntil: "load" }), "tempo esgotado montando o slide");
+          await comTempoLimite(pagina.evaluate("document.fonts.ready.then(() => true)"), "tempo esgotado esperando a letra");
+          conferencia = JSON.parse(String(await comTempoLimite(pagina.evaluate(CONFERIR_TEXTO), "tempo esgotado medindo o texto"))) as { estourou: boolean };
+          // E69: com a ilustração atrás do texto, o contraste é medido no pixel de verdade; não passou, reforça o véu e refaz.
+          if (!imagem || imagem.origem !== "ilustracao" || reforco >= PASSOS_DE_REFORCO || (await contrasteDaPaginaPassa(pagina))) break;
+          reforco += 1;
+        }
         if (conferencia.estourou) avisos.push(`slide ${i + 1}: o texto nao coube, precisa encurtar`);
         const png = await comTempoLimite(pagina.screenshot({ type: "png", clip: { x: 0, y: 0, width: LARGURA_DO_SLIDE, height: ALTURA_DO_SLIDE } }), "tempo esgotado gerando a imagem");
-        feitos.push({ png, precisaEncurtar: conferencia.estourou, semFoto: faltaFoto(entrada.slides[i], foto !== null) });
+        feitos.push({
+          png,
+          precisaEncurtar: conferencia.estourou,
+          semFoto: faltaFoto(entrada.slides[i], foto !== null),
+          imagem: imagem ? { como: imagem.como, origem: imagem.origem, estilo: imagem.como === "fundo" ? estilos[i] : null, reforco } : null,
+        });
       }
       return feitos;
     } finally {

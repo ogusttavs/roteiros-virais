@@ -8,6 +8,17 @@ export function carrosselAtivo(): boolean {
   return process.env.CARROSSEL_ATIVO === "1";
 }
 
+/**
+ * E69 PR A: a chave da ilustracao por slide, lida a cada chamada. Desligada (o padrao), as rotas de admin da ilustracao respondem 404 e o render nem le as ilustracoes guardadas: os slides saem
+ * como antes, com os fundos abstratos. Só o valor "1" liga.
+ */
+export function ilustracaoAtiva(): boolean {
+  return process.env.ILUSTRACAO_ATIVA === "1";
+}
+
+/** E69: a linha pequena e fixa que o slide ilustrado leva em marca de saude. Escrita por codigo, nunca pelo modelo nem pela pessoa. */
+export const TEXTO_IMAGEM_ILUSTRATIVA = "Imagem ilustrativa";
+
 export const TAMANHOS_DO_CARROSSEL = [5, 7, 9] as const;
 export type TamanhoDoCarrossel = (typeof TAMANHOS_DO_CARROSSEL)[number];
 
