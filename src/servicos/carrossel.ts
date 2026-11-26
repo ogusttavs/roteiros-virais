@@ -397,9 +397,13 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
   return criado;
 }
 
-/** Os carrosséis da marca, do mais novo para o mais antigo. */
-export async function carrosseisDaMarca(clienteId: number, limite = 30): Promise<Carrossel[]> {
-  return db().select().from(carrosseis).where(eq(carrosseis.clienteId, clienteId)).orderBy(desc(carrosseis.criadoEm)).limit(limite);
+/**
+ * Os carrosséis da marca, do mais novo para o mais antigo. A capa de notícia mora na mesma tabela e se reconhece pelo primeiro slide (`tipo: "noticia"`): `so` separa as duas listas
+ * ("carrossel" sem as capas, "capa" só com elas); sem `so`, vem tudo.
+ */
+export async function carrosseisDaMarca(clienteId: number, limite = 30, so?: "carrossel" | "capa"): Promise<Carrossel[]> {
+  const doTipo = so === "capa" ? sql`${carrosseis.slides}->0->>'tipo' = 'noticia'` : so === "carrossel" ? sql`${carrosseis.slides}->0->>'tipo' is distinct from 'noticia'` : undefined;
+  return db().select().from(carrosseis).where(and(eq(carrosseis.clienteId, clienteId), doTipo)).orderBy(desc(carrosseis.criadoEm)).limit(limite);
 }
 
 /** Um carrossel da marca, ou nulo (de outra marca responde igual a um que não existe). */

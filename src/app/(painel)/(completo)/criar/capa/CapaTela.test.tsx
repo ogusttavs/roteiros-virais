@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CapaTela } from "./CapaTela";
 
+vi.mock("next/link", () => ({ default: ({ href, children, ...resto }: { href: string; children: unknown } & Record<string, unknown>) => <a href={href} {...resto}>{children as never}</a> }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 
 const NOTICIA = { id: 7, titulo: "Conselho publica regra nova", veiculo: "Jornal da Cidade", data: "24/11/2026" };
@@ -81,5 +82,23 @@ describe("a foto da capa é foto comum, em qualquer ramo (inclusive saúde)", ()
     await waitFor(() => expect(corpos).toHaveLength(1));
     expect(corpos[0]!.get("autorizacaoDoPaciente")).toBeNull();
     expect(corpos[0]!.get("dePaciente")).toBeNull();
+  });
+});
+
+describe("as suas capas", () => {
+  it("na escolha, lista as 5 mais novas pelo pedido das capas e cada uma abre por ?id=", async () => {
+    const urls: string[] = [];
+    const lista = [1, 2, 3, 4, 5, 6].map((id) => ({ id, tema: `Capa ${id}`, quantidade: 1, criadoEm: "2026-11-25T15:00:00Z" }));
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      urls.push(String(url));
+      if (String(url) === "/api/carrossel?tipo=capa") return json({ carrosseis: lista });
+      return json({ titulos: ["Um título bom"], noticia: {} });
+    });
+    render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="" />);
+    expect(await screen.findByRole("heading", { name: "As suas capas" })).toBeTruthy();
+    expect(urls).toContain("/api/carrossel?tipo=capa");
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(5);
+    expect(links[0].getAttribute("href")).toBe("/criar/capa?id=1");
   });
 });

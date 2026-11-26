@@ -892,6 +892,7 @@
   color: var(--cor-titulo);
   font: inherit;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 

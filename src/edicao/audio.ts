@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { executarComLimite, type ExecutorDeProcesso } from "@/jobs/processo";
 
 import { calcularEnergiaDeS16le } from "./energia";
+import { OPCOES_DE_ENTRADA_SEGURA } from "./entrada-segura";
 import type { Energia } from "./tipos";
 
 export const TAXA_DO_AUDIO = 16_000;
@@ -24,7 +25,7 @@ export class ErroDeAudio extends Error {
 
 export function argumentosDoAudio(video: string, wav: string, pcm: string): string[] {
   const saida = ["-vn", "-map", "0:a:0", "-ac", "1", "-ar", String(TAXA_DO_AUDIO), "-c:a", "pcm_s16le"];
-  return ["-nostdin", "-y", "-v", "error", "-t", String(SEGUNDOS_LIDOS_NO_MAXIMO), "-i", video, ...saida, "-f", "wav", wav, ...saida, "-f", "s16le", pcm];
+  return ["-nostdin", "-y", "-v", "error", "-t", String(SEGUNDOS_LIDOS_NO_MAXIMO), ...OPCOES_DE_ENTRADA_SEGURA, "-i", video, ...saida, "-f", "wav", wav, ...saida, "-f", "s16le", pcm];
 }
 
 export type AudioPreparado = { wav: string; energia: Energia };

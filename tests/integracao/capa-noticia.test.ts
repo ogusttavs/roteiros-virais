@@ -12,7 +12,7 @@ import { crc32 } from "@/carrossel/zip";
 import { db, getPool } from "@/db";
 import { briefings, carrosseis, clientes, geracoesIA, nichos, noticias, user, type PerfilCompilado } from "@/db/schema";
 import { criarCapa, criarCapaComTrava, titulosDaCapa, titulosDaCapaComTrava } from "@/servicos/capa-noticia";
-import { carrosselDaMarca, enviarFoto, ErroCarrossel } from "@/servicos/carrossel";
+import { carrosselDaMarca, carrosseisDaMarca, enviarFoto, ErroCarrossel, gerarCarrossel } from "@/servicos/carrossel";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -257,5 +257,22 @@ describe("o PNG da capa", () => {
     expect(dimensoes(com!.png[0])).toEqual({ largura: 1080, altura: 1350 });
     expect(com!.slides[0].semFoto).toBe(false);
     expect(com!.png[0].equals(sem!.png[0])).toBe(false);
+  }, 60_000);
+});
+
+describe("a lista das capas e a lista dos carrosséis", () => {
+  it("cada lista traz só o seu tipo, e uma marca nunca vê a capa da outra", async () => {
+    const dona = await criarCliente(nichoSaude);
+    const outra = await criarCliente(nichoSaude);
+    const noticiaId = await criarNoticia(nichoSaude);
+    const capaDaDona = await criarCapa(dona, { noticiaId, titulo: "O que a regra nova muda para você" });
+    const capaDaOutra = await criarCapa(outra, { noticiaId, titulo: "Outra capa da outra marca" });
+    const carrossel = await gerarCarrossel(dona, { quantidade: 5, de: { origem: "tema", texto: "cuidar do sorriso no dia a dia" } });
+
+    expect((await carrosseisDaMarca(dona, 30, "capa")).map((c) => c.id)).toEqual([capaDaDona.id]);
+    expect((await carrosseisDaMarca(dona, 30, "carrossel")).map((c) => c.id)).toEqual([carrossel.id]);
+    expect((await carrosseisDaMarca(dona)).map((c) => c.id).sort()).toEqual([capaDaDona.id, carrossel.id].sort());
+    expect((await carrosseisDaMarca(outra, 30, "capa")).map((c) => c.id)).toEqual([capaDaOutra.id]);
+    expect((await carrosseisDaMarca(outra, 30, "carrossel")).map((c) => c.id)).toEqual([]);
   }, 60_000);
 });

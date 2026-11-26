@@ -14,6 +14,7 @@
  */
 import { AJUSTES_DO_RENDER } from "@/config/edicao";
 
+import { OPCOES_DE_ENTRADA_SEGURA } from "./entrada-segura";
 import type { Edl, TransicaoCorte, Trecho } from "./tipos";
 
 export type PerfilDeRender = "previa" | "final";
@@ -94,7 +95,7 @@ export function montarGrafoDoRender(entrada: EntradaDoGrafo): GrafoDoRender {
   trechos.forEach((t, k) => {
     const nVideo = quadros[k].n + extensao[k];
     const duracaoLida = Math.min(nVideo / FPS + 0.5, Math.max(0.5, limiteDoBruto - t.origem[0] + 0.5));
-    entradas.push("-ss", numero(t.origem[0]), "-t", numero(duracaoLida), "-i", entrada.bruto);
+    entradas.push("-ss", numero(t.origem[0]), "-t", numero(duracaoLida), ...OPCOES_DE_ENTRADA_SEGURA, "-i", entrada.bruto);
 
     const partes = [`fps=${FPS}`, `scale=${W}:${H}:force_original_aspect_ratio=decrease`, `pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black`];
     if (entrada.hdr) partes.push(cadeiaDeHdr(entrada.hdr));

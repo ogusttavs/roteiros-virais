@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { LIMITES_DO_POST_PRONTO } from "@/config/post-pronto";
+import { lerFormularioComTeto } from "@/lib/formulario-com-teto";
 import { logger } from "@/lib/log";
 import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { sessaoAtual } from "@/lib/sessao";
@@ -31,7 +32,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const form = await request.formData();
+    // M5 (26/11/2026): sem Content-Length (ou mentindo), o corpo é lido em fluxo com teto, nunca inteiro na memória.
+    const form = await lerFormularioComTeto(request, LIMITES_DO_POST_PRONTO.bytesDoPedidoMax + 1_000_000);
+    if (form === "grande-demais") return NextResponse.json({ erro: fraseDeRecusaDoPost("pedido-grande"), codigo: "pedido-grande" }, { status: 413 });
     const arquivos: Uint8Array[] = [];
     for (const item of form.getAll("imagens")) {
       if (typeof item === "string") continue;
