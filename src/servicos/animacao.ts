@@ -10,9 +10,10 @@ import { and, desc, eq, inArray, ne } from "drizzle-orm";
 
 import { animacaoLiberadaParaMarca } from "@/animacao/acesso";
 import { apagarArquivoDaAnimacao } from "@/animacao/arquivos";
-import { cenasDosParagrafos } from "@/animacao/cenas";
+import { montarCenasDosParagrafos } from "@/animacao/cenas";
 import { MOLDE_PADRAO } from "@/animacao/moldes";
 import { montarLinhaDoTempo } from "@/animacao/montador";
+import { temColchete, trechosEntreColchetes } from "@/carrossel/colchetes";
 import { ESTADOS_EM_ANDAMENTO, tempoEsperadoDaPreviaS, tempoEsperadoDoFinalS, type EstadoDaAnimacao } from "@/config/animacao-fila";
 import { db } from "@/db";
 import { animacoes, type Animacao } from "@/db/schema";
@@ -39,6 +40,8 @@ export type VistaDaAnimacao = {
   /** O que a tela diz que leva, já por extenso ("uns 40 segundos"). */
   tempoDaPrevia: string;
   tempoDoFinal: string;
+  /** As frases do roteiro que não couberam no vídeo e ficaram de fora (vazio quando coube tudo). A tela da prévia lista antes de a pessoa aprovar. */
+  foraDoVideo: string[];
   /** Quando o vídeo final sai do ar (só em `final_pronta`). */
   finalExpiraEm: string | null;
 };
@@ -47,11 +50,13 @@ export type VisaoDaAnimacao = {
   /** No "ver como" a tela só lê: nada de pedir, aprovar nem baixar. */
   verComo: boolean;
   animacao: VistaDaAnimacao | null;
+  /** Quantos espaços para completar (trechos entre colchetes) o texto do roteiro ainda tem: com algum, o pedido não sai até a pessoa completar. */
+  colchetes: number;
   /** A marca já tem outra animação em andamento (de outro roteiro): o botão não pede outra. */
   outraEmAndamento: boolean;
 };
 
-export function vistaDaAnimacao(a: Pick<Animacao, "id" | "estado" | "progresso" | "motivo" | "duracaoS" | "finalExpiraEm">): VistaDaAnimacao {
+export function vistaDaAnimacao(a: Pick<Animacao, "id" | "estado" | "progresso" | "motivo" | "duracaoS" | "finalExpiraEm" | "foraDoVideo">): VistaDaAnimacao {
   const duracao = Number(a.duracaoS);
   return {
     id: a.id,
@@ -60,6 +65,7 @@ export function vistaDaAnimacao(a: Pick<Animacao, "id" | "estado" | "progresso" 
     motivo: a.estado === "falhou" ? a.motivo : null,
     tempoDaPrevia: tempoPorExtenso(tempoEsperadoDaPreviaS(duracao)),
     tempoDoFinal: tempoPorExtenso(tempoEsperadoDoFinalS(duracao)),
+    foraDoVideo: a.foraDoVideo ?? [],
     finalExpiraEm: a.estado === "final_pronta" && a.finalExpiraEm ? a.finalExpiraEm.toISOString() : null,
   };
 }
@@ -93,7 +99,7 @@ export async function visaoDaAnimacao(entrada: { clienteId: number; roteiro: Pic
     .from(animacoes)
     .where(and(eq(animacoes.clienteId, clienteId), ne(animacoes.roteiroId, roteiro.id), inArray(animacoes.estado, [...ESTADOS_EM_ANDAMENTO])))
     .limit(1);
-  return { verComo, animacao: ultima ? vistaDaAnimacao(ultima) : null, outraEmAndamento: Boolean(outra) };
+  return { verComo, animacao: ultima ? vistaDaAnimacao(ultima) : null, colchetes: trechosEntreColchetes(paragrafosDoRoteiro(roteiro).join("\n")).length, outraEmAndamento: Boolean(outra) };
 }
 
 /** A vista de uma animação da marca (a consulta de andamento da tela), ou `null` se a marca não pode usar, ou a animação não existe ou é de outra marca. */
@@ -136,7 +142,10 @@ export async function pedirAnimacao(entrada: { clienteId: number; usuarioId: str
   if (!roteiro) return recusa("nao-achou", 404);
   const naoServe = motivoDeNaoServir(roteiro);
   if (naoServe) return recusa(naoServe, 409);
-  const cenas = cenasDosParagrafos(paragrafosDoRoteiro(roteiro));
+  const paragrafos = paragrafosDoRoteiro(roteiro);
+  // O vídeo mostra só o que está escrito: espaço para completar com colchete nunca vai para a tela.
+  if (paragrafos.some(temColchete)) return recusa("colchete", 409);
+  const { cenas, deFora } = montarCenasDosParagrafos(paragrafos);
   let duracaoS: number;
   try {
     duracaoS = montarLinhaDoTempo(cenas).duracaoS;
@@ -162,7 +171,7 @@ export async function pedirAnimacao(entrada: { clienteId: number; usuarioId: str
   try {
     [criada] = await db()
       .insert(animacoes)
-      .values({ clienteId, roteiroId, estado: "pedida", molde: MOLDE_PADRAO, cenas, duracaoS: duracaoS.toFixed(3), criadaPor: usuarioId })
+      .values({ clienteId, roteiroId, estado: "pedida", molde: MOLDE_PADRAO, cenas, foraDoVideo: deFora, duracaoS: duracaoS.toFixed(3), criadaPor: usuarioId })
       .returning();
   } catch (erro) {
     if (ehViolacaoDeUnicidade(erro)) return recusa("em-andamento", 409);

@@ -1,0 +1,1 @@
+ALTER TABLE "animacoes" ADD COLUMN "fora_do_video" jsonb DEFAULT '[]'::jsonb NOT NULL;

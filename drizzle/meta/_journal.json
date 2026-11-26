@@ -834,6 +834,13 @@
       "when": 1795653790365,
       "tag": "0123_ilustracoes",
       "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1795690883270,
+      "tag": "0124_animacao-fora-do-video",
+      "breakpoints": true
     }
   ]
 }
