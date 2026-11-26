@@ -16,6 +16,7 @@ import {
   TITULO_DAS_INSTRUCOES,
   versao,
   CRITERIO_RAMO,
+  CRITERIO_VARIOS_IDIOMAS,
 } from "./verificarTexto";
 
 /**
@@ -63,7 +64,7 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
   });
 
   it("a versão subiu e fato é só o ESPECÍFICO sobre a pessoa, o negócio, o lugar, o momento ou um acontecimento", () => {
-    expect(versao).toBe("1.10.0");
+    expect(versao).toBe("1.11.0");
     expect(sistema).toContain("fato ESPECÍFICO");
     for (const exemplo of ["quem está junto", "onde está", "o que aconteceu", "quando", "quanto custa", "nome de produto, de cliente ou de cidade", "uma cena vivida"]) {
       expect(sistema).toContain(exemplo);
@@ -354,5 +355,15 @@ describe("verificarTexto 1.10.0: o teste 'serve para qualquer ramo?' (R-COPY-27)
     expect(CRITERIO_RAMO).toContain("troque o ramo");
     expect(CRITERIO_RAMO).toContain("NA DÚVIDA, APROVE");
     expect(CRITERIO_RAMO).not.toContain(String.fromCharCode(0x2014));
+  });
+});
+
+/** E76 PR 3: com a estratégia de idioma (a marca de mais de um país), outro idioma não é motivo de reprovação. */
+describe("verificarTexto 1.11.0: vários idiomas", () => {
+  it("sem a opção, o sistema não muda; com ela, ganha o critério", () => {
+    expect(montarSistemaEstavel("roteiro", true)).toBe(montarSistemaEstavel("roteiro", true, false, false));
+    expect(montarSistemaEstavel("roteiro", true)).not.toContain(CRITERIO_VARIOS_IDIOMAS.trim());
+    expect(montarSistemaEstavel("roteiro", true, false, true)).toContain(CRITERIO_VARIOS_IDIOMAS.trim());
+    expect(CRITERIO_VARIOS_IDIOMAS).toContain("nunca é motivo de reprovação");
   });
 });

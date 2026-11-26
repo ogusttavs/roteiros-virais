@@ -1242,3 +1242,27 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
     });
   });
 });
+
+/** E76 PR 3: a marca de mais de um país que escreve também em inglês ou espanhol. Um parágrafo em inglês não tem acento e não é erro. */
+describe("verificarLocalmente, a estratégia de idioma (aceitaTextoSemAcento)", () => {
+  const emIngles =
+    "Most people clean the sofa with too much water and the stain comes back two days later. Use a dry cloth first, press without rubbing, " +
+    "and only then use the product. Save this video and send it to the friend who always spills coffee on the couch.";
+
+  it("sem a opção, o parágrafo longo em inglês reprova por falta de acento, como sempre", () => {
+    expect(emIngles.length).toBeGreaterThan(200);
+    const r = verificarLocalmente({ corpo: emIngles });
+    expect(r.aprovado).toBe(false);
+    expect(r.motivos.some((m) => m.includes("sem nenhum acento"))).toBe(true);
+  });
+
+  it("com a opção, o mesmo parágrafo passa", () => {
+    expect(verificarLocalmente({ corpo: emIngles }, { aceitaTextoSemAcento: true }).aprovado).toBe(true);
+  });
+
+  it("com a opção, o português sem acento nas quatro palavras continua reprovando", () => {
+    const r = verificarLocalmente({ corpo: `${emIngles} E voce nao precisa esfregar.` }, { aceitaTextoSemAcento: true });
+    expect(r.aprovado).toBe(false);
+    expect(r.motivos.some((m) => m.includes("voce"))).toBe(true);
+  });
+});

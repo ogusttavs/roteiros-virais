@@ -25,6 +25,7 @@ import { ramoPorSlug } from "@/config/ramos";
 import { db, getPool } from "@/db";
 import { clientes, membrosMarca, user, type Cliente, type PlanoMarca, type TipoMarca } from "@/db/schema";
 import { config } from "@/lib/config";
+import { estrategiaIdiomaSchema } from "@/lib/estrategia-de-idioma";
 import { avaliarResposta, lerBriefing, salvarRascunho } from "@/servicos/briefing";
 import { p13CobertaPelaP12Antiga } from "@/servicos/briefing-regras";
 import {
@@ -51,6 +52,8 @@ const comecarSchema = z
     objetivo: z.enum(["negocio", "criador", "conhecido", "negocios"]),
     perfis: perfisSchema.optional(),
     quemGrava: z.enum(["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"]).optional(),
+    /** E76 PR 3: a estratégia de idioma, so com onde = mais_de_um_pais (mesmas regras da tela, `lib/estrategia-de-idioma.ts`). */
+    idioma: estrategiaIdiomaSchema.optional(),
   })
   .strict();
 
@@ -124,6 +127,7 @@ export function validarEntrada(entrada: EntradaMarca): string[] {
     if (c.onde === "local" && !c.regiao?.trim()) problemas.push("comecar.regiao: escreva a cidade ou regiao (onde = local).");
     if (c.onde === "outro_pais" && !c.pais?.trim()) problemas.push("comecar.pais: escreva o pais (onde = outro_pais).");
     if (c.onde === "mais_de_um_pais" && !c.paises?.trim()) problemas.push("comecar.paises: escreva quais paises (onde = mais_de_um_pais).");
+    if (c.idioma && c.onde !== "mais_de_um_pais") problemas.push("comecar.idioma: so vale com onde = mais_de_um_pais.");
   }
   const emails = new Set<string>();
   for (const p of entrada.pessoas) {
@@ -261,6 +265,7 @@ export async function cadastrarMarca(entrada: EntradaMarca, opcoes: OpcoesDoScri
       regiao: c.regiao,
       pais: c.pais,
       paises: c.paises,
+      estrategiaIdioma: c.idioma,
       site: c.site,
       ramo: entrada.ramo,
       persona: c.objetivo,
