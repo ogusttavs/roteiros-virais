@@ -456,7 +456,7 @@ export async function definirResponsavelTecnico(clienteId: number, linha: string
 }
 
 /**
- * Trocar o tipo de conteúdo de uma marca (P1, item 1): as doze perguntas do
+ * Trocar o tipo de conteúdo de uma marca (P1, item 1): as perguntas do
  * negócio e as da pessoa têm o mesmo id, mas enunciados diferentes, então
  * uma resposta de um tipo nunca pode ficar pareada com a avaliação do
  * outro. O admin já avisa antes de chamar isto; aqui a troca sempre apaga o

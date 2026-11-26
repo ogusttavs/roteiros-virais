@@ -24,7 +24,7 @@ export type ContaAdmin = ClienteAdmin & {
   /** O nome do ramo (do catálogo, quando há); nulo se a conta ainda não tem setor. */
   ramoNome: string | null;
   quemTemAcesso: PessoaDaConta[];
-  /** O estado do briefing para a lista: sem ele, incompleto (quantas das 12 respondidas), completo com a nota acima ou abaixo do mínimo. */
+  /** O estado do briefing para a lista: sem ele, incompleto (quantas das treze respondidas), completo com a nota acima ou abaixo do mínimo. */
   briefingEstado: { tipo: "sem" } | { tipo: "incompleto"; respondidas: number } | { tipo: "pronto"; nota: number; abaixo: boolean };
   ultimos7: { dia: string; estado: EstadoDoDia }[];
   /** E22 PR 1: a cortesia e a assinatura que conta (a lista mostra o estado, o admin liga a cortesia na página da conta). */

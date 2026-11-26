@@ -190,3 +190,58 @@ describe("PerguntaCampo, sugestão de resposta (E37a, item 2)", () => {
     expect(screen.getByRole("button", { name: "Avaliar de novo" })).toBeTruthy();
   });
 });
+
+describe("PerguntaCampo, sugestão com dado para completar (E76 PR 1)", () => {
+  const EXEMPLO = "Já atendemos [quantas empresas?] desde [que ano?], do pedido até a entrega.";
+  const AVALIACAO_COM_COLCHETE = {
+    nota: 7,
+    bom: "Conta o que o negócio faz.",
+    melhorar: "Falta um número real.",
+    como: "Diga quantas empresas já atendeu.",
+    impacto: "Ajuda o roteiro a soar real.",
+    exemplo: EXEMPLO,
+  };
+
+  function renderizar(onAvaliar = vi.fn()) {
+    render(
+      <PerguntaCampo
+        pergunta={PERGUNTA}
+        resposta="O que o negócio faz."
+        avaliacao={AVALIACAO_COM_COLCHETE}
+        onSalvarRascunho={vi.fn().mockResolvedValue(undefined)}
+        onAvaliar={onAvaliar}
+        onAtualizado={vi.fn()}
+        meta={9}
+        variante="wizard"
+      />,
+    );
+    return onAvaliar;
+  }
+
+  it("destaca cada trecho entre colchetes, explica o que falta e troca o botão", () => {
+    renderizar();
+    const destacados = [...document.querySelectorAll("mark[data-colchete]")].map((m) => m.textContent);
+    expect(destacados).toEqual(["[quantas empresas?]", "[que ano?]"]);
+    expect(screen.getByText("O que está entre colchetes só você sabe. Complete com o dado verdadeiro, ou apague o trecho.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Usar e completar" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Usar esta sugestão" })).toBeNull();
+  });
+
+  it("aceitar põe a sugestão no campo, e avaliar fica desligado até a pessoa completar", () => {
+    const onAvaliar = renderizar();
+    fireEvent.click(screen.getByRole("button", { name: "Usar e completar" }));
+
+    const campo = screen.getByLabelText(PERGUNTA.enunciado) as HTMLTextAreaElement;
+    expect(campo.value).toBe(EXEMPLO);
+    expect((screen.getByRole("button", { name: "Avaliar esta resposta" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Complete o que está entre colchetes, ou apague o trecho, antes de avaliar.")).toBeTruthy();
+
+    // Sair do campo com o colchete ainda lá não avalia sozinho.
+    fireEvent.blur(campo);
+    expect(onAvaliar).not.toHaveBeenCalled();
+
+    fireEvent.change(campo, { target: { value: "Já atendemos 12 empresas desde 2021, do pedido até a entrega." } });
+    expect((screen.getByRole("button", { name: "Avaliar esta resposta" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText("Complete o que está entre colchetes, ou apague o trecho, antes de avaliar.")).toBeNull();
+  });
+});

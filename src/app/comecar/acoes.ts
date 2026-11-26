@@ -1,5 +1,6 @@
 "use server";
 
+import { temColchete } from "@/carrossel/colchetes";
 import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { comoResultadoDaIA } from "@/lib/resultado-da-ia";
@@ -7,6 +8,7 @@ import { exigirForaDoVerComo, recusaDoVerComo } from "@/lib/ver-como";
 import { avaliarResposta, salvarRascunho } from "@/servicos/briefing";
 import { clienteDaSessaoAtual, salvarDadosFixosComPedido } from "@/servicos/clientes";
 import { ErroLimiteDeSetores } from "@/servicos/ramos";
+import { textosBriefing } from "@/textos/briefing";
 import { textosRamo } from "@/textos/ramo";
 
 /**
@@ -45,6 +47,8 @@ export async function salvarRascunhoAction(perguntaId: string, resposta: string,
 export async function avaliarRespostaAction(perguntaId: string, resposta: string) {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida({ soDepoisDoBriefing: true });
+  // E76 PR 1: a resposta com um trecho entre colchetes (a sugestão aceita sem completar) não vai para avaliação; a tela já não deixa.
+  if (temColchete(resposta)) return { ok: false as const, erro: textosBriefing.pergunta.completeOsColchetes };
   const cliente = await clienteDaSessaoAtual();
   return comoResultadoDaIA(() => avaliarResposta(cliente.id, perguntaId, resposta, cliente.tipo));
 }

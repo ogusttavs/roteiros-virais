@@ -99,7 +99,7 @@ export const textosCadastro = {
     titulo: "E-mail confirmado",
     subtitulo: "A sua conta está criada. Agora vem o briefing.",
     itens: [
-      "Doze perguntas sobre o seu trabalho e sobre quem você atende. É com elas que o roteiro sai do seu jeito, e não um texto que serviria para qualquer um.",
+      "Treze perguntas sobre o seu trabalho e sobre quem você atende. É com elas que o roteiro sai do seu jeito, e não um texto que serviria para qualquer um.",
       "Leva cerca de 20 minutos. Dá para parar no meio: tudo salva sozinho.",
       "Depois do briefing, começam os seus 7 dias grátis.",
     ],
@@ -137,7 +137,7 @@ export const textosCadastro = {
     passos: [
       { titulo: "Crie a sua conta", texto: "Nome, e-mail e senha. Sem cartão." },
       { titulo: "Confirme o e-mail", texto: "Mandamos um link na hora." },
-      { titulo: "Responda o briefing", texto: "Doze perguntas sobre o seu trabalho, cerca de 20 minutos. Dá para parar no meio." },
+      { titulo: "Responda o briefing", texto: "Treze perguntas sobre o seu trabalho, cerca de 20 minutos. Dá para parar no meio." },
       {
         titulo: "Use 7 dias grátis",
         texto: `O aplicativo de verdade, no seu ramo, com até ${TETO_DO_TESTE.roteiros} roteiros e ${TETO_DO_TESTE.edicoes} vídeos editados. Se não quiser continuar, não precisa fazer nada: o teste termina sozinho e nada é cobrado.`,

@@ -211,7 +211,7 @@ export type Persona = "negocio" | "criador" | "conhecido" | "negocios";
  * video (a propria marca vendendo, ou um criador atraindo marca patrocinadora);
  * `tipo` diz so a voz gramatical do roteiro. Uma marca "criador" pode muito
  * bem ser "negocio" (vende o proprio curso, por exemplo) ou "pessoa" (o
- * criador fala de si). As doze perguntas de briefing proprias de pessoa
+ * criador fala de si). As perguntas de briefing proprias de pessoa
  * (P1, briefing-e-rubricas.md, secao 2b) usam os mesmos ids, blocos e pesos
  * do negocio; so o enunciado, o que a IA procura e o rotulo curto mudam,
  * por `perguntasDoBriefing(tipo)` em `config/briefing.ts`.
@@ -442,6 +442,12 @@ export type AvaliacaoResposta = {
    * Opcional: avaliacoes gravadas antes desta versao nao tem o campo.
    */
   exemplo?: string;
+  /**
+   * E76 PR 2: a versão do enunciado que esta avaliação leu (`PerguntaBriefing.versao`), gravada só nas
+   * perguntas que mudaram de sentido depois de ter respostas (a P12, separada da P13). Ausente numa
+   * avaliação antiga: ela leu o enunciado de antes. Campo dentro do jsonb, sem coluna nova.
+   */
+  versaoPergunta?: number;
 };
 
 /** Perfil compilado (briefing-e-rubricas.md, secao 4; tarefa compilarPerfil). */
