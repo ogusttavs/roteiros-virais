@@ -55,7 +55,7 @@ export type TokenNumerico = {
 };
 
 /** O valor de um número escrito do jeito do Brasil ("1.250,75", "4,5", "12.5"); `null` quando não dá para ler sem chutar ("1,2,3", "10.05.2026"). */
-function valorCanonico(bruto: string): string | null {
+export function valorCanonico(bruto: string): string | null {
   let valor = bruto;
   if (valor.includes(",")) {
     const partes = valor.split(",");
