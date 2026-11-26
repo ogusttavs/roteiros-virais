@@ -133,6 +133,12 @@ export function verificarLocalmente(
      */
     semJargaoDoMotor?: boolean;
     /**
+     * E76 PR 3: a marca de mais de um país cuja estratégia de idioma põe texto fora do português (`estrategiaTemOutroIdioma`). Um parágrafo em
+     * inglês não tem acento e não é erro: ligado, a reprovação de "mais de 200 caracteres sem nenhum acento" não roda. O conjunto fechado
+     * "voce/nao/tambem/ja" continua valendo (são palavras do português, e o que ficar em português sai acentuado).
+     */
+    aceitaTextoSemAcento?: boolean;
+    /**
      * V4, item 5, roteiro sem vício: a primeira palavra do gancho (sem
      * acento, minúscula) não pode repetir a de nenhum dos últimos 5
      * roteiros do cliente ("Espera", "Para", "Olha" são o vício que motivou
@@ -236,7 +242,7 @@ export function verificarLocalmente(
     for (const problema of encontrarProblemas(valor)) {
       motivos.push(`${nomeCampo}: ${problema}`);
     }
-    const semAcento = problemaDeAcentuacao(valor);
+    const semAcento = problemaDeAcentuacao(valor, opcoes.aceitaTextoSemAcento);
     if (semAcento) {
       motivos.push(`${nomeCampo}: ${semAcento}`);
     }
@@ -458,12 +464,12 @@ function temPalavraSemAcento(texto: string): boolean {
   return false;
 }
 
-function problemaDeAcentuacao(texto: string): string | null {
+function problemaDeAcentuacao(texto: string, aceitaTextoSemAcento = false): string | null {
   const semAspas = texto.replace(ENTRE_ASPAS, "");
   // O texto inteiro sem nenhum acento vem ANTES do conjunto fechado de quatro palavras (22/10/2026): com a ordem de antes, um roteiro todo sem acento ("sofa", "eleicao", "entao") que também
   // trazia "voce" ou "nao" só reprovava pelo motivo mecânico, `corrigirMecanicamente` acentuava essas quatro palavras e o texto passava com o resto sem acento. Reprovando pelo motivo que
   // não se corrige por código, a segunda tentativa recebe o motivo certo (ou, na segunda, o ErroIA).
-  if (semAcentoNenhum(semAspas)) return motivoSemNenhumAcento();
+  if (!aceitaTextoSemAcento && semAcentoNenhum(semAspas)) return motivoSemNenhumAcento();
   if (temPalavraSemAcento(semAspas)) {
     return MOTIVO_PALAVRA_SEM_ACENTO;
   }
@@ -665,6 +671,11 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   soSegundaPessoa?: boolean;
   /** A nota do tema: sem as palavras do motor ("banco do setor", "fora da curva", "nicho"...; ver `verificarLocalmente`). */
   semJargaoDoMotor?: boolean;
+  /**
+   * E76 PR 3: a estratégia de idioma da marca põe texto fora do português. A conferência local não reprova o texto longo sem acento (ver
+   * `verificarLocalmente`) e o `verificarTexto` ganha o critério de que outro idioma não é motivo de reprovação. Ausente, nada muda.
+   */
+  variosIdiomas?: boolean;
   /**
    * Decisão do Gustavo, 22/10/2026: quando o tema é da PRÓPRIA pessoa (Tema livre), as proibições do briefing dela são preferências e viram aviso, nunca bloqueio, na avaliação do tema e no roteiro que
    * sai dele. Ligado, a conferência local não reprova a proibição escrita no texto e o `verificarTexto` troca o critério da proibição pelo de aviso (continua barrando atacar ou ofender gente, prometer
@@ -904,6 +915,7 @@ function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados
     semIdInterno: params.semIdInterno,
     soSegundaPessoa: params.soSegundaPessoa,
     semJargaoDoMotor: params.semJargaoDoMotor,
+    aceitaTextoSemAcento: params.variosIdiomas,
     ganchosUltimos5: params.ganchosUltimos5,
     tipoAberturaAtual: params.extrairTipoAbertura?.(dados),
     tipoAberturaAnterior: params.tipoAberturaAnterior,
@@ -990,7 +1002,7 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
       nivel: verificarTexto.nivel,
       effort: verificarTexto.esforco,
       schema: verificarTexto.schema,
-      sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto, Boolean(params.fontesDosFatos), Boolean(params.citarProibicaoVale)),
+      sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto, Boolean(params.fontesDosFatos), Boolean(params.citarProibicaoVale), Boolean(params.variosIdiomas)),
       // Tema da própria pessoa: a proibição não chega ao verificador nem pela lista nem pela linha "Nunca diria ou faria" das fontes (prova com chave de 22/10/2026: com ela na entrada, o
       // modelo barato reprovou a analogia com eleição em 2 de 3 roteiros, mesmo com o critério de aviso no sistema).
       entrada: verificarTexto.montarEntrada({

@@ -51,6 +51,7 @@ import { ROTULO_FIGURINHA } from "@/ia/enums";
 import * as aindaValeIA from "@/ia/prompts/aindaValeRoteiro";
 import * as filtrarEvidenciaPorMarca from "@/ia/prompts/filtrarEvidenciaPorMarca";
 import { NUMEROS_REGRAS_STORY, regrasDoReels } from "@/ia/prompts/regras-formato";
+import { lembreteDoIdioma } from "@/ia/prompts/idioma";
 import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
 import { registrarGeracao } from "@/ia/registro";
@@ -59,6 +60,7 @@ import { montarEntradaCopyRoteiro, type SaidaParaCopyRoteiro, verificarRegrasCop
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { camposCorridosDosCapitulos } from "@/lib/capitulos-do-roteiro";
 import { hojeISO } from "@/lib/config";
+import { estrategiaDaMarca, estrategiaTemOutroIdioma } from "@/lib/estrategia-de-idioma";
 import { logger } from "@/lib/log";
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, temCapitulos } from "@/lib/marcas-de-fala";
 import { comArroba } from "@/lib/perfil-redes";
@@ -1188,6 +1190,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       : tipoAberturaAnterior;
 
   const quemApareceResolvido = resolverQuemAparece(dados.quemAparece, dados.cliente);
+  // E76 PR 3: a estratégia de idioma só vale para a marca de mais de um país que escolheu uma; nas outras é nula e nada muda no prompt.
+  const estrategiaIdioma = estrategiaDaMarca(dados.cliente);
+  const variosIdiomas = estrategiaTemOutroIdioma(estrategiaIdioma);
 
   /**
    * Hotfix de 01/10/2026 (achado do Gustavo em produção): `porQueAssim` só existia em Story
@@ -1269,6 +1274,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         tipo: dados.cliente.tipo,
         persona: dados.cliente.persona,
         quemAparece: quemApareceResolvido,
+        estrategiaIdioma,
         perfilCompilado,
         camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
         // O modelo do nicho é dos vídeos CURTOS: a duração típica e as estruturas dele contradiriam a duração e a estrutura do longo, que vêm da medida dos longos (na entrada).
@@ -1341,6 +1347,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       quemAparece: quemApareceResolvido,
       formato: dados.formato,
       estilo: dados.estilo,
+      estrategiaIdioma,
     }),
     entrada: roteiroIA.montarEntrada({
       tema: dados.tema,
@@ -1400,7 +1407,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     conferirNumerosNasFontes: Boolean(pesquisaNaEntrada),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais
     // embutido em `montarEntrada`, para continuar sendo a última linha também na segunda tentativa.
-    lembreteFinal: roteiroIA.LEMBRETE_ACENTUACAO,
+    // E76 PR 3: com outro idioma, o lembrete diz a mistura e a acentuação vale só para o que ficar em português.
+    lembreteFinal: lembreteDoIdioma(estrategiaIdioma, roteiroIA.LEMBRETE_ACENTUACAO),
+    variosIdiomas,
     proibicoes: perfil.fatos.proibicoes,
     // 22/10/2026: tema da própria pessoa: a proibição é aviso (a entrada o diz e o verificador não reprova por ela); as R-CONF seguem em `verificarExtra`.
     citarProibicaoVale: dados.temaDaPessoa,

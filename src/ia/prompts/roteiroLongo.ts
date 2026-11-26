@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Objetivo } from "@/db/schema";
+import type { EstrategiaIdioma, Objetivo } from "@/db/schema";
 import {
   LIMITE_DO_TITULO_DO_VIDEO,
   MAXIMO_DE_CAPITULOS_DO_ROTEIRO,
@@ -17,6 +17,7 @@ import type { VozNumerada } from "@/servicos/vozes-do-publico";
 import { NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
+import { blocoDoIdioma, linhaFinalDoIdioma } from "./idioma";
 import { pedidoPorQueDosBlocos, porQueDosBlocosSchema } from "./por-que-dos-blocos";
 import { textoRegrasCopyRoteiro } from "./regras-copy-roteiro-uso";
 import { REGRAS_ROTEIRO_LONGO, textoRegras } from "./regras-formato";
@@ -66,7 +67,16 @@ import {
  */
 /** 1.7.0 (onda 1 de texto, 25/11/2026): o bloco de regras de texto do roteiro longo traz `R-COPY-26` e `R-COPY-27` e a `R-COPY-19` nova (seção 11 das rubricas 1.3.0). O schema não muda. */
 /** 1.8.0 (25/11/2026, decisão do Gustavo): a regra dura 9 ganha a cena que prova em ramo de saúde e proíbe sugerir gravar o procedimento em andamento; `R-CONF-07` 1.4.0 proíbe preço e grátis em saúde. O schema não muda. */
-export const versao = "1.8.0";
+/**
+ * 1.9.0 (E76 PR 3, 26/11/2026, a estratégia de idioma): o mesmo do roteiro curto (2.27.0). A marca de mais de um país que escolheu como misturar
+ * os idiomas recebe a regra de idioma do vídeo longo (`blocoDoIdioma`, peça "video_longo") antes da linha final, e a linha final e o lembrete
+ * passam a valer só para o que fica em português. Sem a estratégia, o sistema é o da 1.8.0, palavra por palavra. O schema não muda.
+ */
+export const versao = "1.9.0";
+
+/** A última linha do sistema estável quando a marca não tem outro idioma (a de sempre). */
+const LINHA_FINAL_DO_SISTEMA = `Escreva em português do Brasil, com acentuação correta. O que o cliente escreveu no perfil ou no
+tema pode vir sem acento; o roteiro que você escreve sai sempre acentuado, mesmo assim.`;
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -135,7 +145,13 @@ export function montarSistemaEstavel(dados: {
   tipo: "negocio" | "pessoa";
   persona?: string | null;
   quemAparece?: string | null;
+  /** E76 PR 3: a estratégia de idioma já resolvida por `estrategiaDaMarca` (nula em marca de um país só); sem ela o sistema é o da 1.8.0. */
+  estrategiaIdioma?: EstrategiaIdioma | null;
 }): string {
+  // E76 PR 3: sem outro idioma, `blocoDoIdioma` é nulo e o fim do sistema é a linha de sempre.
+  const fimDoSistema = [blocoDoIdioma(dados.estrategiaIdioma, "video_longo"), linhaFinalDoIdioma(dados.estrategiaIdioma, LINHA_FINAL_DO_SISTEMA)]
+    .filter((parte): parte is string => Boolean(parte))
+    .join(String.fromCharCode(10, 10));
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
       ? `\n\nO que este cliente já reprovou (a regra firme vale como proibição, a fraca deve ser evitada):\n${dados.regrasCliente
@@ -251,8 +267,7 @@ ${dados.camadaExclusiva}
 Modelo do nicho (os vídeos curtos do ramo; a duração e a estrutura do vídeo longo vêm da entrada):
 ${dados.modeloNicho}
 
-Escreva em português do Brasil, com acentuação correta. O que o cliente escreveu no perfil ou no
-tema pode vir sem acento; o roteiro que você escreve sai sempre acentuado, mesmo assim.`;
+${fimDoSistema}`;
 }
 
 function minutosESegundos(segundos: number): string {

@@ -108,7 +108,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * verdadeiros trocando o ramo, sem nenhum elemento que só existe nesta marca ou neste ramo (o serviço, o lugar, o público, um fato da ficha ou da evidência), o roteiro volta uma vez para refazer. Na dúvida,
  * aprova (o mesmo princípio do critério de fato). Precisa de prova com chave real antes de valer em produção.
  */
-export const versao = "1.10.0";
+export const versao = "1.11.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -275,11 +275,19 @@ export const CRITERIO_PROIBICAO_COMO_AVISO =
   "ou escrever sobre ele com cuidado nunca reprova, e nunca fere a proibição. Por este item, reprove só se o texto atacar ou ofender uma pessoa, um candidato, um partido, um concorrente ou um grupo, prometer " +
   "resultado que não pode cumprir ou tiver palavrão.";
 
-export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false, proibicaoEhAviso = false): string {
+/**
+ * 1.11.0 (E76 PR 3): a marca que fala com mais de um país e escolheu escrever também em outro idioma. Exportado para o teste conferir o texto;
+ * só entra com `variosIdiomas`, e sem ele o sistema é o da 1.10.0, palavra por palavra.
+ */
+export const CRITERIO_VARIOS_IDIOMAS =
+  "\n- o texto pode ter trechos em inglês ou em espanhol, ou ser todo num desses idiomas: a marca fala com público em mais de um país e escolheu assim. O idioma, sozinho, " +
+  "nunca é motivo de reprovação; confira o tom, os fatos e as proibições em qualquer idioma.";
+
+export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false, proibicaoEhAviso = false, variosIdiomas = false): string {
   return `Você confere um texto que vai para a tela de um dono de pequeno negócio. Aprove só
 se:
 - o tom é direto, calmo e de parceiro, sem exclamação e sem entusiasmo forçado;
-- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}${genero === "roteiro" && comFontes ? CRITERIO_RAMO : ""}
+- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}${genero === "roteiro" && comFontes ? CRITERIO_RAMO : ""}${variosIdiomas ? CRITERIO_VARIOS_IDIOMAS : ""}
 - ${proibicaoEhAviso ? CRITERIO_PROIBICAO_COMO_AVISO : CRITERIO_PROIBICAO}
 ${CONTEXTO_GENERO[genero] ?? ""}
 Reprove e diga o motivo em uma frase, sem travessão, quando alguma dessas coisas falhar.
