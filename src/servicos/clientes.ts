@@ -45,6 +45,7 @@ import { marcaEhDeCadastroProprio } from "@/servicos/cadastro-travas";
 import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
 import { mandarEmailDeConvite } from "@/servicos/convite";
 import { pedirFiltroDeNoticias } from "@/servicos/filtro-de-noticias";
+import { zerarSenhasErradas } from "@/servicos/freios-de-entrada";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { cancelarPedidoAberto, registrarPedidoDeRamo } from "@/servicos/pedidos-de-ramo";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
@@ -564,8 +565,11 @@ export async function gerarSenhaNova(usuarioId: string): Promise<string> {
         password: senhaHash,
       });
   }
-  // E58: a senha gerada pelo admin e provisoria outra vez (a pessoa volta a escolher a dela no proximo acesso).
+  // E58: a senha gerada pelo admin e provisoria outra vez (a pessoa volta a escolher a dela no proximo acesso), com 48 horas novas.
   await marcarSenhaProvisoria(usuarioId);
+  // A senha nova entra na hora, mesmo que a conta tenha travado por senhas erradas seguidas (e o mais comum e a pessoa pedir a senha nova justamente por isso).
+  const [pessoa] = await db().select({ email: user.email }).from(user).where(eq(user.id, usuarioId));
+  if (pessoa) await zerarSenhasErradas(pessoa.email);
   return senha;
 }
 

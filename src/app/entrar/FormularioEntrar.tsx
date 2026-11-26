@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { authClient } from "@/lib/auth-client";
+import { CODIGOS_DE_ENTRADA } from "@/lib/entrada-regras";
 import { textosEntrar } from "@/textos/entrar";
 import { Botao } from "@/ui/componentes/Botao";
 import { Campo } from "@/ui/componentes/Campo";
@@ -60,8 +61,11 @@ export function FormularioEntrar({ comecarEsquecendo = false }: { comecarEsquece
 
       if (error || !data) {
         // 400 e 401 sao "senha errada"; o limite de tentativas (429) e a falha do servidor (5xx)
-        // nao sao, e a frase de "e-mail ou senha nao conferem" mentia para os dois.
-        if (error?.status === 429) setErroForma(textosEntrar.muitasTentativas);
+        // nao sao, e a frase de "e-mail ou senha nao conferem" mentia para os dois. A trava por
+        // senhas erradas seguidas e a provisoria vencida (lib/entrada-regras.ts) tem frase propria.
+        if (error?.code === CODIGOS_DE_ENTRADA.contaTravada) setErroForma(textosEntrar.contaTravada);
+        else if (error?.code === CODIGOS_DE_ENTRADA.senhaProvisoriaVencida) setErroForma(textosEntrar.senhaProvisoriaVencida);
+        else if (error?.status === 429) setErroForma(textosEntrar.muitasTentativas);
         else if (error && error.status >= 500) setErroForma(textosEntrar.erroDeServidor);
         else setErroSenha(textosEntrar.erroGenerico);
         return;
@@ -94,7 +98,13 @@ export function FormularioEntrar({ comecarEsquecendo = false }: { comecarEsquece
       const { error } = await authClient.signIn.magicLink({ email, callbackURL: "/hoje" });
 
       if (error) {
-        setErroLink(error.status === 429 ? textosEntrar.muitasTentativas : textosEntrar.erroLink);
+        setErroLink(
+          error.code === CODIGOS_DE_ENTRADA.linksDemais
+            ? textosEntrar.linksDemais
+            : error.status === 429
+              ? textosEntrar.muitasTentativas
+              : textosEntrar.erroLink,
+        );
         return;
       }
       setLinkEnviadoPara(email);

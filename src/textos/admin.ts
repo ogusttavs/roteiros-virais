@@ -1,4 +1,5 @@
 import type { AvaliacaoGeracao } from "@/db/schema";
+import { VALIDADE_DA_SENHA_PROVISORIA_EM_HORAS } from "@/lib/entrada-regras";
 
 /**
  * "6 set" (E27 parte 2, item 5, AdminCliente.dc.html: dia mais mes abreviado,
@@ -559,7 +560,8 @@ export const textosAdmin = {
     copiarSenha: "copiar a senha",
     copiado: "copiado",
     copiarEmailESenha: "copiar e-mail e senha",
-    avisoSenhaUmaVez: "Esta senha não aparece de novo. Se fechar sem copiar, é só gerar outra na linha dele, em quem tem acesso.",
+    /** A provisória vence em 48 horas (auditoria de 26/11/2026, A3): o admin precisa saber, para passar logo e gerar outra se a pessoa demorar. */
+    avisoSenhaUmaVez: `Esta senha não aparece de novo e vale por ${VALIDADE_DA_SENHA_PROVISORIA_EM_HORAS} horas. Se fechar sem copiar, ou se a pessoa não entrar a tempo, é só gerar outra na linha dele, em quem tem acesso.`,
     copieiPodeFechar: "copiei, pode fechar",
     rodape: "Cada pessoa entra com o próprio e-mail e vê tudo desta marca. Tirar o acesso não apaga a pessoa: ela continua entrando nas outras marcas que tiver.",
     /** E46 PR 2: o "ver como" (passo 15 do Opus, `AdminCliente.dc.html`, estado `verComo`). */

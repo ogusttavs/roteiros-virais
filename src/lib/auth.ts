@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins/admin";
 import { magicLink } from "better-auth/plugins/magic-link";
@@ -10,6 +11,7 @@ import { config } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { logger } from "@/lib/log";
 import { SENHA_MAXIMO, SENHA_MINIMO } from "@/lib/senha-regras";
+import { freioAntesDeEntrarComSenha, freioAntesDoLink, freioDepoisDeEntrarComSenha, zerarSenhasErradas } from "@/servicos/freios-de-entrada";
 import {
   aposRedefinirSenha,
   contarPedidosDeRedefinicaoRecentes,
@@ -65,7 +67,23 @@ export const auth = betterAuth({
     revokeSessionsOnPasswordReset: true,
     onPasswordReset: async ({ user }) => {
       await aposRedefinirSenha(user.id);
+      // Quem escolheu a senha nova pelo link do e-mail entra com ela na hora, mesmo que alguém tenha travado a conta errando a senha antiga.
+      await zerarSenhasErradas(user.email);
     },
+  },
+  /**
+   * Os freios por pessoa (auditoria de 26/11/2026, A3 e M7; `servicos/freios-de-entrada.ts`): antes de entrar com senha, a trava depois de senhas erradas seguidas e a
+   * senha provisória vencida (48 horas); depois, a conta das erradas sobe ou zera; antes de pedir o link de entrar sem senha, o teto por e-mail e por hora. Valem também
+   * no `auth.api.*` chamado pelo servidor (o cadastro próprio entra por `signInEmail`) e ficam ligados no e2e, ao contrário do limite por IP: a conta é por e-mail.
+   */
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/sign-in/email") await freioAntesDeEntrarComSenha(ctx.body);
+      else if (ctx.path === "/sign-in/magic-link") await freioAntesDoLink(ctx.body);
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/sign-in/email") await freioDepoisDeEntrarComSenha(ctx.body, ctx.context.returned);
+    }),
   },
   /**
    * `enabled: undefined` preserva o padrão do pacote (ligado só em

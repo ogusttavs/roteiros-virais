@@ -22,9 +22,15 @@ export class ErroSenha extends Error {
   }
 }
 
-/** Nasce quando o admin cria o acesso (senha gerada) ou gera uma senha nova: até a pessoa escolher a dela, o painel pede a troca. */
-export async function marcarSenhaProvisoria(usuarioId: string): Promise<void> {
-  await db().insert(senhasProvisorias).values({ usuarioId }).onConflictDoNothing();
+/**
+ * Nasce quando o admin cria o acesso (senha gerada) ou gera uma senha nova: até a pessoa escolher a dela, o painel pede a troca. A provisória vence 48 horas depois
+ * (`servicos/freios-de-entrada.ts`), contadas daqui: a senha nova gerada sobre uma provisória antiga recomeça o prazo, em vez de já nascer vencida.
+ */
+export async function marcarSenhaProvisoria(usuarioId: string, agora: Date = new Date()): Promise<void> {
+  await db()
+    .insert(senhasProvisorias)
+    .values({ usuarioId, criadoEm: agora })
+    .onConflictDoUpdate({ target: senhasProvisorias.usuarioId, set: { criadoEm: agora } });
 }
 
 export async function limparSenhaProvisoria(usuarioId: string): Promise<void> {
