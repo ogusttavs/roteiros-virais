@@ -59,11 +59,20 @@ describe("molde tipografico-2 (sem navegador)", () => {
 
   it("uma palavra (ou duas seguidas) no destaque em cada cena, pela regra fixa", () => {
     const { html } = montarHtmlDaAnimacao({ cenas: CENAS });
-    expect(html).toContain('<span class="p d">gengiva</span>');
-    expect(html).toContain('<span class="p d">2</span> <span class="p d">semanas,</span>');
-    expect(html).toContain('<span class="p d">avaliação</span>');
+    expect(html).toContain('<span class="p"><span class="d">gengiva</span></span>');
+    expect(html).toContain('<span class="p"><span class="d">avaliação</span></span>');
     const cenas = html.split('<section class="cena"').slice(1);
-    for (const cena of cenas) expect(cena.match(/class="p d"/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
+    for (const cena of cenas) expect(cena.match(/class="d"/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  it("a pontuação colada fica fora do destaque, na cor do texto", () => {
+    const { html } = montarHtmlDaAnimacao({ cenas: CENAS });
+    // "2 semanas," destaca só "2 semanas": a vírgula fica fora do trecho que acende.
+    expect(html).toContain('<span class="p"><span class="d">2</span></span> <span class="p"><span class="d">semanas</span>,</span>');
+    // "avaliação." destaca só "avaliação".
+    const fim = montarHtmlDaAnimacao({ cenas: [{ texto: "Agende hoje a sua avaliação." }] }).html;
+    expect(fim).toContain('<span class="p"><span class="d">avaliação</span>.</span>');
+    expect(fim).not.toMatch(/class="d">[^<]*[.,;:!?…"”]/);
   });
 
   it("a cor da marca é o único acento: o destaque e a pílula do @ usam a mesma cor", () => {

@@ -19,6 +19,17 @@ export function nucleoDaPalavra(palavra: string): string {
   return palavra.replace(CERCA_INICIO, "").replace(CERCA_FIM, "").toLowerCase();
 }
 
+/**
+ * A palavra em três partes: a pontuação colada antes, o miolo e a pontuação colada depois (vírgula, ponto, dois-pontos, ponto e vírgula, interrogação, exclamação, reticências, aspas, parênteses).
+ * Só o miolo vai para a cor do destaque: "semanas," acende "semanas" e a vírgula fica na cor do texto.
+ */
+export function separarPontuacao(palavra: string): [string, string, string] {
+  const antes = CERCA_INICIO.exec(palavra)?.[0] ?? "";
+  const resto = palavra.slice(antes.length);
+  const depois = CERCA_FIM.exec(resto)?.[0] ?? "";
+  return [antes, resto.slice(0, resto.length - depois.length), depois];
+}
+
 /** Palavras comuns demais para destacar. Só as de 4 letras ou mais importam (as menores já ficam de fora pelo tamanho), mas as curtas ficam na lista para a regra do número ("3 de"). */
 export const PALAVRAS_COMUNS: ReadonlySet<string> = new Set(
   (
