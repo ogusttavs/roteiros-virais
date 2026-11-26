@@ -1,8 +1,8 @@
 import * as Sentry from "@sentry/node";
 import { NextResponse } from "next/server";
-import { chromium } from "playwright";
 
 import { comLimiteDeChromium, comTempoLimite, conferirPaginaDeImpressao, ErroFilaCheia, rodapeDoPdf, TEMPO_LIMITE_MS } from "@/lib/chromium-de-impressao";
+import { abrirChromiumDaFolha, paginaSoDaOrigem } from "@/lib/chromium-sem-rede";
 import { CABECALHO_DAS_MARCAS, pedidoComMarcas, roteiroDeQuemPediu, urlDeImpressao, VALOR_NAO_DEU } from "@/lib/impressao-de-roteiro";
 import { logger } from "@/lib/log";
 import { dataPorExtenso } from "@/servicos/folha-do-roteiro";
@@ -25,12 +25,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // O PDF sempre sai: se as marcas não puderam ser escritas, ele sai sem elas e o cabeçalho `X-Marcas` avisa a tela.
     const { comMarcas, naoDeu } = await pedidoComMarcas(request, roteiro, cliente, somenteLeitura);
     const pdf = await comLimiteDeChromium(async () => {
-      const navegador = await chromium.launch();
+      // O token nasce aqui, dentro da vaga: depois de esperar na fila ele já podia estar vencido (vale 60 s).
+      const endereco = urlDeImpressao(roteiro, cliente, "a4", comMarcas);
+      // M4 (auditoria de 26/11/2026): a folha só busca do próprio painel (a origem do endereço) e o que vem embutido; outro servidor, `file` e endereço interno são barrados.
+      const navegador = await abrirChromiumDaFolha(endereco);
       try {
-        const pagina = await navegador.newPage();
+        const pagina = await paginaSoDaOrigem(navegador, endereco);
         await pagina.emulateMedia({ colorScheme: "light" });
-        // O token nasce aqui, dentro da vaga: depois de esperar na fila ele já podia estar vencido (vale 60 s).
-        const resposta = await pagina.goto(urlDeImpressao(roteiro, cliente, "a4", comMarcas), { waitUntil: "networkidle", timeout: TEMPO_LIMITE_MS });
+        const resposta = await pagina.goto(endereco, { waitUntil: "networkidle", timeout: TEMPO_LIMITE_MS });
         conferirPaginaDeImpressao(resposta);
         return await comTempoLimite(
           pagina.pdf({
