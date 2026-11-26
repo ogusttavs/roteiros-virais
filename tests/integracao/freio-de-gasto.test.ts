@@ -1,7 +1,7 @@
 /**
  * O freio de gasto da IA por marca (achado A4 da auditoria de segurança de 26/11/2026), contra o Postgres real, com o simulador da IA e o relógio simulado (só `Date`; o `pg` precisa dos
  * temporizadores de verdade): o que conta em cada janela, a recusa pela hora (que vale até para a cortesia e o plano sem limite), a recusa pelo dia (que não vale para elas), a volta quando
- * a janela passa, a chave que desliga, a busca na web freada do mesmo jeito, a chamada sem marca sem freio e o e-mail do alarme da IA uma vez por dia por marca.
+ * a janela passa, a chave que desliga, a busca na web e as leituras do momento e da agenda freadas do mesmo jeito, a chamada sem marca sem freio e o e-mail do alarme da IA uma vez por dia por marca.
  */
 import { eq, like } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +13,8 @@ import { buscarNaWeb } from "@/ia/busca-na-web";
 import { gerarEstruturado } from "@/ia/cliente";
 import { ErroFreioDeGasto, gastoRecenteDaMarca } from "@/ia/freio";
 import { avisarFreioDeGasto, chaveDoAvisoDoFreio } from "@/servicos/aviso-da-ia";
+import { lerMomentoDeTexto } from "@/servicos/momento";
+import { lerAgendaDeTexto } from "@/servicos/plano";
 import { textosFreioDaIA } from "@/textos/freio-ia";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -131,6 +133,14 @@ describe("a recusa", () => {
   it("a chamada sem marca (tarefa do setor ou do sistema) não passa pelo freio", async () => {
     await gastou(comum, 100, 5 * MINUTO);
     await expect(gerar(undefined)).resolves.toBeDefined();
+  });
+
+  it("a leitura do momento e a da agenda, que antes não levavam marca, são freadas com ela", async () => {
+    await gastou(comum, 9, 5 * MINUTO);
+    await expect(lerMomentoDeTexto("estou na loja com o sabão novo", comum)).rejects.toBeInstanceOf(ErroFreioDeGasto);
+    await expect(lerAgendaDeTexto("segunda: feira", "2026-11-26", comum)).rejects.toBeInstanceOf(ErroFreioDeGasto);
+    await expect(lerMomentoDeTexto("estou na loja com o sabão novo", outra)).resolves.toBeDefined();
+    await expect(lerAgendaDeTexto("segunda: feira", "2026-11-26", outra)).resolves.toBeDefined();
   });
 
   it("a busca na web da marca é freada do mesmo jeito", async () => {

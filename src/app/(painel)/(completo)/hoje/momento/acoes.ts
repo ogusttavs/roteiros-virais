@@ -8,7 +8,7 @@ import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
-import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
+import { ErroAcessoNegado, clienteAtivoDoUsuario, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import { lerMomentoDeTexto, type CamposMomento } from "@/servicos/momento";
 import {
   ErroRoteiro,
@@ -37,7 +37,9 @@ export async function lerMomentoDeTextoAction(texto: string): Promise<CamposMome
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
-  return lerMomentoDeTexto(texto);
+  // Achado A4 da auditoria de 26/11/2026: a marca ativa vai junto para a leitura passar pelo freio de gasto da IA e o custo contar para ela.
+  const marca = await clienteAtivoDoUsuario(sessao.user.id);
+  return lerMomentoDeTexto(texto, marca?.id);
 }
 
 export type DadosMomento = {

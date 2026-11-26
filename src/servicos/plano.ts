@@ -108,9 +108,13 @@ function linhaParaItem(linha: typeof planoGravacoes.$inferSelect): ItemPlano {
  * mais em silêncio, volta em `diasNaoEntendidos` para a folha "Colar a
  * agenda" mostrar "não entendi este dia" e deixar a pessoa escolher a data
  * ou deixar de fora.
+ *
+ * `clienteId` (achado A4 da auditoria de 26/11/2026): a marca de quem pediu, para a chamada passar pelo freio de gasto
+ * (`ia/freio.ts`) e o custo contar para ela, como em `lerMomentoDeTexto`.
  */
-export async function lerAgendaDeTexto(texto: string, hoje = hojeISO()): Promise<ResultadoLerAgenda> {
+export async function lerAgendaDeTexto(texto: string, hoje = hojeISO(), clienteId?: number): Promise<ResultadoLerAgenda> {
   const resultado = await gerarEstruturado({
+    clienteId,
     tarefa: "lerAgenda",
     nivel: lerAgendaIA.nivel,
     effort: lerAgendaIA.esforco,
@@ -124,6 +128,7 @@ export async function lerAgendaDeTexto(texto: string, hoje = hojeISO()): Promise
     versaoPrompt: lerAgendaIA.versao,
     modelo: resultado.modelo,
     nivel: lerAgendaIA.nivel,
+    clienteId,
     entradas: { texto },
     saida: resultado.dados,
     uso: {

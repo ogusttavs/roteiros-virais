@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, contas, membrosMarca, nichos, planoGravacoes, roteiros, user, videos, type PerfilCompilado } from "@/db/schema";
+import { briefings, clientes, contas, geracoesIA, membrosMarca, nichos, planoGravacoes, roteiros, user, videos, type PerfilCompilado } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado } from "@/servicos/clientes";
 
@@ -94,6 +94,14 @@ describe("lerAgendaAction e criarPlanoAction", () => {
     await expect(criarPlanoAction([{ data: hojeMais(0), lugar: "x", compromissos: ["y"] }])).rejects.toThrow(
       ErroAcessoNegado,
     );
+  });
+
+  it("com sessao, lerAgendaAction registra a leitura na marca ativa (o freio de gasto da IA conta e freia essa leitura, achado A4 de 26/11/2026)", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    await lerAgendaAction("segunda: feira com o fornecedor novo");
+    const leituras = await db().select({ clienteId: geracoesIA.clienteId }).from(geracoesIA).where(eq(geracoesIA.tarefa, "lerAgenda"));
+    expect(leituras.length).toBeGreaterThan(0);
+    expect(leituras.every((l) => l.clienteId === marcaA.id)).toBe(true);
   });
 
   it("com sessao, criarPlanoAction cria na marca ativa da sessao", async () => {
