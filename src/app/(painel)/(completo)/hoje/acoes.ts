@@ -45,13 +45,16 @@ export async function roteiroRecenteDesdeAction(desdeMs: number): Promise<{ id: 
  * novo desde o início da espera, se já ficou pronto, é para onde a pessoa vai. Um grupo que o servidor ainda está escrevendo não vale: a pessoa cairia numa comparação com uma ou duas
  * versões e as outras só apareceriam se ela saísse e voltasse (o aviso de "olhe em Hoje" cobre esse caso, e o cartão aparece lá quando as três ficam prontas).
  */
-export async function grupoRecenteDesdeAction(desdeMs: number): Promise<{ grupo: string } | null> {
+export async function grupoRecenteDesdeAction(desdeMs: number, tema?: string): Promise<{ grupo: string } | null> {
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
   const cliente = await clienteDaSessaoAtual();
   const maisNovo = await grupoEmAberto(cliente.id);
-  return maisNovo && !maisNovo.emEscrita && maisNovo.inicio.getTime() >= desdeMs - MARGEM_RELOGIO_MS ? { grupo: maisNovo.grupo } : null;
+  if (!maisNovo || maisNovo.emEscrita || maisNovo.inicio.getTime() < desdeMs - MARGEM_RELOGIO_MS) return null;
+  // E74 PR 1: com `tema`, só vale o grupo deste tema (o mais novo da marca pode ser de outro assunto que a pessoa escreveu depois de sair).
+  if (tema !== undefined && maisNovo.tema.trim().toLowerCase() !== tema.trim().toLowerCase()) return null;
+  return { grupo: maisNovo.grupo };
 }
 

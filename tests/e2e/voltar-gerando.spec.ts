@@ -9,7 +9,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -95,6 +95,12 @@ test.describe("E74 PR 1: o voltar funciona enquanto o roteiro é escrito", () =>
     await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas });
   });
 
+  /** As versões desta marca de teste (nunca as do banco inteiro: outros arquivos de e2e escrevem versões também). */
+  async function versoesDaMarca() {
+    const [marca] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, "e2e-voltar-gerando"));
+    return db().select({ id: versoesDoRoteiro.id }).from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, marca.id));
+  }
+
   /** Segura a resposta da Server Action (o servidor já a processou); devolve um aviso de quando ela foi liberada. */
   async function segurarARespostaDaAcao(page: Page) {
     const estado = { liberada: false };
@@ -104,7 +110,7 @@ test.describe("E74 PR 1: o voltar funciona enquanto o roteiro é escrito", () =>
       // Só a Server Action que escreve (o corpo leva o `origem` do pedido; a sugestão de estilo, que a tela pede ao montar, e as conferências de depois passam direto).
       if (!segurou && pedido.method() === "POST" && pedido.headers()["next-action"] && (pedido.postData() ?? "").includes('"origem"')) {
         segurou = true;
-        const resposta = await rota.fetch(); 
+        const resposta = await rota.fetch();
         await new Promise((resolve) => setTimeout(resolve, ESPERA_MS));
         estado.liberada = true;
         await rota.fulfill({ response: resposta });
@@ -135,7 +141,7 @@ test.describe("E74 PR 1: o voltar funciona enquanto o roteiro é escrito", () =>
     await expect(page).toHaveURL(/\/hoje$/, { timeout: 4000 });
     expect(estado.liberada).toBe(false);
     // O roteiro continua sendo escrito no servidor: as três versões estão no banco, e a resposta tardia não leva a pessoa de volta.
-    await expect.poll(async () => (await db().select({ id: versoesDoRoteiro.id }).from(versoesDoRoteiro)).length, { timeout: 20_000 }).toBeGreaterThanOrEqual(3);
+    await expect.poll(async () => (await versoesDaMarca()).length, { timeout: 20_000 }).toBeGreaterThanOrEqual(3);
     await expect.poll(() => estado.liberada, { timeout: ESPERA_MS + 5000 }).toBe(true);
     await page.waitForTimeout(1500);
     await expect(page).toHaveURL(/\/hoje$/);
@@ -172,5 +178,87 @@ test.describe("E74 PR 1: o voltar funciona enquanto o roteiro é escrito", () =>
     await expect(page.getByText("Escrevendo as três versões")).toBeVisible();
     await expect(page.getByRole("button", { name: "escrever o roteiro" })).toHaveCount(0);
     await expect(page).toHaveURL(/\/criar\/versoes\//, { timeout: 30_000 });
+  });
+
+  test("no caminho feliz, o formulário não volta enquanto a página das versões carrega (um toque nele pagaria uma segunda escrita)", async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.route("**/criar/versoes/**", async (rota) => {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await rota.continue();
+    });
+    await entrar(page);
+    await page.goto("/criar/objetivo?tema=0");
+    await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
+    await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    // A escrita (IA simulada) termina em instantes e a página nova demora 3 s: nesse meio tempo a espera fica na tela, nunca o botão de escrever.
+    const fim = Date.now() + 2500;
+    while (Date.now() < fim) {
+      expect(await page.getByRole("button", { name: "escrever o roteiro" }).count()).toBe(0);
+      await page.waitForTimeout(150);
+    }
+    expect(page.url()).toContain("/criar/objetivo");
+    await expect(page).toHaveURL(/\/criar\/versoes\//, { timeout: 15_000 });
+  });
+
+  test.describe("a escrita falha com a pessoa fora da tela", () => {
+    test.afterEach(async () => {
+      const [marca] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, "e2e-voltar-gerando"));
+      await db().delete(versoesDoRoteiro).where(and(eq(versoesDoRoteiro.clienteId, marca.id), like(versoesDoRoteiro.grupo, "enche-%")));
+    });
+
+    test("quem volta (pelo voltar do navegador) vê o erro de sempre, não 'ainda escrevendo' até o prazo", async ({ page }) => {
+      test.setTimeout(60_000);
+      // O teto do dia: 18 versões já escritas hoje e as três novas passam de 20, então o servidor recusa.
+      const [marca] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, "e2e-voltar-gerando"));
+      await db()
+        .insert(versoesDoRoteiro)
+        .values(
+          Array.from({ length: 18 }, (_, i) => ({
+            clienteId: marca.id,
+            grupo: `enche-${i}`,
+            ordem: 1,
+            parametros: {},
+            valores: {},
+            criadoEm: new Date(Date.now() - 60_000),
+          })),
+        );
+      const estado = await segurarARespostaDaAcao(page);
+      await entrar(page);
+      await page.goto("/hoje");
+      await page.goto("/criar/objetivo?tema=0");
+      await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
+      const pedidoDeEscrever = page.waitForRequest((p) => p.method() === "POST" && (p.postData() ?? "").includes('"origem"'));
+      await page.getByRole("button", { name: "escrever o roteiro" }).click();
+      await pedidoDeEscrever;
+      await page.getByRole("button", { name: "Voltar depois" }).click();
+      await expect(page).toHaveURL(/\/hoje$/, { timeout: 4000 });
+      await expect.poll(() => estado.liberada, { timeout: ESPERA_MS + 5000 }).toBe(true);
+      await page.waitForTimeout(500);
+      await page.goBack();
+      await expect(page).toHaveURL(/\/criar\/objetivo/);
+      await expect(page.getByRole("alert").filter({ hasText: "limite de versões de hoje" })).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText("Escrevendo as três versões")).toHaveCount(0);
+    });
+  });
+
+  test("sair de um tema, escrever outro e voltar ao primeiro não abre a comparação do outro", async ({ page }) => {
+    test.setTimeout(90_000);
+    await segurarARespostaDaAcao(page);
+    await comecarAEscrever(page);
+    await page.getByRole("button", { name: "Voltar depois" }).click();
+    await expect(page).toHaveURL(/\/hoje$/, { timeout: 4000 });
+    // O outro tema: a escrita (que não é segurada) termina e abre as versões dele.
+    await page.goto("/criar/objetivo?tema=1");
+    await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
+    await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    await expect(page).toHaveURL(/\/criar\/versoes\//, { timeout: 30_000 });
+    const versoesDoOutro = page.url();
+    // De volta ao primeiro, com a escrita dele ainda guardada como em andamento: as versões do segundo tema não servem.
+    await page.goto("/criar/objetivo?tema=0");
+    await expect(page.getByText("Escrevendo as três versões")).toBeVisible();
+    await page.waitForTimeout(9000);
+    expect(page.url()).not.toContain("/criar/versoes/");
+    expect(page.url()).toContain("/criar/objetivo?tema=0");
+    expect(versoesDoOutro).toContain("/criar/versoes/");
   });
 });
