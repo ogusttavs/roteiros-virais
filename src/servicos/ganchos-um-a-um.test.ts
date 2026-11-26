@@ -78,4 +78,11 @@ describe("ErroReprovadoDuasVezes", () => {
     expect(erro).toBeInstanceOf(ErroIA);
     expect(erro.ultimaSaida).toEqual({ ganchos: [BOM] });
   });
+
+  it("a saída fica fora das chaves próprias do erro, para o log não gravar o texto inteiro", () => {
+    const erro = new ErroReprovadoDuasVezes("reprovada", { ganchos: [BOM] });
+    expect(Object.keys(erro)).not.toContain("ultimaSaida");
+    expect(JSON.stringify(erro)).not.toContain("ganchos");
+    expect(erro.ultimaSaida).toEqual({ ganchos: [BOM] });
+  });
 });

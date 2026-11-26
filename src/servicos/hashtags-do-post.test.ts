@@ -167,7 +167,7 @@ describe("escolherHashtags", () => {
     const dentista = [cand("comedia", 99), cand("humor", 98), cand("dentista", 40)];
     expect(escolherHashtags(dentista, { ramoSaude: true })).toEqual(["#dentista"]);
     expect(escolherHashtags(dentista, {})).toEqual(["#dentista"]);
-    const outras = ["memes", "humordentista", "piadas", "zoeira", "dentistaengracado", "entretenimento", "standup", "pegadinha", "kkkk"].map((c) => cand(c, 80));
+    const outras = ["memes", "humordentista", "piadas", "zoeira", "dentistaengracado", "entretenimento", "pegadinha", "kkkk"].map((c) => cand(c, 80));
     expect(escolherHashtags([...outras, cand("limpezadacasa", 40)], {})).toEqual(["#limpezadacasa"]);
   });
 
@@ -178,7 +178,7 @@ describe("escolherHashtags", () => {
 
   it("hashtagDeHumor acha o gênero dentro da hashtag e deixa o serviço em paz", () => {
     for (const c of ["comedia", "comediante", "humorbr", "bomhumor", "memes", "piadadodia", "zueira", "videoengracado"]) expect(hashtagDeHumor(c)).toBe(true);
-    for (const c of ["dentista", "clareamento", "comida", "economia", "odontologia", "saudebucal", "sorriso"]) expect(hashtagDeHumor(c)).toBe(false);
+    for (const c of ["dentista", "clareamento", "comida", "economia", "odontologia", "saudebucal", "sorriso", "standuppaddle"]) expect(hashtagDeHumor(c)).toBe(false);
   });
 });
 

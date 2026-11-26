@@ -72,7 +72,7 @@ const PROMESSA = [
  * #humordentista e #bomhumor; "meme" barra #memes. Lista nossa e curta; crescer aqui é barato.
  */
 const GENERO_DE_HUMOR = [
-  "humor", "comedi", "comico", "comica", "piada", "zoeira", "zueira", "zuera", "engracad", "risada", "kkk", "meme", "entretenimento", "pegadinha", "standup", "esquete", "parodia", "besteirol",
+  "humor", "comedi", "comico", "comica", "piada", "zoeira", "zueira", "zuera", "engracad", "risada", "kkk", "meme", "entretenimento", "pegadinha", "esquete", "parodia", "besteirol",
 ];
 
 export function hashtagDeHumor(chave: string): boolean {

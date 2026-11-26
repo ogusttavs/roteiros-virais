@@ -58,11 +58,12 @@ export class ErroIA extends Error {
  * da lista) em vez de perder tudo. Continua sendo um `ErroIA`: quem não usa a saída trata como sempre.
  */
 export class ErroReprovadoDuasVezes<T = unknown> extends ErroIA {
-  constructor(
-    mensagemTecnica: string,
-    readonly ultimaSaida: T,
-  ) {
+  declare readonly ultimaSaida: T;
+
+  constructor(mensagemTecnica: string, ultimaSaida: T) {
     super(mensagemTecnica);
+    // Nao enumeravel: o pino grava as chaves proprias do erro, e a saida inteira (um roteiro, uma lista de ganchos) iria para o log.
+    Object.defineProperty(this, "ultimaSaida", { value: ultimaSaida, enumerable: false, writable: false, configurable: false });
   }
 }
 
