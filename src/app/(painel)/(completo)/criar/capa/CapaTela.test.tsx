@@ -32,14 +32,14 @@ describe("a capa pronta não vive só na memória da tela", () => {
       if (String(url).endsWith("/previa")) return json({ slides: [{ n: 1, imagem: "data:image/png;base64,AAAA", precisaEncurtar: false, semFoto: true }] });
       return json(DADOS);
     });
-    render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="@clinica.exemplo" ramoSaude={false} capaInicialId={55} />);
+    render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="@clinica.exemplo" capaInicialId={55} />);
     expect(await screen.findByRole("heading", { name: "A sua capa está pronta" })).toBeTruthy();
     expect(chamadas).toEqual(["/api/carrossel/55", "/api/carrossel/55/previa"]);
   });
 
   it("se a capa não abre, a tela diz isso e oferece tentar de novo", async () => {
     vi.mocked(fetch).mockResolvedValue(json({ erro: "nao encontrado" }, 404));
-    render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="" ramoSaude={false} capaInicialId={55} />);
+    render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="" capaInicialId={55} />);
     expect(await screen.findByText("Não deu para abrir a capa")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
   });
@@ -52,9 +52,34 @@ describe("baixar a capa", () => {
       if (String(url).endsWith("/slide/1")) return json({ erro: "falhou" }, 504);
       return json(DADOS);
     });
-    render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="" ramoSaude={false} capaInicialId={55} />);
+    render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="" capaInicialId={55} />);
     fireEvent.click(await screen.findByRole("button", { name: "Baixar a imagem" }));
     expect(await screen.findByText("Não deu para baixar agora. Tente de novo em instantes.")).toBeTruthy();
     await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([u]) => String(u).endsWith("/slide/1"))).toBe(true));
+  });
+});
+
+describe("a foto da capa é foto comum, em qualquer ramo (inclusive saúde)", () => {
+  it("o botão da foto não espera marcação nenhuma, não há caixa de autorização e a foto vai sem marca de paciente nem autorização", async () => {
+    const corpos: FormData[] = [];
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      const u = String(url);
+      if (u.endsWith("/fotos")) {
+        corpos.push(init?.body as FormData);
+        return json({ foto: { id: 3 } });
+      }
+      if (u.endsWith("/previa")) return json({ slides: [{ n: 1, imagem: "data:image/png;base64,AAAA", precisaEncurtar: false, semFoto: true }] });
+      return json(DADOS);
+    });
+    const { container } = render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="" capaInicialId={55} />);
+    const botao = (await screen.findByRole("button", { name: "Pôr uma foto" })) as HTMLButtonElement;
+    expect(botao.disabled).toBe(false);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByText("Tenho a autorização por escrito do paciente")).toBeNull();
+    const entrada = container.querySelectorAll('input[type="file"]')[1] as HTMLInputElement;
+    fireEvent.change(entrada, { target: { files: [new File([new Uint8Array([1, 2, 3])], "foto.png", { type: "image/png" })] } });
+    await waitFor(() => expect(corpos).toHaveLength(1));
+    expect(corpos[0]!.get("autorizacaoDoPaciente")).toBeNull();
+    expect(corpos[0]!.get("dePaciente")).toBeNull();
   });
 });

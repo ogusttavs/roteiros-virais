@@ -17,7 +17,7 @@ function abrirCom(titulo: string, legenda: string) {
     slidesComFoto: [false],
   };
   vi.mocked(fetch).mockImplementation(async (url) => (String(url).endsWith("/previa") ? json({ slides: [{ n: 1, imagem: "data:image/png;base64,AAAA", precisaEncurtar: false, semFoto: true }] }) : json(dados)));
-  render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="" ramoSaude={false} capaInicialId={55} />);
+  render(<CapaTela noticia={NOTICIA} corMarca="#0e5a6a" arroba="" capaInicialId={55} />);
 }
 
 beforeEach(() => {
