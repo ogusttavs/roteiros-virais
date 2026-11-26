@@ -296,12 +296,33 @@ const PROMESSAS_DE_SAUDE: RegExp[] = [
   /\bsem riscos?\b/,
 ];
 
+/** As palavras que desmentem a promessa quando aparecem pouco antes dela, na mesma frase ("não dura para sempre", "nunca é garantido", "nenhum dentista garante", "é mito que cura"). */
+const NEGACOES = new Set(["nao", "nunca", "nenhum", "nenhuma", "ninguem", "nem", "mito", "jamais"]);
+const JANELA_DA_NEGACAO = 5;
+/** A negação logo depois do trecho ("resultado garantido não existe", "isso é mito"). */
+const NEGACAO_DEPOIS = /^[ ,]*(?:nao (?:existe|ha|e|passa)|e (?:um )?mito)/;
+const FIM_DE_FRASE = [".", "!", "?", ";", ":", ",", String.fromCharCode(10)];
+
+/** O trecho achado é a frase que DESMENTE a promessa, não a promessa (B1 da revisão de 26/11/2026)? Olha as 5 palavras antes, até a pontuação, e a negação logo depois. */
+function trechoNegado(baixo: string, inicio: number, fim: number): boolean {
+  const antes = baixo.slice(0, inicio);
+  const frase = antes.slice(Math.max(...FIM_DE_FRASE.map((c) => antes.lastIndexOf(c))) + 1);
+  const palavras = frase.split(/\s+/).filter(Boolean).slice(-JANELA_DA_NEGACAO);
+  if (palavras.some((w) => NEGACOES.has(w))) return true;
+  return NEGACAO_DEPOIS.test(baixo.slice(fim));
+}
+
 export function promessaEmSaude(texto: string): string | null {
   const baixo = semAcentoLetraPorLetra(texto);
   let primeiro: { inicio: number; fim: number } | null = null;
   for (const padrao of PROMESSAS_DE_SAUDE) {
-    const m = padrao.exec(baixo);
-    if (m && (primeiro === null || m.index < primeiro.inicio)) primeiro = { inicio: m.index, fim: m.index + m[0].length };
+    for (const m of baixo.matchAll(new RegExp(padrao.source, "g"))) {
+      const inicio = m.index ?? 0;
+      const fim = inicio + m[0].length;
+      if (trechoNegado(baixo, inicio, fim)) continue;
+      if (primeiro === null || inicio < primeiro.inicio) primeiro = { inicio, fim };
+      break;
+    }
   }
   return primeiro ? texto.slice(primeiro.inicio, primeiro.fim).trim() : null;
 }

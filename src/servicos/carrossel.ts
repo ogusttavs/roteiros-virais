@@ -154,6 +154,26 @@ function conformidadeDoCarrossel(slides: SlideDoCarrossel[], contexto: { fontes:
 }
 
 /**
+ * B2 (revisão de 26/11/2026): a legenda do post de um ramo de saúde também não promete resultado, cura, garantia nem prazo e passa pela conformidade de saúde do roteiro (preço, grátis, cura e garantia no corpo);
+ * `verificarLegenda` só olha tamanho e hashtags. Fora de saúde, nada muda.
+ */
+export function conformidadeDaLegenda(legenda: string, contexto: { fontes: string; ramoSaude: boolean }): string[] {
+  if (!contexto.ramoSaude || !legenda.trim()) return [];
+  const promessa = promessaEmSaude(legenda);
+  const motivos = promessa ? [`legenda: em saúde o texto não pode prometer resultado, cura, garantia nem prazo; tire "${promessa}"`] : [];
+  const conformidade = verificarConformidadeDoLongo(
+    { gancho: "", chamadaFinal: "", capitulos: [{ nome: "", pontos: [legenda], ganchoParaOProximo: null, naImagem: "" }], edicao: { textoNaTela: [] } },
+    contexto,
+  );
+  return [...motivos, ...conformidade];
+}
+
+/** O que o reparo aceita consertar além do fato sem apoio: a promessa em saúde (slide ou legenda) e a R-CONF-07. */
+export function motivoReparavelDoCarrossel(motivo: string): boolean {
+  return /em saúde o (?:slide|texto) não pode prometer/.test(motivo) || motivo.startsWith("R-CONF-07");
+}
+
+/**
  * T80: o reparo dirigido troca só os campos que reprovaram por fato sem apoio (ou por promessa em saúde). Os campos têm o nome "slide N campo K" (a ordem de `textoDoSlide`, como em `extrairCampos`);
  * cada troca volta ao campo cru da saída da IA que tem exatamente aquele texto (os textos que o código monta, como o contexto da fala e o número com unidade, nunca casam e ficam como estão).
  */
@@ -314,7 +334,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     fontesDosFatos,
     conferirNumerosNasFontes: true,
     // T80: o que sobra reprovado depois das duas tentativas por fato sem apoio ou promessa em saúde é consertado por um reparo barato, só nos campos apontados.
-    repararFato: { aplicarCampos: (d, trocas) => aplicarTrocasNosCampos(d, trocas, ramoSaude), motivoReparavel: (m) => m.includes("em saúde o slide não pode prometer") },
+    repararFato: { aplicarCampos: (d, trocas) => aplicarTrocasNosCampos(d, trocas, ramoSaude), motivoReparavel: motivoReparavelDoCarrossel },
     lembreteFinal: carrosselIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,
     citarProibicaoVale: origem.temaDaPessoa,
@@ -340,6 +360,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
         ...verificarOrdemDosSlides(slidesDeTexto, quantidade),
         ...verificarLimitesDosSlides(slidesDeTexto, { ramoSaude, fotosPrometidas, fotosDePacientePrometidas, falasDoCliente, tolerarExcessoPequeno: tentativa === 2 }),
         ...verificarLegenda(d.legenda, d.hashtags),
+        ...conformidadeDaLegenda(d.legenda, { fontes: fontesDosFatos, ramoSaude }),
         // A promessa da capa, a capa vaga e as fórmulas de máquina (R-COPY-26) reprovam na 1ª tentativa e só avisam na 2ª (como o roteiro): senão brigam com a regra de "nunca três do mesmo tipo seguidos"; o aviso sai em `avisarExtra`.
         ...(tentativa === 1 ? [...verificarPromessaDaCapa(slidesDeTexto), ...verificarCapaVaga(slidesDeTexto), ...formulasDeMaquinaDosSlides(slidesDeTexto, fontesDosFatos)] : []),
         ...conformidadeDoCarrossel(slidesDeTexto, { fontes: fontesDosFatos, ramoSaude }),
