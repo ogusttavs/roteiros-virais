@@ -11,6 +11,11 @@ export type ItemEdicao = {
   mono?: string;
   /** E50 parte 2, PR 4: as chaves de bloco do "Por quê" deste item (as frases na tela); o botão e o painel só aparecem dentro de `PorQuesProvider` e se houver por quê. */
   porQueChaves?: string[];
+  /**
+   * T112: o mesmo dado de `texto`, uma linha por parte (o "Texto na tela": o tempo como rótulo, a frase e, embaixo, a posição). Quando existe, aparece no lugar de `texto`,
+   * que continua sendo o texto inteiro do item.
+   */
+  lista?: { quando?: string; texto: string; detalhe?: string }[];
 };
 
 type Props = {
@@ -34,7 +39,19 @@ export function BlocoEdicao({ titulo, itens }: Props) {
                   {item.rotulo}
                   {item.porQueChaves ? <PorQueBotao chaves={item.porQueChaves} id={`pq-edicao-${item.rotulo}`} rotuloDoBloco={item.rotulo} /> : null}
                 </span>
-                <span className={styles.corpo}>{item.texto}</span>
+                {item.lista && item.lista.length > 0 ? (
+                  <ul className={item.lista.some((linha) => linha.quando) ? styles.partes : `${styles.partes} ${styles.partesComPonto}`}>
+                    {item.lista.map((linha, i) => (
+                      <li key={i} className={styles.parte}>
+                        {linha.quando ? <span className={styles.quando}>{linha.quando}</span> : null}
+                        <span className={linha.quando ? styles.frase : styles.corpo}>{linha.texto}</span>
+                        {linha.detalhe ? <span className={styles.detalhe}>{linha.detalhe}</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className={styles.corpo}>{item.texto}</span>
+                )}
                 {item.mono ? <span className={styles.mono}>{item.mono}</span> : null}
                 {item.porQueChaves ? <PorQueAberto chaves={item.porQueChaves} id={`pq-edicao-${item.rotulo}`} /> : null}
               </div>

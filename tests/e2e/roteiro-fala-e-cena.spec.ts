@@ -117,14 +117,19 @@ test.describe("fala e cena juntas na leitura do roteiro", () => {
     await expect(page.getByText("Como editar")).toBeVisible();
   });
 
-  test("Reels no desktop: fala à esquerda e cena à direita no mesmo bloco", async ({ page }) => {
+  // T112 (26/11/2026): do tablet para cima a cena ficava à direita da fala, espremida numa coluna estreita; agora vem logo abaixo dela, na largura do bloco, em toda largura de tela.
+  test("Reels no desktop: a cena logo abaixo da fala, na largura do bloco", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await entrar(page);
     await page.goto(`/roteiros/${reelsId}`);
     const bloco = page.locator("[data-bloco-de-fala]").first();
+    const caixaDoBloco = await bloco.boundingBox();
     const fala = await bloco.getByText("FALA DA ABERTURA").boundingBox();
     const cena = await bloco.locator("[data-cena-do-bloco]").boundingBox();
-    expect(fala && cena && cena.x > fala.x + fala.width - 1).toBe(true);
+    expect(caixaDoBloco && fala && cena).toBeTruthy();
+    expect(cena!.y).toBeGreaterThanOrEqual(fala!.y + fala!.height - 1);
+    expect(Math.abs(cena!.x - caixaDoBloco!.x)).toBeLessThan(2);
+    expect(Math.abs(cena!.width - caixaDoBloco!.width)).toBeLessThan(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 

@@ -126,11 +126,14 @@ function itensEdicao(edicao: ConteudoRoteiro["edicao"]): ItemEdicao[] {
       : textosRoteiro.edicao.semTexto;
   const recursos =
     edicao.recursos.length > 0 ? edicao.recursos.join("; ") : textosRoteiro.edicao.semRecurso;
+  // T112: o mesmo dado, um item por momento (o tempo como rótulo, a frase e a posição embaixo), em vez do parágrafo corrido; o que a IA gera não muda.
+  const listaDoTextoNaTela = edicao.textoNaTela.map((item) => ({ quando: item.quando, texto: `“${item.oQue}”`, detalhe: item.onde }));
+  const listaDeRecursos = edicao.recursos.length > 1 ? edicao.recursos.map((recurso) => ({ texto: recurso })) : undefined;
 
   return [
-    { icone: Type, rotulo: textosRoteiro.edicao.texto, texto: textoNaTela, porQueChaves: chavesDasTelas },
+    { icone: Type, rotulo: textosRoteiro.edicao.texto, texto: textoNaTela, lista: listaDoTextoNaTela.length > 0 ? listaDoTextoNaTela : undefined, porQueChaves: chavesDasTelas },
     { icone: Scissors, rotulo: textosRoteiro.edicao.corte, texto: edicao.ritmoDeCorte },
-    { icone: Eye, rotulo: textosRoteiro.edicao.recursos, texto: recursos },
+    { icone: Eye, rotulo: textosRoteiro.edicao.recursos, texto: recursos, lista: listaDeRecursos },
     {
       icone: Music,
       rotulo: textosRoteiro.edicao.audio,
@@ -423,6 +426,8 @@ export function RoteiroTela({
     porQueChave: ehPorCartao ? `cartao:${indice}` : (["gancho", "corpo", "fechamento", "chamada"] as const)[indice],
   }));
   const temChaveDeMarcas = fala.podeMarcar && (!fala.somenteLeitura || fala.marcas !== null);
+  /** "Ver os porquês" só existe com pelo menos um bloco com por quê (o mesmo teste de `PorQuesProvider`). */
+  const temPorQues = corpo.porQueDosBlocos?.some((i) => i.regras.length > 0) ?? false;
   /** 26/11/2026: a cena e o texto na tela vão junto da fala só no Reels falado; o aviso dos colchetes olha o mesmo que a leitura destaca. */
   const comCenasNaFala = roteiro.formato !== "story" && roteiro.estilo !== "sem_fala";
   /** 26/11/2026: a fala tem trecho entre colchetes para completar (o vídeo longo tem a edição por capítulo, sem o "Editar" do roteiro inteiro, e fica de fora). */
@@ -462,7 +467,7 @@ export function RoteiroTela({
    * R1, acabamento (achado do Gustavo, repassado pela Fable): "Como editar" começava rente a "De
    * onde veio", sem respiro nenhum entre os dois. `margin-top` aqui é sempre a altura medida de
    * "De onde veio" (nunca a margem de verdade, que não entra em nenhuma medida de caixa); o
-   * espaço do design, `--espaco-6`, soma na altura só quando "De onde veio" de fato existe, senão
+   * espaço do design, `--espaco-8` (o mesmo ritmo entre os blocos da coluna, T112; era `--espaco-6`), soma na altura só quando "De onde veio" de fato existe, senão
    * "Como editar" ganharia um respiro do nada no caso sem referência nenhuma
    * (`corpo.semEvidencia` falso e `edicao.referencia` nulo, mais comum desde a H4).
    * `getComputedStyle` devolve o texto do token ("1.5rem"), não o pixel resolvido: o cálculo lê
@@ -471,7 +476,7 @@ export function RoteiroTela({
    */
   const espacoLadoPx = useCallback(() => {
     const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const espacamento = getComputedStyle(document.documentElement).getPropertyValue("--espaco-6");
+    const espacamento = getComputedStyle(document.documentElement).getPropertyValue("--espaco-8");
     const emRem = parseFloat(espacamento);
     return Number.isFinite(emRem) ? emRem * remPx : 0;
   }, []);
@@ -799,7 +804,7 @@ export function RoteiroTela({
       <BarraTopo
         titulo={textosRoteiro.tituloTela}
         esquerda={
-          <Link href="/hoje" aria-label={textosComuns.voltar} className={styles.botaoBarra}>
+          <Link href="/hoje" aria-label={textosComuns.voltar} className={`${styles.botaoBarra} ${styles.botaoVoltar}`}>
             <ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" />
           </Link>
         }
@@ -857,14 +862,7 @@ export function RoteiroTela({
 
         <div className={styles.corpoComLado} ref={refCorpoComLado} data-reprovando={painel === "reprovar" ? "" : undefined}>
         <div className={styles.cabecalhoTela}>
-          <div className={styles.topoRoteiro}>
-            <h1>{corpo.titulo}</h1>
-            {!editando && !ehLongo ? (
-              <button type="button" onClick={iniciarEdicao} className={styles.botaoEditar}>
-                {textosRoteiro.editar}
-              </button>
-            ) : null}
-          </div>
+          <h1>{corpo.titulo}</h1>
           <p className={styles.metaRoteiro}>
             {/* E55 PR 2b (passo 21): "Assunto do momento", vivo enquanto o assunto está em alta e neutro ("O assunto já passou") depois. */}
             {momento ? (
@@ -1097,19 +1095,30 @@ export function RoteiroTela({
         ) : (
           <PorQuesProvider itens={corpo.porQueDosBlocos} videos={videosDoPorQue}>
             <article className={ehLongo ? styles.blocosLongos : styles.blocos}>
-              {temChaveDeMarcas ? (
-                <LinhaMarcasDeFala
-                  variante="roteiro"
-                  ligadas={marcasLigadas}
-                  aoTrocar={trocarMarcas}
-                  marcando={estadoMarcas === "marcando" && marcasProntas === null}
-                  erro={marcasLigadas ? erroMarcas : null}
-                  avisos={marcasProntas?.avisos ?? []}
-                />
-              ) : null}
-              {corpo.porQueDosBlocos?.some((i) => i.regras.length > 0) ? (
-                <div className={styles.linhaPorques}>
-                  <VerOsPorques />
+              {/* T112: a linha de ações do texto, logo acima dele: "Editar" e "Ver os porquês" à esquerda, a chave "Marcas de fala" à direita (antes "Editar" ficava solto ao lado do título e "Ver os porquês" sozinho à direita). */}
+              {!ehLongo || temPorQues || temChaveDeMarcas ? (
+                <div className={styles.linhaAcoes} data-linha-acoes-do-roteiro="">
+                  {!ehLongo || temPorQues ? (
+                    <div className={styles.acoesDoTexto}>
+                      {!ehLongo ? (
+                        <button type="button" onClick={iniciarEdicao} className={styles.acaoDoTexto}>
+                          <Pencil size={18} strokeWidth={1.75} aria-hidden="true" />
+                          {textosRoteiro.editar}
+                        </button>
+                      ) : null}
+                      {temPorQues ? <VerOsPorques className={styles.acaoDoTexto} icone={<HelpCircle size={18} strokeWidth={1.75} aria-hidden="true" />} /> : null}
+                    </div>
+                  ) : null}
+                  {temChaveDeMarcas ? (
+                    <LinhaMarcasDeFala
+                      variante="roteiro"
+                      ligadas={marcasLigadas}
+                      aoTrocar={trocarMarcas}
+                      marcando={estadoMarcas === "marcando" && marcasProntas === null}
+                      erro={marcasLigadas ? erroMarcas : null}
+                      avisos={marcasProntas?.avisos ?? []}
+                    />
+                  ) : null}
                 </div>
               ) : null}
               {ehLongo ? (
