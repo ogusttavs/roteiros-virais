@@ -148,6 +148,17 @@ describe("os títulos da capa", () => {
     expect(await geracoesDaCapa(clienteId)).toHaveLength(2);
   });
 
+  it("T114: o título que reprova nas duas tentativas sai e a capa segue com os que passam; sem nenhum que passe, falha", async () => {
+    const clienteId = await criarCliente(nichoSaude);
+    const umLongo = await criarNoticia(nichoSaude, { titulo: "Clareamento dental ganha nova regra [mock:capa-longo-sempre]" });
+    const r = await titulosDaCapa(clienteId, umLongo);
+    expect(r.titulos).toHaveLength(3);
+    expect(r.titulos.join(" ")).not.toMatch(/palavra palavra/);
+    expect(await geracoesDaCapa(clienteId)).toHaveLength(2);
+    const todosLongos = await criarNoticia(nichoSaude, { titulo: "Clareamento dental ganha nova regra [mock:capa-todos-longos-sempre]" });
+    await expect(titulosDaCapa(clienteId, todosLongos)).rejects.toThrow(/reprovada duas vezes/);
+  });
+
   it("notícia de mais de 7 dias, sem data ou sem veículo é recusada, e a IA não é chamada", async () => {
     const clienteId = await criarCliente(nichoSaude);
     const velha = await criarNoticia(nichoSaude, { publicadoEm: new Date(Date.now() - 10 * DIA) });
