@@ -11,7 +11,7 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 /**
  * /api/saude e publica de proposito (etapa 13): healthcheck do Compose,
- * deploy e monitor externo batem nela sem sessao; nao devolve dado.
+ * deploy e monitor externo batem nela sem sessao; nao devolve dado. So a rota EXATA (`ehSaudePublica`): `/api/saude/viagem` mostra dado de operacao e exige sessao de admin (T100, achado M2 da auditoria de 26/11/2026).
  * /api/versao tambem: devolve so o sha do commit em execucao, e o navegador a consulta para saber se a
  * pagina aberta e de uma versao anterior, inclusive depois que a sessao venceu (`src/lib/versao.ts`).
  * /termos e /privacidade sao publicas (etapa 12, decisao 7): quem ainda nao
@@ -22,7 +22,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * /redefinir-senha (E58) e o destino do link do e-mail de "esqueci a senha":
  * quem esqueceu a senha nao tem sessao.
  */
-const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/api/versao", "/termos", "/privacidade", "/dados", "/redefinir-senha", "/api/cadastro/confirmar", "/criar-conta", "/email-confirmado"];
+const ROTAS_PUBLICAS = ["/entrar", "/api/versao", "/termos", "/privacidade", "/dados", "/redefinir-senha", "/api/cadastro/confirmar", "/criar-conta", "/email-confirmado"];
 
 /**
  * Rotas com autenticacao propria, sem cookie de sessao (etapa 6): o cabecalho
@@ -58,11 +58,16 @@ function ehPaginaDeEntrada(pathname: string): boolean {
   return pathname === "/";
 }
 
+function ehSaudePublica(pathname: string): boolean {
+  return pathname === "/api/saude" || pathname === "/api/saude/";
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
     ehPaginaDeEntrada(pathname) ||
+    ehSaudePublica(pathname) ||
     ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota)) ||
     ROTAS_COM_AUTENTICACAO_PROPRIA.some((rota) => pathname.startsWith(rota)) ||
     ehImpressaoDeRoteiro(pathname)

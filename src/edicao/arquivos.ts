@@ -11,7 +11,7 @@
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { createWriteStream } from "node:fs";
-import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
+import { mkdir, open, readdir, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -120,6 +120,21 @@ export async function guardarBruto(edicaoId: number, corpo: ReadableStream<Uint8
     throw erro instanceof ErroDoArquivoDeEdicao ? erro : new ErroDoArquivoDeEdicao("nao foi possivel guardar o video");
   } finally {
     leitor.releaseLock?.();
+  }
+}
+
+/** Os primeiros bytes (até `quantos`) do arquivo no volume, para conferir o formato pelo conteúdo. Arquivo que não abre devolve vazio. */
+export async function primeirosBytesDoArquivoDaEdicao(relativo: string, quantos = 16): Promise<Uint8Array> {
+  let arquivo;
+  try {
+    arquivo = await open(caminhoNoVolume(relativo), "r");
+    const buffer = Buffer.alloc(quantos);
+    const { bytesRead } = await arquivo.read(buffer, 0, quantos, 0);
+    return buffer.subarray(0, bytesRead);
+  } catch {
+    return new Uint8Array(0);
+  } finally {
+    await arquivo?.close().catch(() => undefined);
   }
 }
 

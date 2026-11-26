@@ -164,6 +164,29 @@ describe("gerarCarrossel", () => {
     expect(comum.slides.find((x) => x.tipo === "antes-depois")?.rodape).toBeUndefined();
   });
 
+  it("o responsável técnico: marca de saúde com a linha preenchida leva na chamada, sem a linha não leva, e uma marca nunca vê a linha da outra", async () => {
+    const { definirResponsavelTecnico, clientePorId } = await import("@/servicos/clientes");
+    // O índice único de `ramo_catalogo` impede um segundo nicho de odontologia: reaproveita o que o teste anterior criou, ou cria.
+    const [existente] = await db().select().from(nichos).where(eq(nichos.ramoCatalogo, "odontologia"));
+    const nichoSaude = existente ?? (await db().insert(nichos).values({ slug: "carrossel-saude-resp", nome: "Odontologia resp", termos: [], ramoCatalogo: "odontologia" }).returning())[0];
+    const comLinha = await criarCliente(nichoSaude.id);
+    const semLinha = await criarCliente(nichoSaude.id);
+    const outroRamo = await criarCliente();
+    await definirResponsavelTecnico(comLinha, "Dra. Maria Souza, CRO-SP 12345");
+    await definirResponsavelTecnico(outroRamo, "Dr. Fora do ramo, CRO-RJ 1");
+    expect((await clientePorId(comLinha))?.responsavelTecnico).toBe("Dra. Maria Souza, CRO-SP 12345");
+    expect((await clientePorId(semLinha))?.responsavelTecnico).toBeNull();
+    const a = await gerarCarrossel(comLinha, pedidoLivre("cuidados com o aparelho", 5));
+    expect(a.slides.find((x) => x.tipo === "chamada")?.responsavel).toBe("Dra. Maria Souza, CRO-SP 12345");
+    const b = await gerarCarrossel(semLinha, pedidoLivre("cuidados com o aparelho", 5));
+    expect(b.slides.find((x) => x.tipo === "chamada")?.responsavel).toBeUndefined();
+    // Fora do ramo de saúde o dado guardado não entra no slide.
+    const c = await gerarCarrossel(outroRamo, pedidoLivre("mancha de vinho no estofado", 5));
+    expect(c.slides.find((x) => x.tipo === "chamada")?.responsavel).toBeUndefined();
+    await definirResponsavelTecnico(comLinha, null);
+    expect((await clientePorId(comLinha))?.responsavelTecnico).toBeNull();
+  });
+
   it("o prompt de saúde proíbe preço, promessa e procedimento em andamento, e a versão subiu", async () => {
     const { montarSistemaEstavel, versao } = await import("@/ia/prompts/carrossel");
     const texto = montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", ramoSaude: true });

@@ -1,0 +1,16 @@
+.cartao {
+  display: grid;
+  gap: var(--espaco-3);
+  margin-bottom: var(--espaco-6);
+  padding: var(--espaco-4) var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-divisor);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+}
+
+.titulo {
+  margin: 0;
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-corpo);
+  font-weight: 600;
+}

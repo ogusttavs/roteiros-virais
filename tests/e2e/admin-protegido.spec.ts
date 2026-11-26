@@ -179,16 +179,17 @@ test.describe("admin: as paginas conferem o papel antes de consultar", () => {
     await provarQueSoAdminVe(page, request, "/admin/viagem", ["/admin/viagem"], [clienteNome]);
   });
 
-  // V10, item 3: rota de saude, sem sessao nenhuma (o inverso das outras: sempre 200, nunca dado de cliente).
-  test("saude/viagem: sem sessao devolve 200, e nenhuma sessao ve dado de cliente", async ({ page, request }) => {
+  // V10, item 3, mudado no T100 (M2 da auditoria de 26/11/2026): so o admin le a saude da viagem; sem sessao e com cookie falso e 401 ou redirecionamento, e nenhuma resposta traz dado de cliente.
+  test("saude/viagem: so o admin le, e nenhuma resposta traz dado de cliente", async ({ page, request }) => {
     for (const cookie of [undefined, COOKIE_FALSO]) {
-      const resposta = await request.get("/api/saude/viagem", { headers: cookie ? { Cookie: cookie } : {} });
-      expect(resposta.status()).toBe(200);
+      const resposta = await request.get("/api/saude/viagem", { headers: cookie ? { Cookie: cookie } : {}, maxRedirects: 0 });
+      expect([307, 401]).toContain(resposta.status());
       const corpo = await resposta.text();
       expect(corpo).not.toContain(clienteNome);
       expect(corpo).not.toContain(clienteEmail);
       expect(corpo).not.toContain(MARCA_UNICA_GERACAO);
     }
+    expect((await request.get("/api/saude")).status()).toBe(200);
 
     await entrar(page, EMAIL_ADMIN);
     const cookieAdmin = await cookieDeSessao(page);

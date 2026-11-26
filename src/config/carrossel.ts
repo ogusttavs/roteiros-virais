@@ -150,7 +150,7 @@ export type SlideDoCarrossel = {
   /** A capa de notícia (E66). */
   veiculo?: string;
   data?: string;
-  /** Só na chamada de ramo de saúde: o lugar de uma linha opcional "Responsável técnica" (CRO). Sem campo nem tela por enquanto (falta o sim do Gustavo); o modelo só desenha se vier preenchida. */
+  /** Só na chamada de ramo de saúde: o lugar de uma linha opcional "Responsável técnica" (CRO). Vem do campo "Responsável técnico" da Conta (`clientes.responsavel_tecnico`); o modelo só desenha se vier preenchida. */
   responsavel?: string;
   /** O ponto da foto que fica no centro do recorte (`object-position`, por exemplo "50% 30%"). */
   foco?: string;

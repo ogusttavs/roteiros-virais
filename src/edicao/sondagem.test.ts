@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { argumentosDoAudio } from "./audio";
+import { comecaComoMp4OuMov } from "./entrada-segura";
 import { argumentosDoFfprobe, ErroDeSondagem, interpretarSondagem, recusaDaSondagem, sondarVideo } from "./sondagem";
 
 function saida(opcoes: { largura?: number; altura?: number; duracao?: string; rotacaoLado?: number; rotacaoTag?: string; audio?: boolean; video?: boolean }): string {
@@ -90,5 +92,24 @@ describe("sondarVideo", () => {
     }).catch((e: unknown) => e);
     expect(erro).toBeInstanceOf(ErroDeSondagem);
     expect((erro as Error).message).not.toContain("/segredo");
+  });
+});
+
+describe("entrada segura (A2, 26/11/2026)", () => {
+  it("o ffprobe leva o formato fixo e a lista de protocolos antes do arquivo", () => {
+    const a = argumentosDoFfprobe("/v/a.video");
+    expect(a.join(" ")).toContain("-protocol_whitelist file -f mov");
+    expect(a.indexOf("-protocol_whitelist")).toBeLessThan(a.indexOf("/v/a.video"));
+  });
+  it("o ffmpeg do áudio leva o formato fixo e a lista de protocolos antes do -i", () => {
+    const a = argumentosDoAudio("/v/a.video", "/t/a.wav", "/t/a.pcm");
+    expect(a.slice(a.indexOf("-protocol_whitelist"), a.indexOf("-i") + 2)).toEqual(["-protocol_whitelist", "file", "-f", "mov", "-i", "/v/a.video"]);
+  });
+  it("só começa como MP4 ou MOV o que tem uma caixa conhecida nos bytes 4 a 8", () => {
+    const caixa = (nome: string) => new Uint8Array([0, 0, 0, 24, ...Buffer.from(nome)]);
+    for (const n of ["ftyp", "moov", "mdat", "wide", "free", "skip"]) expect(comecaComoMp4OuMov(caixa(n))).toBe(true);
+    expect(comecaComoMp4OuMov(new Uint8Array(Buffer.from("ffconcat version 1.0\nfile 'ed-1.video'\n")))).toBe(false);
+    expect(comecaComoMp4OuMov(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0]))).toBe(false);
+    expect(comecaComoMp4OuMov(new Uint8Array(4))).toBe(false);
   });
 });
