@@ -373,7 +373,8 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     },
   });
 
-  const slides: SlideDoCarrossel[] = slidesDaSaida(saida.slides, { ramoSaude });
+  // O responsável técnico só entra na chamada de marca de saúde e só se a pessoa preencheu; vazio, o slide não desenha a linha (o app nunca inventa o dado).
+  const slides: SlideDoCarrossel[] = slidesDaSaida(saida.slides, { ramoSaude, responsavelTecnico: cliente.responsavelTecnico });
   const slidesParaEncurtar = slidesComExcessoPequeno(slides, { ramoSaude, fotosPrometidas, fotosDePacientePrometidas });
   const [criado] = await db()
     .insert(carrosseis)

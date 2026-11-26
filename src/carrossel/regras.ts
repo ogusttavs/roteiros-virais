@@ -57,7 +57,7 @@ const limpo = (v: string | undefined): string => (v ?? "").trim();
 /**
  * Da saída da IA para o que o slide guarda: cada tipo fica só com os campos que usa, com os nomes do desenho; o número e o total dos passos, o rodapé de saúde e o fim do contexto da fala são escritos por código.
  */
-export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolean }): SlideDoCarrossel[] {
+export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolean; responsavelTecnico?: string | null }): SlideDoCarrossel[] {
   const totalDePassos = saida.filter((s) => s.tipo === "passo").length;
   let passo = 0;
   return rotularItens(saida.map((s): SlideDoCarrossel => {
@@ -84,7 +84,7 @@ export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolea
       case "resumo":
         return { tipo: s.tipo, titulo: limpo(s.titulo), linhas: s.linhas.map(limpo).filter(Boolean) };
       case "chamada":
-        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), acoes: s.acoes.map(limpo).filter(Boolean) };
+        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), acoes: s.acoes.map(limpo).filter(Boolean), ...(opcoes.ramoSaude && opcoes.responsavelTecnico ? { responsavel: opcoes.responsavelTecnico } : {}) };
       case "noticia":
         return { tipo: s.tipo, titulo: limpo(s.titulo), veiculo: limpo(s.fonte), data: limpo(s.referencia) };
     }

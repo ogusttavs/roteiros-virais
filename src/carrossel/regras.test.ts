@@ -250,3 +250,16 @@ describe("promessaEmSaude", () => {
     expect(verificarLimitesDosSlides([slide], { ramoSaude: false })).toEqual([]);
   });
 });
+
+describe("slidesDaSaida: o responsável técnico", () => {
+  const vazio = { rotulo: "", titulo: "", texto: "", antes: "", depois: "", valor: "", unidade: "", fonte: "", referencia: "", quem: "", contexto: "", linhas: [] as string[], acoes: [] as string[] };
+  const chamada: SlideDaSaida = { ...vazio, tipo: "chamada", titulo: "Salve", texto: "Mande", acoes: ["Salve", "Mande"] };
+  it("entra só na chamada, em ramo de saúde, quando preenchido", () => {
+    expect(slidesDaSaida([chamada], { ramoSaude: true, responsavelTecnico: "Dra. Ana, CRO-SP 1" })[0].responsavel).toBe("Dra. Ana, CRO-SP 1");
+  });
+  it("vazio, ausente ou fora da saúde, não entra", () => {
+    expect(slidesDaSaida([chamada], { ramoSaude: true, responsavelTecnico: "" })[0].responsavel).toBeUndefined();
+    expect(slidesDaSaida([chamada], { ramoSaude: true })[0].responsavel).toBeUndefined();
+    expect(slidesDaSaida([chamada], { ramoSaude: false, responsavelTecnico: "Dra. Ana, CRO-SP 1" })[0].responsavel).toBeUndefined();
+  });
+});
