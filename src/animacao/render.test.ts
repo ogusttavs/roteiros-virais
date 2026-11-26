@@ -52,14 +52,14 @@ describe("renderizarAnimacao (Chromium e ffmpeg de verdade)", () => {
     { texto: MALICIOSO, duracaoS: 1 },
   ];
 
-  it("a prévia de 2 segundos sai em 540 por 960, 30 quadros por segundo, e abre no ffprobe", async () => {
+  it("a prévia de 2 segundos (mais os 2 da chamada final do molde) sai em 540 por 960, 30 quadros por segundo, e abre no ffprobe", async () => {
     const saida = join(pasta, "previa.mp4.parte");
     const r = await renderizarAnimacao({
       cenas: [{ texto: "Você sabia disso?", duracaoS: 2 }],
       qualidade: "previa",
       saida,
     });
-    expect(r.quadros).toBe(60);
+    expect(r.quadros).toBe(120);
     const sonda = JSON.parse(
       execFileSync("ffprobe", [
         "-v",
@@ -92,9 +92,9 @@ describe("renderizarAnimacao (Chromium e ffmpeg de verdade)", () => {
       "h264",
       "yuv420p",
     ]);
-    expect(Number(v.nb_read_frames)).toBe(60);
-    expect(Number(sonda.format.duration)).toBeGreaterThan(1.95);
-    expect(Number(sonda.format.duration)).toBeLessThan(2.1);
+    expect(Number(v.nb_read_frames)).toBe(120);
+    expect(Number(sonda.format.duration)).toBeGreaterThan(3.95);
+    expect(Number(sonda.format.duration)).toBeLessThan(4.1);
     expect(r.bytes).toBeGreaterThan(1000);
   }, 120_000);
 
