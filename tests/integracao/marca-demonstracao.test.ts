@@ -8,7 +8,7 @@ import { db, getPool } from "@/db";
 import { briefings, clientes, geracoesIA, user } from "@/db/schema";
 import { membrosDaMarca } from "@/servicos/clientes";
 
-import { cadastrarMarca, ErroDoScript, lerEntrada, type EntradaMarca } from "../../scripts/marca-demonstracao";
+import { cadastrarMarca, ErroDoScript, lerEntrada, validarEntrada, type EntradaMarca } from "../../scripts/marca-demonstracao";
 import { resetarSchema } from "../../scripts/resetar-schema";
 
 const entrada: EntradaMarca = lerEntrada(
@@ -86,5 +86,18 @@ describe("marca-demonstracao", () => {
 
   it("entrada invalida (ramo fora do catalogo) para antes de gravar", async () => {
     await expect(cadastrarMarca({ ...entrada, marca: "Outra", ramo: "nao-existe" }, normal)).rejects.toThrow(/catalogo/);
+  });
+
+  // E76 PR 3: com mais de um pais, o Comecar exige a estrategia de idioma; o script confere antes de gravar e manda o idioma ao servidor.
+  it("mais de um pais sem idioma para antes de gravar; com idioma, o idioma e gravado na marca", async () => {
+    const doisPaises = { onde: "mais_de_um_pais" as const, paises: "Estados Unidos e Brasil", objetivo: "negocio" as const };
+    expect(validarEntrada({ ...entrada, comecar: doisPaises }).some((p) => p.startsWith("comecar.idioma"))).toBe(true);
+    expect(validarEntrada({ ...entrada, comecar: { onde: "local", regiao: "Campinas", objetivo: "negocio", idioma: { modo: "so_ingles" } } }).some((p) => p.startsWith("comecar.idioma"))).toBe(true);
+
+    const comIdioma = { ...entrada, marca: "[teste] Marca Dois Paises", comecar: { ...doisPaises, idioma: { modo: "linha_no_outro" as const, principal: "portugues" as const, segundo: "ingles" as const } } };
+    expect(validarEntrada(comIdioma).some((p) => p.startsWith("comecar.idioma"))).toBe(false);
+    const relatorio = await cadastrarMarca(comIdioma, normal);
+    const [marca] = await db().select().from(clientes).where(eq(clientes.id, relatorio.marcaId ?? 0));
+    expect(marca?.estrategiaIdioma).toEqual({ modo: "linha_no_outro", principal: "portugues", segundo: "ingles", comoOutro: null });
   });
 });

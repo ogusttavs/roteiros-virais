@@ -128,6 +128,7 @@ export function validarEntrada(entrada: EntradaMarca): string[] {
     if (c.onde === "outro_pais" && !c.pais?.trim()) problemas.push("comecar.pais: escreva o pais (onde = outro_pais).");
     if (c.onde === "mais_de_um_pais" && !c.paises?.trim()) problemas.push("comecar.paises: escreva quais paises (onde = mais_de_um_pais).");
     if (c.idioma && c.onde !== "mais_de_um_pais") problemas.push("comecar.idioma: so vale com onde = mais_de_um_pais.");
+    if (c.onde === "mais_de_um_pais" && !c.idioma) problemas.push("comecar.idioma: escolha a estrategia de idioma (onde = mais_de_um_pais).");
   }
   const emails = new Set<string>();
   for (const p of entrada.pessoas) {

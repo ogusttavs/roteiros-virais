@@ -1160,12 +1160,19 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   // E50 parte 2 (PR 2): o ramo de saúde liga as conferências do R-CONF-07; ramo fora do catálogo não é saúde (só o ramo principal da marca conta).
   const ramoDaMarca = await ramoAtualDoCliente(nichoId);
   const ramoSaude = ramoPorSlug(ramoDaMarca?.ramoSlug)?.grupo === "saude";
+  // E76 PR 3: a estratégia de idioma só vale para a marca de mais de um país que escolheu uma; nas outras é nula e nada muda no prompt.
+  const estrategiaIdioma = estrategiaDaMarca(dados.cliente);
+  const variosIdiomas = estrategiaTemOutroIdioma(estrategiaIdioma);
+  // Com a fala fora do português, as conferências que procuram palavras do português na fala (o momento no gancho, o passo a passo da ficha
+  // "guardem", o verbo de ação da R-ROTEIRO-14) não rodam.
+  const falaForaDoPortugues = falaPodeSairForaDoPortugues(estrategiaIdioma);
   const entradaCopy = (d: SaidaParaCopyRoteiro, tentativa: 1 | 2) =>
     montarEntradaCopyRoteiro(d, {
       fontes: fontesDosFatos,
       ramoSaude,
       nomeDaMarca: dados.cliente.nome,
       palavrasDoTema: palavrasDeConteudo(dados.tema),
+      falaForaDoPortugues,
       tentativa,
     });
 
@@ -1190,11 +1197,6 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       : tipoAberturaAnterior;
 
   const quemApareceResolvido = resolverQuemAparece(dados.quemAparece, dados.cliente);
-  // E76 PR 3: a estratégia de idioma só vale para a marca de mais de um país que escolheu uma; nas outras é nula e nada muda no prompt.
-  const estrategiaIdioma = estrategiaDaMarca(dados.cliente);
-  const variosIdiomas = estrategiaTemOutroIdioma(estrategiaIdioma);
-  // Com a fala fora do português, as conferências que procuram palavras do português na fala (o momento no gancho, o passo a passo da ficha "guardem") não rodam.
-  const falaForaDoPortugues = falaPodeSairForaDoPortugues(estrategiaIdioma);
 
   /**
    * Hotfix de 01/10/2026 (achado do Gustavo em produção): `porQueAssim` só existia em Story

@@ -84,10 +84,11 @@ describe("a estratégia de idioma por marca", () => {
     expect(apagada.estrategiaIdioma).toBeNull();
   });
 
-  it("o Começar sem a estratégia, de volta em mais de um país, deixa a coluna nula (o passo manda o estado inteiro)", async () => {
+  it("o Começar com mais de um país e sem a estratégia é recusado no servidor, e o que estava gravado fica", async () => {
     await salvarDadosFixosComPedido(marcaA, base({ alcance: "mais_de_um_pais", paises: "Estados Unidos e Brasil", estrategiaIdioma: { modo: "outro", principal: "ingles", comoOutro: "só inglês nos Reels" } }));
     expect((await clientePorId(marcaA))?.estrategiaIdioma).toEqual({ modo: "outro", principal: "ingles", segundo: null, comoOutro: "só inglês nos Reels" });
-    const { cliente } = await salvarDadosFixosComPedido(marcaA, base({ alcance: "mais_de_um_pais", paises: "Estados Unidos e Brasil" }));
-    expect(cliente.estrategiaIdioma).toBeNull();
+    await expect(salvarDadosFixosComPedido(marcaA, base({ alcance: "mais_de_um_pais", paises: "Estados Unidos e Brasil" }))).rejects.toThrow();
+    await expect(salvarDadosFixosComPedido(marcaA, base({ alcance: "mais_de_um_pais", paises: "Estados Unidos e Brasil", estrategiaIdioma: null }))).rejects.toThrow();
+    expect((await clientePorId(marcaA))?.estrategiaIdioma?.modo).toBe("outro");
   });
 });

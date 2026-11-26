@@ -659,8 +659,8 @@ export const dadosFixosSchema = z
       .optional(),
     quemGrava: z.enum(["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"]).optional(),
     /**
-     * E76 PR 3: a estratégia de idioma (`lib/estrategia-de-idioma.ts`), opcional e só lida com "mais_de_um_pais"; com qualquer outro valor de
-     * onde, o que vier é ignorado e a coluna fica nula. Ausente com "mais_de_um_pais" também zera: o Começar manda o estado inteiro do passo.
+     * E76 PR 3: a estratégia de idioma (`lib/estrategia-de-idioma.ts`). Obrigatória com "mais_de_um_pais" (o refine abaixo, igual à tela);
+     * com qualquer outro valor de onde, o que vier é ignorado e a coluna fica nula.
      */
     estrategiaIdioma: estrategiaIdiomaSchema.nullish(),
   })
@@ -679,6 +679,10 @@ export const dadosFixosSchema = z
   .refine((dados) => dados.alcance !== "mais_de_um_pais" || Boolean(dados.paises?.trim()), {
     message: "escreva quais países",
     path: ["paises"],
+  })
+  .refine((dados) => dados.alcance !== "mais_de_um_pais" || Boolean(dados.estrategiaIdioma), {
+    message: "escolha em que idioma saem os seus vídeos",
+    path: ["estrategiaIdioma"],
   });
 
 export type DadosFixos = z.infer<typeof dadosFixosSchema>;

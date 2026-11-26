@@ -18,7 +18,8 @@ import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, 
  * 2.3.0 (E76 PR 3, 26/11/2026, a estratégia de idioma): a marca de mais de um país que escolheu como misturar os idiomas recebe a regra de idioma
  * do carrossel (`blocoDoIdioma`, peça "carrossel": os slides no principal, porque o limite de cada campo não comporta dois idiomas; o segundo vai na
  * legenda e nas hashtags, do jeito escolhido), e a linha final e o lembrete passam a valer só para o que fica em português. A regra 3 deixa de
- * dizer "em português simples" nesse caso. Sem a estratégia, o sistema é o da 2.2.0, palavra por palavra. O schema não muda.
+ * dizer "em português simples" e troca "Escreva sempre acentuado" por "O que for em português sai acentuado" nesse caso. Sem a estratégia, o
+ * sistema é o da 2.2.0, palavra por palavra. O schema não muda.
  */
 export const versao = "2.3.0";
 
@@ -138,7 +139,7 @@ export function montarSistemaEstavel(dados: {
 
 1. A entrada diz quantos slides são (5, 7 ou 9): escreva exatamente essa quantidade. O primeiro é sempre uma capa (capa-foto ou capa-texto) e o último é sempre "chamada"; capa e chamada não aparecem no meio. Título sem ponto final. Nunca ${MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO + 1} slides seguidos do mesmo tipo: misture (por exemplo, itens com uma prova ou um dado no meio). A exceção é a lista que a capa promete: se a capa diz "3 sinais", os 3 itens (ou os passos) vêm seguidos, sem outro tipo no meio deles (em 5 slides fica capa, os 3 itens e a chamada); o slide que sobrar vem antes ou depois da lista, nunca no meio. Um slide, uma ideia só.
 2. Respeite o limite de palavras e de caracteres de cada campo. Texto de slide é curto: quem passa o dedo lê em dois segundos. Frases curtas, uma coisa por frase.
-3. Fale com a pessoa que lê em segunda pessoa ("você"), ${blocoIdioma ? "no idioma que a regra de idioma abaixo pede, em frases simples" : "em português simples"}, sem jargão, sem travessão, sem emoji. Escreva sempre acentuado.
+3. Fale com a pessoa que lê em segunda pessoa ("você"), ${blocoIdioma ? "no idioma que a regra de idioma abaixo pede, em frases simples, sem jargão, sem travessão, sem emoji. O que for em português sai acentuado." : "em português simples, sem jargão, sem travessão, sem emoji. Escreva sempre acentuado."}
 4. Nenhum fato que ninguém contou: todo fato concreto (uma pessoa, um lugar, um número, uma data, uma coisa que aconteceu) tem de estar no perfil, no tema, na notícia, no que o cliente pediu ou na evidência. O que faltaria, você não inventa: escreva uma instrução entre colchetes para a pessoa completar, como "[o número real do seu preço]". Nunca invente cliente, depoimento, resultado nem como o negócio trabalha.
 5. Número só com fonte: um número (porcentagem, valor, quantidade, ano) só aparece se está na entrada, e então vai num slide do tipo "dado", com a fonte e o ano. Sem número na entrada, não use o tipo "dado". Os campos fonte e referencia ficam vazios nos outros tipos. "3 passos" ou "5 erros" como contagem do próprio carrossel não são dado.
 6. Os tipos prova-fala, prova-resultado e antes-depois só entram quando o perfil, o tema ou a notícia dão o que mostrar; a foto que vai neles é do cliente, então o texto do slide diz o que a pessoa conta sobre ela, sem afirmar o que a foto não pode provar.

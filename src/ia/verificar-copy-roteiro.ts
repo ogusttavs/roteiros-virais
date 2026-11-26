@@ -47,6 +47,11 @@ export type EntradaCopyRoteiro = {
   tipoAbertura?: string | null;
   /** As palavras de conteúdo do tema (R-ROTEIRO-04, só aviso). */
   palavrasDoTema?: string[];
+  /**
+   * E76 PR 3: a fala pode sair fora do português (a estratégia de idioma da marca de mais de um país, `falaPodeSairForaDoPortugues`). A
+   * R-ROTEIRO-14 procura verbo de ação em português no último bloco e reprovaria sempre "Book your visit today."; nesse caso ela não roda.
+   */
+  falaForaDoPortugues?: boolean;
   tentativa: 1 | 2;
 };
 
@@ -504,6 +509,8 @@ const ENCERRAMENTO_VAZIO = /^(entao e isso|e isso( ai)?|obrigad[oa]( por assisti
 /** R-ROTEIRO-14 (fechamento, chamada, só Reels falado): o último bloco não começa com encerramento vazio e traz ação ou pergunta. */
 function roteiroUltimoBloco(e: EntradaCopyRoteiro): string | null {
   if (e.estrutura !== "reels_falado") return null;
+  // E76 PR 3: os verbos e os encerramentos da lista são do português; com a fala em outro idioma, a regra não tem como conferir.
+  if (e.falaForaDoPortugues) return null;
   const ultimo = e.chamadaFinal.trim() || e.fechamento.trim();
   if (!ultimo) return null; // o R-ROTEIRO-01 já cobre o que falta
   const n = normalizar(emUmaLinha(ultimo)).replace(/^[^a-z0-9]+/, "");
@@ -680,7 +687,7 @@ export type SaidaParaCopyRoteiro = {
  */
 export function montarEntradaCopyRoteiro(
   saida: SaidaParaCopyRoteiro,
-  contexto: Pick<EntradaCopyRoteiro, "fontes" | "ramoSaude" | "nomeDaMarca" | "palavrasDoTema" | "tentativa">,
+  contexto: Pick<EntradaCopyRoteiro, "fontes" | "ramoSaude" | "nomeDaMarca" | "palavrasDoTema" | "falaForaDoPortugues" | "tentativa">,
 ): EntradaCopyRoteiro {
   const frasesNaTela = saida.edicao.textoNaTela.map((t) => t.oQue).filter((t) => t.trim());
   const itensDaEdicao = [...(saida.edicao.recursos ?? []), ...(saida.cenas ?? []).map((c) => c.oQueFazer), saida.ondeGravar ?? ""].filter((t) => t.trim());

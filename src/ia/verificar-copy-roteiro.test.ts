@@ -572,3 +572,35 @@ describe("R-COPY-26: fórmula de texto de máquina (onda 1 de texto)", () => {
     expect(com(a.reprovam, "R-COPY-28") || com(a.reprovam, "R-COPY-29")).toBe(false);
   });
 });
+
+/** E76 PR 3: a R-ROTEIRO-14 procura verbo de ação em português; com a fala fora do português (a estratégia de idioma), ela não roda. */
+describe("R-ROTEIRO-14 e a fala fora do português", () => {
+  const emIngles = {
+    gancho: "Most people clean the sofa the wrong way.",
+    corpo: "Use a dry cloth first and press without rubbing.",
+    fechamento: "That is the whole trick.",
+    chamadaFinal: "Book your visit today.",
+    cartoes: null,
+    edicao: { textoNaTela: [] },
+    tipoAbertura: null,
+  };
+  const contexto = { fontes: "", ramoSaude: false, tentativa: 1 as const };
+
+  it("sem a opção, a chamada em inglês reprova pela R-ROTEIRO-14 (não acha verbo de ação em português nem pergunta)", () => {
+    const { reprovam } = verificarRegrasCopyRoteiro(montarEntradaCopyRoteiro(emIngles, contexto));
+    expect(reprovam.some((m) => m.startsWith("R-ROTEIRO-14"))).toBe(true);
+  });
+
+  it("com a fala fora do português, a R-ROTEIRO-14 não roda", () => {
+    const entrada = montarEntradaCopyRoteiro(emIngles, { ...contexto, falaForaDoPortugues: true });
+    expect(entrada.falaForaDoPortugues).toBe(true);
+    const { reprovam, avisos } = verificarRegrasCopyRoteiro(entrada);
+    expect([...reprovam, ...avisos].some((m) => m.startsWith("R-ROTEIRO-14"))).toBe(false);
+  });
+
+  it("com a fala em português, a regra continua valendo mesmo sem a opção desligada de propósito", () => {
+    const vazio = { ...emIngles, chamadaFinal: "Então é isso, pessoal." };
+    const { reprovam } = verificarRegrasCopyRoteiro(montarEntradaCopyRoteiro(vazio, { ...contexto, falaForaDoPortugues: false }));
+    expect(reprovam.some((m) => m.startsWith("R-ROTEIRO-14"))).toBe(true);
+  });
+});

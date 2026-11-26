@@ -114,7 +114,8 @@ describe("a regra nos prompts do roteiro curto, do longo e do carrossel", () => 
     expect(carrossel.montarSistemaEstavel({ ...baseCarrossel, estrategiaIdioma: null })).toBe(deSlides);
     expect(carrossel.montarSistemaEstavel({ ...baseCarrossel, estrategiaIdioma: SO_PORTUGUES })).toBe(deSlides);
     expect(deSlides).not.toContain(TITULO_DA_REGRA);
-    expect(deSlides).toContain("em português simples, sem jargão");
+    expect(deSlides).toContain("em português simples, sem jargão, sem travessão, sem emoji. Escreva sempre acentuado.");
+    expect(deSlides).not.toContain("O que for em português sai acentuado.");
     expect(deSlides.endsWith("o carrossel que você escreve sai sempre acentuado.")).toBe(true);
   });
 
@@ -137,5 +138,9 @@ describe("a regra nos prompts do roteiro curto, do longo e do carrossel", () => 
     expect(deSlides).toContain("os slides ficam só em português");
     expect(deSlides).toContain("no idioma que a regra de idioma abaixo pede");
     expect(deSlides).not.toContain("em português simples, sem jargão");
+    // "Só em inglês" não pode terminar a regra 3 em "Escreva sempre acentuado": o acento vale só para o que for em português.
+    const soIngles = carrossel.montarSistemaEstavel({ ...baseCarrossel, estrategiaIdioma: SO_INGLES });
+    expect(soIngles).toContain("sem jargão, sem travessão, sem emoji. O que for em português sai acentuado.");
+    expect(soIngles).not.toContain("Escreva sempre acentuado.");
   });
 });
