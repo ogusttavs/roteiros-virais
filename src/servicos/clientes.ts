@@ -450,8 +450,13 @@ export async function definirCorMarca(clienteId: number, cor: string | null): Pr
   await db().update(clientes).set({ corMarca: cor }).where(eq(clientes.id, clienteId));
 }
 
+/** O responsável técnico da marca de saúde (a linha do último slide do carrossel). Quem chama valida (`validarResponsavelTecnico`); `null` apaga. */
+export async function definirResponsavelTecnico(clienteId: number, linha: string | null): Promise<void> {
+  await db().update(clientes).set({ responsavelTecnico: linha }).where(eq(clientes.id, clienteId));
+}
+
 /**
- * Trocar o tipo de conteúdo de uma marca (P1, item 1): as doze perguntas do
+ * Trocar o tipo de conteúdo de uma marca (P1, item 1): as perguntas do
  * negócio e as da pessoa têm o mesmo id, mas enunciados diferentes, então
  * uma resposta de um tipo nunca pode ficar pareada com a avaliação do
  * outro. O admin já avisa antes de chamar isto; aqui a troca sempre apaga o

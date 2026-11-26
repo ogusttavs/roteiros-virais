@@ -89,7 +89,7 @@ function CabecalhoSimples({ marcaAtiva, marcas, nomePessoa }: { marcaAtiva: Marc
 /**
  * As sete estados de /comecar (design v2, `Comecar.dc.html`): introducao,
  * dados fixos, os cinco blocos do briefing (cada um com o estado de pergunta,
- * avaliando e erro, dentro de `PerguntaCampo`, mais a folha das doze notas,
+ * avaliando e erro, dentro de `PerguntaCampo`, mais a folha das treze notas,
  * dentro de `BarraNotaGeral`), e liberado. Sem a Nav principal do app
  * (proposital: isto acontece antes do painel abrir), por isso esta rota
  * mora fora do grupo (painel), sem a casca compartilhada.

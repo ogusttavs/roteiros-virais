@@ -28,7 +28,7 @@ type Props = {
   notas: NotaListada[];
   /** Texto para uma nota ainda sem avaliacao (ex.: "sem nota"). */
   semNota: string;
-  /** aria-label do dialogo no celular (ex.: "As doze notas"). */
+  /** aria-label do dialogo no celular (ex.: "As treze notas"). */
   tituloFolha: string;
   /** Tocar numa linha da lista (ajuste de 06/09/2026): rola ate a pergunta. */
   aoTocarItem?: (id: string) => void;

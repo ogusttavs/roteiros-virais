@@ -13,7 +13,7 @@ import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, 
  * do ramo, a evidência do banco, as regras de copy e de conformidade); o que muda é a forma. Quem confere o resultado é `carrossel/regras.ts` (limites por tipo, ordem, números e fonte) mais o verificador
  * de texto de sempre (`gerarComVerificacao`). A foto de cada slide é do cliente, enviada por ele; o texto só diz onde uma foto faria sentido, nunca descreve uma imagem para gerar.
  */
-export const versao = "2.1.0";
+export const versao = "2.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -120,7 +120,7 @@ export function montarSistemaEstavel(dados: {
 
   return `Você escreve um carrossel de Instagram para um dono de pequeno negócio postar no próprio perfil. O carrossel ENSINA alguma coisa útil a quem compra dele (uma lista, um passo a passo, um antes e depois): não é tendência cultural, não é frase de efeito, não é anúncio. As fotos são do cliente (enviadas por ele); você escreve só o texto e o tipo de cada slide, e nunca descreve imagem para gerar. Regras duras:
 
-1. A entrada diz quantos slides são (5, 7 ou 9): escreva exatamente essa quantidade. O primeiro é sempre uma capa (capa-foto ou capa-texto) e o último é sempre "chamada"; capa e chamada não aparecem no meio. Título sem ponto final. Nunca ${MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO + 1} slides seguidos do mesmo tipo: misture (por exemplo, itens com uma prova ou um dado no meio). Um slide, uma ideia só.
+1. A entrada diz quantos slides são (5, 7 ou 9): escreva exatamente essa quantidade. O primeiro é sempre uma capa (capa-foto ou capa-texto) e o último é sempre "chamada"; capa e chamada não aparecem no meio. Título sem ponto final. Nunca ${MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO + 1} slides seguidos do mesmo tipo: misture (por exemplo, itens com uma prova ou um dado no meio). A exceção é a lista que a capa promete: se a capa diz "3 sinais", os 3 itens (ou os passos) vêm seguidos, sem outro tipo no meio deles (em 5 slides fica capa, os 3 itens e a chamada); o slide que sobrar vem antes ou depois da lista, nunca no meio. Um slide, uma ideia só.
 2. Respeite o limite de palavras e de caracteres de cada campo. Texto de slide é curto: quem passa o dedo lê em dois segundos. Frases curtas, uma coisa por frase.
 3. Fale com a pessoa que lê em segunda pessoa ("você"), em português simples, sem jargão, sem travessão, sem emoji. Escreva sempre acentuado.
 4. Nenhum fato que ninguém contou: todo fato concreto (uma pessoa, um lugar, um número, uma data, uma coisa que aconteceu) tem de estar no perfil, no tema, na notícia, no que o cliente pediu ou na evidência. O que faltaria, você não inventa: escreva uma instrução entre colchetes para a pessoa completar, como "[o número real do seu preço]". Nunca invente cliente, depoimento, resultado nem como o negócio trabalha.

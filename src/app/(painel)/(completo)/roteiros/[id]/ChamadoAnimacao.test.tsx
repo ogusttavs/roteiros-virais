@@ -25,7 +25,7 @@ const t = textosAnimacao;
 
 afterEach(() => cleanup());
 
-const vista = (extra: Partial<VistaDaAnimacao> = {}): VistaDaAnimacao => ({ id: 1, estado: "previa_pronta", progresso: null, motivo: null, tempoDaPrevia: "uns 40 segundos", tempoDoFinal: "uns 2 minutos", foraDoVideo: [], finalExpiraEm: null, ...extra });
+const vista = (extra: Partial<VistaDaAnimacao> = {}): VistaDaAnimacao => ({ id: 1, estado: "previa_pronta", progresso: null, motivo: null, tempoDaPrevia: "uns 2 minutos", tempoDoFinal: "uns 3 minutos", foraDoVideo: [], finalExpiraEm: null, ...extra });
 const visao = (extra: Partial<VisaoDaAnimacao> = {}): VisaoDaAnimacao => ({ verComo: false, animacao: null, colchetes: 0, outraEmAndamento: false, ...extra });
 
 describe("ChamadoAnimacao: espaços para completar", () => {
@@ -57,5 +57,30 @@ describe("ChamadoAnimacao: o que ficou de fora", () => {
   it("quando coube tudo, nenhum aviso", () => {
     const { container } = render(<ChamadoAnimacao roteiroId={1} visao={visao({ animacao: vista() })} />);
     expect(container.querySelector("[data-fora-do-video]")).toBeNull();
+  });
+});
+
+describe("ChamadoAnimacao: os estados que a pessoa vê", () => {
+  it("montando a prévia: diz quanto leva e que ela aparece ali mesmo", () => {
+    render(<ChamadoAnimacao roteiroId={1} visao={visao({ animacao: vista({ estado: "fazendo_previa", progresso: 35 }) })} />);
+    expect(screen.getByText(t.estados.fazendo_previa("uns 2 minutos"))).toBeTruthy();
+    expect(screen.getByText(t.aviso.andamento(35))).toBeTruthy();
+  });
+
+  it("a prévia e o final abrem no primeiro quadro (o iPhone não mostra um retângulo preto)", () => {
+    const { container, unmount } = render(<ChamadoAnimacao roteiroId={1} visao={visao({ animacao: vista() })} />);
+    expect(container.querySelector("video[data-previa-da-animacao]")!.getAttribute("src")).toBe("/api/animacao/1/previa#t=0.1");
+    unmount();
+    const final = render(<ChamadoAnimacao roteiroId={1} visao={visao({ animacao: vista({ estado: "final_pronta" }) })} />);
+    expect(final.container.querySelector("video[data-final-da-animacao]")!.getAttribute("src")).toBe("/api/animacao/1/final#t=0.1");
+  });
+
+  it("final pronto: o botão de baixar, o lembrete da música e como salvar no iPhone", () => {
+    const { container } = render(<ChamadoAnimacao roteiroId={1} visao={visao({ animacao: vista({ estado: "final_pronta" }) })} />);
+    expect(screen.getByText(t.estados.final_pronta)).toBeTruthy();
+    const baixar = container.querySelector("a[data-baixar-animacao]")!;
+    expect(baixar.getAttribute("href")).toBe("/api/animacao/1/final?baixar=1");
+    expect(baixar.textContent).toContain(t.acoes.baixar);
+    expect(screen.getByText(t.aviso.baixarNoIphone)).toBeTruthy();
   });
 });

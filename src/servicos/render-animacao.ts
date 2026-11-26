@@ -21,10 +21,11 @@ import {
   garantirSubpastaDaAnimacao,
   nomeRelativoDaAnimacao,
 } from "@/animacao/arquivos";
-import { ErroDaAnimacao, type EntradaDaAnimacao, type ResultadoDaAnimacao } from "@/animacao/tipos";
+import { arrobaDoPerfil } from "@/animacao/montador";
+import { ErroDaAnimacao, type EntradaDaAnimacao, type MarcaDaAnimacao, type ResultadoDaAnimacao } from "@/animacao/tipos";
 import { ESPERA_ENTRE_TENTATIVAS_S, GUARDA_DO_FINAL_MS, TENTATIVAS_DA_ANIMACAO } from "@/config/animacao-fila";
 import { db } from "@/db";
-import { animacoes, type Animacao } from "@/db/schema";
+import { animacoes, clientes, type Animacao } from "@/db/schema";
 import { logger } from "@/lib/log";
 import { enfileirarRenderDaAnimacao, type PerfilDaAnimacao } from "@/servicos/animacao-fila";
 import { recusaPorDiscoCritico, type DepsDaRecusaPorDisco } from "@/servicos/disco";
@@ -51,6 +52,17 @@ async function motorDeVerdade(entrada: EntradaDaAnimacao): Promise<ResultadoDaAn
   // Importado na hora: o aplicativo e os testes que não montam vídeo nunca carregam o navegador.
   const { renderizarAnimacao } = await import("@/animacao/render");
   return renderizarAnimacao(entrada);
+}
+
+/** A cor e o @ da marca para o vídeo (o molde valida os dois de novo). Sem cor, o molde usa a do produto; sem @, a chamada final fica sem ele. Uma falha aqui nunca derruba o vídeo. */
+async function marcaDoVideo(clienteId: number): Promise<MarcaDaAnimacao> {
+  try {
+    const [cliente] = await db().select({ corMarca: clientes.corMarca, perfis: clientes.perfis }).from(clientes).where(eq(clientes.id, clienteId));
+    return { corDestaque: cliente?.corMarca ?? undefined, arroba: arrobaDoPerfil(cliente?.perfis?.instagram) ?? undefined };
+  } catch (erro) {
+    logger.warn({ err: erro, clienteId }, "animacao: nao foi possivel ler a cor e o @ da marca, o video sai com o padrao");
+    return {};
+  }
 }
 
 function condicaoDaReserva(animacaoId: number, perfil: PerfilDaAnimacao) {
@@ -104,7 +116,8 @@ export async function rodarRenderizarAnimacao(animacaoId: number, perfil: Perfil
   };
 
   try {
-    await (deps.renderizar ?? motorDeVerdade)({ cenas: animacao.cenas, molde: animacao.molde, qualidade: perfil, saida: parcial, aoProgredir });
+    const marca = await marcaDoVideo(animacao.clienteId);
+    await (deps.renderizar ?? motorDeVerdade)({ cenas: animacao.cenas, molde: animacao.molde, marca, qualidade: perfil, saida: parcial, aoProgredir });
     await rename(parcial, caminhoDaAnimacaoNoVolume(relativo));
   } catch (erro) {
     await rm(parcial, { force: true }).catch(() => undefined);

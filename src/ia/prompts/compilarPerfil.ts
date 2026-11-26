@@ -14,8 +14,13 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * secao 2b), mais dois campos novos e opcionais, `historia` e
  * `posicionamentos`, para nenhum prompt de tema ou de roteiro quebrar por
  * causa de um campo ausente no negocio.
+ *
+ * 1.3.0 (E76 PR 2): o briefing passou de doze para treze perguntas (a P12 virou duas: os
+ * concorrentes, ou os perfis parecidos da pessoa, na P12, e os perfis admirados na P13). O sistema
+ * deixa de dizer "as doze respostas" e a pessoa lê os admirados na P13. A resposta antiga da P12,
+ * que ainda fala das duas coisas, chega com o enunciado de antes (`enunciadoParaLer`).
  */
-export const versao = "1.2.0";
+export const versao = "1.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -79,7 +84,7 @@ significado:
 - cenasFilmaveis: a semana dela que dá para filmar (P11).
 - concorrentes: os perfis parecidos que ela citou (P12); uma pessoa não tem concorrente, tem
   vizinho de assunto.
-- perfisAdmirados: os perfis que ela admira, com o @ quando houver (P12).
+- perfisAdmirados: os perfis que ela admira, com o @ quando houver (P13).
 - historia: o episódio da virada que ela contou (P3), em até 60 palavras.
 - posicionamentos: as opiniões que geram conversa (P6), uma frase cada, com o porquê.
 
@@ -91,8 +96,8 @@ como os negócios ou as parcerias dela entram na vida dela.`;
 export function montarSistemaEstavel(tipo: TipoMarca): string {
   const sobreQuem =
     tipo === "pessoa"
-      ? "as doze respostas do briefing de uma pessoa que vai gravar vídeos com a própria cara"
-      : "as doze respostas do briefing de um dono de pequeno negócio que vai gravar vídeos com a própria cara";
+      ? "as respostas do briefing de uma pessoa que vai gravar vídeos com a própria cara"
+      : "as respostas do briefing de um dono de pequeno negócio que vai gravar vídeos com a própria cara";
   const instrucaoFatos = tipo === "pessoa" ? montarInstrucaoFatosPessoa() : montarInstrucaoFatosNegocio();
 
   return `Você lê ${sobreQuem}, já aprovadas (nota geral 8 ou mais), e compila um perfil em

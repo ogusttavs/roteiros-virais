@@ -12,8 +12,11 @@ export type LinhaDoTempo = { cenas: CenaMontada[]; duracaoS: number };
 export type MarcaDaAnimacao = {
   corFundo?: string;
   corTexto?: string;
+  /** No molde definitivo (`tipografico-2`) é a cor da marca, de onde saem o fundo, o texto e o destaque (as contas do carrossel); no provisório, só o destaque. */
   corDestaque?: string;
   fonteBase64?: string;
+  /** O @ do Instagram da marca, com o arroba ("@clinica.exemplo"); fora do formato do Instagram, cai fora. */
+  arroba?: string;
 };
 
 export type MarcaResolvida = {
@@ -21,6 +24,7 @@ export type MarcaResolvida = {
   corTexto: string;
   corDestaque: string;
   fonteBase64: string | null;
+  arroba: string | null;
 };
 
 export type EntradaDoMolde = {
@@ -30,8 +34,11 @@ export type EntradaDoMolde = {
   altura: number;
 };
 
-/** Um molde é só uma função de dados para HTML: trocar o visual é trocar o arquivo do molde. */
-export type Molde = { nome: string; html: (entrada: EntradaDoMolde) => string };
+/**
+ * Um molde é só uma função de dados para HTML: trocar o visual é trocar o arquivo do molde. `seguraDoFinalS` é quanto a última cena (a chamada) fica a mais na tela depois do tempo de leitura; o
+ * montador soma esse tempo sem passar do teto do vídeo.
+ */
+export type Molde = { nome: string; html: (entrada: EntradaDoMolde) => string; seguraDoFinalS?: number };
 
 export type EntradaDaAnimacao = {
   cenas: CenaDeEntrada[];

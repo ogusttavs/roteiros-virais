@@ -7,6 +7,7 @@ import { sessaoDoPainel } from "@/lib/ver-como";
 import { assinaturasDaMarca, ehDonoDaMarca } from "@/servicos/assinatura";
 import { situacaoDaAssinatura } from "@/servicos/assinatura-tela";
 import { garantirBriefing } from "@/servicos/briefing";
+import { marcaEhDeSaude } from "@/servicos/carrossel";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { candidatasDaMarca, contaLigadaDaMarca, ehDonoDaMarca as ehDonoParaInstagram, ligacaoDisponivel } from "@/servicos/conta-conectada";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
@@ -25,6 +26,7 @@ import { InstalarNoCelular } from "./InstalarNoCelular";
 import { LinkPostPronto } from "./LinkPostPronto";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
+import { ResponsavelTecnico } from "./ResponsavelTecnico";
 import { codigoDoRetorno, montarVisaoSeuInstagram } from "./seu-instagram-visao";
 import { SeuInstagram } from "./SeuInstagram";
 import { SuaAssinatura } from "./SuaAssinatura";
@@ -50,6 +52,8 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
   const ramoAtual = await ramoAtualDoCliente(cliente?.nichoId);
   const pedidoAberto = cliente ? await pedidoAbertoDaMarca(cliente.id) : null;
   const alternativos = cliente ? await ramosAlternativosDaMarca(cliente.id) : [];
+  // O responsável técnico só existe para marca de saúde (a linha sai no último slide do carrossel).
+  const ehSaude = cliente ? await marcaEhDeSaude(cliente.id, ramoAtual?.ramoSlug ?? null) : false;
   const tiposDaMarca = cliente ? await formatosDaMarcaComEstado(cliente.id) : [];
   const notaBriefing = briefing?.notaGeral ? Number(briefing.notaGeral) : null;
   // E22 PR 2: o cartão "Sua assinatura" só aparece com a cobrança ligada ou com assinatura no histórico da marca (desligada e sem assinatura, Conta fica como sempre foi).
@@ -114,6 +118,9 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
           paisesInicial={onde?.paises ?? null}
           desligadoVerComo={sessao.verComo ? textosVerComo.contaSalvarDesligado(sessao.user.name) : undefined}
         />
+        {cliente && ehSaude ? (
+          <ResponsavelTecnico inicial={cliente.responsavelTecnico ?? ""} desligadoVerComo={sessao.verComo ? textosVerComo.contaSalvarDesligado(sessao.user.name) : undefined} />
+        ) : null}
       </div>
       {cliente ? (
         <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
