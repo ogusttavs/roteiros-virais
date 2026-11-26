@@ -201,13 +201,13 @@ test.describe("as versões do roteiro", () => {
     await entrar(page, "d");
     await page.goto("/criar/objetivo?tema=0");
     await page.locator("[data-fichas]").getByRole("radio", { name: /Que me chamem/ }).click();
-    // A resposta fica parada por uns segundos, para a pessoa sair na espera ("Voltar depois"); o servidor recebe o pedido na hora e escreve as versões. (Antes o teste segurava o PEDIDO,
-    // e o "Voltar depois" só navegava quando o servidor terminava; agora o Hoje abre durante a escrita, e um reload cancelaria um pedido ainda parado no navegador.)
+    // O pedido fica parado no navegador por uns segundos (a IA simulada responde na hora), para a pessoa sair na espera ("Voltar depois"); depois segue UMA vez para o servidor, que escreve as versões.
+    // Nada de `rota.fetch()` + `rota.fulfill()`: o Playwright pede ao servidor por conta própria e o navegador repete o pedido quando a resposta chega, e a ação de escrita, que gasta a IA, rodava duas vezes
+    // (um segundo grupo de versões, nunca escolhido, e o cartão do Hoje que não some). Aqui `continue()` deixa o pedido original seguir uma só vez.
     await page.route("**/criar/objetivo*", async (rota) => {
       if (rota.request().method() === "POST" && (rota.request().postData() ?? "").includes('"origem"')) {
-        const resposta = await rota.fetch();
         await new Promise((resolver) => setTimeout(resolver, 8000));
-        await rota.fulfill({ response: resposta }).catch(() => undefined);
+        await rota.continue().catch(() => undefined);
         return;
       }
       await rota.continue();
@@ -225,6 +225,12 @@ test.describe("as versões do roteiro", () => {
     await expect(cartao).toContainText("Suas versões estão prontas");
     await expect(cartao).toContainText("o erro que faz a mancha voltar");
     await expect(cartao).toContainText("Para que te chamem");
+    // Um pedido, uma escrita: um grupo só e três versões (a IA gasta a cada escrita; uma segunda escrita aqui era o que fazia o cartão voltar depois de escolher).
+    const clienteD = await clienteDe("d");
+    const grupos = await db().selectDistinct({ grupo: versoesDoRoteiro.grupo }).from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, clienteD.id));
+    expect(grupos).toHaveLength(1);
+    const [{ total: versoesDoD }] = await db().select({ total: count() }).from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, clienteD.id));
+    expect(versoesDoD).toBe(3);
     await cartao.getByRole("button", { name: "Escolher uma" }).click();
     await expect(page).toHaveURL(/\/criar\/versoes\/[0-9a-f-]{36}$/);
     await expect(page.locator("article[data-versao]")).toHaveCount(3);
