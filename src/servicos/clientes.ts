@@ -445,6 +445,11 @@ export async function definirCortesia(clienteId: number, cortesia: boolean): Pro
   await db().update(clientes).set({ cortesia }).where(eq(clientes.id, clienteId));
 }
 
+/** A cor da marca ("#rrggbb"; a mesma coluna que o primeiro carrossel preenche). Quem chama valida o formato (`corValida`); `null` volta ao neutro do produto. */
+export async function definirCorMarca(clienteId: number, cor: string | null): Promise<void> {
+  await db().update(clientes).set({ corMarca: cor }).where(eq(clientes.id, clienteId));
+}
+
 /**
  * Trocar o tipo de conteúdo de uma marca (P1, item 1): as doze perguntas do
  * negócio e as da pessoa têm o mesmo id, mas enunciados diferentes, então
