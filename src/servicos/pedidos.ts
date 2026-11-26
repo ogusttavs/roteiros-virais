@@ -110,6 +110,8 @@ export async function criarPedido(novo: NovoPedido): Promise<{ pedido: PedidoDeG
   const existente = await pedidoPorId(id);
   if (existente) return repetido(existente, novo);
   const andando = await pedidoEmAndamento(novo.clienteId, novo.tipo);
+  // O mesmo id mandado duas vezes ao mesmo tempo: o que anda pode ser ele mesmo, criado pela outra chamada entre as duas leituras (achado do teste de corrida).
+  if (andando?.id === id) return repetido(andando, novo);
   if (andando) throw new ErroPedido(textosPedidos.jaEmAndamento[novo.tipo], "ja-em-andamento", andando.id);
   await novo.conferirFolga?.();
   try {
