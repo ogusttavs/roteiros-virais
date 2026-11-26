@@ -20,7 +20,8 @@ import { resetarSchema } from "../../scripts/resetar-schema";
 const AGORA = new Date("2026-11-26T15:00:00.000Z");
 const MINUTO = 60 * 1000;
 const HORA = 60 * MINUTO;
-const SCHEMA = z.object({ ok: z.boolean() });
+/** O simulador devolve o roteiro de exemplo; um objeto sem campos exigidos aceita qualquer saída (o teste é do freio, não do roteiro). */
+const SCHEMA = z.object({});
 
 let comum: number;
 let outra: number;
