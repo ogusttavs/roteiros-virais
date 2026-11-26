@@ -669,6 +669,8 @@ function mockCarrossel(entrada: string) {
   if (marcado("carrossel-capa-errada")) slides[0].titulo = `9 erros que estragam ${tema}`.split(" ").slice(0, 10).join(" ");
   // A mesma promessa errada nas DUAS tentativas (E65 PR 4): na 2ª ela só vira aviso de log e o carrossel sai.
   if (entrada.includes("[mock:carrossel-capa-errada-sempre]")) slides[0].titulo = `9 erros que estragam ${tema}`.split(" ").slice(0, 10).join(" ");
+  // 1.11.0 (R-COPY-27 no carrossel): o título do segundo slide que serve para qualquer ramo, só na 1ª tentativa; o verificador (simulado) reprova e o texto volta limpo.
+  if (marcado("carrossel-qualquer-ramo")) slides[1].titulo = "Cuide bem do que é seu {mock:qualquer-ramo}";
   if (marcado("carrossel-capa-vaga")) slides[0].titulo = `Tudo sobre ${tema}`.split(" ").slice(0, 10).join(" ");
   if (marcado("carrossel-capa-sem-promessa")) slides[0].titulo = `Estofado bonito`;
   if (marcado("carrossel-promessa")) slides[1].texto = "Com o clareamento, o dente volta ao branco em uma sessão.";

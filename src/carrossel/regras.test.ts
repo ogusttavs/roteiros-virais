@@ -23,6 +23,13 @@ const s = (tipo: SlideDoCarrossel["tipo"], extra: Partial<SlideDoCarrossel> = {}
 const palavras = (n: number) => Array.from({ length: n }, () => "ok").join(" ");
 
 describe("verificarOrdemDosSlides", () => {
+  it("o slide O problema não conta como item na mistura: problema, item, item passa; item, item, item não", () => {
+    const problema = { tipo: "item" as const, rotulo: "O problema" };
+    const ok = [s("capa-texto"), problema, s("item"), s("item"), s("passo"), s("resumo"), s("chamada")];
+    expect(verificarOrdemDosSlides(ok, 7).join("|")).not.toMatch(/seguidos/);
+    const ruim = [s("capa-texto"), s("item"), s("item"), s("item"), s("passo"), s("resumo"), s("chamada")];
+    expect(verificarOrdemDosSlides(ruim, 7).join("|")).toMatch(/3 slides seguidos/);
+  });
   it("aceita capa, meio misturado e chamada", () => {
     expect(verificarOrdemDosSlides([s("capa-texto"), s("passo"), s("item"), s("passo"), s("chamada")], 5)).toEqual([]);
   });

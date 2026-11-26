@@ -22,7 +22,7 @@ import {
 import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 
 import { distribuirFotos } from "./fotos";
-import { rotularItens } from "./metodo";
+import { ehOProblema, rotularItens } from "./metodo";
 
 export function contarPalavras(texto: string): number {
   return texto.trim() === "" ? 0 : texto.trim().split(/\s+/).length;
@@ -96,8 +96,23 @@ export function textoDoSlide(s: SlideDoCarrossel): string[] {
   return [s.rotulo, s.titulo, s.sub, s.texto, s.antes, s.depois, s.valor && `${s.valor}${s.unidade ?? ""}`, s.frase, s.fonte, s.citacao, s.quem, s.contexto, ...(s.linhas ?? []), ...(s.acoes ?? [])].filter((t): t is string => Boolean(t && t.trim()));
 }
 
+/**
+ * O formato de um carrossel pelos tipos dos slides (prompt 2.2.0, regra F): "passo a passo" quando há mais passos que itens, "antes e depois" quando o antes-depois pesa mais que os dois, senão "lista" (itens);
+ * sem nenhum dos três, nulo. O slide "O problema" é um item de apoio e não decide o formato.
+ */
+export function formatoDoCarrossel(slides: { tipo: TipoDeSlide; rotulo?: string }[]): string | null {
+  const conta = (f: (s: { tipo: TipoDeSlide; rotulo?: string }) => boolean) => slides.filter(f).length;
+  const passos = conta((s) => s.tipo === "passo");
+  const itens = conta((s) => s.tipo === "item" && !ehOProblema(s));
+  const antesDepois = conta((s) => s.tipo === "antes-depois");
+  if (antesDepois > 0 && antesDepois >= passos && antesDepois >= itens) return "antes e depois";
+  if (passos > itens) return "passo a passo";
+  if (itens > 0) return "lista";
+  return passos > 0 ? "passo a passo" : null;
+}
+
 /** A ordem e a forma da lista: quantidade, capa primeiro, chamada por último, nunca três do mesmo tipo seguidos. */
-export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide }[], quantidade: number): string[] {
+export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide; rotulo?: string }[], quantidade: number): string[] {
   const motivos: string[] = [];
   if (slides.length !== quantidade) motivos.push(`carrossel: ${slides.length} slides, o pedido era de exatamente ${quantidade}`);
   if (slides.length > 0 && !ehCapa(slides[0].tipo)) motivos.push('carrossel: o primeiro slide precisa ser uma capa (capa-foto ou capa-texto)');
@@ -106,9 +121,11 @@ export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide }[], quantid
     if (i > 0 && ehCapa(s.tipo)) motivos.push(`slide ${i + 1}: o tipo "${s.tipo}" só pode ser o primeiro`);
     if (i < slides.length - 1 && s.tipo === "chamada") motivos.push(`slide ${i + 1}: o tipo "chamada" só pode ser o último`);
   });
+  // O slide "O problema" (regra C do prompt 2.2.0) sai como item, mas conta como um tipo à parte na mistura: problema, item, item não são três itens seguidos.
+  const tipoNaMistura = (x: { tipo: TipoDeSlide; rotulo?: string }) => (ehOProblema(x) ? "problema" : x.tipo);
   let seguidos = 1;
   for (let i = 1; i < slides.length; i += 1) {
-    seguidos = slides[i].tipo === slides[i - 1].tipo ? seguidos + 1 : 1;
+    seguidos = tipoNaMistura(slides[i]) === tipoNaMistura(slides[i - 1]) ? seguidos + 1 : 1;
     if (seguidos > MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO) {
       motivos.push(`slides ${i - seguidos + 2} a ${i + 1}: ${seguidos} slides seguidos do tipo "${slides[i].tipo}", misture os tipos`);
       break;

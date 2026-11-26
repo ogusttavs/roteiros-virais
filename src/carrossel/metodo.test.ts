@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { SlideDoCarrossel } from "@/config/carrossel";
 
 import { larguraDaImagem } from "./fotos";
-import { avisosDoMetodo, capaTemPromessaConcreta, moldeVagoDaCapa, promessaDeContagem, rotularItens, verificarCapaVaga, verificarPromessaDaCapa } from "./metodo";
-import { formulasDeMaquinaDosSlides, slidesDaSaida, type SlideDaSaida } from "./regras";
+import { avisosDoMetodo, ehOProblema, capaTemPromessaConcreta, moldeVagoDaCapa, promessaDeContagem, rotularItens, verificarCapaVaga, verificarPromessaDaCapa } from "./metodo";
+import { formatoDoCarrossel, formulasDeMaquinaDosSlides, slidesDaSaida, type SlideDaSaida } from "./regras";
 
 const capa = (titulo: string, sub?: string): SlideDoCarrossel => ({ tipo: "capa-texto", titulo, ...(sub ? { sub } : {}) });
 const item = (texto = "Um texto de explicação com mais de oito palavras para ensinar"): SlideDoCarrossel => ({ tipo: "item", titulo: "Um item", texto });
@@ -160,5 +160,26 @@ describe("fórmulas com cara de máquina (o detector do roteiro, sem lista próp
     expect(formulasDeMaquinaDosSlides(comFormula, "").join()).toMatch(/R-COPY-26: o gancho usa a fórmula/);
     const noMeio = [capa("3 erros no estofado"), { ...item(), texto: "Você deixa o produto agir. E isso muda tudo." }, chamada];
     expect(formulasDeMaquinaDosSlides(noMeio, "").join()).toMatch(/R-COPY-26: o corpo usa a fórmula/);
+  });
+});
+
+describe("o slide O problema (prompt 2.2.0, regra C)", () => {
+  const problema: SlideDoCarrossel = { tipo: "item", rotulo: "O problema", titulo: "O vinho secou no sofá", texto: "A mancha escurece e você passa pano molhado, que só espalha." };
+
+  it("não conta como um dos N da capa e não entra na numeração dos itens", () => {
+    const slides = [capa("3 erros que estragam o seu sofá"), problema, item(), item(), item(), chamada];
+    expect(ehOProblema(problema)).toBe(true);
+    expect(ehOProblema(item())).toBe(false);
+    expect(verificarPromessaDaCapa(slides)).toEqual([]);
+    const rotulados = rotularItens(slides);
+    expect(rotulados[1].rotulo).toBe("O problema");
+    expect(rotulados.slice(2, 5).map((x) => x.rotulo)).toEqual(["Erro 1 de 3", "Erro 2 de 3", "Erro 3 de 3"]);
+  });
+
+  it("o formato do carrossel vem dos tipos (o problema não decide)", () => {
+    expect(formatoDoCarrossel([capa("x"), problema, passo(), passo(), passo(), chamada])).toBe("passo a passo");
+    expect(formatoDoCarrossel([capa("x"), problema, item(), item(), chamada])).toBe("lista");
+    expect(formatoDoCarrossel([capa("x"), { tipo: "antes-depois", titulo: "t", antes: "a", depois: "d" }, chamada])).toBe("antes e depois");
+    expect(formatoDoCarrossel([capa("x"), chamada])).toBeNull();
   });
 });
