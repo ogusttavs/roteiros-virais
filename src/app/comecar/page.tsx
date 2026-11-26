@@ -90,6 +90,7 @@ export default async function Comecar() {
           dadosFixosIniciais={{
             nome: cliente.nome,
             ...dadosOndeIniciais(cliente),
+            estrategiaIdioma: cliente.estrategiaIdioma ?? null,
             site: cliente.site,
             nichoId: cliente.nichoId,
             ramoSlug: ramoAtual?.ramoSlug ?? null,

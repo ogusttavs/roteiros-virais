@@ -31,6 +31,7 @@ import {
 } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
 import { adiamentoDoConvite } from "@/lib/convite-instalar";
+import { estrategiaIdiomaSchema, normalizarEstrategiaIdioma } from "@/lib/estrategia-de-idioma";
 import {
   lerClienteIdDoCookie,
   NOME_COOKIE_MARCA_ATIVA,
@@ -657,6 +658,11 @@ export const dadosFixosSchema = z
       })
       .optional(),
     quemGrava: z.enum(["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"]).optional(),
+    /**
+     * E76 PR 3: a estratégia de idioma (`lib/estrategia-de-idioma.ts`), opcional e só lida com "mais_de_um_pais"; com qualquer outro valor de
+     * onde, o que vier é ignorado e a coluna fica nula. Ausente com "mais_de_um_pais" também zera: o Começar manda o estado inteiro do passo.
+     */
+    estrategiaIdioma: estrategiaIdiomaSchema.nullish(),
   })
   .refine((dados) => Boolean(dados.ramo) || Boolean(dados.nichoId) || Boolean(dados.ramoOutro?.trim()), {
     message: "escolha um ramo da lista ou descreva o seu",
@@ -746,6 +752,7 @@ export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: 
       regiao: dados.alcance === "local" ? (dados.regiao?.trim() ?? null) : null,
       pais: dados.alcance === "outro_pais" ? (dados.pais?.trim() ?? null) : null,
       paises: dados.alcance === "mais_de_um_pais" ? (dados.paises?.trim() ?? null) : null,
+      estrategiaIdioma: dados.alcance === "mais_de_um_pais" && dados.estrategiaIdioma ? normalizarEstrategiaIdioma(dados.estrategiaIdioma) : null,
       site: dados.site?.trim() || null,
       nichoId,
       ramoOutro: escolheuDaLista ? null : (ramoEmEspera ?? dados.ramoOutro?.trim() ?? null),
@@ -1028,6 +1035,8 @@ export async function salvarOndeConta(clienteId: number, dadosBrutos: unknown): 
       regiao: dados.alcance === "local" ? (dados.regiao?.trim() ?? null) : null,
       pais: dados.alcance === "outro_pais" ? (dados.pais?.trim() ?? null) : null,
       paises: dados.alcance === "mais_de_um_pais" ? (dados.paises?.trim() ?? null) : null,
+      // E76 PR 3: a Conta não mostra a estratégia de idioma. Continuar em "mais de um país" a mantém; sair dele a apaga, como `paises`.
+      ...(dados.alcance === "mais_de_um_pais" ? {} : { estrategiaIdioma: null }),
     })
     .where(eq(clientes.id, clienteId))
     .returning();

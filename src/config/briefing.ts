@@ -18,7 +18,7 @@
  * vale para a P12 e cobre a P13 até a pessoa editar a P12 ou responder a P13
  * (`p13CobertaPelaP12Antiga`, em `servicos/briefing-regras.ts`).
  */
-import type { Alcance, Persona, QuemGrava, TipoMarca, TipoPerfilCitado } from "@/db/schema";
+import type { Alcance, IdiomaDoConteudo, ModoDeIdioma, Persona, QuemGrava, TipoMarca, TipoPerfilCitado } from "@/db/schema";
 
 export type PersonaOpcao = { valor: Persona; rotulo: string };
 export type QuemGravaOpcao = { valor: QuemGrava; rotulo: string };
@@ -31,6 +31,24 @@ export type QuemGravaOpcao = { valor: QuemGrava; rotulo: string };
  * `avaliarResposta.ts`: a palavra fica só onde o checar-texto não olha.
  */
 export type OndeOpcao = { valor: Alcance; rotulo: string };
+
+/** E76 PR 3: uma opção de como os idiomas se misturam (`ModoDeIdioma`), com a linha de ajuda quando o rótulo sozinho não basta. */
+export type ModoDeIdiomaOpcao = { valor: ModoDeIdioma; rotulo: string; ajuda?: string };
+export type IdiomaOpcao = { valor: IdiomaDoConteudo; rotulo: string };
+
+/**
+ * E76 PR 3 (avaliação externa do cadastro da Skyline, 26/11/2026): a estratégia de idioma, só com a opção "mais_de_um_pais". As regras de
+ * validação estão em `lib/estrategia-de-idioma.ts`; o que cada modo faz no texto da IA, em `ia/prompts/idioma.ts`.
+ */
+export type IdiomaConfig = {
+  rotulo: string;
+  ajuda: string;
+  opcoes: ModoDeIdiomaOpcao[];
+  rotuloPrincipal: string;
+  rotuloSegundo: string;
+  idiomas: IdiomaOpcao[];
+  campoComo: { rotulo: string; ajuda: string };
+};
 
 export type DadosFixosConfig = {
   nome: { rotulo: string };
@@ -47,6 +65,8 @@ export type DadosFixosConfig = {
      * linha, que a pesquisa de vídeos ainda é feita por aqui (o motor não muda nesta etapa).
      */
     avisoPesquisaNoBrasil: string;
+    /** E76 PR 3: só com a opção "mais_de_um_pais". */
+    idioma: IdiomaConfig;
   };
   site: { rotulo: string; ajuda: string };
   ramo: {
@@ -85,6 +105,31 @@ const ONDE_CAMPO_PAISES = { rotulo: "Quais países?", ajuda: 'Por exemplo "Estad
 const ONDE_AVISO_PESQUISA_NO_BRASIL =
   "Por enquanto, a pesquisa de vídeos que vira roteiro olha só o Brasil, mesmo com o seu público em outro lugar.";
 
+/**
+ * E76 PR 3: a mesma pergunta para o negócio e para a pessoa. Os modos seguem o pedido do plano (português; inglês; o principal com uma linha no
+ * outro; metade em cada; outro jeito, com uma frase curta); o espanhol entra só como idioma principal ou segundo, porque "Estados Unidos e
+ * México" é o exemplo do próprio campo de países.
+ */
+const ONDE_IDIOMA: IdiomaConfig = {
+  rotulo: "Em que idioma saem os seus vídeos e posts?",
+  ajuda: "Vale para o que o seu público ouve e lê. O que o aplicativo te explica continua em português.",
+  opcoes: [
+    { valor: "so_portugues", rotulo: "Só em português" },
+    { valor: "so_ingles", rotulo: "Só em inglês" },
+    { valor: "linha_no_outro", rotulo: "Um idioma principal, com uma linha no outro", ajuda: "Tudo no principal e uma frase curta no outro, como o convite do fim repetido." },
+    { valor: "metade", rotulo: "Metade em cada", ajuda: "A fala e os slides num idioma; o texto na tela e a legenda no outro." },
+    { valor: "outro", rotulo: "De outro jeito", ajuda: "Você conta em poucas palavras." },
+  ],
+  rotuloPrincipal: "Qual é o idioma principal?",
+  rotuloSegundo: "E o outro idioma?",
+  idiomas: [
+    { valor: "portugues", rotulo: "Português" },
+    { valor: "ingles", rotulo: "Inglês" },
+    { valor: "espanhol", rotulo: "Espanhol" },
+  ],
+  campoComo: { rotulo: "Como você mistura os idiomas?", ajuda: 'Por exemplo "só inglês nos Reels, português no resto".' },
+};
+
 const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
   nome: { rotulo: "Nome do negócio" },
   onde: {
@@ -94,6 +139,7 @@ const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
     campoPais: ONDE_CAMPO_PAIS,
     campoPaises: ONDE_CAMPO_PAISES,
     avisoPesquisaNoBrasil: ONDE_AVISO_PESQUISA_NO_BRASIL,
+    idioma: ONDE_IDIOMA,
   },
   site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Pode escrever só o endereço, como minhaloja.com.br" },
   ramo: {
@@ -132,6 +178,7 @@ const DADOS_FIXOS_PESSOA: DadosFixosConfig = {
     campoPais: ONDE_CAMPO_PAIS,
     campoPaises: ONDE_CAMPO_PAISES,
     avisoPesquisaNoBrasil: ONDE_AVISO_PESQUISA_NO_BRASIL,
+    idioma: ONDE_IDIOMA,
   },
   site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Pode escrever só o endereço, como minhaloja.com.br" },
   ramo: {
