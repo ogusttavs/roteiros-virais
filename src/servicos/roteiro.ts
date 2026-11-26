@@ -60,7 +60,7 @@ import { montarEntradaCopyRoteiro, type SaidaParaCopyRoteiro, verificarRegrasCop
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { camposCorridosDosCapitulos } from "@/lib/capitulos-do-roteiro";
 import { hojeISO } from "@/lib/config";
-import { estrategiaDaMarca, estrategiaTemOutroIdioma } from "@/lib/estrategia-de-idioma";
+import { estrategiaDaMarca, estrategiaTemOutroIdioma, falaPodeSairForaDoPortugues } from "@/lib/estrategia-de-idioma";
 import { logger } from "@/lib/log";
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, temCapitulos } from "@/lib/marcas-de-fala";
 import { comArroba } from "@/lib/perfil-redes";
@@ -1193,6 +1193,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   // E76 PR 3: a estratégia de idioma só vale para a marca de mais de um país que escolheu uma; nas outras é nula e nada muda no prompt.
   const estrategiaIdioma = estrategiaDaMarca(dados.cliente);
   const variosIdiomas = estrategiaTemOutroIdioma(estrategiaIdioma);
+  // Com a fala fora do português, as conferências que procuram palavras do português na fala (o momento no gancho, o passo a passo da ficha "guardem") não rodam.
+  const falaForaDoPortugues = falaPodeSairForaDoPortugues(estrategiaIdioma);
 
   /**
    * Hotfix de 01/10/2026 (achado do Gustavo em produção): `porQueAssim` só existia em Story
@@ -1415,7 +1417,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     citarProibicaoVale: dados.temaDaPessoa,
     exigeEvidencia: !semEvidencia,
     evidenciasFornecidas,
-    palavrasDoMomento,
+    palavrasDoMomento: falaForaDoPortugues ? undefined : palavrasDoMomento,
     /**
      * O gancho da versão reprovada entra aqui também (E27, parte 1, item 4:
      * "com gancho_fraco, o gancho novo tem de ser diferente do reprovado, a
@@ -1448,7 +1450,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     generoTexto: "roteiro",
     formato: dados.formato,
     estilo: dados.estilo,
-    ficha: dados.ficha ?? undefined,
+    ficha: falaForaDoPortugues ? undefined : (dados.ficha ?? undefined),
     extrairCartoes: (d) => d.cartoes,
     extrairLegenda: (d) => d.legenda,
     extrairPorQueAssim: (d) => porQueAssimValido(d.porQueAssim),

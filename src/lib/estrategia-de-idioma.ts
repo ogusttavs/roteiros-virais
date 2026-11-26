@@ -121,3 +121,14 @@ export function estrategiaTemOutroIdioma(estrategia: EstrategiaIdioma | null | u
   if (estrategia.modo === "so_portugues") return false;
   return true;
 }
+
+/**
+ * Verdadeiro quando a FALA do roteiro (o gancho, o corpo) pode sair fora do português: o idioma principal não é o português, ou o modo é
+ * "outro" (a frase da pessoa pode pedir, por exemplo, "só inglês nos Reels"). Nesses casos, as conferências do verificador que procuram
+ * palavras do português na fala (o gancho citar o momento descrito, o corpo da ficha "guardem" ter um passo a passo) não rodam: reprovariam
+ * sempre o roteiro certo. Com o português como principal ("uma linha no outro", "metade" com a fala em português), elas continuam.
+ */
+export function falaPodeSairForaDoPortugues(estrategia: EstrategiaIdioma | null | undefined): boolean {
+  if (!estrategiaTemOutroIdioma(estrategia)) return false;
+  return estrategia.principal !== "portugues" || estrategia.modo === "outro";
+}

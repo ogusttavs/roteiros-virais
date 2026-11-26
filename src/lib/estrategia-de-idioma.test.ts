@@ -12,6 +12,7 @@ import {
   estrategiaIdiomaSchema,
   estrategiaTemOutroIdioma,
   faltaNaEstrategia,
+  falaPodeSairForaDoPortugues,
   normalizarEstrategiaIdioma,
   TAMANHO_MAXIMO_DO_COMO_OUTRO,
   type EscolhaDeIdiomaNaTela,
@@ -72,6 +73,18 @@ describe("estrategiaTemOutroIdioma", () => {
     expect(estrategiaTemOutroIdioma({ modo: "so_ingles", principal: "ingles", segundo: null, comoOutro: null })).toBe(true);
     expect(estrategiaTemOutroIdioma(LINHA_EM_INGLES)).toBe(true);
     expect(estrategiaTemOutroIdioma({ modo: "outro", principal: "portugues", segundo: null, comoOutro: "só inglês nos Reels" })).toBe(true);
+  });
+});
+
+describe("falaPodeSairForaDoPortugues", () => {
+  it("só quando o principal não é o português, ou no outro jeito; com o português como principal, a fala continua em português", () => {
+    expect(falaPodeSairForaDoPortugues(null)).toBe(false);
+    expect(falaPodeSairForaDoPortugues({ modo: "so_portugues", principal: "portugues", segundo: null, comoOutro: null })).toBe(false);
+    expect(falaPodeSairForaDoPortugues(LINHA_EM_INGLES)).toBe(false);
+    expect(falaPodeSairForaDoPortugues({ modo: "metade", principal: "portugues", segundo: "ingles", comoOutro: null })).toBe(false);
+    expect(falaPodeSairForaDoPortugues({ modo: "so_ingles", principal: "ingles", segundo: null, comoOutro: null })).toBe(true);
+    expect(falaPodeSairForaDoPortugues({ modo: "metade", principal: "espanhol", segundo: "portugues", comoOutro: null })).toBe(true);
+    expect(falaPodeSairForaDoPortugues({ modo: "outro", principal: "portugues", segundo: null, comoOutro: "só inglês nos Reels" })).toBe(true);
   });
 });
 
