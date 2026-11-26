@@ -96,7 +96,7 @@ export const LIMITE_DA_LEGENDA_PALAVRAS = 150;
 /** De 3 a 5, como a regra de legenda das plataformas que o roteiro já usa (R-IG-REEL-09). */
 export const HASHTAGS = { min: 3, max: 5 } as const;
 
-/** Nunca três slides seguidos do mesmo tipo (o código confere depois da IA). */
+/** Nunca três slides seguidos do mesmo tipo (o código confere depois da IA), menos os itens ou passos da lista que a capa promete ("3 sinais": os 3 itens seguidos valem). */
 export const MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO = 2;
 
 /** Quais tipos aceitam foto do cliente: o antes e depois aceita duas (a do antes e a do depois). */

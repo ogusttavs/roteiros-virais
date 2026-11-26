@@ -682,12 +682,15 @@ function mockCapaNoticia(entrada: string) {
   if (marcado("capa-promessa")) titulos[2] = "Esta técnica garante o resultado em uma sessão";
   if (marcado("capa-igual")) titulos[3] = manchete;
   if (marcado("capa-formula")) titulos[1] = "Um resultado incrível para o seu sorriso";
+  // T114: um título (ou todos) longo demais nas DUAS tentativas: o servidor confere título a título e fica com os que passam; sem nenhum, a capa falha.
+  if (entrada.includes("[mock:capa-longo-sempre]")) titulos[1] = Array.from({ length: 20 }, () => "palavra").join(" ");
+  if (entrada.includes("[mock:capa-todos-longos-sempre]")) return { titulos: titulos.map((t) => `${t} ${Array.from({ length: 20 }, () => "palavra").join(" ")}`) };
   return { titulos };
 }
 
 /**
  * E65 PR 1: o carrossel simulado, determinístico: a quantidade vem da entrada, a capa abre (capa-foto só se a entrada diz que há foto), a chamada fecha e o meio alterna passo e item (nunca três iguais). Marcadores de teste no tema:
- * "[mock:carrossel-longo]" estoura o limite de palavras de um slide, "[mock:carrossel-tres-iguais]" repete o tipo três vezes, "[mock:carrossel-dado-sem-fonte]" tira a fonte do dado,
+ * "[mock:carrossel-longo]" estoura o limite de palavras de um slide, "[mock:carrossel-tres-iguais]" repete o tipo três vezes (com a capa sem número: os itens da lista que a capa conta podem vir seguidos), "[mock:carrossel-dado-sem-fonte]" tira a fonte do dado,
  * "[mock:carrossel-prova-resultado]" põe um slide de resultado com foto, "[mock:carrossel-prova-fala-outro]" e "[mock:carrossel-prova-fala-cliente]" põem uma fala que só está no tema (nunca do cliente) e uma do perfil, "[mock:carrossel-numero-solto]" escreve um número que a entrada não traz. Os marcadores valem só na primeira tentativa (a segunda corrige, como um modelo corrigiria).
  */
 function mockCarrossel(entrada: string) {
@@ -700,7 +703,7 @@ function mockCarrossel(entrada: string) {
   type Fatia = { tipo: string; rotulo: string; titulo: string; texto: string; antes: string; depois: string; valor: string; unidade: string; fonte: string; referencia: string; quem: string; contexto: string; linhas: string[]; acoes: string[] };
   const vazio: Fatia = { tipo: "item", rotulo: "", titulo: "", texto: "", antes: "", depois: "", valor: "", unidade: "", fonte: "", referencia: "", quem: "", contexto: "", linhas: [], acoes: [] };
   const slides: Fatia[] = [
-    { ...vazio, tipo: entrada.includes("O cliente enviou") ? "capa-foto" : "capa-texto", rotulo: "Dicas", titulo: `${quantidade - 2} dicas sobre ${tema}`.split(" ").slice(0, 10).join(" "), texto: "Para você salvar e usar hoje" },
+    { ...vazio, tipo: entrada.includes("O cliente enviou") ? "capa-foto" : "capa-texto", rotulo: "Dicas", titulo: (marcado("carrossel-tres-iguais") ? `Dicas sobre ${tema}` : `${quantidade - 2} dicas sobre ${tema}`).split(" ").slice(0, 10).join(" "), texto: "Para você salvar e usar hoje" },
   ];
   for (let i = 0; i < quantidade - 2; i += 1) {
     const tipo = marcado("carrossel-tres-iguais") ? "item" : meio[i % meio.length];

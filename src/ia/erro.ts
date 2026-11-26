@@ -53,6 +53,19 @@ export class ErroIA extends Error {
   }
 }
 
+/**
+ * A tarefa foi reprovada nas duas tentativas (e no reparo, quando há). Carrega a última saída gerada, para quem sabe aproveitar parte dela (os ganchos alternativos conferem um a um o que sobrou
+ * da lista) em vez de perder tudo. Continua sendo um `ErroIA`: quem não usa a saída trata como sempre.
+ */
+export class ErroReprovadoDuasVezes<T = unknown> extends ErroIA {
+  constructor(
+    mensagemTecnica: string,
+    readonly ultimaSaida: T,
+  ) {
+    super(mensagemTecnica);
+  }
+}
+
 /** A frase que a tela mostra: a da causa para quem e admin na sessao real, a generica (`mensagemCliente`) para todo mundo e para o erro sem causa. */
 export function fraseDoErroDaIA(erro: ErroIA, souAdmin: boolean): string {
   return souAdmin && erro.causa ? FRASE_DA_CAUSA_PARA_ADMIN[erro.causa] : erro.mensagemCliente;

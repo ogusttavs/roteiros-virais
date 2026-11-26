@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { candidatasDosVideos, chavesDaCidade, escolherHashtags, hashtagsDoTexto, tirarNomesDeConta, type VideoParaHashtags } from "./hashtags-do-post";
+import { candidatasDosVideos, chavesDaCidade, escolherHashtags, hashtagDeHumor, hashtagsDoTexto, marcaFalaComHumor, tirarNomesDeConta, type VideoParaHashtags } from "./hashtags-do-post";
 
 const AGORA = new Date("2026-11-25T12:00:00Z");
 const diasAtras = (d: number) => new Date(AGORA.getTime() - d * 86_400_000);
@@ -160,5 +160,40 @@ describe("escolherHashtags", () => {
 
   it("sem dados devolve vazio", () => {
     expect(escolherHashtags([], { tema: "qualquer coisa", regiao: "Campinas", ramoSaude: true })).toEqual([]);
+  });
+
+  // T114 (ensaio de 26/11/2026): o roteiro de dentista saiu com "#comedia #humor #dentista", porque no ramo viraliza vídeo de humor.
+  it("hashtag de humor ou de entretenimento fica de fora quando a marca não fala com humor, em saúde e fora dela", () => {
+    const dentista = [cand("comedia", 99), cand("humor", 98), cand("dentista", 40)];
+    expect(escolherHashtags(dentista, { ramoSaude: true })).toEqual(["#dentista"]);
+    expect(escolherHashtags(dentista, {})).toEqual(["#dentista"]);
+    const outras = ["memes", "humordentista", "piadas", "zoeira", "dentistaengracado", "entretenimento", "standup", "pegadinha", "kkkk"].map((c) => cand(c, 80));
+    expect(escolherHashtags([...outras, cand("limpezadacasa", 40)], {})).toEqual(["#limpezadacasa"]);
+  });
+
+  it("com o tom de humor da marca, a de humor entra pela régua de sempre", () => {
+    const r = escolherHashtags([cand("comedia", 99), cand("humor", 98), cand("dentista", 40)], { humorDaMarca: true });
+    expect(r).toEqual(["#comedia", "#humor", "#dentista"]);
+  });
+
+  it("hashtagDeHumor acha o gênero dentro da hashtag e deixa o serviço em paz", () => {
+    for (const c of ["comedia", "comediante", "humorbr", "bomhumor", "memes", "piadadodia", "zueira", "videoengracado"]) expect(hashtagDeHumor(c)).toBe(true);
+    for (const c of ["dentista", "clareamento", "comida", "economia", "odontologia", "saudebucal", "sorriso"]) expect(hashtagDeHumor(c)).toBe(false);
+  });
+});
+
+describe("marcaFalaComHumor", () => {
+  it("lê o tom que a marca disse: brincalhão, engraçado, humor, comédia, piada, zoeira", () => {
+    expect(marcaFalaComHumor(["Bora que bora! Tá limpinho! Meu tom é brincalhão."])).toBe(true);
+    expect(marcaFalaComHumor([null, "Fala de um jeito bem-humorado, com piadas do dia a dia da oficina."])).toBe(true);
+    expect(marcaFalaComHumor(["Sou engraçada e falo rápido"])).toBe(true);
+  });
+
+  it("tom sério ou direto, negação e ânimo não contam", () => {
+    expect(marcaFalaComHumor(["Olha aqui na tela. A gente mostra antes de falar de tratamento.", "Clínica de tom calmo e direto."])).toBe(false);
+    expect(marcaFalaComHumor(["Nunca faço piada com dente. Meu tom é sério."])).toBe(false);
+    expect(marcaFalaComHumor(["Atendo sempre de bom humor, sem pressa."])).toBe(false);
+    expect(marcaFalaComHumor(["Aqui é sem humor, só o que importa."])).toBe(false);
+    expect(marcaFalaComHumor([undefined, null, ""])).toBe(false);
   });
 });
