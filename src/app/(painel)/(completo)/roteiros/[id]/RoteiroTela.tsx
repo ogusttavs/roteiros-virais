@@ -53,7 +53,7 @@ import { LinhaMarcasDeFala } from "@/ui/componentes/LinhaMarcasDeFala";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { PorQuesProvider, VerOsPorques, type VideoDoPorQue } from "@/ui/componentes/PorQue";
-import { RoteiroTexto, type BlocoRoteiro } from "@/ui/componentes/RoteiroTexto";
+import { blocosComColchete, RoteiroTexto, type BlocoRoteiro } from "@/ui/componentes/RoteiroTexto";
 import { TelaReescrevendo } from "@/ui/componentes/TelaReescrevendo";
 import { Toast } from "@/ui/componentes/Toast";
 import { VideoEmbed } from "@/ui/componentes/VideoEmbed";
@@ -69,6 +69,7 @@ import {
   reprovarERescreverAction,
   salvarEdicaoAction,
 } from "./acoes";
+import { AvisoDeColchetes } from "./AvisoDeColchetes";
 import { CartaoDaLegenda } from "./CartaoDaLegenda";
 import { ChamadoAnimacao } from "./ChamadoAnimacao";
 import { ChamadoEditarMeuVideo } from "./ChamadoEditarMeuVideo";
@@ -422,6 +423,10 @@ export function RoteiroTela({
     porQueChave: ehPorCartao ? `cartao:${indice}` : (["gancho", "corpo", "fechamento", "chamada"] as const)[indice],
   }));
   const temChaveDeMarcas = fala.podeMarcar && (!fala.somenteLeitura || fala.marcas !== null);
+  /** 26/11/2026: a cena e o texto na tela vão junto da fala só no Reels falado; o aviso dos colchetes olha o mesmo que a leitura destaca. */
+  const comCenasNaFala = roteiro.formato !== "story" && roteiro.estilo !== "sem_fala";
+  /** 26/11/2026: a fala tem trecho entre colchetes para completar (o vídeo longo tem a edição por capítulo, sem o "Editar" do roteiro inteiro, e fica de fora). */
+  const temColchetesParaCompletar = !ehLongo && blocosComColchete(blocos, comCenasNaFala);
   // E41 2c: "No PDF e na imagem, com as marcas de fala", no menu "Mais opções": desligada por padrão, vale para o PDF e para a imagem (as marcas que ainda não existem são escritas na hora do pedido).
   const [exportarComMarcas, setExportarComMarcas] = useState(false);
   /** O PDF ou a imagem saíram sem as marcas que a pessoa pediu: a frase de um toque só, no lugar do "pronto". */
@@ -965,6 +970,9 @@ export function RoteiroTela({
           </div>
         ) : null}
 
+        {/* 26/11/2026: os espaços entre colchetes que a pessoa precisa completar, antes dos blocos; o botão abre a mesma edição do "Editar" do alto. */}
+        {temColchetesParaCompletar && !editando ? <AvisoDeColchetes aoCompletar={iniciarEdicao} /> : null}
+
         {roteiro.objetivoDoVideo ? (
           <p className={styles.recado}>
             <span className={styles.rotulo}>{textosRoteiro.recado}</span>
@@ -1111,7 +1119,7 @@ export function RoteiroTela({
                   {ganchos ? <OutrosGanchos key={roteiro.id} roteiroId={roteiro.id} visao={ganchos} /> : null}
                 <RoteiroTexto
                   blocos={blocosVisiveis}
-                  comCenas={roteiro.formato !== "story" && roteiro.estilo !== "sem_fala"}
+                  comCenas={comCenasNaFala}
                   comMarcas={mostrarMarcas}
                 />
                 </>
