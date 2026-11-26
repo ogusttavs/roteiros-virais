@@ -759,7 +759,7 @@ describe("o fluxo da tela contra as rotas", () => {
     const deOutra = ((await (await raiz.POST(json("/api/carrossel", "POST", { quantidade: 5, cor: "#0e5a6a", de: { origem: "tema", texto: "tema da outra marca" } }))).json()) as { id: number }).id;
 
     como(dona);
-    const lista = (await (await raiz.GET()).json()) as { carrosseis: { id: number; tema: string; quantidade: number; criadoEm: string }[] };
+    const lista = (await (await raiz.GET(json("/api/carrossel", "GET"))).json()) as { carrosseis: { id: number; tema: string; quantidade: number; criadoEm: string }[] };
     expect(lista.carrosseis.map((c) => c.id)).toEqual([segundo, primeiro]);
     expect(lista.carrosseis.map((c) => c.id)).not.toContain(deOutra);
     expect(lista.carrosseis[0]).toMatchObject({ quantidade: 7 });
@@ -814,7 +814,7 @@ describe("a chave desligada", () => {
     const pedido = () => new Request("http://localhost/api/carrossel", { method: "POST", body: "{}" });
     const id = { params: Promise.resolve({ id: "1", fotoId: "1", n: "1" }) };
     const respostas = [
-      await rotaPrincipal.GET(),
+      await rotaPrincipal.GET(new Request("http://localhost/api/carrossel")),
       await rotaPrincipal.POST(pedido()),
       await rotaDoCarrossel.GET(pedido(), id),
       await rotaDoCarrossel.PATCH(pedido(), id),

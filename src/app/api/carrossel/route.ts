@@ -8,12 +8,12 @@ import { carrosseisDaMarca, gerarCarrosselComTrava, type DeOndeVem } from "@/ser
 export const dynamic = "force-dynamic";
 
 /** Os carrosséis da marca da sessão, do mais novo para o mais antigo, sem as capas de notícia; `?tipo=capa` devolve só as capas. */
-export async function GET(request?: Request) {
+export async function GET(request: Request) {
   const marca = await marcaDoCarrossel();
   if (marca instanceof NextResponse) return marca;
   const recusa = await recusaDaCobranca();
   if (recusa) return recusa;
-  const lista = await carrosseisDaMarca(marca.clienteId, 30, request && new URL(request.url).searchParams.get("tipo") === "capa" ? "capa" : "carrossel");
+  const lista = await carrosseisDaMarca(marca.clienteId, 30, new URL(request.url).searchParams.get("tipo") === "capa" ? "capa" : "carrossel");
   return NextResponse.json({ carrosseis: lista.map((c) => ({ id: c.id, tema: c.tema, quantidade: c.quantidade, criadoEm: c.criadoEm })) }, { headers: SEM_CACHE });
 }
 
