@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nucleoDaPalavra, palavraEmDestaque } from "./destaque";
+import { nucleoDaPalavra, palavraEmDestaque, separarPontuacao } from "./destaque";
 
 const destaque = (texto: string): string | null => {
   const palavras = texto.split(" ");
@@ -13,6 +13,22 @@ describe("nucleoDaPalavra", () => {
     expect(nucleoDaPalavra("“Avaliação?”")).toBe("avaliação");
     expect(nucleoDaPalavra("80%,")).toBe("80%");
     expect(nucleoDaPalavra("R$")).toBe("r$");
+  });
+});
+
+describe("separarPontuacao", () => {
+  it("a pontuação colada fica fora do miolo, que é o que acende", () => {
+    expect(separarPontuacao("semanas,")).toEqual(["", "semanas", ","]);
+    expect(separarPontuacao("avaliação.")).toEqual(["", "avaliação", "."]);
+    expect(separarPontuacao("“Gengivite?”")).toEqual(["“", "Gengivite", "?”"]);
+    expect(separarPontuacao("hoje...")).toEqual(["", "hoje", "..."]);
+    expect(separarPontuacao("assim:")).toEqual(["", "assim", ":"]);
+    expect(separarPontuacao("80%;")).toEqual(["", "80%", ";"]);
+    expect(separarPontuacao("(sorriso)!")).toEqual(["(", "sorriso", ")!"]);
+  });
+  it("palavra sem pontuação fica inteira", () => {
+    expect(separarPontuacao("gengiva")).toEqual(["", "gengiva", ""]);
+    expect(separarPontuacao("R$")).toEqual(["", "R$", ""]);
   });
 });
 

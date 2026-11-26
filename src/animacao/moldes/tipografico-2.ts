@@ -17,7 +17,7 @@
  * número ou cor `#rrggbb` (validada por `montador.ts` e saída das contas de `cores.ts`). Sem rede: a letra é `data:`, e a política de conteúdo fecha o resto.
  */
 import { canais, coresDaAnimacao } from "../cores";
-import { palavraEmDestaque } from "../destaque";
+import { palavraEmDestaque, separarPontuacao } from "../destaque";
 import { escaparTexto } from "../montador";
 import type { EntradaDoMolde, Molde } from "../tipos";
 
@@ -73,15 +73,20 @@ export function passoEntrePalavras(quantas: number): number {
   return quantas > 1 ? Math.min(TEMPOS.passoMaximo, TEMPOS.escadaMaxima / (quantas - 1)) : 0;
 }
 
+/** A palavra de destaque: só o miolo acende (`.d`); a pontuação colada fica na cor do texto. Cada parte passa por `escaparTexto`. */
+function palavraDestacada(palavra: string): string {
+  const [antes, miolo, depois] = separarPontuacao(palavra);
+  if (!miolo) return escaparTexto(palavra);
+  return `${escaparTexto(antes)}<span class="d">${escaparTexto(miolo)}</span>${escaparTexto(depois)}`;
+}
+
 function html({ linha, marca, largura, altura }: EntradaDoMolde): string {
   const cores = coresDaAnimacao(marca.corDestaque);
   const ultima = linha.cenas.length - 1;
   const cenas = linha.cenas
     .map((c, k) => {
       const faixa = palavraEmDestaque(c.palavras);
-      const palavras = c.palavras
-        .map((p, i) => `<span class="p${faixa && i >= faixa[0] && i <= faixa[1] ? " d" : ""}">${escaparTexto(p)}</span>`)
-        .join(" ");
+      const palavras = c.palavras.map((p, i) => `<span class="p">${faixa && i >= faixa[0] && i <= faixa[1] ? palavraDestacada(p) : escaparTexto(p)}</span>`).join(" ");
       const tamanho = tamanhoDaLetra(c.palavras);
       const arroba =
         k === ultima && marca.arroba
@@ -149,9 +154,10 @@ window.irPara=function(t){
       var e=instantanea?1:suave(lim((local-i*passo)/ENTRA));
       ps[i].style.opacity=String(e);
       ps[i].style.transform="translateY("+((1-e)*0.32*tam)+"px)";
-      if(ps[i].classList.contains("d")){
+      var d=ps[i].querySelector(".d");
+      if(d){
         var h=instantanea?1:suave(lim((local-i*passo-ESPERA)/ACENDE));
-        ps[i].style.color=mistura(CT,CD,h);
+        d.style.color=mistura(CT,CD,h);
       }
     }
     var ar=c.querySelector(".arroba");
