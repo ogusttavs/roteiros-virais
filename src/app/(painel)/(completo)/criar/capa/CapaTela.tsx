@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, Check, CircleAlert, Copy, Download, Pencil, Plus, RefreshCw, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -13,7 +14,7 @@ import { Botao } from "@/ui/componentes/Botao";
 
 import estilos from "../carrossel/CarrosselTela.module.css";
 import { TextoComColchetes } from "../carrossel/TextoComColchetes";
-import { ErroDaRota, pedir, type DadosDoCarrossel, type PreviaDoSlide } from "../carrossel/tipos";
+import { ErroDaRota, pedir, type CarrosselRecente, type DadosDoCarrossel, type PreviaDoSlide } from "../carrossel/tipos";
 
 type Fase = "abrindo" | "erroAoAbrir" | "titulos" | "escolher" | "montando" | "pronto" | "erro" | "limite";
 
@@ -54,6 +55,7 @@ function useEtapa(ativa: boolean): number {
 export function CapaTela({ noticia, corMarca, arroba, capaInicialId }: Props) {
   const router = useRouter();
   const [fase, setFase] = useState<Fase>(capaInicialId ? "abrindo" : "titulos");
+  const [recentes, setRecentes] = useState<CarrosselRecente[]>([]);
   const [sugeridos, setSugeridos] = useState<Titulos | null>(null);
   const [falhaDosTitulos, setFalhaDosTitulos] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
@@ -110,6 +112,20 @@ export function CapaTela({ noticia, corMarca, arroba, capaInicialId }: Props) {
       setFase("escolher");
     }
   }
+
+  // As 5 capas mais novas da marca (a lista de baixo da escolha); se não vier, a lista só não aparece.
+  useEffect(() => {
+    if (capaInicialId) return;
+    let vivo = true;
+    pedir<{ carrosseis: CarrosselRecente[] }>("/api/carrossel?tipo=capa")
+      .then(({ carrosseis }) => vivo && setRecentes(carrosseis.slice(0, 5)))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+    // só ao abrir a tela
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Os títulos vêm ao abrir a tela (uma vez só, mesmo com o React rodando o efeito duas vezes em desenvolvimento).
   useEffect(() => {
@@ -536,6 +552,23 @@ export function CapaTela({ noticia, corMarca, arroba, capaInicialId }: Props) {
             </Botao>
             <p className={estilos.miudo}>{t.criarAjuda}</p>
           </div>
+
+          {recentes.length > 0 ? (
+            <section className={estilos.bloco} aria-labelledby="c-recentes">
+              <h2 id="c-recentes">{t.recentesTitulo}</h2>
+              <p className={estilos.ajuda}>{t.recentesAjuda}</p>
+              <ul className={estilos.recentes}>
+                {recentes.map((c) => (
+                  <li key={c.id}>
+                    <Link className={estilos.recente} href={`/criar/capa?id=${c.id}`}>
+                      <strong>{c.tema}</strong>
+                      <span>{t.recenteDetalhe(new Date(c.criadoEm).toLocaleDateString("pt-BR", { day: "numeric", month: "short" }))}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       ) : null}
 
