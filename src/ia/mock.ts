@@ -663,6 +663,9 @@ function mockGanchosAlternativos(entrada: string) {
   if (marcado("ganchos-igual")) ganchos[4].texto = atual;
   if (marcado("ganchos-poucos")) return { ganchos: ganchos.slice(0, 2) };
   if (entrada.includes("[mock:ganchos-sempre-poucos]")) return { ganchos: ganchos.slice(0, 2) };
+  // T75: o verificador de fato reprova a lista inteira nas duas tentativas por causa de UM gancho (ou de todos): o servidor confere um a um e mostra só os que passam.
+  if (entrada.includes("[mock:ganchos-sempre-fato-em-um]")) return { ganchos: ganchos.map((x, i) => (i === 1 ? { ...x, texto: `${x.texto} {mock:fato-inventado}` } : x)) };
+  if (entrada.includes("[mock:ganchos-sempre-fato-em-todos]")) return { ganchos: ganchos.map((x) => ({ ...x, texto: `${x.texto} {mock:fato-inventado}` })) };
   // Fórmula de máquina nas duas tentativas: a 2a só avisa, e o servidor tira da lista o gancho que a tem (três de cinco: sobram dois e não dá; um de cinco: sobram quatro).
   // Nenhum gancho com detalhe do roteiro, nas duas tentativas: o servidor tira todos e diz que não deu.
   if (entrada.includes("[mock:ganchos-sempre-todos-sem-detalhe]")) return { ganchos: ganchos.map((x) => ({ ...x, texto: "Um jeito simples que ninguém conta ainda" + ((x.tipoAbertura as string) === "pergunta" ? "?" : (x.tipoAbertura as string) === "numero" ? " em 3 passos" : "") })) };
