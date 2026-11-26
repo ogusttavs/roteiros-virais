@@ -2,19 +2,19 @@
  * E69 PR A: a ilustracao que chega do Codex (JPEG ou PNG, ate 6 MB, em qualquer tamanho) vira JPEG de 1080 por 1350 (recorte central, "cover") antes de ser guardada. A conta e feita no mesmo Chromium
  * do render, num canvas, sem biblioteca de imagem nova. Um PNG de 3,5 MB como `background-image` em data-URL o Chromium descarta em silencio (licao da maquete de 25/11/2026): por isso o JPEG de qualidade 84.
  */
-import { chromium } from "playwright";
-
 import { ALTURA_DO_SLIDE, LARGURA_DO_SLIDE } from "@/config/carrossel";
 import { comLimiteDeChromium, comTempoLimite } from "@/lib/chromium-de-impressao";
+import { abrirChromiumSemRede, paginaSemRede } from "@/lib/chromium-sem-rede";
 
 export const QUALIDADE_DA_ILUSTRACAO = 0.84;
 
 /** Os bytes reduzidos (JPEG 1080 por 1350), ou lanca se o navegador nao consegue ler a imagem. */
 export async function reduzirIlustracao(bytes: Buffer, tipo: string): Promise<Buffer> {
   return comLimiteDeChromium(async () => {
-    const navegador = await chromium.launch();
+    // M4 (auditoria de 26/11/2026): a mesma página sem rede do render dos slides.
+    const navegador = await abrirChromiumSemRede();
     try {
-      const pagina = await navegador.newPage();
+      const pagina = await paginaSemRede(navegador);
       const base64 = (await comTempoLimite(
         pagina.evaluate(
           async ({ b64, mime, largura, altura, qualidade }) => {

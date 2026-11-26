@@ -6,10 +6,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { chromium } from "playwright";
-
 import { LARGURA_DO_SLIDE, ALTURA_DO_SLIDE, type SlideDoCarrossel } from "@/config/carrossel";
 import { comLimiteDeChromium, comTempoLimite } from "@/lib/chromium-de-impressao";
+import { abrirChromiumSemRede, paginaSemRede } from "@/lib/chromium-sem-rede";
 import { logger } from "@/lib/log";
 
 import { distribuirFotos, fotoDeFundoDoSlide } from "./fotos";
@@ -169,9 +168,10 @@ export async function renderizarSlides(entrada: {
   const escala = Math.min(1, Math.max(0.1, entrada.escala ?? 1));
 
   const slides = await comLimiteDeChromium(async () => {
-    const navegador = await chromium.launch();
+    // M4 (auditoria de 26/11/2026): sem rede e sem o JavaScript da página; só o que vem embutido no HTML do slide (`data:`) carrega.
+    const navegador = await abrirChromiumSemRede();
     try {
-      const pagina = await navegador.newPage({ viewport: { width: LARGURA_DO_SLIDE, height: ALTURA_DO_SLIDE }, deviceScaleFactor: escala });
+      const pagina = await paginaSemRede(navegador, { viewport: { width: LARGURA_DO_SLIDE, height: ALTURA_DO_SLIDE }, deviceScaleFactor: escala });
       await pagina.emulateMedia({ colorScheme: "light" });
       const feitos: SlideRenderizado[] = [];
       for (let i = 0; i < entrada.slides.length; i += 1) {
