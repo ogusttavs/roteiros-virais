@@ -693,6 +693,11 @@ function mockCarrossel(entrada: string) {
   }
   slides.push({ ...vazio, tipo: "chamada", titulo: "Salve este post", texto: "Mande para quem precisa ver isso.", acoes: ["Salve para lembrar", "Mande para alguém"] });
   if (marcado("carrossel-longo")) slides[1].texto = Array.from({ length: 60 }, () => "palavra").join(" ");
+  // Excesso de tamanho nas DUAS tentativas (T77): `pequeno` passa 2 palavras do limite de 30 e `grande` passa 30; `pequeno-com-fato` soma um número que as fontes não trazem.
+  if (entrada.includes("[mock:carrossel-excesso-pequeno-sempre]") || entrada.includes("[mock:carrossel-excesso-pequeno-com-fato-sempre]")) slides[1].texto = Array.from({ length: 32 }, () => "sala").join(" ");
+  if (marcado("carrossel-excesso-pequeno")) slides[1].texto = Array.from({ length: 32 }, () => "sala").join(" ");
+  if (entrada.includes("[mock:carrossel-excesso-grande-sempre]")) slides[1].texto = Array.from({ length: 60 }, () => "sala").join(" ");
+  if (entrada.includes("[mock:carrossel-excesso-pequeno-com-fato-sempre]")) slides[2].texto = "Nove em cada dez pessoas, 87% delas, erram isso todo mês.";
   if (marcado("carrossel-dado-sem-fonte")) slides[1] = { ...vazio, tipo: "dado", valor: "30", unidade: "%", texto: "É o que a pesquisa diz.", referencia: "Pesquisa de 2026" };
   if (marcado("carrossel-antes-depois")) slides[1] = { ...vazio, tipo: "antes-depois", titulo: "Como ficou", antes: "Manchado e sem brilho.", depois: "Limpo e macio." };
   if (marcado("carrossel-prova-resultado")) slides[1] = { ...vazio, tipo: "prova-resultado", titulo: "Resultado de verdade" };

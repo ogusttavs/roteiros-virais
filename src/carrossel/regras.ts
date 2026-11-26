@@ -153,6 +153,22 @@ export function motivoDoCampo(tipo: TipoDeSlide, chave: ChaveDeCampo, valor: str
   return e.tipo === "palavras" ? `passou ${e.n} ${e.n === 1 ? "palavra" : "palavras"} (o limite é ${e.limite})` : `passou ${e.n} caracteres (o limite é ${e.limite})`;
 }
 
+/** O excesso pequeno que a 2ª tentativa tolera: até 3 palavras a mais E até 20% de caracteres acima do limite. */
+export const EXCESSO_PEQUENO_DE_PALAVRAS = 3;
+export const EXCESSO_PEQUENO_DE_CARACTERES = 0.2;
+
+function excessoEhPequeno(palavras: number, limitePalavras: number, caracteres: number, limiteCaracteres: number): boolean {
+  return palavras <= limitePalavras + EXCESSO_PEQUENO_DE_PALAVRAS && caracteres <= Math.floor(limiteCaracteres * (1 + EXCESSO_PEQUENO_DE_CARACTERES));
+}
+
+/** O campo passou do limite, mas só um pouco (não vale para vazio nem para o valor e a unidade do dado, que quebram o desenho). */
+export function excessoPequenoDoCampo(tipo: TipoDeSlide, chave: ChaveDeCampo, valor: string, comFoto: boolean): boolean {
+  const e = excessoDoCampo(tipo, chave, valor, comFoto);
+  const limite = limiteDoCampo(tipo, chave, comFoto);
+  if (!e || e.tipo === "vazio" || !limite || limite.palavras <= 1) return false;
+  return excessoEhPequeno(contarPalavras(valor), limite.palavras, valor.trim().length, limite.caracteres);
+}
+
 const NOME_DO_CAMPO: Record<ChaveDeCampo, string> = {
   rotulo: "rótulo",
   titulo: "título",
@@ -176,8 +192,26 @@ const NOME_DO_CAMPO: Record<ChaveDeCampo, string> = {
  * Os limites de cada campo de cada tipo, a fonte e o ano do `dado`, os tipos que o ramo de saúde não aceita, as fotos que o pedido prometeu (capa-foto e prova-resultado só existem com foto) e a citação do
  * `prova-fala`, que só vale se for uma frase que a própria pessoa disse (está nas falas DELA, nunca nas de outros criadores, na notícia ou no tema) e tiver ao menos `MINIMO_DE_PALAVRAS_DA_CITACAO` palavras.
  */
-export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: { ramoSaude: boolean; fotosPrometidas?: number; fotosDePacientePrometidas?: number; falasDoCliente?: string }): string[] {
-  const motivos: string[] = [];
+export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: OpcoesDosLimites & { tolerarExcessoPequeno?: boolean }): string[] {
+  return conferirLimites(slides, opcoes).filter((m) => !(opcoes.tolerarExcessoPequeno && m.pequeno)).map((m) => m.texto);
+}
+
+/** Os números dos slides que só passaram do tamanho por pouco (os que a 2ª tentativa deixa sair, marcados para encurtar). */
+export function slidesComExcessoPequeno(slides: SlideDoCarrossel[], opcoes: OpcoesDosLimites): number[] {
+  return [...new Set(conferirLimites(slides, opcoes).filter((m) => m.pequeno).map((m) => m.slide))];
+}
+
+export type OpcoesDosLimites = { ramoSaude: boolean; fotosPrometidas?: number; fotosDePacientePrometidas?: number; falasDoCliente?: string };
+type MotivoDeLimite = { texto: string; pequeno: boolean; slide: number };
+
+function conferirLimites(slides: SlideDoCarrossel[], opcoes: OpcoesDosLimites): MotivoDeLimite[] {
+  const achados: MotivoDeLimite[] = [];
+  let slideAtual = 0;
+  const motivos = {
+    push: (texto: string, pequeno = false) => {
+      achados.push({ texto, pequeno, slide: slideAtual });
+    },
+  };
   const falasNormalizadas = opcoes.falasDoCliente === undefined ? null : semAcentoMinusculo(opcoes.falasDoCliente);
   const comFotoObrigatoria = slides.filter((s) => TIPOS_COM_FOTO_OBRIGATORIA.has(s.tipo)).length;
   if (opcoes.ramoSaude && opcoes.fotosPrometidas !== undefined) {
@@ -193,11 +227,12 @@ export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: { 
   const comFoto = opcoes.ramoSaude ? slidesComFoto(slides, opcoes.fotosPrometidas ?? 0, opcoes.fotosDePacientePrometidas ?? 0) : slidesComFoto(slides, opcoes.fotosPrometidas ?? 0);
   slides.forEach((s, i) => {
     const n = i + 1;
+    slideAtual = n;
     const campos = CAMPOS_DO_TIPO[s.tipo];
     for (const chave of Object.keys(campos) as ChaveDeCampo[]) {
       const valor = chave === "fonte" ? (s.fonte ?? "") : ((s[chave as keyof SlideDoCarrossel] as string | undefined) ?? "");
       const motivo = motivoDoCampo(s.tipo, chave, valor, comFoto[i]);
-      if (motivo) motivos.push(motivo === "vazio" ? `slide ${n} (${s.tipo}): sem ${NOME_DO_CAMPO[chave]}` : `slide ${n} (${s.tipo}): ${NOME_DO_CAMPO[chave]}, ${motivo}`);
+      if (motivo) motivos.push(motivo === "vazio" ? `slide ${n} (${s.tipo}): sem ${NOME_DO_CAMPO[chave]}` : `slide ${n} (${s.tipo}): ${NOME_DO_CAMPO[chave]}, ${motivo}`, excessoPequenoDoCampo(s.tipo, chave, valor, comFoto[i]));
     }
     const lista = LISTAS_DO_TIPO[s.tipo];
     if (lista) {
@@ -206,7 +241,9 @@ export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: { 
         motivos.push(`slide ${n} (${s.tipo}): ${lista.chave} tem ${itens.length} itens, o pedido é ${lista.minimo === lista.maximo ? `de ${lista.minimo}` : `de ${lista.minimo} a ${lista.maximo}`}`);
       }
       itens.forEach((l, k) => {
-        if (contarPalavras(l) > lista.palavras || l.trim().length > lista.caracteres) motivos.push(`slide ${n} (${s.tipo}): ${lista.chave} ${k + 1} passa de ${lista.palavras} palavras ou ${lista.caracteres} caracteres`);
+        if (contarPalavras(l) > lista.palavras || l.trim().length > lista.caracteres) {
+          motivos.push(`slide ${n} (${s.tipo}): ${lista.chave} ${k + 1} passa de ${lista.palavras} palavras ou ${lista.caracteres} caracteres`, excessoEhPequeno(contarPalavras(l), lista.palavras, l.trim().length, lista.caracteres));
+        }
       });
     }
     if (s.tipo === "dado") {
@@ -228,7 +265,7 @@ export function verificarLimitesDosSlides(slides: SlideDoCarrossel[], opcoes: { 
       }
     }
   });
-  return motivos;
+  return achados;
 }
 
 /** Letra sem acento e em minúscula, uma por uma (o texto fica com o mesmo tamanho, para o trecho achado voltar como a pessoa escreveu). */
