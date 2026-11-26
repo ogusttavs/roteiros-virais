@@ -570,7 +570,6 @@
     bottom: 0;
     padding-inline: var(--espaco-6);
     justify-content: flex-start;
-    transition: left var(--duracao-rapida) var(--curva-saida);
   }
 
   .barraAcoes .motivoBarra {
