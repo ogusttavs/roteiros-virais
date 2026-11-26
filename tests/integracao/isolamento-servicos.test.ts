@@ -24,6 +24,7 @@ vi.mock("@/jobs/fila", async (importarOriginal) => {
 import { db, getPool } from "@/db";
 import { briefings, clientes, geracoesIA, nichos, perfisCitados, planoGravacoes, roteiros, user, videosCliente, type PerfilCompilado } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
+import { curvasDoHistorico } from "@/servicos/curva";
 import { enfileirarAnaliseDePerfil } from "@/servicos/perfis-analisados";
 import { desmarcarGravado as desmarcarGravadoNoPlano, marcarGravado as marcarGravadoNoPlano, pular } from "@/servicos/plano";
 import {
@@ -259,5 +260,17 @@ describe("perfis-analisados.ts: o perfil citado de outra marca não entra na fil
     await enfileirarAnaliseDePerfil(b.id, citadoDeB.id);
     expect(enviados).toHaveLength(1);
     expect(enviados[0].dados).toMatchObject({ clienteId: b.id, perfilCitadoId: citadoDeB.id, handle: "concorrente_de_b" });
+  });
+});
+
+describe("curva.ts: a curva do vídeo de outra marca não aparece no histórico desta", () => {
+  it("curvasDoHistorico só devolve a curva dos vídeos da própria marca", async () => {
+    const a = await criarMarca();
+    const b = await criarMarca();
+    const deB = await criarRoteiro(b.id, { status: "postado" });
+    await db().insert(videosCliente).values({ clienteId: b.id, roteiroId: deB.id, url: "https://exemplo.invalido/b", postadoEm: new Date() });
+
+    expect((await curvasDoHistorico(a.id, [deB.id])).has(deB.id)).toBe(false);
+    expect((await curvasDoHistorico(b.id, [deB.id])).get(deB.id)).toEqual({ status: "sem_acompanhamento" });
   });
 });

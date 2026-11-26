@@ -311,7 +311,8 @@ export async function curvasDoHistorico(
       idExterno: videosCliente.idExterno,
     })
     .from(videosCliente)
-    .where(inArray(videosCliente.roteiroId, roteiroIds))
+    // M3 da auditoria de 26/11/2026: só os vídeos da marca, no próprio SQL (como `fontesDoHistorico`, abaixo); o `roteiroId` de outra marca não devolve a curva dela.
+    .where(and(eq(videosCliente.clienteId, clienteId), inArray(videosCliente.roteiroId, roteiroIds)))
     .orderBy(desc(videosCliente.postadoEm));
 
   for (const video of videos) {
