@@ -125,6 +125,13 @@ export const textosBriefing = {
     sugestaoAplicada: "Resposta substituída pela sugestão",
     desfazerSugestao: "Desfazer",
     /**
+     * E76 PR 1: a sugestão nunca afirma um dado que o app não tem da marca; o que falta vem entre colchetes, destacado, para a
+     * pessoa completar. Com colchete, o botão diz que ainda falta completar, e a resposta só vai para avaliação depois.
+     */
+    avisoSugestaoComColchete: "O que está entre colchetes só você sabe. Complete com o dado verdadeiro, ou apague o trecho.",
+    usarECompletar: "Usar e completar",
+    completeOsColchetes: "Complete o que está entre colchetes, ou apague o trecho, antes de avaliar.",
+    /**
      * P2, item 2: "Responder falando" ao lado do campo. O rótulo muda com a fase do gravador
      * (`useGravadorDeAudio`); o mesmo texto de `textosMomento` para o aparelho sem microfone,
      * para a pessoa reconhecer o aviso.

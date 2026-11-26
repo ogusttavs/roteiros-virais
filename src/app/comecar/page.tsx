@@ -6,7 +6,7 @@ import { config } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { barreiraDoCadastroNaSessao } from "@/lib/portao-cadastro";
 import { sessaoDoPainel } from "@/lib/ver-como";
-import { blocoInicial, garantirBriefing, lerBriefing } from "@/servicos/briefing";
+import { avaliacoesParaMostrar, blocoInicial, garantirBriefing, lerBriefing } from "@/servicos/briefing";
 import {
   clienteAtivoDoUsuario,
   clienteTemOndeEscolhido,
@@ -76,6 +76,8 @@ export default async function Comecar() {
   }
 
   const dadosFixosCompletos = clienteTemOndeEscolhido(cliente) && Boolean(cliente.nichoId || cliente.ramoOutro);
+  // E76 PR 1: a sugestão de resposta guardada passa pela conferência das fontes antes de chegar à tela (sem IA, sem gravar).
+  const avaliacoes = await avaliacoesParaMostrar(cliente.id, briefing, cliente.tipo);
 
   return (
     <ConexaoDaTela>
@@ -106,7 +108,7 @@ export default async function Comecar() {
             quemGrava: cliente.quemGrava,
           }}
           respostasIniciais={briefing.respostas}
-          avaliacoesIniciais={briefing.avaliacoes}
+          avaliacoesIniciais={avaliacoes}
           notaGeralInicial={Number(briefing.notaGeral ?? 0)}
           blocoInicial={blocoInicial(briefing.avaliacoes, cliente.tipo)}
           meta={config.regras.notaMinimaBriefing}

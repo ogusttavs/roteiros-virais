@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { temColchete } from "@/carrossel/colchetes";
 import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { comoResultadoDaIA } from "@/lib/resultado-da-ia";
 import { exigirForaDoVerComo } from "@/lib/ver-como";
@@ -39,6 +40,8 @@ export async function salvarRascunhoAction(perguntaId: string, resposta: string,
 export async function avaliarRespostaAction(perguntaId: string, resposta: string) {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
+  // E76 PR 1: a resposta com um trecho entre colchetes (a sugestão aceita sem completar) não vai para avaliação; a tela já não deixa.
+  if (temColchete(resposta)) return { ok: false as const, erro: textosBriefing.pergunta.completeOsColchetes };
   const cliente = await clienteDaSessaoAtual();
   return comoResultadoDaIA(() => avaliarResposta(cliente.id, perguntaId, resposta, cliente.tipo));
 }
