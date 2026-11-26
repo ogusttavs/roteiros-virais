@@ -56,3 +56,54 @@
   color: var(--cor-texto-suave);
   margin-top: 2px;
 }
+
+/*
+ * T112: um item com várias partes vira lista (o "Texto na tela", um momento por linha: o tempo como rótulo, a frase e a posição embaixo), em vez de um parágrafo corrido de
+ * tempos e frases separados por ponto e vírgula. Sem tempo (os recursos), é uma lista simples com marcador.
+ */
+.partes {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: var(--espaco-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parte {
+  display: grid;
+  gap: 2px;
+}
+
+.quando {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  line-height: 1.4;
+  color: var(--cor-destaque);
+}
+
+.frase {
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  line-height: 1.4;
+  color: var(--cor-titulo);
+}
+
+.detalhe {
+  font-size: var(--tamanho-rodape);
+  line-height: 1.4;
+  color: var(--cor-texto-suave);
+}
+
+.partesComPonto {
+  gap: var(--espaco-1);
+  padding-left: var(--espaco-5);
+  list-style: disc;
+}
+
+.partesComPonto > .parte {
+  display: list-item;
+}
+
+.partesComPonto > .parte::marker {
+  color: var(--cor-texto-suave);
+}
