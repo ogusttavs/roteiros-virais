@@ -102,6 +102,8 @@ export function ConteudoTelaEscrevendo({
               {formatarDuracaoDecorrida(segundosDecorridos)}
             </p>
             {demorando ? <p className={styles.demorando}>{fraseDemorando}</p> : null}
+            {/* E74 PR 1: o recado de que dá para sair vem desde o começo (só onde o pedido já está salvo no servidor, que é onde o botão aparece). */}
+            {aoVoltarDepois ? <p className={styles.recado}>{textosComuns.esperaPodeSair}</p> : null}
             {aoVoltarDepois ? (
               <button type="button" className={styles.botaoTexto} onClick={aoVoltarDepois}>
                 {textosComuns.esperaVoltarDepois}

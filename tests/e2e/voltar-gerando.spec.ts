@@ -1,0 +1,176 @@
+/**
+ * E74 PR 1 (pedido do Gustavo em 25/11/2026: "quando você gera roteiro, a parte de voltar não tá funcionando"): enquanto a
+ * IA escreve as três versões (de 30 segundos a uns 2 minutos), o "Voltar depois" e o voltar do navegador (o gesto do iPhone)
+ * precisam funcionar na hora. A causa era a espera rodar dentro de `useTransition`: uma transição assíncrona do React 19
+ * segura todas as outras, e o `router.push` do "Voltar depois" ficava na fila até o servidor terminar.
+ *
+ * O servidor do e2e responde rápido (IA simulada); o teste segura a RESPOSTA da Server Action por `ESPERA_MS` (o pedido
+ * chega ao servidor e o roteiro é gravado de verdade; só a resposta demora), que é o que a tela vê numa geração lenta.
+ */
+import { expect, test, type Page } from "@playwright/test";
+import { hashPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
+
+import { db } from "../../src/db";
+import {
+  account,
+  briefings,
+  clientes,
+  membrosMarca,
+  nichos,
+  preferenciasUsuario,
+  temasDia,
+  versoesDoRoteiro,
+  user,
+  type TemaDoDia,
+} from "../../src/db/schema";
+import { hojeISO } from "../../src/lib/config";
+
+const ESPERA_MS = 12_000;
+const SENHA = "ExemploSenha123";
+const EMAIL = "e2e-voltar-gerando@exemplo.teste";
+
+async function entrar(page: Page) {
+  await page.goto("/entrar");
+  await page.getByLabel("E-mail").fill(EMAIL);
+  await page.getByLabel("Senha").fill(SENHA);
+  await page.getByRole("button", { name: "entrar", exact: true }).click();
+  await expect(page).toHaveURL(/\/hoje/);
+}
+
+test.describe("E74 PR 1: o voltar funciona enquanto o roteiro é escrito", () => {
+  test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-voltar-gerando"));
+    if (jaExiste) return;
+
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "e2e-voltar-gerando", nome: "[teste] Objetivo voltar depois" })
+      .returning();
+
+    await db().insert(user).values({ id: "e2e-voltar-gerando", name: "[teste] Oficina", email: EMAIL });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-voltar-gerando-credential",
+        issuer: "local:credential",
+        accountId: "e2e-voltar-gerando",
+        providerId: "credential",
+        userId: "e2e-voltar-gerando",
+        password: await hashPassword(SENHA),
+      });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-voltar-gerando", aceitouTermosEm: new Date() });
+
+    const [marca] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-voltar-gerando", nome: "[teste] Oficina", nichoId: nicho.id })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-voltar-gerando", clienteId: marca.id, papel: "dono" });
+    await db().insert(briefings).values({
+      clienteId: marca.id,
+      completo: true,
+      perfil: {
+        fatos: {
+          oQueVende: "conserto de eletrodomésticos",
+          preco: "revisão simples por R$ 90",
+          clienteIdeal: "mora perto da oficina",
+          medos: [],
+          frasesDaFala: [],
+          proibicoes: [],
+          cenasFilmaveis: [],
+          concorrentes: [],
+          perfisAdmirados: [],
+        },
+        resumo: "conserta eletrodomésticos na oficina própria",
+        referencias: [],
+      },
+    });
+
+    const temas: TemaDoDia[] = [
+      { titulo: "tema de teste 1", descricao: "descricao 1", porQue: "esta subindo", evidencias: [], puxaPara: "conversao" },
+      { titulo: "tema de teste 2", descricao: "descricao 2", porQue: "esta subindo", evidencias: [], puxaPara: "engajamento" },
+      { titulo: "tema de teste 3", descricao: "descricao 3", porQue: "esta subindo", evidencias: [], puxaPara: "alcance" },
+    ];
+    await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas });
+  });
+
+  /** Segura a resposta da Server Action (o servidor já a processou); devolve um aviso de quando ela foi liberada. */
+  async function segurarARespostaDaAcao(page: Page) {
+    const estado = { liberada: false };
+    let segurou = false;
+    await page.route("**/*", async (rota) => {
+      const pedido = rota.request();
+      // Só a Server Action que escreve (o corpo leva o `origem` do pedido; a sugestão de estilo, que a tela pede ao montar, e as conferências de depois passam direto).
+      if (!segurou && pedido.method() === "POST" && pedido.headers()["next-action"] && (pedido.postData() ?? "").includes('"origem"')) {
+        segurou = true;
+        const resposta = await rota.fetch(); 
+        await new Promise((resolve) => setTimeout(resolve, ESPERA_MS));
+        estado.liberada = true;
+        await rota.fulfill({ response: resposta });
+        return;
+      }
+      await rota.continue();
+    });
+    return estado;
+  }
+
+  async function comecarAEscrever(page: Page) {
+    await entrar(page);
+    await page.goto("/criar/objetivo?tema=0");
+    await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
+    const pedidoDeEscrever = page.waitForRequest((p) => p.method() === "POST" && (p.postData() ?? "").includes('"origem"'));
+    await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    await expect(page.getByText("Escrevendo as três versões")).toBeVisible();
+    // A pessoa só sai depois de o pedido ter ido ao servidor (como no uso real: a espera dura minutos).
+    await pedidoDeEscrever;
+    await expect(page.getByText("Pode sair desta tela")).toBeVisible();
+  }
+
+  test("'Voltar depois' leva ao Hoje na hora, sem esperar a IA terminar", async ({ page }) => {
+    test.setTimeout(60_000);
+    const estado = await segurarARespostaDaAcao(page);
+    await comecarAEscrever(page);
+    await page.getByRole("button", { name: "Voltar depois" }).click();
+    await expect(page).toHaveURL(/\/hoje$/, { timeout: 4000 });
+    expect(estado.liberada).toBe(false);
+    // O roteiro continua sendo escrito no servidor: as três versões estão no banco, e a resposta tardia não leva a pessoa de volta.
+    await expect.poll(async () => (await db().select({ id: versoesDoRoteiro.id }).from(versoesDoRoteiro)).length, { timeout: 20_000 }).toBeGreaterThanOrEqual(3);
+    await expect.poll(() => estado.liberada, { timeout: ESPERA_MS + 5000 }).toBe(true);
+    await page.waitForTimeout(1500);
+    await expect(page).toHaveURL(/\/hoje$/);
+  });
+
+  test("o voltar do navegador funciona durante a espera e a resposta tardia não puxa a pessoa de volta", async ({ page }) => {
+    test.setTimeout(60_000);
+    const estado = await segurarARespostaDaAcao(page);
+    await entrar(page);
+    await page.goto("/hoje");
+    await page.goto("/criar/objetivo?tema=0");
+    await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
+    const pedidoDeEscrever = page.waitForRequest((p) => p.method() === "POST" && (p.postData() ?? "").includes('"origem"'));
+    await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    await expect(page.getByText("Escrevendo as três versões")).toBeVisible();
+    // A pessoa só sai depois de o pedido ter ido ao servidor (como no uso real: a espera dura minutos).
+    await pedidoDeEscrever;
+    await page.goBack();
+    await expect(page).toHaveURL(/\/hoje$/, { timeout: 4000 });
+    await expect(page.getByText("Escrevendo as três versões")).toHaveCount(0);
+    await expect.poll(() => estado.liberada, { timeout: ESPERA_MS + 5000 }).toBe(true);
+    await page.waitForTimeout(1500);
+    await expect(page).toHaveURL(/\/hoje$/);
+  });
+
+  test("quem volta à tela com a escrita correndo vê que ainda está sendo escrito, e as versões abrem quando ficam prontas", async ({ page }) => {
+    test.setTimeout(60_000);
+    await segurarARespostaDaAcao(page);
+    await comecarAEscrever(page);
+    await page.getByRole("button", { name: "Voltar depois" }).click();
+    await expect(page).toHaveURL(/\/hoje$/, { timeout: 4000 });
+    await page.goto("/criar/objetivo?tema=0");
+    // Não oferece escrever de novo (seria pagar duas vezes): mostra a espera e, quando o servidor terminou, abre a comparação.
+    await expect(page.getByText("Escrevendo as três versões")).toBeVisible();
+    await expect(page.getByRole("button", { name: "escrever o roteiro" })).toHaveCount(0);
+    await expect(page).toHaveURL(/\/criar\/versoes\//, { timeout: 30_000 });
+  });
+});

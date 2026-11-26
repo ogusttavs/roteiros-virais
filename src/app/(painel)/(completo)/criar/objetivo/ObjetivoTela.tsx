@@ -3,7 +3,7 @@
 import { Play } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import { AJUDA_EM_DA_FICHA, EXEMPLO_DA_FICHA, FICHAS_EM_ORDEM, FRASE_DA_FICHA, NOME_DA_FICHA, objetivoDaFicha, OBJETIVO_DO_SEM_FALA, OBJETIVO_DO_STORY, PARECE_FEITO_PARA } from "@/config/fichas";
@@ -49,6 +49,30 @@ function CapaDoExemplo({ capaUrl }: { capaUrl: string | null }) {
       )}
     </span>
   );
+}
+
+/** O recado que sobrevive a sair da tela enquanto o servidor escreve as versões (o instante em que a espera começou, por tema). */
+const CHAVE_ESCREVENDO = "objetivo-escrevendo";
+/** Mais que isto, a escrita já terminou ou falhou: o recado vale pouco e a tela volta ao formulário. */
+const ESPERA_MAXIMA_MS = 4 * 60_000;
+const INTERVALO_DA_CONFERENCIA_MS = 4000;
+
+function lerEspera(chave: string): number | null {
+  try {
+    const lido = Number(window.sessionStorage.getItem(chave));
+    return Number.isFinite(lido) && lido > 0 && Date.now() - lido <= ESPERA_MAXIMA_MS ? lido : null;
+  } catch {
+    return null;
+  }
+}
+
+function guardarEspera(chave: string, desdeMs: number | null) {
+  try {
+    if (desdeMs === null) window.sessionStorage.removeItem(chave);
+    else window.sessionStorage.setItem(chave, String(desdeMs));
+  } catch {
+    // sem sessionStorage: a tela segue funcionando, só não lembra da espera
+  }
 }
 
 type Props = {
@@ -159,7 +183,15 @@ export function ObjetivoTela({
   const estiloTocadoRef = useRef(false);
   // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
   const [erro, setErro] = useState<string | null>(null);
-  const [pendente, iniciarTransicao] = useTransition();
+  /**
+   * E74 PR 1: a espera NÃO roda dentro de `useTransition`. Uma transição assíncrona do React 19 segura todas as outras
+   * (o `router.push` do "Voltar depois" ficava na fila até o servidor terminar, uns 2 minutos, e o botão parecia morto).
+   * Estado simples, como `PesquisaTela` e `FolhaGravarAgora` já fazem.
+   */
+  const [escrevendo, setEscrevendo] = useState(false);
+  /** Quando a pessoa saiu no meio e voltou: o instante (ms) em que a escrita que ainda corre no servidor começou; a tela espera ela ficar pronta em vez de oferecer escrever de novo. */
+  const [retomadaDesde, setRetomadaDesde] = useState<number | null>(null);
+  const chaveDaEspera = `${CHAVE_ESCREVENDO}:${chaveDaEscolhaDoTema}`;
   const tratarFalha = useTratarFalha();
   const { avisarRedeOk } = useConexao();
   /**
@@ -169,8 +201,17 @@ export function ObjetivoTela({
    * clique, o sucesso (ou o erro) depois dela não navega nem escreve na tela mais.
    */
   const saiuRef = useRef(false);
+  useEffect(() => {
+    saiuRef.current = false;
+    // Sair da tela por qualquer caminho (o voltar do navegador, o gesto do iPhone, um link) também vale: a resposta que chegar depois não navega nem escreve na tela.
+    return () => {
+      saiuRef.current = true;
+    };
+  }, []);
 
   useEffect(() => {
+    const espera = lerEspera(chaveDaEspera);
+    if (espera !== null) setRetomadaDesde(espera);
     const guardada = lerEscolha(chaveDaEscolhaDoTema, hojeISO());
     if (guardada) {
       if (guardada.formato) setFormato(guardada.formato);
@@ -218,13 +259,45 @@ export function ObjetivoTela({
     };
   }, [temaEscolhidoTexto]);
 
-  function escrever() {
-    if (pergunta && !ficha) return;
+  /** Voltou para a tela com a escrita ainda correndo: confere de 4 em 4 segundos se as versões já ficaram prontas e abre a comparação; passado o prazo, desiste e mostra o formulário. */
+  useEffect(() => {
+    if (retomadaDesde === null) return;
+    let parou = false;
+    async function conferir() {
+      if (Date.now() - retomadaDesde! > ESPERA_MAXIMA_MS) {
+        guardarEspera(chaveDaEspera, null);
+        if (!parou) setRetomadaDesde(null);
+        return;
+      }
+      try {
+        const pronto = await grupoRecenteDesdeAction(retomadaDesde!);
+        if (parou) return;
+        if (pronto) {
+          guardarEspera(chaveDaEspera, null);
+          router.push(`/criar/versoes/${pronto.grupo}`);
+        }
+      } catch {
+        // Sem resposta agora (rede): tenta de novo na próxima batida.
+      }
+    }
+    void conferir();
+    const id = setInterval(() => void conferir(), INTERVALO_DA_CONFERENCIA_MS);
+    return () => {
+      parou = true;
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retomadaDesde]);
+
+  async function escrever() {
+    if (escrevendo || pergunta && !ficha) return;
     // O Story e o sem fala não têm ficha: o Story grava o objetivo de falar com quem já segue; o sem fala, o de mais gente te conhecer.
     const objetivo: Objetivo = formato === "story" ? OBJETIVO_DO_STORY : !pergunta || !ficha ? OBJETIVO_DO_SEM_FALA : objetivoDaFicha(ficha);
     setErro(null);
     const desdeMs = Date.now();
-    iniciarTransicao(async () => {
+    guardarEspera(chaveDaEspera, desdeMs);
+    setEscrevendo(true);
+    {
       try {
         const resultado = await gerarVersoesAction(
           origem,
@@ -244,6 +317,7 @@ export function ObjetivoTela({
           pesquisa?.id,
         );
         if (saiuRef.current) return;
+        guardarEspera(chaveDaEspera, null);
         if (!resultado.ok) {
           setErro(resultado.erro);
           return;
@@ -276,9 +350,12 @@ export function ObjetivoTela({
         if (saiuRef.current) return;
         // Gerar demora e o servidor pode ter terminado antes de a conexão cair: repetir escreve outras versões,
         // então a frase de rede manda olhar o Hoje primeiro (V7, item 4 do PROXIMO.md; E26 4b: as versões prontas aparecem lá).
+        guardarEspera(chaveDaEspera, null);
         setErro(tratarFalha(falha, textosObjetivo.erro, textosObjetivo.conexaoCaiuNoMeio));
+      } finally {
+        if (!saiuRef.current) setEscrevendo(false);
       }
-    });
+    }
   }
 
   function voltarDepois() {
@@ -287,7 +364,7 @@ export function ObjetivoTela({
     router.push("/hoje");
   }
 
-  if (pendente) {
+  if (escrevendo || retomadaDesde !== null) {
     return <TelaEscrevendo aberto fraseDemorando={textosObjetivo.demorando} aoVoltarDepois={voltarDepois} titulo={textosObjetivo.esperaVersoesTitulo} duracao={textosObjetivo.esperaVersoesDuracao} />;
   }
 
