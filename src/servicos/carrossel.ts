@@ -528,7 +528,8 @@ export function arrobaDaMarca(instagram: string | null | undefined): string {
 }
 
 /** Só o necessário das fotos, sem os bytes. */
-export type FotoSemBytes = Omit<CarrosselFoto, "bytes">;
+/** A foto como a tela a vê: sem os bytes e sem o registro de quem confirmou a autorização do paciente (M6), que fica só no banco. */
+export type FotoSemBytes = Omit<CarrosselFoto, "bytes" | "autorizadoPor" | "autorizadoEm">;
 
 export async function fotosDoCarrossel(clienteId: number, carrosselId: number): Promise<FotoSemBytes[]> {
   return db()
@@ -564,13 +565,16 @@ export function tipoPelosBytes(bytes: Buffer): (typeof TIPOS_DE_FOTO)[number] | 
   return null;
 }
 
-export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer; autorizacaoDoPaciente?: boolean; dePaciente?: boolean }): Promise<FotoSemBytes & { largura: number | null }> {
+/** `usuarioId` é quem está na sessão: na foto de paciente ele é gravado como quem marcou a caixa da autorização, com a hora (M6 da auditoria de 26/11/2026); sem ele, a foto de paciente é recusada. */
+export async function enviarFoto(clienteId: number, carrosselId: number, arquivo: { tipoDeclarado: string; bytes: Buffer; autorizacaoDoPaciente?: boolean; dePaciente?: boolean; usuarioId?: string }): Promise<FotoSemBytes & { largura: number | null }> {
   const carrossel = await carrosselDaMarca(clienteId, carrosselId);
   if (!carrossel) throw new ErroCarrossel("Não achei esse carrossel.", "nao-achou");
   // Em marca de saúde há dois tipos de foto (E65 PR 5): a comum (o lugar, a equipe, o trabalho) entra sem autorização e nunca vai em antes e depois nem em resultado; a de paciente (`dePaciente`) só é aceita com a
   // confirmação da autorização escrita do paciente, é gravada com a marca e só serve a esses dois tipos. Fora da saúde, `dePaciente` é ignorado.
   const dePaciente = arquivo.dePaciente === true && (await marcaEhDeSaude(clienteId));
   if (dePaciente) await exigirAutorizacaoDoPaciente(clienteId, arquivo.autorizacaoDoPaciente);
+  // Sem saber quem confirmou, a foto de paciente não entra: o registro da autorização é o que a torna aceitável (M6).
+  if (dePaciente && !arquivo.usuarioId) throw new ErroCarrossel(FRASE_SEM_AUTORIZACAO_DO_PACIENTE, "sem-autorizacao");
   if (arquivo.bytes.length === 0) throw new ErroCarrossel("A foto veio vazia.", "foto-invalida");
   if (arquivo.bytes.length > TETO_DA_FOTO_BYTES) throw new ErroCarrossel(`A foto passa de ${Math.round(TETO_DA_FOTO_BYTES / 1024 / 1024)} MB. Mande uma menor.`, "foto-invalida");
   const tipo = tipoPelosBytes(arquivo.bytes);
@@ -585,7 +589,7 @@ export async function enviarFoto(clienteId: number, carrosselId: number, arquivo
     if (total >= MAXIMO_DE_FOTOS) return null;
     const [nova] = await tx
       .insert(carrosselFotos)
-      .values({ carrosselId, clienteId, ordem: ultima + 1, tipo, bytes: arquivo.bytes, tamanho: arquivo.bytes.length, dePaciente })
+      .values({ carrosselId, clienteId, ordem: ultima + 1, tipo, bytes: arquivo.bytes, tamanho: arquivo.bytes.length, dePaciente, autorizadoPor: dePaciente ? arquivo.usuarioId : null, autorizadoEm: dePaciente ? sql`now()` : null })
       .returning({ id: carrosselFotos.id, carrosselId: carrosselFotos.carrosselId, clienteId: carrosselFotos.clienteId, ordem: carrosselFotos.ordem, tipo: carrosselFotos.tipo, tamanho: carrosselFotos.tamanho, dePaciente: carrosselFotos.dePaciente, criadoEm: carrosselFotos.criadoEm });
     return nova;
   });

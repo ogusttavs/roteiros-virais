@@ -51,6 +51,18 @@ async function criarCliente(nicho: number = nichoId): Promise<number> {
   return cliente.id;
 }
 
+/** O usuário que criou a marca de `criarCliente`: quem está na sessão quando ela manda foto. */
+async function usuarioDe(clienteId: number): Promise<string> {
+  const [cliente] = await db().select({ usuarioId: clientes.usuarioId }).from(clientes).where(eq(clientes.id, clienteId));
+  return cliente!.usuarioId!;
+}
+
+/** O registro da autorização (M6) como está no banco: a tela nunca recebe esses dois campos. */
+async function autorizacaoGravada(fotoId: number): Promise<{ por: string | null; em: Date | null }> {
+  const [foto] = await db().select({ por: carrosselFotos.autorizadoPor, em: carrosselFotos.autorizadoEm }).from(carrosselFotos).where(eq(carrosselFotos.id, fotoId));
+  return foto!;
+}
+
 async function criarVideo(idExterno: string, assunto: string): Promise<number> {
   const [video] = await db()
     .insert(videos)
@@ -196,17 +208,29 @@ describe("gerarCarrossel", () => {
     // a foto de paciente sem a autorização é recusada e não é gravada
     await expect(enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true })).rejects.toThrow(/autorização dele por escrito/);
     await expect(enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: false })).rejects.toThrow(/autorização/);
+    // M6: com a caixa marcada mas sem saber quem marcou (o usuário da sessão), também é recusada
+    await expect(enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true })).rejects.toThrow(/autorização dele por escrito/);
     expect(await fotosDoCarrossel(saude, paraSaude.id)).toHaveLength(0);
-    // a foto comum entra sem autorização, mas não vai em antes e depois (nem pela troca, nem na distribuição automática)
-    const lugar = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png });
+    const quem = await usuarioDe(saude);
+    // a foto comum entra sem autorização, mas não vai em antes e depois (nem pela troca, nem na distribuição automática); mesmo vinda de alguém na sessão, não grava autorização
+    const lugar = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, usuarioId: quem });
     expect(lugar.dePaciente).toBe(false);
+    expect(await autorizacaoGravada(lugar.id)).toEqual({ por: null, em: null });
     await expect(trocarSlide(saude, paraSaude.id, indice, { fotoId: lugar.id })).rejects.toThrow(/só aceitam foto de paciente/);
     expect(distribuirFotos(paraSaude.slides, await fotosDoCarrossel(saude, paraSaude.id), true)[indice]).toEqual({ foto: null, fotoDepois: null });
     // a de paciente, com a autorização, é gravada com a marca e é usada
-    const antes = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true });
-    const depois = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true });
+    const antes = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true, usuarioId: quem });
+    const depois = await enviarFoto(saude, paraSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true, usuarioId: quem });
     expect(antes.dePaciente).toBe(true);
+    // M6: a foto de paciente guarda quem marcou a caixa e quando; a tela não recebe nenhum dos dois
+    const registro = await autorizacaoGravada(antes.id);
+    expect(registro.por).toBe(quem);
+    expect(registro.em).toBeInstanceOf(Date);
+    expect(Math.abs(registro.em!.getTime() - Date.now())).toBeLessThan(5 * 60 * 1000);
+    expect(antes).not.toHaveProperty("autorizadoPor");
+    expect(antes).not.toHaveProperty("autorizadoEm");
     const fotos = await fotosDoCarrossel(saude, paraSaude.id);
+    expect(fotos.some((f) => "autorizadoPor" in f || "autorizadoEm" in f)).toBe(false);
     expect(distribuirFotos(paraSaude.slides, fotos, true)[indice]).toEqual({ foto: antes.id, fotoDepois: depois.id });
     const ok = await trocarSlide(saude, paraSaude.id, indice, { fotoId: antes.id, fotoDepoisId: depois.id });
     expect(ok.slides[indice].fotoId).toBe(antes.id);
@@ -217,8 +241,9 @@ describe("gerarCarrossel", () => {
     await trocarSlide(saude, paraSaude.id, indice, { campos: { titulo: "Novo título" } });
     // fora da saúde: dePaciente é ignorado, não pede autorização e a foto vale para o antes e depois, como sempre
     const paraComum = await gerarCarrossel(comum, pedidoLivre("mancha de vinho no estofado [mock:carrossel-antes-depois]"));
-    const f2 = await enviarFoto(comum, paraComum.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true });
+    const f2 = await enviarFoto(comum, paraComum.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true, usuarioId: await usuarioDe(comum) });
     expect(f2.dePaciente).toBe(false);
+    expect(await autorizacaoGravada(f2.id)).toEqual({ por: null, em: null });
     await trocarSlide(comum, paraComum.id, paraComum.slides.findIndex((x) => x.tipo === "antes-depois"), { fotoId: f2.id });
   });
 
@@ -239,7 +264,7 @@ describe("gerarCarrossel", () => {
     await enviarFoto(saude, c.id, { tipoDeclarado: "image/png", bytes: png });
     await enviarFoto(saude, c.id, { tipoDeclarado: "image/png", bytes: png });
     expect((await pngDoCarrossel(saude, c.id, 1))?.slides[0].semFoto).toBe(true);
-    await enviarFoto(saude, c.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true });
+    await enviarFoto(saude, c.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true, usuarioId: await usuarioDe(saude) });
     expect((await pngDoCarrossel(saude, c.id, 1))?.slides[0].semFoto).toBe(false);
   });
 
@@ -604,7 +629,7 @@ describe("saúde: foto comum e foto de paciente (E65 PR 5, antes: toda foto exig
     await expect(enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true })).rejects.toThrow(/autorização dele por escrito/);
     expect(await fotosDoCarrossel(saude, deSaude.id)).toHaveLength(0);
     await enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png });
-    await enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true });
+    await enviarFoto(saude, deSaude.id, { tipoDeclarado: "image/png", bytes: png, dePaciente: true, autorizacaoDoPaciente: true, usuarioId: await usuarioDe(saude) });
     expect((await fotosDoCarrossel(saude, deSaude.id)).map((f) => f.dePaciente)).toEqual([false, true]);
     // outra marca não manda foto neste carrossel
     await expect(enviarFoto(outraSaude, deSaude.id, { tipoDeclarado: "image/png", bytes: png })).rejects.toThrow(/Não achei esse carrossel/);
@@ -681,7 +706,14 @@ describe("a cor da marca", () => {
 const estadoDaSessao = vi.hoisted(() => ({ clienteId: 0, recusa: null as Response | null }));
 vi.mock("@/lib/porta-do-carrossel", async (importarOriginal) => {
   const real = await importarOriginal<typeof import("@/lib/porta-do-carrossel")>();
-  return { ...real, marcaDoCarrossel: async () => (estadoDaSessao.clienteId ? { clienteId: estadoDaSessao.clienteId } : real.marcaDoCarrossel()) };
+  // A sessão de mentira traz também o usuário dono da marca, como a de verdade (M6: é quem fica gravado na foto de paciente).
+  const marcaDoCarrossel = async () => {
+    if (!estadoDaSessao.clienteId) return real.marcaDoCarrossel();
+    const [{ db: banco }, { clientes: tabela }, { eq: igual }] = await Promise.all([import("@/db"), import("@/db/schema"), import("drizzle-orm")]);
+    const [dono] = await banco().select({ usuarioId: tabela.usuarioId }).from(tabela).where(igual(tabela.id, estadoDaSessao.clienteId));
+    return { clienteId: estadoDaSessao.clienteId, usuarioId: dono?.usuarioId ?? "" };
+  };
+  return { ...real, marcaDoCarrossel };
 });
 vi.mock("@/lib/portao-cobranca", () => ({ recusaDaCobranca: async () => estadoDaSessao.recusa }));
 
@@ -796,9 +828,19 @@ describe("o fluxo da tela contra as rotas", () => {
     const sem = await rotaDeFotos.POST(formulario(true, false), id(c.id));
     expect(sem.status).toBe(400);
     expect(((await sem.json()) as { erro: string }).erro).toMatch(/autorização dele por escrito/);
-    expect((await rotaDeFotos.POST(formulario(true, true), id(c.id))).status).toBe(200);
-    expect((await rotaDeFotos.POST(formulario(false, false), id(c.id))).status).toBe(200);
+    const comAutorizacao = await rotaDeFotos.POST(formulario(true, true), id(c.id));
+    expect(comAutorizacao.status).toBe(200);
+    const { foto: daPaciente } = (await comAutorizacao.json()) as { foto: Record<string, unknown> & { id: number } };
+    const comum = await rotaDeFotos.POST(formulario(false, false), id(c.id));
+    expect(comum.status).toBe(200);
+    const { foto: daComum } = (await comum.json()) as { foto: { id: number } };
     expect((await fotosDoCarrossel(saude, c.id)).map((f) => f.dePaciente)).toEqual([true, false]);
+    // M6: a rota grava como quem confirmou o usuário da sessão, com a hora, e a resposta não leva esse registro
+    const registro = await autorizacaoGravada(daPaciente.id);
+    expect(registro.por).toBe(await usuarioDe(saude));
+    expect(registro.em).toBeInstanceOf(Date);
+    expect(daPaciente).not.toHaveProperty("autorizadoPor");
+    expect(await autorizacaoGravada(daComum.id)).toEqual({ por: null, em: null });
   });
 });
 

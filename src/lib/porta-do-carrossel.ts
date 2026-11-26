@@ -23,15 +23,15 @@ export function respostaDoErroDoCarrossel(erro: unknown): NextResponse | null {
   return erro instanceof ErroCarrossel ? respostaDeErro(erro.message, STATUS_DO_ERRO[erro.codigo]) : null;
 }
 
-/** A marca da sessão, ou a resposta que a rota devolve sem fazer mais nada. */
-export async function marcaDoCarrossel(): Promise<{ clienteId: number } | NextResponse> {
+/** A marca da sessão e quem está nela (o usuário, para gravar quem confirmou a autorização da foto de paciente, M6), ou a resposta que a rota devolve sem fazer mais nada. */
+export async function marcaDoCarrossel(): Promise<{ clienteId: number; usuarioId: string } | NextResponse> {
   if (!carrosselAtivo()) return NextResponse.json({ erro: "nao encontrado" }, { status: 404, headers: SEM_CACHE });
   if (await modoVerComoLigado()) return respostaDeErro(MENSAGEM_VER_COMO_DESLIGADO, 403);
   const sessao = await sessaoAtual();
   if (!sessao) return respostaDeErro("nao autenticado", 401);
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) return respostaDeErro("nao autenticado", 401);
-  return { clienteId: cliente.id };
+  return { clienteId: cliente.id, usuarioId: sessao.user.id };
 }
 
 /** O id de um parâmetro de rota, ou nulo. */

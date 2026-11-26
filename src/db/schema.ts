@@ -3315,6 +3315,12 @@ export const carrosselFotos = pgTable(
     tamanho: integer("tamanho").notNull(),
     /** Foto de paciente (E65 PR 5): só em marca de saúde, mandada com a autorização escrita do paciente confirmada; só ela entra em antes e depois e em resultado, e nunca em outro tipo de slide. */
     dePaciente: boolean("de_paciente").notNull().default(false),
+    /**
+     * M6 da auditoria de 26/11/2026: quem marcou a caixa da autorização escrita do paciente (o usuário da sessão que mandou a foto) e quando. Só a foto de paciente tem os dois; a comum fica com os dois
+     * nulos. Foto de paciente gravada antes da 0127 fica nula (não dá para saber quem confirmou). Nunca vai para a tela (`FotoSemBytes` tira os dois).
+     */
+    autorizadoPor: text("autorizado_por").references(() => user.id, { onDelete: "set null" }),
+    autorizadoEm: timestamp("autorizado_em", { withTimezone: true }),
     criadoEm: criadoEm(),
   },
   (t) => [index("carrossel_fotos_carrossel").on(t.carrosselId, t.ordem)],
