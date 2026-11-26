@@ -15,8 +15,8 @@ import { expect, test } from "@playwright/test";
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA_ADMIN = "ExemploSenha123";
 const EMAIL_NOVO_CLIENTE = "cliente-e2e@exemplo.teste";
-/** Formato de `gerarSenhaLegivel` (`src/lib/senha-legivel.ts`): substantivo-adjetivo-NN-substantivo. */
-const PADRAO_SENHA_GERADA = /[a-zà-ÿ]+-[a-zà-ÿ]+-\d{2}-[a-zà-ÿ]+/;
+/** Formato de `gerarSenhaLegivel` (`src/lib/senha-legivel.ts`, T100): tres grupos de 4, 4 e 5 simbolos do `ALFABETO_SENHA`. */
+const PADRAO_SENHA_GERADA = /(?<![a-z0-9-])[a-hjkmnp-z2-9]{4}-[a-hjkmnp-z2-9]{4}-[a-hjkmnp-z2-9]{5}(?![a-z0-9])/;
 
 // Seed uma vez so, no globalSetup (etapa 11, ajuste 3 da revisao da etapa 10); o pool do
 // Postgres fecha uma vez so, no globalTeardown (playwright.config.ts): mais de um arquivo de
