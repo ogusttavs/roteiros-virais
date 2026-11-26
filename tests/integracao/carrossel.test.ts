@@ -15,7 +15,7 @@ import { crc32, montarZip } from "@/carrossel/zip";
 import { TETO_DO_TESTE } from "@/config/cadastro";
 import { LINHA_FIXA_ANTES_DEPOIS_SAUDE, SEM_FOTO } from "@/config/carrossel";
 import { db, getPool } from "@/db";
-import { briefings, cadastrosProprios, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, ramosDaConta, user, videos, type PerfilCompilado } from "@/db/schema";
+import { briefings, cadastrosProprios, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, pedidosDeGeracao, ramosDaConta, user, videos, type PerfilCompilado } from "@/db/schema";
 import { logger } from "@/lib/log";
 import { lerCorpoComTeto } from "@/lib/porta-do-carrossel";
 import { barreiraDoCadastro } from "@/servicos/cadastro-travas";
@@ -386,6 +386,33 @@ describe("uma geração por vez por marca", () => {
     expect(resultado).toEqual({ recusa: "teto" });
     expect(await db().select().from(carrosseis).where(eq(carrosseis.clienteId, clienteId))).toHaveLength(0);
     expect("carrossel" in (await gerarCarrosselComTrava(clienteId, pedidoLivre("mancha de vinho no estofado", 5), async () => null))).toBe(true);
+  });
+
+  /** E74 PR 2a: o carrossel nasce como pedido (`pedidos_de_geracao`), reserva o lugar dele no teto enquanto anda e, pronto, guarda o id do carrossel. */
+  it("o carrossel nasce como pedido e, pronto, o pedido guarda o id dele", async () => {
+    const clienteId = await criarCliente();
+    const resultado = await gerarCarrosselComTrava(clienteId, pedidoLivre("mancha de vinho no estofado", 5), async () => null);
+    if (!("carrossel" in resultado)) throw new Error("recusado");
+    const pedidos = await db().select().from(pedidosDeGeracao).where(eq(pedidosDeGeracao.clienteId, clienteId));
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0]).toMatchObject({ tipo: "carrossel", estado: "pronto", resultadoTipo: "carrossel", resultadoId: String(resultado.carrossel.id), titulo: "mancha de vinho no estofado" });
+    expect(pedidos[0].terminouEm).not.toBeNull();
+  });
+
+  it("um carrossel parado no banco (o processo caiu no meio): o próximo recebe o aviso sem gastar a IA", async () => {
+    const clienteId = await criarCliente();
+    await db().insert(pedidosDeGeracao).values({ id: crypto.randomUUID(), clienteId, tipo: "carrossel", estado: "escrevendo", titulo: "parado", parametros: {} });
+    const erro = await gerarCarrosselComTrava(clienteId, pedidoLivre("mancha de vinho no estofado", 5), async () => null).catch((e: unknown) => e);
+    expect(erro).toBeInstanceOf(ErroCarrossel);
+    expect((erro as ErroCarrossel).codigo).toBe("em-andamento");
+    expect(await db().select().from(geracoesIA).where(and(eq(geracoesIA.tarefa, "carrossel"), eq(geracoesIA.clienteId, clienteId)))).toHaveLength(0);
+  });
+
+  it("o carrossel que falha marca o pedido como falho, com a frase do erro (não conta no limite)", async () => {
+    const clienteId = await criarCliente();
+    await expect(gerarCarrosselComTrava(clienteId, pedidoLivre("mancha de vinho no estofado", 4), async () => null)).rejects.toBeInstanceOf(ErroCarrossel);
+    const [pedido] = await db().select().from(pedidosDeGeracao).where(eq(pedidosDeGeracao.clienteId, clienteId));
+    expect(pedido).toMatchObject({ tipo: "carrossel", estado: "falhou", motivo: "Escolha um carrossel de 5, 7 ou 9 slides.", codigoDoErro: "pedido-invalido" });
   });
 
   it("marcas diferentes geram ao mesmo tempo", async () => {

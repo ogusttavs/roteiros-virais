@@ -46,6 +46,10 @@ type Props = {
   /** E26 4b: o título e o prazo de quem escreve as três versões (o padrão é o do roteiro único). */
   titulo?: string;
   duracao?: string;
+  /** E74 PR 2a: a etapa em que o pedido está, como o servidor disse ("Etapa 2 de 3: escrevendo a versão 2 de 3"); sem etapa, a linha não aparece. */
+  etapa?: string | null;
+  /** E74 PR 2a: quando a escrita começou (ms), para o contador de quem volta à espera continuar de onde estava em vez de recomeçar do zero. */
+  desdeMs?: number | null;
 };
 
 /**
@@ -63,6 +67,7 @@ export function ConteudoTelaEscrevendo({
   segundosDecorridos,
   titulo = textosComuns.esperaTitulo,
   duracao = textosComuns.esperaDuracao,
+  etapa = null,
 }: {
   fraseDemorando: string;
   erro: string | null;
@@ -73,6 +78,7 @@ export function ConteudoTelaEscrevendo({
   segundosDecorridos: number;
   titulo?: string;
   duracao?: string;
+  etapa?: string | null;
 }) {
   return (
     <div className={styles.tela} role="status" aria-live="polite">
@@ -90,6 +96,7 @@ export function ConteudoTelaEscrevendo({
         ) : (
           <>
             <h2 className={styles.titulo}>{titulo}</h2>
+            {etapa ? <p className={styles.duracao}>{etapa}</p> : null}
             <p className={styles.frase}>{frase}</p>
             <p className={styles.duracao}>{duracao}</p>
             {/*
@@ -122,7 +129,7 @@ export function ConteudoTelaEscrevendo({
  * tela inteira, sem barra de abas, no lugar do círculo girando que cada tela
  * montava sozinha antes.
  */
-export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDeNovo, aoVoltarDepois, titulo, duracao }: Props) {
+export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDeNovo, aoVoltarDepois, titulo, duracao, etapa = null, desdeMs = null }: Props) {
   const [indiceFrase, setIndiceFrase] = useState(0);
   const [demorando, setDemorando] = useState(false);
   const [segundosDecorridos, setSegundosDecorridos] = useState(0);
@@ -154,10 +161,13 @@ export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDe
       setSegundosDecorridos(0);
       return;
     }
-    const inicio = Date.now();
-    const id = setInterval(() => setSegundosDecorridos(Math.floor((Date.now() - inicio) / 1000)), 1000);
+    // E74 PR 2a: quem volta à espera vê o tempo desde o começo da escrita, não desde que voltou (nunca negativo, se o relógio do aparelho andar para trás).
+    const inicio = desdeMs !== null && desdeMs <= Date.now() ? desdeMs : Date.now();
+    const contar = () => setSegundosDecorridos(Math.floor((Date.now() - inicio) / 1000));
+    contar();
+    const id = setInterval(contar, 1000);
     return () => clearInterval(id);
-  }, [aberto, erro]);
+  }, [aberto, erro, desdeMs]);
 
   if (!aberto) return null;
 
@@ -172,6 +182,7 @@ export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDe
       segundosDecorridos={segundosDecorridos}
       titulo={titulo}
       duracao={duracao}
+      etapa={etapa}
     />,
     document.body,
   );

@@ -116,4 +116,14 @@ describe("ConteudoTelaEscrevendo", () => {
     expect(html).not.toContain(textosComuns.esperaDuracao);
     expect(html).not.toContain("0:12");
   });
+
+  /** E74 PR 2a (R-e): a etapa que o servidor disse aparece na espera; sem etapa, a linha não existe (nada de barra que anda sozinha, R-f). */
+  it("com a etapa do pedido: mostra a etapa; sem ela, nada", () => {
+    const base = { erro: null, fraseDemorando: "demora", demorando: false, frase: textosComuns.espera[0], segundosDecorridos: 0 };
+    const com = renderToStaticMarkup(createElement(ConteudoTelaEscrevendo, { ...base, etapa: "Etapa 2 de 3: escrevendo a versão 2 de 3" }));
+    expect(com).toContain("Etapa 2 de 3: escrevendo a versão 2 de 3");
+    const sem = renderToStaticMarkup(createElement(ConteudoTelaEscrevendo, base));
+    expect(sem).not.toContain("Etapa");
+    expect(com).not.toContain("<progress");
+  });
 });

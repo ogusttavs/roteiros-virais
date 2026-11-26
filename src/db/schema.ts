@@ -21,12 +21,14 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 import type { CenaDeEntrada } from "@/animacao/tipos";
 import type { EstadoDaAnimacao } from "@/config/animacao-fila";
 import type { EstadoDoCarrossel, OrigemDoCarrossel, SlideDoCarrossel } from "@/config/carrossel";
+import type { EstadoDoPedido, TipoDePedido } from "@/config/pedidos";
 import type { Edl, Legendas, PalavraFalada } from "@/edicao/tipos";
 import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
 
@@ -3390,3 +3392,51 @@ export const animacoes = pgTable(
   ],
 );
 export type Animacao = typeof animacoes.$inferSelect;
+
+/**
+ * E74 PR 2a: o pedido de geração (o roteiro com as três versões e, depois, o carrossel). Nasce quando a pessoa toca em "Escrever", com o id que o navegador gerou (`crypto.randomUUID()`), e é o
+ * que a tela acompanha (`GET /api/pedidos/estado`), nunca "o grupo mais novo da marca". O mesmo id enviado de novo devolve o pedido que já existe, sem escrever de novo; o índice único parcial
+ * deixa um em andamento por tipo e marca (decisão do Gustavo em 26/11/2026: "um de cada tipo"). Enquanto anda, o pedido reserva a folga do teto (o teste grátis e o teto do dia o contam); o que
+ * falha deixa de contar, e a pessoa não paga pelo que não recebeu. Desenho em `estrategia/e74-aba-em-andamento.md`, seção 3.1.
+ */
+export const pedidosDeGeracao = pgTable(
+  "pedidos_de_geracao",
+  {
+    id: uuid("id").primaryKey(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    tipo: text("tipo").$type<TipoDePedido>().notNull(),
+    estado: text("estado").$type<EstadoDoPedido>().notNull().default("lendo"),
+    /** O "versão 2 de 3" do roteiro (as versões saem em sequência). */
+    etapaN: integer("etapa_n"),
+    /** O tema, para a lista dizer do que se trata. */
+    titulo: text("titulo").notNull(),
+    /** O pedido como veio (já conferido), para o worker do PR 2b rodar e para "Tentar de novo" refazer igual. */
+    parametros: jsonb("parametros").$type<Record<string, unknown>>().notNull(),
+    /** `versoes` (o grupo, desde a primeira versão) ou `carrossel` (o id). */
+    resultadoTipo: text("resultado_tipo"),
+    resultadoId: text("resultado_id"),
+    /** A frase de falha para a pessoa, nunca o erro técnico. */
+    motivo: text("motivo"),
+    /** O código técnico, para o admin. */
+    codigoDoErro: text("codigo_do_erro"),
+    refeitoDe: uuid("refeito_de"),
+    criadoPor: text("criado_por").references(() => user.id, { onDelete: "set null" }),
+    criadoEm: criadoEm(),
+    iniciadoEm: timestamp("iniciado_em", { withTimezone: true }).notNull().defaultNow(),
+    /** O batimento: cada mudança de etapa o move; a varredura olha para ele. */
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+    terminouEm: timestamp("terminou_em", { withTimezone: true }),
+    /** Quando a pessoa viu o "ficou pronto" (PR 3: a faixa e o ponto somem). */
+    avisadoEm: timestamp("avisado_em", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("pedidos_um_em_andamento_por_tipo")
+      .on(t.clienteId, t.tipo)
+      .where(sql`${t.estado} in ('na_vez', 'lendo', 'escrevendo', 'conferindo')`),
+    index("pedidos_marca_criado").on(t.clienteId, t.criadoEm.desc()),
+    index("pedidos_estado_atualizado").on(t.estado, t.atualizadoEm),
+  ],
+);
+export type PedidoDeGeracao = typeof pedidosDeGeracao.$inferSelect;

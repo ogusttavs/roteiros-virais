@@ -6,6 +6,7 @@ import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { pedidoDeRoteiroDoTema } from "@/servicos/pedidos-estado";
 import { lerPesquisa } from "@/servicos/pesquisa-na-hora";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
@@ -99,6 +100,10 @@ export default async function Objetivo({ searchParams }: Props) {
     paraHoje = temaDoDia.doMomento !== undefined;
   }
 
+  // E74 PR 2a (R-c): o pedido deste tema que o servidor ainda escreve; quem reabre o app (o iPhone fechou a aba em segundo plano) volta à espera dele, sem depender do que o aparelho guardou.
+  // Uma falha aqui nunca derruba a tela: sem o pedido, vale o que o aparelho guardou.
+  const pedidoDoTema = await pedidoDeRoteiroDoTema(cliente.id, temaEscolhidoTexto).catch(() => null);
+
   return (
     <ObjetivoTela
       origem={origem}
@@ -114,6 +119,7 @@ export default async function Objetivo({ searchParams }: Props) {
       assuntoEmAlta={assuntoEmAlta}
       perguntaChave={perguntaChave}
       pesquisa={pesquisaDoRoteiro}
+      pedidoDoTema={pedidoDoTema ? { id: pedidoDoTema.id, decorridoMs: Math.max(0, Date.now() - pedidoDoTema.iniciadoEm.getTime()) } : null}
     />
   );
 }

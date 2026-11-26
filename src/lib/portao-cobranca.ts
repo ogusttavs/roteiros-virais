@@ -22,7 +22,8 @@ import { marcaPrecisaAssinar } from "@/servicos/assinatura";
 import { briefingCompleto, clienteAtivoDoUsuario } from "@/servicos/clientes";
 
 /** `gasto` (E63): a ação cria um roteiro ou manda um vídeo para editar; o teto do teste de quem criou a conta sozinho confere o tanto de cada um. */
-export type OpcoesDoPortao = { soDepoisDoBriefing?: boolean; gasto?: GastoQueConta };
+/** `pedidoId` (E74 PR 2a): o pedido de geração que está sendo pedido de novo; ele já reserva a folga do teto e não conta contra si mesmo. */
+export type OpcoesDoPortao = { soDepoisDoBriefing?: boolean; gasto?: GastoQueConta; pedidoId?: string };
 
 export const FRASE_ASSINATURA_NECESSARIA = "Para continuar, a conta precisa de uma assinatura ativa.";
 

@@ -10,10 +10,11 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 
+import { ESTADOS_EM_ANDAMENTO } from "@/config/pedidos";
 import { db } from "@/db";
-import { roteiros, versoesDoRoteiro, type ConteudoRoteiro, type Ficha, type NotasDaVersao, type Objetivo, type VersaoDoRoteiro } from "@/db/schema";
+import { pedidosDeGeracao, roteiros, versoesDoRoteiro, type ConteudoRoteiro, type Ficha, type NotasDaVersao, type Objetivo, type VersaoDoRoteiro } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as notaIA from "@/ia/prompts/notaDaVersao";
 import { registrarGeracao } from "@/ia/registro";
@@ -27,6 +28,7 @@ import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { temposDosBlocosReels } from "./folha-do-roteiro";
 import { inicioDoDiaEmSaoPaulo } from "./noticias-do-dia";
+import { marcarEtapa, terminarPedido } from "./pedidos";
 import {
   blocosParaLeitura,
   ErroRoteiro,
@@ -168,13 +170,30 @@ export function ordenarVersoes(versoes: VersaoDoGrupo[], objetivo: Objetivo): Ve
  * O teto de segurança do dia (`ROTEIROS_POR_DIA_MAX`, 20 por padrão): só contra laço ou abuso. A pessoa não vê contador nenhum; quem chega nele lê uma frase própria. Conta as versões escritas
  * hoje (no fuso de São Paulo) por esta marca, e recusa antes de gastar qualquer chamada. É um teto macio: conta o que já foi gravado, então pedidos simultâneos passam juntos pela mesma
  * checagem e uma geração que falha não entra na conta; serve para o uso normal repetido, não para abuso concorrente.
+ *
+ * E74 PR 2a: conta também a folga reservada pelos pedidos de roteiro que ainda andam, para um "Gerar outra" no meio de uma escrita não passar junto com ela pela mesma conta. `semOPedido` tira o
+ * próprio pedido da reserva; um pedido que falhou deixa de reservar. Dois "Gerar outra" ao mesmo tempo continuam passando juntos (o teto segue macio para esse caso).
  */
-async function exigirFolgaDoDia(clienteId: number, quantidade: number): Promise<void> {
+export async function conferirFolgaDoDia(clienteId: number, quantidade: number, semOPedido?: string): Promise<void> {
   const [{ total }] = await db()
     .select({ total: sql<number>`count(*)::int` })
     .from(versoesDoRoteiro)
     .where(and(eq(versoesDoRoteiro.clienteId, clienteId), gte(versoesDoRoteiro.criadoEm, inicioDoDiaEmSaoPaulo(new Date()))));
-  if (total + quantidade > config.regras.roteirosPorDiaMax) throw new ErroRoteiro(textosRoteiro.versoes.tetoDoDia);
+  // E74 PR 2a: a folga que os pedidos de roteiro ainda andando reservaram (as versões que faltam a cada um escrever).
+  const [{ reservadas }] = await db()
+    .select({
+      reservadas: sql<number>`coalesce(sum(greatest(${VERSOES_POR_GERACAO} - (select count(*) from versoes_do_roteiro v where v.cliente_id = ${pedidosDeGeracao.clienteId} and v.grupo = ${pedidosDeGeracao.resultadoId}), 0)), 0)::int`,
+    })
+    .from(pedidosDeGeracao)
+    .where(
+      and(
+        eq(pedidosDeGeracao.clienteId, clienteId),
+        eq(pedidosDeGeracao.tipo, "roteiro"),
+        inArray(pedidosDeGeracao.estado, [...ESTADOS_EM_ANDAMENTO]),
+        semOPedido ? ne(pedidosDeGeracao.id, semOPedido) : undefined,
+      ),
+    );
+  if (total + reservadas + quantidade > config.regras.roteirosPorDiaMax) throw new ErroRoteiro(textosRoteiro.versoes.tetoDoDia);
 }
 
 /** O gancho que a próxima versão não deve repetir: o falado em Reels; em Story e vídeo sem fala, o que o primeiro cartão diz, ou o texto que ele põe na tela, ou, por fim, o título. */
@@ -319,9 +338,20 @@ async function gravarNotas(versaoId: number, notas: NotasDaVersao | null): Promi
  * Escreve as versões de um tema (três, a primeira vez). Uma depois da outra, cada uma sabendo o gancho e a abertura das anteriores; cada versão é gravada assim que fica pronta (quem sai
  * da tela na espera as encontra depois) e as notas correm em paralelo com a escrita da seguinte. Se a primeira falha, o erro sobe (nada foi gravado); se uma das seguintes falha, o grupo
  * fica com as que deram certo.
+ *
+ * E74 PR 2a: com `pedidoId`, a etapa vai para o pedido (lendo a pesquisa, escrevendo a versão N, conferindo as notas, pronto). Quem marca a falha é quem criou o pedido (a ação), que sabe a
+ * frase. Sem `pedidoId` (chamadas internas, testes), nada muda.
  */
-export async function gerarVersoes(clienteId: number, params: ParametrosGerarRoteiro, quantidade = VERSOES_POR_GERACAO): Promise<{ grupo: string; versoes: VersaoDoGrupo[] }> {
-  await exigirFolgaDoDia(clienteId, quantidade);
+export async function gerarVersoes(
+  clienteId: number,
+  params: ParametrosGerarRoteiro,
+  quantidade = VERSOES_POR_GERACAO,
+  opcoes: { pedidoId?: string } = {},
+): Promise<{ grupo: string; versoes: VersaoDoGrupo[] }> {
+  const { pedidoId } = opcoes;
+  // Com pedido, o teto do dia foi conferido quando ele nasceu, e a folga é dele.
+  if (!pedidoId) await conferirFolgaDoDia(clienteId, quantidade);
+  else await marcarEtapa(pedidoId, { estado: "lendo" });
 
   // O tema se resolve uma vez: as três versões (e as de "Gerar outra" depois) são do mesmo tema, mesmo que a lista do dia mude no meio.
   const parametros: ParametrosDaVersao = { pedido: params, tema: await resolverTemaDoPedido(clienteId, params) };
@@ -330,6 +360,8 @@ export async function gerarVersoes(clienteId: number, params: ParametrosGerarRot
   const notasEmAndamento: Promise<void>[] = [];
 
   for (let ordem = 1; ordem <= quantidade; ordem += 1) {
+    // O grupo vai para o pedido desde a primeira versão: a varredura fecha com o que já existe, e o grupo que ainda está sendo escrito nunca aparece como "falta escolher".
+    if (pedidoId) await marcarEtapa(pedidoId, { estado: "escrevendo", etapaN: ordem, titulo: parametros.tema.tema, resultado: { tipo: "versoes", id: grupo } });
     try {
       const linha = await escreverUmaVersao(clienteId, grupo, parametros, jaEscritas, ordem);
       const valores = linha.valores as unknown as ValoresDoRoteiro;
@@ -341,7 +373,9 @@ export async function gerarVersoes(clienteId: number, params: ParametrosGerarRot
       break;
     }
   }
+  if (pedidoId) await marcarEtapa(pedidoId, { estado: "conferindo" });
   await Promise.all(notasEmAndamento);
+  if (pedidoId) await terminarPedido(pedidoId, { tipo: "versoes", id: grupo });
   return { grupo, versoes: await versoesDoGrupo(clienteId, grupo) };
 }
 
@@ -356,7 +390,7 @@ export async function gerarOutraVersao(clienteId: number, grupo: string): Promis
     .where(and(eq(versoesDoRoteiro.clienteId, clienteId), eq(versoesDoRoteiro.grupo, grupo)))
     .orderBy(asc(versoesDoRoteiro.ordem));
   if (existentes.length === 0) throw new ErroRoteiro(textosRoteiro.versoes.naoEncontrada);
-  await exigirFolgaDoDia(clienteId, 1);
+  await conferirFolgaDoDia(clienteId, 1);
 
   const parametros = existentes[0].parametros as unknown as ParametrosDaVersao;
   // O assunto em alta é do dia em que foi visto (a mesma regra de planejar para outro dia): um grupo de ontem não escreve mais uma versão de um assunto de ontem.
@@ -466,8 +500,11 @@ const MINUTOS_DA_NOTA_EM_ANDAMENTO = 4;
 /**
  * O grupo mais novo da marca, se a pessoa ainda não ficou com nenhuma versão dele (os mais velhos, não resolvidos, foram abandonados: quem pediu outro tema ou trocou o objetivo não precisa
  * vê-los de volta). Conta pelo grupo inteiro, não pela janela: um grupo resolvido que ganhou "Gerar outra" depois não volta como aberto. `agora` só existe para os testes.
+ *
+ * E74 PR 2a (achado do Fable de 26/11, R-b): `semOGrupo` é o grupo que um pedido ainda está escrevendo; ele fica fora da conta, e o grupo anterior que falta escolher continua aparecendo (antes,
+ * o grupo novo escondia o antigo, e o antigo escondia o "Escrevendo" do novo).
  */
-export async function grupoEmAberto(clienteId: number, agora = new Date()): Promise<GrupoEmAberto | null> {
+export async function grupoEmAberto(clienteId: number, agora = new Date(), opcoes: { semOGrupo?: string | null } = {}): Promise<GrupoEmAberto | null> {
   const desde = new Date(agora.getTime() - DIAS_DO_GRUPO_EM_ABERTO * 86_400_000);
   const [novo] = await db()
     .select({
@@ -478,32 +515,68 @@ export async function grupoEmAberto(clienteId: number, agora = new Date()): Prom
       resolvido: sql<boolean>`bool_or(${versoesDoRoteiro.roteiroId} is not null)`,
     })
     .from(versoesDoRoteiro)
-    .where(eq(versoesDoRoteiro.clienteId, clienteId))
+    .where(and(eq(versoesDoRoteiro.clienteId, clienteId), opcoes.semOGrupo ? ne(versoesDoRoteiro.grupo, opcoes.semOGrupo) : undefined))
     .groupBy(versoesDoRoteiro.grupo)
     .having(sql`min(${versoesDoRoteiro.criadoEm}) >= ${desde}`)
     .orderBy(sql`min(${versoesDoRoteiro.criadoEm}) desc`)
     .limit(1);
   if (!novo || novo.resolvido) return null;
+  return grupoEmAbertoDaLinha(clienteId, novo, agora);
+}
 
+type ResumoDoGrupo = { grupo: string; inicio: Date; fim: Date; total: number };
+
+async function grupoEmAbertoDaLinha(clienteId: number, resumo: ResumoDoGrupo, agora: Date): Promise<GrupoEmAberto> {
   const [primeira] = await db()
     .select()
     .from(versoesDoRoteiro)
-    .where(and(eq(versoesDoRoteiro.clienteId, clienteId), eq(versoesDoRoteiro.grupo, novo.grupo)))
+    .where(and(eq(versoesDoRoteiro.clienteId, clienteId), eq(versoesDoRoteiro.grupo, resumo.grupo)))
     .orderBy(asc(versoesDoRoteiro.ordem))
     .limit(1);
   const base = paraVersaoDoGrupo(primeira);
-  const fim = new Date(novo.fim);
+  const fim = new Date(resumo.fim);
   return {
-    grupo: novo.grupo,
+    grupo: resumo.grupo,
     tema: base.tema,
     objetivo: base.objetivo,
     ficha: base.ficha,
     formato: base.formato,
     estilo: base.estilo,
-    quantidade: novo.total,
-    inicio: new Date(novo.inicio),
-    emEscrita: novo.total < VERSOES_POR_GERACAO && agora.getTime() - fim.getTime() < MINUTOS_DE_UM_GRUPO_EM_ESCRITA * 60_000,
+    quantidade: resumo.total,
+    inicio: new Date(resumo.inicio),
+    emEscrita: resumo.total < VERSOES_POR_GERACAO && agora.getTime() - fim.getTime() < MINUTOS_DE_UM_GRUPO_EM_ESCRITA * 60_000,
   };
+}
+
+/** Quantos grupos a lista do "falta escolher a versão" traz, no máximo. */
+const GRUPOS_EM_ABERTO_NA_LISTA = 10;
+
+/**
+ * E74 PR 2a: TODOS os grupos dos últimos dois dias em que a pessoa ainda não ficou com nenhuma versão, o mais novo primeiro (a lista "Falta escolher a versão" da aba, R-b), menos os que um
+ * pedido ainda escreve (`semOsGrupos`). Escopado pela marca.
+ */
+export async function gruposEmAberto(clienteId: number, agora = new Date(), semOsGrupos: string[] = []): Promise<GrupoEmAberto[]> {
+  const desde = new Date(agora.getTime() - DIAS_DO_GRUPO_EM_ABERTO * 86_400_000);
+  const linhas = await db()
+    .select({
+      grupo: versoesDoRoteiro.grupo,
+      inicio: sql<Date>`min(${versoesDoRoteiro.criadoEm})`,
+      fim: sql<Date>`max(${versoesDoRoteiro.criadoEm})`,
+      total: sql<number>`count(*)::int`,
+    })
+    .from(versoesDoRoteiro)
+    .where(eq(versoesDoRoteiro.clienteId, clienteId))
+    .groupBy(versoesDoRoteiro.grupo)
+    .having(sql`min(${versoesDoRoteiro.criadoEm}) >= ${desde} and not bool_or(${versoesDoRoteiro.roteiroId} is not null)`)
+    .orderBy(sql`min(${versoesDoRoteiro.criadoEm}) desc`)
+    .limit(GRUPOS_EM_ABERTO_NA_LISTA + semOsGrupos.length);
+  const fora = new Set(semOsGrupos);
+  const abertos: GrupoEmAberto[] = [];
+  for (const linha of linhas) {
+    if (fora.has(linha.grupo) || abertos.length >= GRUPOS_EM_ABERTO_NA_LISTA) continue;
+    abertos.push(await grupoEmAbertoDaLinha(clienteId, linha, agora));
+  }
+  return abertos;
 }
 
 export type ResumoDaFaxinaDeVersoes = {

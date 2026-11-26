@@ -7,11 +7,12 @@
  *   `geracoes_ia` da marca mais a transcrição das edições (a IA da edição já está em `geracoes_ia`).
  * - **Ramos novos:** a pesquisa de setor novo (Apify e YouTube) roda sozinha só para `ramosNovosPorDia` ramos por dia vindos de cadastro próprio.
  */
-import { and, count, eq, gt, sql } from "drizzle-orm";
+import { and, count, eq, gt, inArray, ne, sql } from "drizzle-orm";
 
 import { LIMITES_DO_CADASTRO, TETO_DO_TESTE } from "@/config/cadastro";
+import { ESTADOS_EM_ANDAMENTO } from "@/config/pedidos";
 import { db } from "@/db";
-import { cadastrosProprios, carrosseis, edicoes, geracoesIA, roteiros, setoresDeCadastro, user } from "@/db/schema";
+import { cadastrosProprios, carrosseis, edicoes, geracoesIA, pedidosDeGeracao, roteiros, setoresDeCadastro, user } from "@/db/schema";
 
 import { assinaturaVale, assinaturasDaMarca } from "./assinatura";
 
@@ -38,10 +39,28 @@ export async function gastoDeIaDaMarcaUsd(clienteId: number): Promise<number> {
 }
 
 /**
+ * E74 PR 2a: os pedidos de roteiro e de carrossel que estão sendo escritos agora reservam a folga do teto (decisão do Gustavo em 26/11/2026): sem isso, três tipos ao mesmo tempo passariam juntos
+ * pela mesma conta. `semOPedido` tira da conta o próprio pedido que está sendo pedido de novo (o mesmo id não conta contra si mesmo). O que falhou deixa de contar: a falha não gasta o limite.
+ */
+export async function pedidosQueReservam(clienteId: number, semOPedido?: string): Promise<number> {
+  const [{ total }] = await db()
+    .select({ total: count() })
+    .from(pedidosDeGeracao)
+    .where(
+      and(
+        eq(pedidosDeGeracao.clienteId, clienteId),
+        inArray(pedidosDeGeracao.estado, [...ESTADOS_EM_ANDAMENTO]),
+        semOPedido ? ne(pedidosDeGeracao.id, semOPedido) : undefined,
+      ),
+    );
+  return total;
+}
+
+/**
  * Esta marca está barrada agora? `null` para quem não é de cadastro próprio, ou é e está em dia. O e-mail vem antes do teto. `gasto` diz que ação está sendo pedida: criar roteiro
  * confere o teto de roteiros, mandar vídeo para editar confere o de edições; o teto de IA vale para toda ação.
  */
-export async function barreiraDoCadastro(entrada: { clienteId: number; cortesia: boolean; gasto?: GastoQueConta; agora?: Date }): Promise<Barreira | null> {
+export async function barreiraDoCadastro(entrada: { clienteId: number; cortesia: boolean; gasto?: GastoQueConta; agora?: Date; semOPedido?: string }): Promise<Barreira | null> {
   const agora = entrada.agora ?? new Date();
   const [cadastro] = await db()
     .select({ confirmado: user.emailVerified })
@@ -59,7 +78,9 @@ export async function barreiraDoCadastro(entrada: { clienteId: number; cortesia:
     const [{ total: dosRoteiros }] = await db().select({ total: count() }).from(roteiros).where(eq(roteiros.clienteId, entrada.clienteId));
     // E65: um carrossel conta como um roteiro no teto do teste.
     const [{ total: dosCarrosseis }] = await db().select({ total: count() }).from(carrosseis).where(eq(carrosseis.clienteId, entrada.clienteId));
-    if (dosRoteiros + dosCarrosseis >= TETO_DO_TESTE.roteiros) return { tipo: "teto", qual: "roteiros" };
+    // E74 PR 2a: o que está sendo escrito agora já ocupa o lugar dele.
+    const reservados = await pedidosQueReservam(entrada.clienteId, entrada.semOPedido);
+    if (dosRoteiros + dosCarrosseis + reservados >= TETO_DO_TESTE.roteiros) return { tipo: "teto", qual: "roteiros" };
   }
   if (entrada.gasto === "edicao") {
     const [{ total }] = await db()

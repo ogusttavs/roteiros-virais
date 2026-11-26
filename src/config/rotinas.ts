@@ -29,6 +29,7 @@ export const ROTINAS: Rotina[] = [
   { chave: "publicar", titulo: "Publicar no Instagram", faz: "Espera a Meta preparar o vídeo que a pessoa enviou e o publica no Instagram dela; depois liga o link do post ao roteiro. Também publica, um por vez e com intervalo, os posts prontos de imagem e carrossel que a pessoa pôs na fila.", filas: [FILAS.publicarInstagram, FILAS.publicarPostPronto, FILAS.filaDePosts] },
   { chave: "edicao", titulo: "Editar os vídeos das pessoas", faz: "Escreve o que a pessoa falou no vídeo que enviou para editar (com a hora de cada palavra), decide o que fica no vídeo (cortes, título e legenda), confere o resultado, monta a prévia e o vídeo final (num contêiner só para isso, um vídeo por vez) e, de hora em hora, apaga os vídeos que passaram do prazo de guarda: o bruto em 48 horas e o editado em 7 dias.", filas: [FILAS.transcreverEdicao, FILAS.decidirEdicao, FILAS.renderizarEdicao, FILAS.renderizarAnimacao, FILAS.limparEdicoes] },
   { chave: "disco", titulo: "Vigiar o espaço do servidor", faz: "A cada 15 minutos mede quanto do disco está usado e avisa por e-mail quando passa de 80% (atenção) e de 90% (crítico). No crítico, o envio de vídeos para editar fica pausado e a limpeza roda na hora.", filas: [FILAS.vigiarDisco] },
+  { chave: "pedidos", titulo: "Fechar os pedidos parados", faz: "De minuto em minuto, confere os roteiros que estão sendo escritos: o que parou no meio (o servidor reiniciou, por exemplo) fica pronto com as versões que já saíram, ou falha sem contar no limite da pessoa.", filas: [FILAS.varrerPedidos] },
   { chave: "aprender", titulo: "Aprender com as reprovações", faz: "Transforma o que a pessoa reprovou em regras daquela conta.", filas: [FILAS.aprenderCliente] },
   { chave: "faxina", titulo: "Limpar as versões que ninguém escolheu", faz: "Apaga as versões de roteiro que ficaram sem escolha em grupos parados há mais de 30 dias.", filas: [FILAS.faxinaVersoes, FILAS.faxinaCadastros] },
   { chave: "instagram-ligado", titulo: "Renovar o acesso dos Instagram ligados", faz: "Renova, antes de vencer, o acesso que as pessoas deram ao próprio Instagram, e avisa o dono da conta quando não dá mais para renovar.", filas: [FILAS.renovarContasLigadas] },
@@ -84,6 +85,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.renderizarAnimacao]: "a montagem do vídeo em animação",
   [FILAS.limparEdicoes]: "a limpeza dos vídeos guardados para editar",
   [FILAS.vigiarDisco]: "a vigia do espaço do servidor",
+  [FILAS.varrerPedidos]: "a conferência dos pedidos parados",
 };
 
 /** "30 3 * * *" em língua de gente. O que não cabe nos formatos que o agendamento usa volta cru, para nunca mentir. */

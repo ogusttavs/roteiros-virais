@@ -10,12 +10,12 @@ import { textosCadastro } from "@/textos/cadastro";
 export type { Barreira, GastoQueConta };
 
 /** A barreira da marca da sessão, ou `null` para seguir. */
-export async function barreiraDoCadastroNaSessao(opcoes: { gasto?: GastoQueConta } = {}): Promise<Barreira | null> {
+export async function barreiraDoCadastroNaSessao(opcoes: { gasto?: GastoQueConta; pedidoId?: string } = {}): Promise<Barreira | null> {
   const sessao = await sessaoDoPainel();
   if (!sessao || sessao.verComo) return null;
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) return null;
-  return barreiraDoCadastro({ clienteId: cliente.id, cortesia: cliente.cortesia, gasto: opcoes.gasto });
+  return barreiraDoCadastro({ clienteId: cliente.id, cortesia: cliente.cortesia, gasto: opcoes.gasto, semOPedido: opcoes.pedidoId });
 }
 
 /** Para onde a Server Action leva a pessoa. */

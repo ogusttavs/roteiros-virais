@@ -8,6 +8,7 @@ import { ErroIA } from "@/ia/erro";
 import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import { formatarVideo, legendaSemHashtags } from "@/lib/formatar-video-referencia";
+import { idDePedidoOuNulo, novoIdDePedido } from "@/lib/id-do-pedido";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
@@ -27,10 +28,38 @@ import {
   validarQuemAparece,
   type OrigemRoteiro,
 } from "@/servicos/roteiro";
+import { criarPedido, ErroPedido, falharPedido, pedidoDaMarca } from "@/servicos/pedidos";
 import { apagarRascunhoSeForDoTexto } from "@/servicos/temas";
-import { gerarVersoes } from "@/servicos/versoes";
+import { conferirFolgaDoDia, gerarVersoes, VERSOES_POR_GERACAO } from "@/servicos/versoes";
+import { textosPedidos } from "@/textos/pedidos";
 import { textosRoteiro } from "@/textos/roteiro";
 import type { VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
+
+/** O que a escrita das versões devolve (E74 PR 2a). */
+export type ResultadoDasVersoes =
+  | { grupo: string }
+  /** O mesmo pedido já está sendo escrito (a resposta da primeira vez se perdeu): a tela segue o pedido por este id. */
+  | { pedidoId: string; escrevendo: true }
+  /** Outro roteiro desta marca está sendo escrito agora: nada foi escrito nem gasto. */
+  | { jaEmAndamento: string; frase: string };
+
+/** O que o pedido guarda: o que é preciso para refazer igual, sem nada que não seja desta marca. */
+function parametrosDoPedido(params: Parameters<typeof gerarVersoes>[1]): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(params)) as Record<string, unknown>;
+}
+
+function tituloDoPedido(origem: OrigemRoteiro): string {
+  if (origem.origem === "livre") return origem.textoTema;
+  if (origem.origem === "sugerido") return origem.temaTitulo ?? textosPedidos.temaDoDia;
+  return textosPedidos.temaDoDia;
+}
+
+/** A resposta para o mesmo id mandado de novo: o grupo, se já ficou pronto; a frase, se falhou; senão, "continua sendo escrito". Nunca escreve de novo. */
+function respostaDoRepetido(pedido: { id: string; estado: string; resultadoTipo: string | null; resultadoId: string | null; motivo: string | null }): ResultadoAcao<ResultadoDasVersoes> {
+  if (pedido.estado === "pronto" && pedido.resultadoTipo === "versoes" && pedido.resultadoId) return { ok: true, dado: { grupo: pedido.resultadoId } };
+  if (pedido.estado === "falhou") return { ok: false, erro: pedido.motivo || textosPedidos.falhou.roteiro };
+  return { ok: true, dado: { pedidoId: pedido.id, escrevendo: true } };
+}
 
 /**
  * `/hoje/objetivo` (etapa 11; V9c, item 1: `formato` do controle segmentado; M4, item 2: `estilo`,
@@ -42,6 +71,10 @@ import type { VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
  * R1, item 0c: `ErroIA.mensagemCliente` e `ErroRoteiro.message` vêm como resultado, não lançados
  * (Next.js troca a mensagem de uma exceção por um texto genérico em produção); erro de outra
  * natureza (rede, bug) continua subindo, para a tela de espera cair no caminho de sempre.
+ *
+ * E74 PR 2a: a escrita nasce como um pedido (`pedidos_de_geracao`) com o id que o navegador gerou (`pedidoId`), ANTES de gastar qualquer coisa. O mesmo id de novo devolve o pedido que já
+ * existe sem escrever outra vez (a tela que perdeu a resposta pergunta por ele); outro pedido de roteiro andando na marca devolve `jaEmAndamento` com o id dele, sem gastar nada. A falha marca o
+ * pedido como falho, e ele deixa de contar no limite (R-o). Sem `pedidoId` (quem chama por dentro, os testes), o servidor gera um: todo roteiro desta tela passa pela mesma trava.
  */
 export async function gerarVersoesAction(
   origem: OrigemRoteiro,
@@ -68,10 +101,16 @@ export async function gerarVersoesAction(
   perguntaChave?: string,
   /** E54 (parte 2): o id da pesquisa na hora que a pessoa aprovou para este vídeo; só um id de linha vale (um valor que não vale é erro explícito, não "sem pesquisa"), e `gerarVersoes` confere que é desta marca e que está pronta. */
   pesquisaId?: number,
-): Promise<ResultadoAcao<{ grupo: string }>> {
+  /** E74 PR 2a: o id do pedido que o navegador gerou ao tocar em "Escrever"; o mesmo id nunca escreve duas vezes. */
+  pedidoId?: string,
+  /** E74 PR 2a: o pedido que falhou e que "Tentar de novo" refaz (só fica registrado se for desta marca). */
+  refeitoDe?: string,
+): Promise<ResultadoAcao<ResultadoDasVersoes>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
-  await exigirAssinaturaValida({ gasto: "roteiro" });
+  // Um valor que não é id vale como "sem id" (o servidor gera um); o pedido que já existe não conta contra o próprio teto quando é mandado de novo.
+  const idDoPedido = idDePedidoOuNulo(pedidoId);
+  await exigirAssinaturaValida({ gasto: "roteiro", pedidoId: idDoPedido ?? undefined });
   const cliente = await clienteDaSessaoAtual();
   // Um id que veio e não vale não vira "sem pesquisa" em silêncio: a pessoa pediu a pesquisa, e o roteiro sairia sem ela.
   const pesquisaValida = pesquisaId === undefined || pesquisaId === null ? undefined : idDoBancoOuNulo(pesquisaId);
@@ -80,7 +119,7 @@ export async function gerarVersoesAction(
     // O que chega do navegador é texto livre: a origem é reconstruída campo a campo (nunca espalhada, `validarOrigemDaTelaDoObjetivo`: "momento" é da folha "Gravar agora", que confere
     // a marca citada) e o objetivo é um dos três.
     const origemValida = validarOrigemDaTelaDoObjetivo(origem);
-    const { grupo } = await gerarVersoes(cliente.id, {
+    const params = {
       ...origemValida,
       objetivo: validarObjetivo(objetivo),
       ficha: ehFicha(ficha) ? ficha : undefined,
@@ -95,7 +134,30 @@ export async function gerarVersoesAction(
       noticiaAssuntoId: origemValida.origem === "livre" ? noticiaAssuntoId : undefined,
       perguntaChave: origemValida.origem === "livre" ? chaveDeVozValida(perguntaChave) : undefined,
       pesquisaId: pesquisaValida,
+    };
+    const sessaoDoPedido = await sessaoDoPainel();
+    const { pedido, novo } = await criarPedido({
+      id: idDoPedido ?? novoIdDePedido(),
+      clienteId: cliente.id,
+      tipo: "roteiro",
+      titulo: tituloDoPedido(origemValida),
+      parametros: parametrosDoPedido(params),
+      criadoPor: sessaoDoPedido?.user.id ?? null,
+      refeitoDe: refeitoDe && (await pedidoDaMarca(cliente.id, refeitoDe)) ? refeitoDe : null,
+      // A folga do dia é conferida antes de o pedido existir; depois, ela é dele.
+      conferirFolga: () => conferirFolgaDoDia(cliente.id, VERSOES_POR_GERACAO),
     });
+    if (!novo) return respostaDoRepetido(pedido);
+
+    let grupo: string;
+    try {
+      ({ grupo } = await gerarVersoes(cliente.id, params, VERSOES_POR_GERACAO, { pedidoId: pedido.id }));
+    } catch (falha) {
+      // A falha devolve a folga (o pedido deixa de contar) e fica com a frase que a tela mostraria; o erro segue para o tratamento de sempre, abaixo.
+      const motivo = falha instanceof ErroIA ? await fraseDoErroDaIAParaASessao(falha) : falha instanceof ErroRoteiro ? falha.message : null;
+      await falharPedido(pedido.id, { tipo: "roteiro", codigo: falha instanceof Error ? falha.name : "erro", motivo });
+      throw falha;
+    }
     // O roteiro saiu deste assunto seu: o rascunho do Tema livre (texto e nota) some, e a próxima visita começa em branco (pedido do Gustavo em 23/10/2026; antes ficava o texto).
     if (origemValida.origem === "livre") {
       const sessao = await sessaoDoPainel();
@@ -103,6 +165,10 @@ export async function gerarVersoesAction(
     }
     return { ok: true, dado: { grupo } };
   } catch (falha) {
+    if (falha instanceof ErroPedido) {
+      if (falha.codigo === "ja-em-andamento" && falha.emAndamentoId) return { ok: true, dado: { jaEmAndamento: falha.emAndamentoId, frase: falha.message } };
+      return { ok: false, erro: falha.message };
+    }
     if (falha instanceof ErroIA) return { ok: false, erro: await fraseDoErroDaIAParaASessao(falha) };
     if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };
     throw falha;

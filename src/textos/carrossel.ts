@@ -77,6 +77,8 @@ export const textosCarrossel = {
   gerandoTitulo: "Montando o seu carrossel",
   gerandoAjuda: "Leva cerca de 1 minuto. Fique nesta tela até ele ficar pronto.",
   etapaTexto: (n: number) => `Escrevendo o texto dos ${n} slides`,
+  /** E74 PR 2a: o nome do carrossel na lista do que está sendo escrito, quando ele não vem de um tema com nome. */
+  tituloDoPedido: { tema: "Carrossel", roteiro: "Carrossel do roteiro", noticia: "Carrossel da notícia" },
   etapaConferindo: "Conferindo os dados e as fontes",
   etapaConferindoDica: "Número só entra com de onde veio e o ano.",
   etapaConferindoSaude: "Conferindo o texto com as regras de saúde",

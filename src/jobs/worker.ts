@@ -62,6 +62,7 @@ import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
 import { type PayloadTranscreverEdicao, rodarTranscreverEdicao } from "./transcrever-edicao";
+import { rodarVarrerPedidos } from "./varrer-pedidos";
 import { rodarVigiarDisco } from "./vigiar-disco";
 import { rodarVigilancia } from "./vigilancia";
 
@@ -287,6 +288,9 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.vigiarDisco, async () => {
     await executarComRegistro(FILAS.vigiarDisco, () => rodarVigiarDisco());
+  });
+  await boss().work(FILAS.varrerPedidos, async () => {
+    await executarComRegistro(FILAS.varrerPedidos, () => rodarVarrerPedidos());
   });
 
   console.log("worker no ar.");

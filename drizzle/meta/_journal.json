@@ -841,6 +841,13 @@
       "when": 1795690883270,
       "tag": "0124_animacao-fora-do-video",
       "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1795694600000,
+      "tag": "0126_pedidos-de-geracao",
+      "breakpoints": true
     }
   ]
 }

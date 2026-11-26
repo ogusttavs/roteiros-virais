@@ -8,6 +8,7 @@
 #   3. docker compose pull (imagens do GHCR, construidas no CI)
 #   4. sobe o Postgres e espera ficar saudavel
 #   5. roda as migracoes pelo container do worker (tem tsx e a pasta drizzle)
+#   5b. espera os pedidos de geracao em andamento terminarem, ate 4 minutos (E74 PR 2a, R-n: deploy nao mata pedido)
 #   6. sobe tudo (app, worker, render, backup) e confere /api/saude por dentro da rede
 #
 # Uso: deploy/deploy.sh <sha>   (o sha curto ou inteiro do commit que passou na CI: 7 a
@@ -74,6 +75,15 @@ ssh "$ALIAS" "cd $DIR && TAG=$TAG docker compose run --rm --no-deps roteiros-wor
 # aplicaria o `cap_drop` do servico e o root nao poderia trocar o dono. Idempotente e rapido (o que guardamos sao poucos arquivos, por 48 horas e 7 dias).
 echo "== acertando o dono dos volumes de video (999:999)"
 ssh "$ALIAS" "docker run --rm --user root --entrypoint chown -v roteiros_edicao:/var/edicao -v roteiros_publicar:/var/publicar ghcr.io/ogusttavs/roteiros-virais/worker:$TAG -R 999:999 /var/edicao /var/publicar"
+
+# E74 PR 2a (R-n): o roteiro e o carrossel sao escritos pelo app; recriar o app no meio mataria a escrita de quem esta esperando. Espera eles terminarem (ate 4 minutos, `deploy/pedidos-andando.sh`).
+# shellcheck source=pedidos-andando.sh
+. "$AQUI/pedidos-andando.sh"
+contar_pedidos() {
+  ssh "$ALIAS" "cd $DIR && docker compose exec -T roteiros-postgres psql -U roteiros -d roteiros -tAc \"$SQL_PEDIDOS_ANDANDO\""
+}
+echo "== esperando os pedidos em andamento (ate ${ESPERA_DOS_PEDIDOS_S}s)"
+esperar_pedidos "$ESPERA_DOS_PEDIDOS_S"
 
 echo "== subindo app, worker, render e backup"
 ssh "$ALIAS" "cd $DIR && TAG=$TAG docker compose up -d --remove-orphans"

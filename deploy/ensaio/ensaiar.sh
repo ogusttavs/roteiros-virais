@@ -158,6 +158,24 @@ subir_resto() {
   "${COMPOSE[@]}" up -d --remove-orphans
 }
 
+# E74 PR 2a (R-n): a espera do deploy pelos pedidos em andamento, contra o banco recem-migrado. A conta precisa sair (um numero): se nao sair, o deploy seguiria sem esperar ninguem.
+# shellcheck source=../pedidos-andando.sh
+. "$RAIZ/deploy/pedidos-andando.sh"
+contar_pedidos() {
+  "${COMPOSE[@]}" exec -T roteiros-postgres psql -U roteiros -d roteiros -tAc "$SQL_PEDIDOS_ANDANDO"
+}
+espera_dos_pedidos_funciona() {
+  local n
+  n=$(contar_pedidos | tr -d '[:space:]') || return 1
+  case "$n" in
+    '' | *[!0-9]*)
+      echo "a conta dos pedidos em andamento nao saiu: '$n'" >&2
+      return 1
+      ;;
+  esac
+  esperar_pedidos 10
+}
+
 conferir_saude() {
   for _ in $(seq 1 30); do
     codigo=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/api/saude" || true)
@@ -486,6 +504,7 @@ passo "yt-dlp tem alvo de impersonação" worker_tem_alvo_impersonacao
 passo "garante a rede externa 'web'" garantir_rede_web
 passo "sobe o postgres e espera ficar saudavel" subir_postgres
 passo "migra o banco pelo container do worker" migrar
+passo "conta os pedidos em andamento (a espera do deploy)" espera_dos_pedidos_funciona
 passo "sobe o app, o worker e o backup" subir_resto
 passo "confere /api/saude em $BASE_URL" conferir_saude
 passo "worker fala com o provedor de PO Token" worker_fala_com_provedor_pot
