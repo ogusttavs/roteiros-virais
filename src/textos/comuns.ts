@@ -37,6 +37,8 @@ export const textosComuns = {
    */
   esperaDuracao: "Pode levar até 3 minutos",
   esperaVoltarDepois: "Voltar depois",
+  /** E74 PR 1: o recado da espera; o roteiro continua sendo escrito mesmo com a pessoa fora da tela. */
+  esperaPodeSair: "Pode sair desta tela. O roteiro continua sendo escrito e fica guardado para você.",
   /**
    * P2b, item 4: só aparece quando a prévia ao vivo usa o reconhecimento de fala do navegador
    * (camada a). Compartilhado entre o briefing, o momento e o plano, que usam o mesmo gancho.

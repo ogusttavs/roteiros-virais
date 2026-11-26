@@ -74,5 +74,9 @@ export const textosVersoesNoHoje = {
   selo: (quantas: number) => (quantas === 1 ? "Uma versão pronta" : `${quantas === 3 ? "Três" : quantas} versões prontas`),
   texto: "Jeitos diferentes de gravar o mesmo tema, cada um com as três notas. Você escolhe um e o roteiro abre.",
   escolher: "Escolher uma",
+  /** E74 PR 1: enquanto o servidor ainda escreve; o cartão muda sozinho para "prontas". */
+  escrevendoTitulo: "Escrevendo as suas versões",
+  escrevendoSelo: "Escrevendo",
+  escrevendoTexto: "Pode ficar por aqui ou sair: quando as três ficarem prontas, este cartão muda sozinho.",
   outroTema: "Escolher outro tema escreve outras versões, e estas ficam guardadas.",
 } as const;
