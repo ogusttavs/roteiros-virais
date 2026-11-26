@@ -7,7 +7,7 @@ import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { sessaoDoPainel } from "@/lib/ver-como";
-import { arrobaDaMarca, carrosselDaMarca, marcaEhDeSaude } from "@/servicos/carrossel";
+import { arrobaDaMarca, carrosselDaMarca } from "@/servicos/carrossel";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { noticiaPorId } from "@/servicos/noticias";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -26,7 +26,6 @@ export default async function CriarCapa({ searchParams }: { searchParams: Promis
   if (!cliente) redirect(destinoSemMarca(sessao.user.role));
   await exigirAssinaturaValida();
   const parametros = await searchParams;
-  const ramoSaude = await marcaEhDeSaude(cliente.id);
   const arroba = arrobaDaMarca(cliente.perfis?.instagram);
 
   // Abrir pelo endereço da capa pronta (`?id=`): a capa é da marca e é uma capa de notícia (outra coisa, ou de outra marca, não existe). Já feita, não depende mais de a notícia ter menos de 7 dias.
@@ -36,7 +35,7 @@ export default async function CriarCapa({ searchParams }: { searchParams: Promis
     const slide = capa?.slides[0];
     const noticiaDaCapa = typeof capa?.origemRef?.noticiaId === "number" ? capa.origemRef.noticiaId : null;
     if (!capa || capa.origem !== "noticia" || slide?.tipo !== "noticia" || noticiaDaCapa === null) notFound();
-    return <CapaTela noticia={{ id: noticiaDaCapa, titulo: capa.tema, veiculo: slide.veiculo ?? "", data: slide.data ?? "" }} corMarca={cliente.corMarca} arroba={arroba} ramoSaude={ramoSaude} capaInicialId={capa.id} />;
+    return <CapaTela noticia={{ id: noticiaDaCapa, titulo: capa.tema, veiculo: slide.veiculo ?? "", data: slide.data ?? "" }} corMarca={cliente.corMarca} arroba={arroba} capaInicialId={capa.id} />;
   }
 
   const id = idDoBancoOuNulo(parametros.noticia ?? "");
@@ -51,7 +50,6 @@ export default async function CriarCapa({ searchParams }: { searchParams: Promis
       noticia={{ id: noticia.id, titulo: noticia.titulo, veiculo: veiculoDaCapa(noticia.fonte), data: dataDaCapa(noticia.publicadoEm) }}
       corMarca={cliente.corMarca}
       arroba={arroba}
-      ramoSaude={ramoSaude}
     />
   );
 }
