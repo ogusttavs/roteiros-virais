@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { LINHA_FIXA_ANTES_DEPOIS_SAUDE, type SlideDoCarrossel } from "@/config/carrossel";
 
-import { excessoDoCampo, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComFoto, slidesDaSaida, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides, type SlideDaSaida } from "./regras";
+import { excessoDoCampo, motivoDoCampo, normalizarHashtags, promessaEmSaude, slidesComExcessoPequeno, slidesComFoto, slidesDaSaida, verificarLegenda, verificarLimitesDosSlides, verificarOrdemDosSlides, type SlideDaSaida } from "./regras";
 
 const s = (tipo: SlideDoCarrossel["tipo"], extra: Partial<SlideDoCarrossel> = {}): SlideDoCarrossel => {
   const base: Record<string, Partial<SlideDoCarrossel>> = {
@@ -37,6 +37,36 @@ describe("verificarOrdemDosSlides", () => {
   it("aceita dois seguidos e reprova três seguidos do mesmo tipo", () => {
     expect(verificarOrdemDosSlides([s("capa-texto"), s("item"), s("item"), s("passo"), s("chamada")], 5)).toEqual([]);
     expect(verificarOrdemDosSlides([s("capa-texto"), s("item"), s("item"), s("item"), s("chamada")], 5).join("|")).toMatch(/3 slides seguidos do tipo "item"/);
+  });
+});
+
+describe("T77: o excesso pequeno de tamanho na 2ª tentativa", () => {
+  const o = { ramoSaude: false };
+  const tolera = { ramoSaude: false, tolerarExcessoPequeno: true };
+  it("até 3 palavras a mais (e até 20% de caracteres) deixa de reprovar quando tolerado; sem tolerar, reprova como sempre", () => {
+    const slide = [s("chamada", { texto: palavras(22) })];
+    expect(verificarLimitesDosSlides(slide, o).join()).toMatch(/passou 2 palavras/);
+    expect(verificarLimitesDosSlides(slide, tolera)).toEqual([]);
+    expect(slidesComExcessoPequeno(slide, o)).toEqual([1]);
+    expect(verificarLimitesDosSlides([s("passo", { texto: palavras(33) })], tolera)).toEqual([]);
+  });
+  it("4 palavras a mais, ou caracteres demais, continuam reprovando", () => {
+    expect(verificarLimitesDosSlides([s("passo", { texto: palavras(34) })], tolera).join()).toMatch(/passou 4 palavras/);
+    expect(verificarLimitesDosSlides([s("passo", { titulo: "x".repeat(58) })], tolera).join()).toMatch(/passou 10 caracteres/);
+    expect(verificarLimitesDosSlides([s("passo", { titulo: "x".repeat(57) })], tolera)).toEqual([]);
+    expect(slidesComExcessoPequeno([s("passo", { texto: palavras(34) })], o)).toEqual([]);
+  });
+  it("a linha do resumo até 20% acima passa; mais que isso, a quantidade de itens e o valor do dado não", () => {
+    expect(verificarLimitesDosSlides([s("resumo", { linhas: ["a", "b", "x".repeat(54)] })], tolera)).toEqual([]);
+    expect(verificarLimitesDosSlides([s("resumo", { linhas: ["a", "b", "x".repeat(55)] })], tolera).join()).toMatch(/linhas 3/);
+    expect(verificarLimitesDosSlides([s("resumo", { linhas: ["a", "b"] })], tolera).join()).toMatch(/tem 2 itens/);
+    expect(verificarLimitesDosSlides([s("dado", { valor: "1234567" })], tolera).join()).toMatch(/valor/);
+  });
+  it("o excesso pequeno não leva junto o que continua reprovando (vazio, fonte, ano, saúde, ordem do tipo)", () => {
+    expect(verificarLimitesDosSlides([s("item", { texto: "" })], tolera).join()).toMatch(/sem texto/);
+    expect(verificarLimitesDosSlides([s("dado", { fonte: null })], tolera).join()).toMatch(/sem a fonte/);
+    expect(verificarLimitesDosSlides([s("passo", { texto: `${palavras(31)} garantido` })], { ramoSaude: true, tolerarExcessoPequeno: true }).join()).toMatch(/prometer/);
+    expect(verificarLimitesDosSlides([s("prova-fala")], { ramoSaude: true, tolerarExcessoPequeno: true }).join()).toMatch(/saúde/);
   });
 });
 
