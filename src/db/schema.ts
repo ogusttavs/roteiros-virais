@@ -3398,3 +3398,46 @@ export const animacoes = pgTable(
   ],
 );
 export type Animacao = typeof animacoes.$inferSelect;
+
+/**
+ * Convite de grupo (27/11/2026): um link de uso único que o admin gera para um dono de varias empresas (o Leandro e as clinicas dele). Só o hash do código fica aqui (o código vai no link,
+ * mostrado uma vez). Quem abre o link cria a conta e a primeira empresa, no ramo (`nichoId`) do convite; depois cria outras até `marcasMax`. `cortesia` é a das marcas que nascem dele.
+ * Sem cadastro próprio: estas marcas não entram em `cadastros_proprios` (sem teto de teste, sem faxina de 7 dias).
+ */
+export const convitesDeGrupo = pgTable(
+  "convites_de_grupo",
+  {
+    id: id(),
+    codigoHash: text("codigo_hash").notNull().unique(),
+    rotulo: text("rotulo").notNull(),
+    nichoId: integer("nicho_id")
+      .notNull()
+      .references(() => nichos.id),
+    marcasMax: integer("marcas_max").notNull().default(5),
+    cortesia: boolean("cortesia").notNull().default(true),
+    expiraEm: timestamp("expira_em", { withTimezone: true }).notNull(),
+    usadoPor: text("usado_por").references(() => user.id, { onDelete: "set null" }),
+    usadoEm: timestamp("usado_em", { withTimezone: true }),
+    desativadoEm: timestamp("desativado_em", { withTimezone: true }),
+    criadoEm: criadoEm(),
+  },
+  () => [],
+);
+
+/** As empresas (marcas) que nasceram de um convite de grupo: é por esta tabela que o dono pode criar outras e dar acesso à equipe. */
+export const marcasDoGrupo = pgTable(
+  "marcas_do_grupo",
+  {
+    clienteId: integer("cliente_id")
+      .primaryKey()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    conviteId: integer("convite_id")
+      .notNull()
+      .references(() => convitesDeGrupo.id, { onDelete: "cascade" }),
+    usuarioId: text("usuario_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("marcas_do_grupo_usuario_id").on(t.usuarioId)],
+);
