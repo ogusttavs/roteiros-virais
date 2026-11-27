@@ -181,6 +181,7 @@ async function gastoDeIADeHojeEmReais(inicioDoDia: Date): Promise<number> {
 async function resumirOuNulo(noticia: NoticiaDeFeed, assunto: AssuntoDaMarca): Promise<string | null> {
   try {
     const resultado = await gerarEstruturado({
+      clienteId: assunto.clienteId,
       tarefa: "resumirNoticia",
       nivel: resumirNoticiaIA.nivel,
       effort: resumirNoticiaIA.esforco,

@@ -197,7 +197,7 @@ describe("o roteiro do tema do momento", () => {
     expect((await cartaoEmAltaDaMarca(await clienteDaMarca(), hojeISO()))?.roteiro).toEqual({ id: roteiro.id, status: "gerado" });
     expect(await roteiroDoMomentoDeHoje(clienteId, hojeISO(), roteiro.temaDoMomento!.chave)).toEqual({ id: roteiro.id, status: "gerado", arquivado: false });
 
-    await arquivarRoteiro(roteiro.id);
+    await arquivarRoteiro(roteiro.id, roteiro.clienteId);
     // Arquivar é a saída do assunto do momento: o cartão não volta a oferecer o mesmo assunto no mesmo dia.
     expect(await cartaoEmAltaDaMarca(await clienteDaMarca(), hojeISO())).toBeNull();
     expect((await roteiroDoMomentoDeHoje(clienteId, hojeISO(), roteiro.temaDoMomento!.chave))?.arquivado).toBe(true);
@@ -206,7 +206,7 @@ describe("o roteiro do tema do momento", () => {
   it("a reescrita (Não gostei, quero outro) continua sendo do momento: guarda o mesmo assunto e pede de novo o formato fácil de gravar hoje", async () => {
     const indice = await prepararTemaDoMomento();
     const primeiro = await gerarRoteiro(clienteId, { origem: "sugerido", temaIndice: indice, objetivo: "alcance" });
-    const nova = await reprovarERescrever(primeiro.id, ["gancho_fraco"]);
+    const nova = await reprovarERescrever(primeiro.id, primeiro.clienteId, ["gancho_fraco"]);
 
     expect(nova.versaoDe).toBe(primeiro.id);
     expect(nova.temaDoMomento).toEqual(primeiro.temaDoMomento);
@@ -221,8 +221,8 @@ describe("o roteiro do tema do momento", () => {
   it("com três versões da série, só a ponta aparece: a v2 reprovada não fica na agenda ao lado do cartão, e arquivar a ponta tira o assunto do dia", async () => {
     const indice = await prepararTemaDoMomento();
     const v1 = await gerarRoteiro(clienteId, { origem: "sugerido", temaIndice: indice, objetivo: "alcance" });
-    const v2 = await reprovarERescrever(v1.id, ["gancho_fraco"]);
-    const v3 = await reprovarERescrever(v2.id, ["gancho_fraco"]);
+    const v2 = await reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"]);
+    const v3 = await reprovarERescrever(v2.id, v2.clienteId, ["gancho_fraco"]);
     // As três apontam `versaoDe` para a raiz (v1): "ninguém aponta para este id" deixava a v2 de pé ao lado da v3.
     expect([v2.versaoDe, v3.versaoDe]).toEqual([v1.id, v1.id]);
 
@@ -231,7 +231,7 @@ describe("o roteiro do tema do momento", () => {
     expect(agenda.reels.map((item) => item.id)).toEqual([v3.id]);
     expect((await roteiroDoMomentoDeHoje(clienteId, hojeISO(), v1.temaDoMomento!.chave))?.id).toBe(v3.id);
 
-    await arquivarRoteiro(v3.id);
+    await arquivarRoteiro(v3.id, v3.clienteId);
     expect((await agendaDoDia(clienteId, hojeISO())).reels).toEqual([]);
   });
 
@@ -240,11 +240,11 @@ describe("o roteiro do tema do momento", () => {
     const roteiro = await gerarRoteiro(clienteId, { origem: "sugerido", temaIndice: indice, objetivo: "alcance" });
     const amanha = new Date(Date.now() + 24 * HORA).toISOString().slice(0, 10);
 
-    await expect(mudarDataRoteiro(roteiro.id, amanha)).rejects.toThrow(textosHoje.emAlta.naoMudaDeDia);
-    await expect(mudarDataRoteiro(roteiro.id, amanha)).rejects.toBeInstanceOf(ErroRoteiro);
+    await expect(mudarDataRoteiro(roteiro.id, roteiro.clienteId, amanha)).rejects.toThrow(textosHoje.emAlta.naoMudaDeDia);
+    await expect(mudarDataRoteiro(roteiro.id, roteiro.clienteId, amanha)).rejects.toBeInstanceOf(ErroRoteiro);
     const [depois] = await db().select({ data: roteiros.data }).from(roteiros).where(eq(roteiros.id, roteiro.id));
     expect(depois.data).toBe(hojeISO());
-    await mudarDataRoteiro(roteiro.id, hojeISO());
+    await mudarDataRoteiro(roteiro.id, roteiro.clienteId, hojeISO());
   });
 
   it("o roteiro de um tema comum muda de dia como sempre", async () => {
@@ -253,7 +253,7 @@ describe("o roteiro do tema do momento", () => {
     if (resultado.status !== "ok") throw new Error("sem tema");
     const roteiro = await gerarRoteiro(clienteId, { origem: "sugerido", temaIndice: resultado.temas.findIndex((t) => !t.doMomento), objetivo: "alcance" });
     const amanha = new Date(Date.now() + 24 * HORA).toISOString().slice(0, 10);
-    await mudarDataRoteiro(roteiro.id, amanha);
+    await mudarDataRoteiro(roteiro.id, roteiro.clienteId, amanha);
     const [depois] = await db().select({ data: roteiros.data }).from(roteiros).where(and(eq(roteiros.id, roteiro.id)));
     expect(depois.data).toBe(amanha);
   });

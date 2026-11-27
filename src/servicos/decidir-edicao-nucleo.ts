@@ -41,6 +41,8 @@ export type EntradaDoNucleo = {
   /** Chamado quando uma decisão passa nas conferências do código e antes do verificador: o job guarda para poder retomar. */
   aoPassarNoCodigo?: (decisao: DecisaoDaEdicao, resultado: ResultadoDaEdicao) => Promise<void>;
   agora: Date;
+  /** A marca da edição: as chamadas ao modelo passam pelo freio de gasto dela (`ia/freio.ts`). O golden set roda sem marca. */
+  clienteId?: number;
 };
 
 export type SaidaDoNucleo = {
@@ -68,6 +70,7 @@ export async function decidirEVerificar(entrada: EntradaDoNucleo): Promise<Saida
     } else {
       decisao = await chamar<DecisaoDaEdicao>("decidirEdicao", decidirIA.versao, decidirIA.nivel, { tentativa: n, palavras: palavras.length }, () =>
         gerarEstruturado({
+          clienteId: entrada.clienteId,
           tarefa: "decidirEdicao",
           nivel: decidirIA.nivel,
           effort: decidirIA.esforco,
@@ -103,6 +106,7 @@ export async function decidirEVerificar(entrada: EntradaDoNucleo): Promise<Saida
     if (entrada.aoPassarNoCodigo) await entrada.aoPassarNoCodigo(decisao, resultado);
     const verificacao = await chamar<verificarIA.SaidaVerificarEdicao>("verificarEdicao", verificarIA.versao, verificarIA.nivel, { tentativa: n }, () =>
       gerarEstruturado({
+        clienteId: entrada.clienteId,
         tarefa: "verificarEdicao",
         nivel: verificarIA.nivel,
         effort: verificarIA.esforco,

@@ -98,9 +98,13 @@ export type CamposMomento = { onde: string; oQueEstaAcontecendo: string; oQueDaP
  * A tarefa `lerMomento` (barata, sem verificador, mesmo espírito de
  * `classificarAbertura`, ver `ia/prompts/lerMomento.ts`): separa o texto
  * (falado ou digitado) nos três campos da folha.
+ *
+ * `clienteId` (achado A4 da auditoria de 26/11/2026): a marca de quem pediu. Com ela a chamada passa pelo freio de gasto
+ * (`ia/freio.ts`) e o custo conta para a marca; antes a leitura não levava marca e ficava fora da conta do freio.
  */
-export async function lerMomentoDeTexto(texto: string): Promise<CamposMomento> {
+export async function lerMomentoDeTexto(texto: string, clienteId?: number): Promise<CamposMomento> {
   const resultado = await gerarEstruturado({
+    clienteId,
     tarefa: "lerMomento",
     nivel: lerMomentoIA.nivel,
     effort: lerMomentoIA.esforco,
@@ -114,6 +118,7 @@ export async function lerMomentoDeTexto(texto: string): Promise<CamposMomento> {
     versaoPrompt: lerMomentoIA.versao,
     modelo: resultado.modelo,
     nivel: lerMomentoIA.nivel,
+    clienteId,
     entradas: { texto },
     saida: resultado.dados,
     uso: {

@@ -92,9 +92,9 @@ describe("a regra nos prompts do roteiro curto, do longo e do carrossel", () => 
   const baseCarrossel = { perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio" as const, ramoSaude: false };
 
   it("as versões dos três prompts subiram", () => {
-    expect(roteiro.versao).toBe("2.27.0");
-    expect(roteiroLongo.versao).toBe("1.9.0");
-    expect(carrossel.versao).toBe("2.3.0");
+    expect(roteiro.versao).toBe("2.30.0");
+    expect(roteiroLongo.versao).toBe("1.12.0");
+    expect(carrossel.versao).toBe("2.4.0");
   });
 
   it("marca de um país só (sem o campo): o sistema é o de antes, igual com nulo e com só português, e termina na linha de acentuação", () => {

@@ -322,19 +322,26 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * título do bloco diz que ela manda no assunto e no público. Sem foco confirmado o bloco é o da 2.23.0, palavra por palavra, fora o título. O schema de saída não muda.
  */
 /**
+ * 2.28.0 (ajustes da segunda opinião sobre a onda 2, 26/11/2026): o bloco de regras de texto (gerado da seção 11 das rubricas 1.6.0) muda três regras da 2.27.0. `R-ROTEIRO-21`: a lente deixa de ser obrigatória em dica, tutorial ou opinião (só a 3 ou nenhuma), a lente 5 fala com quem assiste na segunda pessoa ("você talvez ache que...", nunca "todo mundo acha") e, em saúde, o desfecho das lentes de virada é a decisão ou o cuidado, nunca o resultado clínico. `R-COPY-30`: em saúde, o caso é a dúvida do paciente ou a cena do atendimento, nunca número de resultado nem prazo. `R-COPY-31`: a ponte não repete o elemento do ramo que o gancho já tem por `R-COPY-27`, e em saúde a pessoa pública entra só pelo assunto. O detector da `R-COPY-26` só conta "olha" e "olha só" no começo do bloco com pontuação logo depois. O schema de saída não muda. Precisa de prova com chave real.
+ */
+/**
+ * 2.27.0 (onda 2 de texto, 26/11/2026, decisão do Gustavo: os roteiros saíam "meio genéricos", por exemplo a analogia de filme de super-herói com a página de produto, sem cliente, número nem cena): o bloco de regras de texto (`regras-copy-roteiro-uso.ts`, gerado da seção 11 das rubricas 1.5.0) ganha `R-COPY-30` (o corpo tem um caso concreto, ou um colchete para a pessoa completar), `R-COPY-31` (o gancho de fora do ramo tem a ponte no corpo, com fato da marca) e `R-ROTEIRO-21` (uma lente narrativa só, do gancho ao fechamento, entre seis). O detector da `R-COPY-26` ganha duas famílias (muleta de abertura de bloco e fecho com pergunta de confirmação), que reprovam na 1ª tentativa e avisam na 2ª. O schema de saída não muda. Precisa de prova com chave real.
+ */
+/**
  * 2.26.0 (25/11/2026, decisão do Gustavo "faz o que o conselho falou"): a regra dura 1 ganha, para os ramos de saúde, a cena que prova (consultório, equipe, equipamento, explicação, resultado final com autorização) e proíbe sugerir gravar o procedimento em andamento. A `R-CONF-07` das regras 1.4.0 passa a proibir preço e serviço grátis em saúde. O schema não muda. Precisa de prova com chave real.
  */
 /**
  * 2.25.0 (onda 1 de texto, 25/11/2026): o bloco de regras de texto (`regras-copy-roteiro-uso.ts`, gerado da seção 11 das rubricas 1.3.0) ganha `R-COPY-26` (nenhuma fórmula de texto de máquina) e `R-COPY-27`
  * (o título e o gancho têm um elemento só desta marca ou deste ramo), e `R-COPY-19` passa a pedir o contraste só com os dois lados em fatos. O schema de saída não muda. Precisa de prova com chave real.
  */
+/** 2.29.0 (27/11/2026, consertos da prova com chave da onda 2): o bloco de regras de texto traz a nota de saúde (como `R-COPY-08` e `R-COPY-30` se cumprem juntas) e proíbe colchete no gancho. */
 /**
- * 2.27.0 (E76 PR 3, 26/11/2026, a estratégia de idioma): a marca que fala com mais de um país e escolheu como misturar os idiomas recebe, perto do
+ * 2.30.0 (E76 PR 3, 26/11/2026, a estratégia de idioma): a marca que fala com mais de um país e escolheu como misturar os idiomas recebe, perto do
  * fim do sistema, a regra de idioma (`blocoDoIdioma`, `prompts/idioma.ts`): o idioma principal, e o segundo do jeito escolhido, sem dobrar a fala.
  * A linha final de acentuação e o lembrete do fim da entrada passam a valer só para o que fica em português (`linhaFinalDoIdioma`,
- * `lembreteDoIdioma`). Sem a estratégia (marca de um país só, ou "só português"), o sistema é o da 2.26.0, palavra por palavra. O schema não muda.
+ * `lembreteDoIdioma`). Sem a estratégia (marca de um país só, ou "só português"), o sistema é o da 2.29.0, palavra por palavra. O schema não muda.
  */
-export const versao = "2.27.0";
+export const versao = "2.30.0";
 
 /** A última linha do sistema estável quando a marca não tem outro idioma (a de sempre). */
 const LINHA_FINAL_DO_SISTEMA = `Escreva em português do Brasil, com acentuação correta. O que o cliente escreveu no perfil ou
@@ -507,7 +514,7 @@ export function montarSistemaEstavel(dados: {
   duracaoTipicaMaxS?: number;
   /**
    * E76 PR 3: a estratégia de idioma da marca de mais de um país, já resolvida por `estrategiaDaMarca` (nula em marca de um país só). Sem ela,
-   * ou com "só português", o sistema é o da 2.26.0, palavra por palavra.
+   * ou com "só português", o sistema é o da 2.29.0, palavra por palavra.
    */
   estrategiaIdioma?: EstrategiaIdioma | null;
 }): string {

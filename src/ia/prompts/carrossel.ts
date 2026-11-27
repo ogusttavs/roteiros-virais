@@ -14,14 +14,15 @@ import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, 
  * do ramo, a evidência do banco, as regras de copy e de conformidade); o que muda é a forma. Quem confere o resultado é `carrossel/regras.ts` (limites por tipo, ordem, números e fonte) mais o verificador
  * de texto de sempre (`gerarComVerificacao`). A foto de cada slide é do cliente, enviada por ele; o texto só diz onde uma foto faria sentido, nunca descreve uma imagem para gerar.
  */
+/** 2.3.0 (27/11/2026, consertos da prova com chave da onda 2): o bloco de regras de texto traz a nota de saúde (como `R-COPY-08` e `R-COPY-30` se cumprem juntas) e proíbe colchete no gancho e, no escopo "semfala", deixa de trazer `R-COPY-30` e `R-COPY-31`. */
 /**
- * 2.3.0 (E76 PR 3, 26/11/2026, a estratégia de idioma): a marca de mais de um país que escolheu como misturar os idiomas recebe a regra de idioma
+ * 2.4.0 (E76 PR 3, 26/11/2026, a estratégia de idioma): a marca de mais de um país que escolheu como misturar os idiomas recebe a regra de idioma
  * do carrossel (`blocoDoIdioma`, peça "carrossel": os slides no principal, porque o limite de cada campo não comporta dois idiomas; o segundo vai na
  * legenda e nas hashtags, do jeito escolhido), e a linha final e o lembrete passam a valer só para o que fica em português. A regra 3 deixa de
  * dizer "em português simples" e troca "Escreva sempre acentuado" por "O que for em português sai acentuado" nesse caso. Sem a estratégia, o
  * sistema é o da 2.2.0, palavra por palavra. O schema não muda.
  */
-export const versao = "2.3.0";
+export const versao = "2.4.0";
 
 /** A última linha do sistema estável quando a marca não tem outro idioma (a de sempre). */
 const LINHA_FINAL_DO_SISTEMA =
@@ -110,7 +111,7 @@ export function montarSistemaEstavel(dados: {
   persona?: Persona;
   quemAparece?: QuemGrava;
   ramoSaude: boolean;
-  /** E76 PR 3: a estratégia de idioma já resolvida por `estrategiaDaMarca` (nula em marca de um país só); sem ela o sistema é o da 2.2.0. */
+  /** E76 PR 3: a estratégia de idioma já resolvida por `estrategiaDaMarca` (nula em marca de um país só); sem ela o sistema é o da 2.3.0. */
   estrategiaIdioma?: EstrategiaIdioma | null;
 }): string {
   // E76 PR 3: sem outro idioma, `blocoDoIdioma` é nulo e o fim do sistema é a linha de sempre.
@@ -152,7 +153,7 @@ A legenda é o texto do post: até ${LIMITE_DA_LEGENDA_PALAVRAS} palavras, em co
 
 Quando a entrada trouxer evidência (vídeos de outras pessoas que renderam bem), use só o JEITO de contar (a ordem, o tipo de promessa, a forma de abrir), nunca o assunto deles como fato do cliente, e devolva em evidencias os ids que de fato usou. Sem evidência, devolva evidencias vazio e não cite nenhum id.
 
-${textoRegrasCopyRoteiro("longo")}
+${textoRegrasCopyRoteiro("semfala")}
 Neste carrossel, onde as regras de texto falam de fala, gancho e chamada, valem para o texto dos slides: o gancho é a capa, a chamada final é o último slide.
 
 Perfil do cliente:

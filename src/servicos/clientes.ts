@@ -15,6 +15,7 @@ import {
   clientes,
   contextoMarca,
   contextoMarcaItens,
+  convitesDeGrupo,
   membrosMarca,
   nichos,
   preferenciasUsuario,
@@ -320,7 +321,7 @@ export const NOME_SEM_NOME_AINDA = "Sem nome ainda";
  * (insert direto, nao `auth.api.createUser`, que nao aceita senha pronta
  * fora do fluxo de signup completo).
  */
-async function criarUsuarioComSenhaGerada(email: string, nome: string): Promise<{ usuarioId: string; senha: string }> {
+export async function criarUsuarioComSenhaGerada(email: string, nome: string): Promise<{ usuarioId: string; senha: string }> {
   const usuarioId = randomUUID();
   const senha = gerarSenhaLegivel();
   await db()
@@ -502,6 +503,26 @@ export async function mudarTipoMarca(clienteId: number, tipo: TipoMarca): Promis
 export type ResultadoDarAcesso = { tipo: "jaTinhaLogin"; nome: string } | { tipo: "convite"; senha: string };
 
 /**
+ * A conta existe, mas quem a criou escolheu a senha sem provar que o e-mail é dele? Vale para o cadastro sozinho (`cadastros_proprios`) e para quem abriu o link de um convite de grupo
+ * (`convites_de_grupo.usado_por`), os dois com e-mail ainda não confirmado. Dar marca a uma conta assim entregaria a marca a quem fez o cadastro (qualquer um cadastra qualquer e-mail).
+ * As contas de "Dar acesso" ficam de fora: a senha delas é provisória e ninguém a conhece.
+ */
+export async function emailNaoConfirmadoDeConta(usuarioId: string): Promise<boolean> {
+  const [proprio] = await db()
+    .select({ confirmado: user.emailVerified })
+    .from(cadastrosProprios)
+    .innerJoin(user, eq(user.id, cadastrosProprios.usuarioId))
+    .where(eq(cadastrosProprios.usuarioId, usuarioId));
+  if (proprio && !proprio.confirmado) return true;
+  const [convite] = await db()
+    .select({ confirmado: user.emailVerified })
+    .from(convitesDeGrupo)
+    .innerJoin(user, eq(user.id, convitesDeGrupo.usadoPor))
+    .where(eq(convitesDeGrupo.usadoPor, usuarioId));
+  return Boolean(convite && !convite.confirmado);
+}
+
+/**
  * "Dar acesso" a uma marca (V3, item 5, AdminCliente.dc.html; V12b, item 2:
  * agora tambem o jeito de a primeira pessoa entrar numa marca criada sem
  * ninguem). Quem ja entra no painel ganha a marca na hora, sem senha nova,
@@ -519,12 +540,7 @@ export async function darAcesso(clienteId: number, nome: string, email: string):
   if (usuarioExistente) {
     // E63: quem criou conta sozinho e ainda não confirmou o e-mail pode não ser o dono dele (qualquer um cadastra qualquer e-mail, com a senha que quiser). Dar a marca a essa
     // conta entregaria a marca a quem fez o cadastro. Só depois de confirmar.
-    const [proprio] = await db()
-      .select({ confirmado: user.emailVerified })
-      .from(cadastrosProprios)
-      .innerJoin(user, eq(user.id, cadastrosProprios.usuarioId))
-      .where(eq(cadastrosProprios.usuarioId, usuarioExistente.id));
-    if (proprio && !proprio.confirmado) throw new ErroCliente(textosCadastro.adminEmailNaoConfirmado);
+    if (await emailNaoConfirmadoDeConta(usuarioExistente.id)) throw new ErroCliente(textosCadastro.adminEmailNaoConfirmado);
     const [jaMembro] = await db()
       .select({ id: membrosMarca.id })
       .from(membrosMarca)

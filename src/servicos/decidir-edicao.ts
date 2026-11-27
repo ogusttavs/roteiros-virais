@@ -142,6 +142,7 @@ async function decidir(edicao: Edicao, agora: Date, deps: DepsDaDecisao): Promis
   const energia = energiaDoBanco(edicao.energia);
 
   const saida = await decidirEVerificar({
+    clienteId: edicao.clienteId,
     palavras,
     energia,
     duracaoS: edicao.duracaoS === null ? energia.duracao : Number(edicao.duracaoS),

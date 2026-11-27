@@ -218,7 +218,7 @@ export async function marcarAchados(clienteId: number, pesquisaId: number, ids: 
   const pesquisa = await lerPesquisa(clienteId, pesquisaId);
   if (!pesquisa || pesquisa.status !== "pronta") throw new ErroPesquisa("Essa pesquisa não está pronta para marcar.");
   const marcados = pesquisa.achados.map((a) => a.id).filter((id) => ids.includes(id));
-  await db().update(pesquisasNaHora).set({ selecionados: marcados }).where(eq(pesquisasNaHora.id, pesquisa.id));
+  await db().update(pesquisasNaHora).set({ selecionados: marcados }).where(and(eq(pesquisasNaHora.id, pesquisa.id), eq(pesquisasNaHora.clienteId, clienteId)));
   return marcados;
 }
 
@@ -228,7 +228,7 @@ export async function registrarPosicao(clienteId: number, pesquisaId: number, po
   if (!pesquisa) throw new ErroPesquisa("Pesquisa não encontrada.");
   const texto = limparParaPrompt(typeof posicao === "string" ? posicao : "", 300);
   if (texto === "") throw new ErroPesquisa('Diga qual é a sua posição, ou escolha "Prefiro não dar opinião".');
-  await db().update(pesquisasNaHora).set({ posicaoDaPessoa: texto }).where(eq(pesquisasNaHora.id, pesquisa.id));
+  await db().update(pesquisasNaHora).set({ posicaoDaPessoa: texto }).where(and(eq(pesquisasNaHora.id, pesquisa.id), eq(pesquisasNaHora.clienteId, clienteId)));
 }
 
 /**
@@ -258,7 +258,7 @@ export async function decidirPremissa(clienteId: number, pesquisaId: number, dec
   if (!DECISOES.includes(decisao)) throw new ErroPesquisa("Não entendemos a sua escolha.");
   const pesquisa = await lerPesquisa(clienteId, pesquisaId);
   if (!pesquisa || pesquisa.premissa?.situacao !== "nao_confere") throw new ErroPesquisa("Essa pesquisa não tem um aviso para você decidir.");
-  await db().update(pesquisasNaHora).set({ decisaoDaPremissa: decisao }).where(eq(pesquisasNaHora.id, pesquisa.id));
+  await db().update(pesquisasNaHora).set({ decisaoDaPremissa: decisao }).where(and(eq(pesquisasNaHora.id, pesquisa.id), eq(pesquisasNaHora.clienteId, clienteId)));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -391,7 +391,7 @@ export async function confirmarPesquisa(clienteId: number, pesquisaId: number, c
     await decidirPremissa(clienteId, pesquisaId, confirmacao.decisao ?? "fontes");
   }
   if (posicao !== "") await registrarPosicao(clienteId, pesquisaId, posicao);
-  await db().update(pesquisasNaHora).set({ confirmadaEm: new Date() }).where(eq(pesquisasNaHora.id, pesquisaId));
+  await db().update(pesquisasNaHora).set({ confirmadaEm: new Date() }).where(and(eq(pesquisasNaHora.id, pesquisaId), eq(pesquisasNaHora.clienteId, clienteId)));
   return { destino: pesquisa.destino ?? null };
 }
 
@@ -516,6 +516,7 @@ export async function executarPesquisa(pesquisaId: number, deps: DepsDaPesquisa 
         entrada: pesquisaIA.montarEntrada({ pedido: pesquisa.pedido, tema: pesquisa.tema, hoje: hojePorExtenso(agora) }),
         maxBuscas,
         dominios: dominiosPermitidos(),
+        clienteId: pesquisa.clienteId,
       });
     } catch (erro) {
       if (erro instanceof ErroDaBusca && (erro.usoParcial.buscasNaWeb ?? 0) > 0) {
@@ -564,6 +565,7 @@ export async function executarPesquisa(pesquisaId: number, deps: DepsDaPesquisa 
     try {
       const t0 = Date.now();
       const resultado = await gerarEstruturado({
+        clienteId: pesquisa.clienteId,
         tarefa: "conferirPremissa",
         nivel: conferirPremissaIA.nivel,
         effort: conferirPremissaIA.esforco,

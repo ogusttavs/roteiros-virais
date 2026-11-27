@@ -230,6 +230,7 @@ async function escreverMarcas(clienteId: number, roteiroId: number): Promise<Res
   for (let tentativa = 1; tentativa <= 2 && pendentes.length > 0; tentativa += 1) {
     const inicio = Date.now();
     const saida = await gerarEstruturado({
+      clienteId: clienteId,
       tarefa: "marcarFala",
       nivel: marcarIA.nivel,
       effort: marcarIA.esforco,

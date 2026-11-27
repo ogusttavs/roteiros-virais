@@ -659,7 +659,6 @@ function verificarCartoesSemFala(
 
 export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   versaoPrompt: string;
-  clienteId?: number;
   proibicoes?: string[];
   exigeEvidencia?: boolean;
   /** Os ids que entraram na entrada, para o verificador reprovar qualquer id citado fora daqui. */
@@ -849,6 +848,7 @@ async function repararOQueSobrou<T>(
     const campos = params.extrairCampos(atual.dados);
     const inicio = Date.now();
     const resposta = await gerarEstruturado({
+      clienteId: params.clienteId,
       tarefa: "repararFato",
       nivel: repararFato.nivel,
       effort: repararFato.esforco,
@@ -998,6 +998,7 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
     // 1.9.0: com a conferência de fato (com fontes), as instruções de gravação e de edição vão num bloco à parte, que o critério manda nunca conferir como fato (`montarTextoParaConferir`).
     const textoJunto = verificarTexto.montarTextoParaConferir(campos, Boolean(params.fontesDosFatos));
     const verificacao = await gerarEstruturado({
+      clienteId: params.clienteId,
       tarefa: "verificarTexto",
       nivel: verificarTexto.nivel,
       effort: verificarTexto.esforco,
@@ -1011,6 +1012,10 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
         fontes: params.citarProibicaoVale && params.fontesDosFatos ? verificarTexto.fontesSemProibicoes(params.fontesDosFatos) : params.fontesDosFatos,
       }),
     });
+    // 1.11.0: o caso recontado com outras palavras, apoiado por uma frase que as fontes trazem de fato, não reprova (`fatoApoiadoPelasFontes`); o aprovado vale também para o registro abaixo.
+    if (!verificacao.dados.aprovado && verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDosFatos)) {
+      verificacao.dados = { ...verificacao.dados, aprovado: true, motivo: null };
+    }
     aprovado = verificacao.dados.aprovado;
     // Reprovando por fato, o motivo carrega o fato e a frase mais próxima das fontes (`motivoDaConferencia`): é o que a segunda tentativa recebe para corrigir.
     motivos = verificacao.dados.aprovado ? [] : [verificarTexto.motivoDaConferencia(verificacao.dados)];

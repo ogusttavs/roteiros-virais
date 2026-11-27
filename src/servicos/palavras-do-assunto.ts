@@ -106,6 +106,7 @@ export async function sugerirPalavrasDoAssunto(clienteId: number, textoDigitado:
   let saida;
   try {
     saida = await gerarEstruturado({
+      clienteId: clienteId,
       tarefa: "sugerirPalavrasDoAssunto",
       nivel: sugerirIA.nivel,
       effort: sugerirIA.esforco,

@@ -20,6 +20,7 @@ import { config } from "@/lib/config";
 import { anthropic, traduzirErro } from "./cliente";
 import { type CausaDoErroIA, ErroIA } from "./erro";
 import { registrarFalhaDaIA } from "./falha-da-ia";
+import { comFreioDeGasto } from "./freio";
 import { buscaSimulada } from "./mock-busca";
 import type { UsoTokens } from "./registro";
 
@@ -52,6 +53,8 @@ export type ParametrosDaBusca = {
   maxBuscas: number;
   /** `allowed_domains`: só estes (e os subdomínios deles) chegam ao modelo. */
   dominios: string[];
+  /** A marca que paga a pesquisa: com ela a busca passa pelo freio de gasto (`freio.ts`, achado A4 da auditoria de 26/11/2026), como `gerarEstruturado`. */
+  clienteId?: number;
 };
 
 /** Uma resposta do SDK, no que importa aqui (estrutural, para o leitor puro rodar com fixtures sem importar o SDK). */
@@ -149,6 +152,10 @@ const OPCOES_DA_REQUISICAO = { maxRetries: 0, timeout: 120_000 };
  * e uma resposta que não terminou (pausa sem fim, texto cortado, recusa) é erro, não "sem dado".
  */
 export async function buscarNaWeb(params: ParametrosDaBusca): Promise<RespostaDaBusca> {
+  return comFreioDeGasto(params.clienteId, "pesquisaNaHora", () => buscarSemFreio(params));
+}
+
+async function buscarSemFreio(params: ParametrosDaBusca): Promise<RespostaDaBusca> {
   if (config.ia.provedor === "mock") return buscaSimulada(params);
 
   let mensagens: MessageParam[] = [{ role: "user", content: params.entrada.toWellFormed() }];

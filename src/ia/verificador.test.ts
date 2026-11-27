@@ -1231,6 +1231,32 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
       expect(entradaDoVerificador()).toContain("O Uli está aqui do meu lado.");
     });
 
+    it("1.11.0: reprovado por fato, mas a frase citada está nas fontes e o fato a reconta: aprova (paráfrase)", async () => {
+      const FONTES = "Caso: uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer.";
+      const texto = { corpo: "Uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer." };
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce({
+          dados: { aprovado: false, motivo: "fato sem apoio", fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer", fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer" },
+          modelo: "mock",
+          ...usoZero,
+        });
+      const ok = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: FONTES });
+      expect(ok.dados).toEqual(texto);
+      expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("1.11.0: fato novo, com 'nenhuma' como fonte mais próxima, reprova como antes", async () => {
+      const novo = { corpo: "O Uli está aqui do meu lado com a mochila." };
+      const reprovado = { dados: { aprovado: false, motivo: "fato sem apoio", fatoEspecifico: "o Uli está do meu lado", fonteMaisProxima: "nenhuma" }, modelo: "mock", ...usoZero };
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({ dados: novo, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce(reprovado)
+        .mockResolvedValueOnce({ dados: novo, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce(reprovado);
+      await expect(gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: "Perfil: lavagem de sofá" })).rejects.toThrow();
+    });
+
     it("sem as fontes dos fatos, o texto vai ao verificador como veio", async () => {
       gerarEstruturadoMock
         .mockResolvedValueOnce({ dados: { corpo: COM_COLCHETE }, modelo: "mock", ...usoZero })

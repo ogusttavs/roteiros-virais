@@ -78,11 +78,12 @@ function chavesComPorQue(contexto: Contexto | null, chaves: string[]): string[] 
 }
 
 /** "Ver os porquês" / "Fechar os porquês", no alto do roteiro; não aparece sem nenhum por quê. */
-export function VerOsPorques({ className }: { className?: string }) {
+export function VerOsPorques({ className, icone }: { className?: string; /** O ícone antes do texto, quando o botão fica numa linha de ações com outros (T112). */ icone?: ReactNode }) {
   const contexto = usePorQues();
   if (!contexto?.existe) return null;
   return (
     <button type="button" className={[styles.verTodos, className].filter(Boolean).join(" ")} onClick={contexto.alternarTodos} aria-pressed={contexto.todosAbertos} data-ver-os-porques="">
+      {icone}
       {contexto.todosAbertos ? textosRoteiro.porQue.fecharOsPorques : textosRoteiro.porQue.verOsPorques}
     </button>
   );

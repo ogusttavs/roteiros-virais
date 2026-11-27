@@ -90,7 +90,7 @@ export async function registrarAberturaDeNoticia(clienteId: number, noticiaId: n
     .where(and(eq(noticiasDoAssunto.id, noticiaId), eq(assuntosDaMarca.clienteId, clienteId)));
   if (!linha) throw new ErroAssunto("essa notícia não é desta marca.");
   await db().update(noticiasDoAssunto).set({ abertaEm: agora }).where(eq(noticiasDoAssunto.id, noticiaId));
-  await db().update(assuntosDaMarca).set({ ultimoAbertoEm: agora }).where(eq(assuntosDaMarca.id, linha.assuntoId));
+  await db().update(assuntosDaMarca).set({ ultimoAbertoEm: agora }).where(and(eq(assuntosDaMarca.id, linha.assuntoId), eq(assuntosDaMarca.clienteId, clienteId)));
 }
 
 /** A notícia de um assunto DESTA marca (nunca a de outra), para virar o ponto de partida de um roteiro; nula se não for dela ou não existir mais. */

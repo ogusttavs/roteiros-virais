@@ -11,13 +11,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, contas, membrosMarca, nichos, roteiros, user, videos, type PerfilCompilado } from "@/db/schema";
+import { briefings, clientes, contas, geracoesIA, membrosMarca, nichos, roteiros, user, videos, type PerfilCompilado } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado } from "@/servicos/clientes";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
-import { gerarRoteiroMomentoAction } from "../../src/app/(painel)/(completo)/hoje/momento/acoes";
+import { gerarRoteiroMomentoAction, lerMomentoDeTextoAction } from "../../src/app/(painel)/(completo)/hoje/momento/acoes";
 
 const PERFIL: PerfilCompilado = {
   fatos: {
@@ -249,5 +249,16 @@ describe("gerarRoteiroMomentoAction: a duração (E52, PR 4)", () => {
     const falado = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", duracao: "longo" });
     expect(falado).toEqual({ ok: false, erro: textosRoteiro.longo.semLongos });
     expect(await db().select().from(roteiros).where(eq(roteiros.clienteId, c.id))).toHaveLength(0);
+  });
+});
+
+describe("lerMomentoDeTextoAction: a marca da sessão paga a leitura (achado A4 da auditoria de 26/11/2026)", () => {
+  it("a geração fica na marca ativa da sessão, para o freio de gasto da IA contar e frear essa leitura também", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const campos = await lerMomentoDeTextoAction("estou na loja, chegou o sabão novo, dá para mostrar a espuma");
+    expect(campos.onde).toEqual(expect.any(String));
+    const leituras = await db().select({ clienteId: geracoesIA.clienteId }).from(geracoesIA).where(eq(geracoesIA.tarefa, "lerMomento"));
+    expect(leituras.length).toBeGreaterThan(0);
+    expect(leituras.every((l) => l.clienteId === marcaA.id)).toBe(true);
   });
 });

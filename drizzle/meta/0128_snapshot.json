@@ -1,6 +1,6 @@
 {
   "id": "c2d41e92-66f1-4b59-a135-74ecd12c78f5",
-  "prevId": "04b62c69-21c4-45ad-9329-32d8e4746dca",
+  "prevId": "2f2fd257-f523-40ca-a6f7-020d2f1c0a42",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3268,6 +3268,134 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.convites_de_grupo": {
+      "name": "convites_de_grupo",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "convites_de_grupo_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "codigo_hash": {
+          "name": "codigo_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rotulo": {
+          "name": "rotulo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nicho_id": {
+          "name": "nicho_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marcas_max": {
+          "name": "marcas_max",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 5
+        },
+        "cortesia": {
+          "name": "cortesia",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "expira_em": {
+          "name": "expira_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usado_por": {
+          "name": "usado_por",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usado_em": {
+          "name": "usado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "desativado_em": {
+          "name": "desativado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "convites_de_grupo_nicho_id_nichos_id_fk": {
+          "name": "convites_de_grupo_nicho_id_nichos_id_fk",
+          "tableFrom": "convites_de_grupo",
+          "tableTo": "nichos",
+          "columnsFrom": [
+            "nicho_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "convites_de_grupo_usado_por_user_id_fk": {
+          "name": "convites_de_grupo_usado_por_user_id_fk",
+          "tableFrom": "convites_de_grupo",
+          "tableTo": "user",
+          "columnsFrom": [
+            "usado_por"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "convites_de_grupo_codigo_hash_unique": {
+          "name": "convites_de_grupo_codigo_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "codigo_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.custos_externos": {
       "name": "custos_externos",
       "schema": "",
@@ -5113,6 +5241,100 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.marcas_do_grupo": {
+      "name": "marcas_do_grupo",
+      "schema": "",
+      "columns": {
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "convite_id": {
+          "name": "convite_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criada_em": {
+          "name": "criada_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "marcas_do_grupo_usuario_id": {
+          "name": "marcas_do_grupo_usuario_id",
+          "columns": [
+            {
+              "expression": "usuario_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "marcas_do_grupo_cliente_id_clientes_id_fk": {
+          "name": "marcas_do_grupo_cliente_id_clientes_id_fk",
+          "tableFrom": "marcas_do_grupo",
+          "tableTo": "clientes",
+          "columnsFrom": [
+            "cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "marcas_do_grupo_convite_id_convites_de_grupo_id_fk": {
+          "name": "marcas_do_grupo_convite_id_convites_de_grupo_id_fk",
+          "tableFrom": "marcas_do_grupo",
+          "tableTo": "convites_de_grupo",
+          "columnsFrom": [
+            "convite_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "marcas_do_grupo_usuario_id_user_id_fk": {
+          "name": "marcas_do_grupo_usuario_id_user_id_fk",
+          "tableFrom": "marcas_do_grupo",
+          "tableTo": "user",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
