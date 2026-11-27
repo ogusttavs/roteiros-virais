@@ -278,3 +278,13 @@ describe("a chave", () => {
     }
   });
 });
+
+describe("slide da chamada: a linha do responsável técnico", () => {
+  it("desenha a linha quando vem preenchida e escapa o texto", () => {
+    const html = slideHTML(dados("chamada", "marca", { slide: { ...SLIDE.chamada, responsavel: "Dra. Ana <b>, CRO-SP 1" } }));
+    expect(html).toContain('<p class="s-resp">Dra. Ana &lt;b&gt;, CRO-SP 1</p>');
+  });
+  it("sem o campo, não desenha a linha", () => {
+    expect(slideHTML(dados("chamada", "marca"))).not.toContain("s-resp");
+  });
+});

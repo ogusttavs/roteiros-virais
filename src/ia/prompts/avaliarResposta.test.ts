@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { montarSistemaEstavel } from "./avaliarResposta";
+import { MARCA_DA_FONTE, montarEntrada, montarSistemaEstavel, versao } from "./avaliarResposta";
 
 describe("montarSistemaEstavel, criterio Concreto e a regra dura do H2", () => {
   const sistema = montarSistemaEstavel();
@@ -31,5 +31,93 @@ describe("montarSistemaEstavel, criterio Concreto e a regra dura do H2", () => {
   it("avisa que a resposta do cliente pode vir sem acento, mas a analise sai sempre acentuada", () => {
     expect(sistema).toContain("A resposta do cliente pode vir sem");
     expect(sistema).toContain("a sua análise sai sempre acentuada");
+  });
+});
+
+/** E76 PR 1: a sugestão de resposta não inventa dado; as fontes da marca vão na entrada, com a marca de cada uma. */
+describe("1.7.0, os fatos travados no exemplo", () => {
+  const sistema = montarSistemaEstavel();
+
+  it("o sistema proíbe afirmar o que não está nas fontes e manda o que falta para um colchete em forma de pergunta", () => {
+    expect(sistema).toContain("Fatos travados no exemplo");
+    expect(sistema).toContain("que não esteja escrito nas FONTES DA MARCA");
+    expect(sistema.replace(/\s+/g, " ")).toContain("Nunca estime, nunca arredonde");
+    expect(sistema.replace(/\s+/g, " ")).toContain("vira um espaço entre colchetes escrito como pergunta curta");
+    expect(sistema).toContain("Nunca escreva o dado no lugar do colchete.");
+    for (const marca of Object.values(MARCA_DA_FONTE)) expect(sistema).toContain(marca);
+  });
+
+  it("a entrada traz as outras respostas e o que lemos do site e das redes, cada item com a marca da fonte, antes da resposta", () => {
+    const entrada = montarEntrada({
+      pergunta: "O que o seu negócio faz?",
+      oQueAIAProcura: "um exemplo concreto",
+      resposta: "Cuidamos da importação inteira.",
+      outrasRespostas: [
+        { enunciado: "O que você vende?", resposta: "Importação de máquinas pequenas." },
+        { enunciado: "Pergunta sem resposta", resposta: "  " },
+      ],
+      lidoDaMarca: [
+        { origem: "site", texto: "Importadora que atua desde 2019." },
+        { origem: "instagram", texto: "Posta os pedidos chegando no galpão." },
+      ],
+    });
+    expect(entrada).toContain("FONTES DA MARCA");
+    expect(entrada).toContain("- O que você vende?: Importação de máquinas pequenas.");
+    expect(entrada).not.toContain("Pergunta sem resposta");
+    expect(entrada).toContain("- (do seu site) Importadora que atua desde 2019.");
+    expect(entrada).toContain("- (do seu Instagram) Posta os pedidos chegando no galpão.");
+    expect(entrada.indexOf("FONTES DA MARCA")).toBeLessThan(entrada.indexOf("Resposta do cliente:"));
+    // O lembrete de acentuação continua sendo a última linha (1.6.1).
+    expect(entrada.trimEnd().endsWith("mesmo que a resposta do cliente esteja sem acento.")).toBe(true);
+  });
+
+  it("sem outra fonte, a entrada diz que só há a resposta do cliente", () => {
+    const entrada = montarEntrada({ pergunta: "P", oQueAIAProcura: "Q", resposta: "R" });
+    expect(entrada).toContain("- Nenhuma além da resposta do cliente abaixo.");
+  });
+
+  it("uma resposta longa entra cortada, numa linha só", () => {
+    const longa = `${"palavra ".repeat(200)}
+segunda linha`;
+    const entrada = montarEntrada({ pergunta: "P", oQueAIAProcura: "Q", resposta: "R", outrasRespostas: [{ enunciado: "E", resposta: longa }] });
+    const linha = entrada.split(String.fromCharCode(10)).find((l) => l.startsWith("- E: "))!;
+    expect(linha.length).toBeLessThan(520);
+    expect(linha.endsWith("...")).toBe(true);
+  });
+});
+
+/**
+ * E76 PR 2: a régua empurrava a inventar (o 9 a 10 pedia número, e quem não tem o número ficava abaixo da meta por dizer a
+ * verdade). A restrição declarada com o porquê pontua tanto quanto o dado; "depende" sem o porquê continua vago.
+ */
+describe("1.8.0, a restrição declarada vale tanto quanto o dado", () => {
+  const sistema = montarSistemaEstavel().replace(/\s+/g, " ");
+
+  it("a versão sobe a partir da 1.7.0 dos fatos travados", () => {
+    expect(versao).toBe("1.8.0");
+  });
+
+  it("a restrição com o porquê cumpre Concreto e Específico e pontua tanto quanto um número", () => {
+    expect(sistema).toContain("Uma restrição declarada com o porquê também cumpre");
+    expect(sistema).toContain("Restrição declarada vale tanto quanto o dado.");
+    expect(sistema).toContain('"não trabalhamos com pedido mínimo nesta fase; cada projeto é avaliado');
+    expect(sistema).toContain('cumprem "Concreto" e "Específico" e pontuam tanto quanto um número');
+    expect(sistema).toContain("Nunca baixe a nota por faltar um número que a pessoa explicou que não existe");
+    expect(sistema).toContain("nunca peça que ela invente um");
+  });
+
+  it("a âncora de 9 a 10 aceita o número ou a restrição com o porquê", () => {
+    expect(sistema).toContain("- 9 a 10: cumpre os quatro critérios, com pelo menos um exemplo ou número real, ou com uma restrição declarada e o porquê dela.");
+    expect(sistema).toContain("- 7 a 8: clara e específica, mas falta exemplo, número ou o porquê em um ponto.");
+  });
+
+  it("a resposta vaga sem o porquê continua de 3 a 4", () => {
+    expect(sistema).toContain('Continua vaga a resposta que foge do dado sem dizer o porquê: "depende", "varia"');
+    expect(sistema).toContain('- 3 a 4: vaga, curta demais, cheia de termo do ramo sem explicação, ou "depende" sem dizer de quê.');
+  });
+
+  it("o exemplo mantém a restrição em vez de trocar por um número (coerente com os fatos travados)", () => {
+    expect(sistema).toContain("o exemplo mantém a restrição em vez de trocar por um número");
+    expect(sistema).toContain("Fatos travados no exemplo");
   });
 });

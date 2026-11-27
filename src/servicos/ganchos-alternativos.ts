@@ -12,10 +12,11 @@ import { promessaEmSaude } from "@/carrossel/regras";
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import { geracoesIA, roteiros, type ConteudoRoteiro, type GanchoAlternativo, type GanchosDoRoteiro, type TipoAbertura } from "@/db/schema";
+import { ErroReprovadoDuasVezes } from "@/ia/erro";
 import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 import * as ganchosIA from "@/ia/prompts/ganchosAlternativos";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
-import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
+import { conferirSaida, gerarComVerificacao, palavrasDeConteudo, type ParametrosGeracaoVerificada } from "@/ia/verificador";
 import { acharResultadoOuMedoEmSaude, temNumeroNoTexto, verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
@@ -228,6 +229,30 @@ export function ganchosParaGuardar(ganchos: GanchoAlternativo[]): GanchoAlternat
   return ganchos.slice(0, ganchosIA.MAXIMO_DE_GANCHOS).map((g) => ({ texto: limparGancho(g.texto), tipoAbertura: g.tipoAbertura, emocao: g.emocao }));
 }
 
+/**
+ * Depois de a lista ser reprovada nas duas tentativas: tira por código o que já reprova sozinho (`ganchosQuePassam`, as fórmulas de máquina) e confere cada gancho que sobrou, sozinho, com o mesmo
+ * conjunto de conferências da geração (o verificador de fato é o modelo barato, cerca de US$ 0,004 por gancho). Devolve só os aprovados, na ordem do modelo; o que reprova um gancho não derruba os outros.
+ */
+export async function aproveitarGanchosUmAUm(
+  parametros: ParametrosGeracaoVerificada<ganchosIA.SaidaGanchosAlternativos>,
+  ultima: ganchosIA.SaidaGanchosAlternativos,
+  contexto: Contexto,
+  fontes: string,
+): Promise<ganchosIA.SaidaGanchosAlternativos["ganchos"]> {
+  const candidatos = semFormulasDeMaquina(ganchosQuePassam(ultima.ganchos, contexto), fontes).slice(0, ganchosIA.MAXIMO_DE_GANCHOS) as ganchosIA.SaidaGanchosAlternativos["ganchos"];
+  const aprovados: ganchosIA.SaidaGanchosAlternativos["ganchos"] = [];
+  for (const gancho of candidatos) {
+    try {
+      const conferencia = await conferirSaida(parametros, { ...ultima, ganchos: [gancho] }, 2);
+      if (conferencia.aprovado) aprovados.push(gancho);
+    } catch (erro) {
+      // Uma conferência que falha (IA fora) tira só aquele gancho: nunca mostra um que não foi conferido.
+      logger.warn({ err: erro }, "ganchos alternativos: a conferencia de um gancho falhou");
+    }
+  }
+  return aprovados;
+}
+
 async function marcaEhDeSaude(clienteId: number, nichoId: number | null): Promise<boolean> {
   const principal = (await ramoAtualDoCliente(nichoId))?.ramoSlug;
   const alternativos = (await ramosAlternativosDaMarca(clienteId)).map((a) => a.ramoSlug);
@@ -310,45 +335,54 @@ async function pedirSemTrava(clienteId: number, roteiroId: number, agora: Date):
   const detalhes = [perfilCompilado, camadaExclusiva, corpo.corpo, corpo.fechamento, corpo.chamadaFinal].join("\n");
   const contexto: Contexto = { ganchoAtual: corpo.gancho, tipoAtual: roteiro.tipoAbertura ?? null, fontes, ramoSaude, detalhes, jaDito: `${roteiro.tema}\n${corpo.gancho}` };
 
-  let saida;
+  const parametros: ParametrosGeracaoVerificada<ganchosIA.SaidaGanchosAlternativos> = {
+    tarefa: "ganchosAlternativos",
+    nivel: ganchosIA.nivel,
+    effort: ganchosIA.esforco,
+    versaoPrompt: ganchosIA.versao,
+    clienteId,
+    schema: ganchosIA.schema,
+    sistemaEstavel: ganchosIA.montarSistemaEstavel({ perfilCompilado, camadaExclusiva, tipo: cliente.tipo, persona: cliente.persona, quemAparece: cliente.quemGrava ?? undefined, ramoSaude }),
+    entrada: ganchosIA.montarEntrada({
+      tema: roteiro.tema,
+      objetivo: roteiro.objetivo,
+      ganchoAtual: corpo.gancho,
+      tipoAberturaAtual: roteiro.tipoAbertura ?? null,
+      corpo: corpo.corpo,
+      fechamento: corpo.fechamento,
+      chamadaFinal: corpo.chamadaFinal,
+    }),
+    fontesDosFatos: fontes,
+    conferirNumerosNasFontes: true,
+    lembreteFinal: ganchosIA.LEMBRETE_ACENTUACAO,
+    proibicoes: perfil.fatos.proibicoes,
+    citarProibicaoVale: roteiro.origem === "livre",
+    exigeEvidencia: false,
+    evidenciasFornecidas: [],
+    generoTexto: "roteiro",
+    maxTokens: 1500,
+    extrairEvidencias: () => [],
+    extrairCampos: (d) => Object.fromEntries(d.ganchos.map((g, i) => [`gancho ${i + 1}`, g.texto])),
+    // R-COPY-26 (texto com cara de máquina): reprova na 1a tentativa; na 2a o gancho com fórmula sai da lista (abaixo), nunca vai para a pessoa.
+    // 1a tentativa: tudo reprova e volta para o modelo uma vez. 2a: nada derruba a geração, o servidor tira da lista, gancho por gancho, o que continua reprovado (abaixo).
+    verificarExtra: (d, tentativa) => (tentativa === 1 ? [...problemasDosGanchos(d.ganchos, contexto), ...formulasDosGanchos(d.ganchos, fontes).motivos] : []),
+  };
+
+  let saida: ganchosIA.SaidaGanchosAlternativos;
   try {
-    ({ dados: saida } = await gerarComVerificacao({
-      tarefa: "ganchosAlternativos",
-      nivel: ganchosIA.nivel,
-      effort: ganchosIA.esforco,
-      versaoPrompt: ganchosIA.versao,
-      clienteId,
-      schema: ganchosIA.schema,
-      sistemaEstavel: ganchosIA.montarSistemaEstavel({ perfilCompilado, camadaExclusiva, tipo: cliente.tipo, persona: cliente.persona, quemAparece: cliente.quemGrava ?? undefined, ramoSaude }),
-      entrada: ganchosIA.montarEntrada({
-        tema: roteiro.tema,
-        objetivo: roteiro.objetivo,
-        ganchoAtual: corpo.gancho,
-        tipoAberturaAtual: roteiro.tipoAbertura ?? null,
-        corpo: corpo.corpo,
-        fechamento: corpo.fechamento,
-        chamadaFinal: corpo.chamadaFinal,
-      }),
-      fontesDosFatos: fontes,
-      conferirNumerosNasFontes: true,
-      lembreteFinal: ganchosIA.LEMBRETE_ACENTUACAO,
-      proibicoes: perfil.fatos.proibicoes,
-      citarProibicaoVale: roteiro.origem === "livre",
-      exigeEvidencia: false,
-      evidenciasFornecidas: [],
-      generoTexto: "roteiro",
-      maxTokens: 1500,
-      extrairEvidencias: () => [],
-      extrairCampos: (d) => Object.fromEntries(d.ganchos.map((g, i) => [`gancho ${i + 1}`, g.texto])),
-      // R-COPY-26 (texto com cara de máquina): reprova na 1a tentativa; na 2a o gancho com fórmula sai da lista (abaixo), nunca vai para a pessoa.
-      // 1a tentativa: tudo reprova e volta para o modelo uma vez. 2a: nada derruba a geração, o servidor tira da lista, gancho por gancho, o que continua reprovado (abaixo).
-      verificarExtra: (d, tentativa) => (tentativa === 1 ? [...problemasDosGanchos(d.ganchos, contexto), ...formulasDosGanchos(d.ganchos, fontes).motivos] : []),
-    }));
+    ({ dados: saida } = await gerarComVerificacao(parametros));
   } catch (erro) {
     if (erro instanceof ErroGanchos) throw erro;
-    // A IA que não respondeu ou reprovou duas vezes: a tela diz que não deu e o roteiro segue como está.
-    logger.warn({ err: erro, clienteId, roteiroId }, "ganchos alternativos: a geracao nao saiu");
-    throw new ErroGanchos("a IA nao entregou ganchos validos", "ia-fora");
+    // Reprovada duas vezes (em geral o verificador de fato, que reprova a lista inteira por UM gancho): confere gancho a gancho e fica com os que passam; só "não deu" se nenhum passar.
+    const aproveitados = erro instanceof ErroReprovadoDuasVezes ? await aproveitarGanchosUmAUm(parametros, erro.ultimaSaida as ganchosIA.SaidaGanchosAlternativos, contexto, fontes) : [];
+    if (erro instanceof ErroReprovadoDuasVezes && aproveitados.length > 0) {
+      logger.warn({ clienteId, roteiroId, aproveitados: aproveitados.length }, "ganchos alternativos: a lista foi reprovada duas vezes e os ganchos que passam um a um foram mantidos");
+      saida = { ...(erro.ultimaSaida as ganchosIA.SaidaGanchosAlternativos), ganchos: aproveitados };
+    } else {
+      // A IA que não respondeu ou reprovou duas vezes: a tela diz que não deu e o roteiro segue como está.
+      logger.warn({ err: erro, clienteId, roteiroId }, "ganchos alternativos: a geracao nao saiu");
+      throw new ErroGanchos("a IA nao entregou ganchos validos", "ia-fora");
+    }
   }
 
   // Nunca vai para a pessoa um gancho reprovado; com menos de três a tela mostra os que passaram (sem inventar), e sem nenhum diz que não deu.

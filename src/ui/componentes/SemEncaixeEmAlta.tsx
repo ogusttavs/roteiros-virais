@@ -1,6 +1,7 @@
 "use client";
 
 import { TrendingUp } from "lucide-react";
+import { useState } from "react";
 
 import type { AssuntoSemEncaixe } from "@/servicos/em-alta";
 import { textosCriar } from "@/textos/criar";
@@ -27,7 +28,23 @@ export function linhaDoAssuntoSemEncaixe(assunto: AssuntoSemEncaixe): string {
  * pessoa dizer como ele cabe no ramo e receber a nota antes do roteiro.
  */
 export function SemEncaixeEmAlta({ assuntos, desabilitado = false, aoTrazer }: Props) {
+  const [aberto, setAberto] = useState(false);
   if (assuntos.length === 0) return null;
+  // Nenhum assunto em alta cabe no ramo: uma linha calma, e a lista só a pedido (T111, 26/11/2026).
+  if (!aberto) {
+    return (
+      <section className={styles.bloco} aria-label={t.origem} data-sem-encaixe>
+        <span className={styles.origem}>
+          <TrendingUp size={16} strokeWidth={1.75} aria-hidden="true" />
+          {t.origem}
+        </span>
+        <p className={styles.explicacao}>{t.calmo}</p>
+        <button type="button" className={styles.trazer} aria-expanded={false} onClick={() => setAberto(true)}>
+          {t.verMesmoAssim}
+        </button>
+      </section>
+    );
+  }
   return (
     <section className={styles.bloco} aria-labelledby="t-sem-encaixe" data-sem-encaixe>
       <span className={styles.origem}>

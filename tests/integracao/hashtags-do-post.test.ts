@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { clientes, contas, nichos, ramosDaConta, user, videos } from "@/db/schema";
+import { briefings, clientes, contas, nichos, ramosDaConta, user, videos } from "@/db/schema";
 import { hashtagsDoPost, limparCacheDeHashtags } from "@/servicos/hashtags-do-post";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -160,6 +160,15 @@ describe("hashtagsDoPost", () => {
     const r = await hashtagsDoPost({ clienteId: marcaSaudeId, tema: "sorriso" });
     expect(r.join(" ")).not.toMatch(/perfeito|garantido/);
     expect(r).toContain("#antesedepois");
+  });
+
+  it("T114: hashtag de humor do vídeo de outra pessoa fica de fora quando a marca não fala com humor; com o tom brincalhão no cadastro, entra", async () => {
+    await par(saudeId, "o cuidado com o seu sorriso #comedia #humor #dentista");
+    expect(await hashtagsDoPost({ clienteId: marcaSaudeId, tema: "gengiva que sangra" })).toEqual(["#dentista"]);
+    await db().insert(user).values({ id: "h70-u4", name: "[teste] D", email: "d@h70.teste" });
+    const [brincalhona] = await db().insert(clientes).values({ usuarioId: "h70-u4", nome: "[teste] Brincalhona", nichoId: saudeId }).returning();
+    await db().insert(briefings).values({ clienteId: brincalhona.id, respostas: { p9: "Bora que bora! Meu tom é brincalhão." } });
+    expect((await hashtagsDoPost({ clienteId: brincalhona.id, tema: "gengiva que sangra" })).sort()).toEqual(["#comedia", "#dentista", "#humor"]);
   });
 
   it("marca que não existe devolve vazio, sem lançar", async () => {

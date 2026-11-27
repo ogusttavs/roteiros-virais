@@ -1,6 +1,6 @@
 /**
  * Fluxo do briefing contra o Postgres real, em mock (etapa 5, criterios de
- * aceite): doze respostas curtas nao liberam, doze concretas liberam e
+ * aceite): treze respostas curtas nao liberam, treze concretas liberam e
  * geram o perfil, reavaliar sem mudar o texto reusa a avaliacao guardada, e
  * o briefing de um cliente nunca aparece no de outro.
  */
@@ -69,7 +69,7 @@ afterAll(async () => {
 });
 
 describe("briefing: nota geral e gate de liberacao (mock)", () => {
-  it("doze respostas curtas nao chegam ao gate", async () => {
+  it("treze respostas curtas nao chegam ao gate", async () => {
     for (const pergunta of perguntasDoBriefing("negocio")) {
       await avaliarResposta(clienteId, pergunta.id, respostaCurta(), "negocio");
     }
@@ -80,7 +80,7 @@ describe("briefing: nota geral e gate de liberacao (mock)", () => {
     expect(briefing.perfil).toBeNull();
   });
 
-  it("doze respostas concretas liberam e geram o perfil", async () => {
+  it("treze respostas concretas liberam e geram o perfil", async () => {
     let ultimoResultado;
     for (const pergunta of perguntasDoBriefing("negocio")) {
       ultimoResultado = await avaliarResposta(clienteId, pergunta.id, respostaConcreta(pergunta.id), "negocio");
@@ -144,7 +144,7 @@ describe("briefing: nota geral e gate de liberacao (mock)", () => {
 
 /** P1: avaliarResposta e compilarPerfil (via avaliarResposta, que compila ao liberar) com marca pessoa. */
 describe("briefing: marca do tipo pessoa (mock)", () => {
-  it("as doze respostas da pessoa liberam e o perfil ganha historia e posicionamentos", async () => {
+  it("as treze respostas da pessoa liberam e o perfil ganha historia e posicionamentos", async () => {
     const [usuario] = await db()
       .insert(user)
       .values({ id: "briefing-pessoa", name: "[teste] Pessoa", email: "pessoa@briefing.teste" })

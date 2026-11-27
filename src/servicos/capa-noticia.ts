@@ -8,13 +8,14 @@ import { and, desc, eq } from "drizzle-orm";
 import { dataDaCapa, limparTituloDaCapa, motivoDeNaoServirParaCapa, motivoDoTitulo, titulosParaATela, veiculoDaCapa, verificarTitulosDaCapa } from "@/carrossel/capa-noticia";
 import { corValida, garantirLeitura } from "@/carrossel/modelos";
 import { promessaEmSaude } from "@/carrossel/regras";
-import { COR_NEUTRA, QUANTIDADE_DA_CAPA, type SlideDoCarrossel } from "@/config/carrossel";
+import { COR_NEUTRA, QUANTIDADE_DA_CAPA, TITULOS_DA_CAPA, type SlideDoCarrossel } from "@/config/carrossel";
 import { db } from "@/db";
 import { carrosseis, clientes, type Carrossel } from "@/db/schema";
+import { ErroReprovadoDuasVezes } from "@/ia/erro";
 import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 import * as capaIA from "@/ia/prompts/capaNoticia";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
-import { gerarComVerificacao } from "@/ia/verificador";
+import { conferirSaida, gerarComVerificacao, type ParametrosGeracaoVerificada } from "@/ia/verificador";
 import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
@@ -55,7 +56,28 @@ function formulasDosTitulos(titulos: string[], fontes: string): string[] {
 
 export type TitulosDaCapa = { titulos: string[]; veiculo: string; data: string; manchete: string };
 
-/** De 3 a 5 títulos para a capa desta notícia. Gasta IA (modelo forte, uma ou duas tentativas); o chamador passa pela trava (`titulosDaCapaComTrava`). */
+/**
+ * T114 (ensaio de 26/11/2026), como os ganchos alternativos (#314): depois de a lista ser reprovada nas duas tentativas (um título com o horário da clínica, outro longo demais, e a capa caía inteira),
+ * confere cada título sozinho, com o mesmo conjunto de conferências da 2ª tentativa (o que reprova no código não chega a gastar o verificador de fato, que é o modelo barato). Os títulos são conferidos
+ * ao mesmo tempo, para a pessoa não esperar um por um. Devolve só os aprovados, na ordem do modelo; o que reprova um título não derruba os outros, e uma conferência que falha tira só aquele.
+ */
+export async function aproveitarTitulosUmAUm(parametros: ParametrosGeracaoVerificada<capaIA.SaidaCapaNoticia>, ultima: capaIA.SaidaCapaNoticia): Promise<string[]> {
+  const candidatos = titulosParaATela(ultima.titulos).slice(0, TITULOS_DA_CAPA.max);
+  const conferidos = await Promise.all(
+    candidatos.map(async (titulo) => {
+      try {
+        const conferencia = await conferirSaida(parametros, { ...ultima, titulos: [titulo] }, 2);
+        return conferencia.aprovado ? conferencia.dados.titulos : [];
+      } catch (erro) {
+        logger.warn({ err: erro }, "capa: a conferencia de um titulo falhou");
+        return [];
+      }
+    }),
+  );
+  return conferidos.flat();
+}
+
+/** De 3 a 5 títulos para a capa desta notícia (menos, quando alguns reprovam nas duas tentativas; T114). Gasta IA (modelo forte, uma ou duas tentativas); o chamador passa pela trava (`titulosDaCapaComTrava`). */
 export async function titulosDaCapa(clienteId: number, noticiaId: number, agora: Date = new Date()): Promise<TitulosDaCapa> {
   const noticia = await noticiaParaCapa(clienteId, noticiaId, agora);
   const cliente = await clientePorId(clienteId);
@@ -78,7 +100,7 @@ export async function titulosDaCapa(clienteId: number, noticiaId: number, agora:
     leituras.filter((l) => l.existeNaRede && l.leitura).map((l) => ({ handle: l.handle, leitura: l.leitura as string })),
   );
   const fontesDosFatos = montarFontesDosFatos({ perfilCompilado, camadaExclusiva, tema: noticia.titulo, noticia: { titulo: noticia.titulo, resumo: noticia.resumo, angulo: noticia.angulo } });
-  const { dados } = await gerarComVerificacao({
+  const parametros: ParametrosGeracaoVerificada<capaIA.SaidaCapaNoticia> = {
     tarefa: "capaNoticia",
     nivel: capaIA.nivel,
     effort: capaIA.esforco,
@@ -104,12 +126,24 @@ export async function titulosDaCapa(clienteId: number, noticiaId: number, agora:
     avisarExtra: (d, tentativa) => (tentativa === 2 ? formulasDosTitulos(d.titulos, fontesDosFatos) : []),
     verificarExtra: (d, tentativa) => [
       ...(tentativa === 1 ? formulasDosTitulos(d.titulos, fontesDosFatos) : []),
-      ...verificarTitulosDaCapa(d.titulos, noticia, { ramoSaude }),
+      // T114: na 2ª tentativa basta um título; o que sobrar reprovado sai título a título (abaixo), e a pessoa escolhe entre os que passam.
+      ...verificarTitulosDaCapa(d.titulos, noticia, { ramoSaude, minimo: tentativa === 1 ? TITULOS_DA_CAPA.min : 1 }),
       // R-CONF (preço, serviço grátis, promessa, fato inventado): os títulos fazem o papel do gancho.
       ...verificarConformidadeDoLongo({ gancho: d.titulos.join(". "), chamadaFinal: "", capitulos: [], edicao: { textoNaTela: [] } }, { fontes: fontesDosFatos, ramoSaude }),
     ],
-  });
-  return { titulos: titulosParaATela(dados.titulos).slice(0, 5), veiculo: noticia.veiculo, data: dataDaCapa(noticia.publicadoEm), manchete: noticia.titulo };
+  };
+  let titulos: string[];
+  try {
+    titulos = (await gerarComVerificacao(parametros)).dados.titulos;
+  } catch (erro) {
+    if (!(erro instanceof ErroReprovadoDuasVezes)) throw erro;
+    // Reprovada duas vezes por um título (ou por alguns): confere título a título e fica com os que passam; só falha se nenhum passar.
+    const aproveitados = await aproveitarTitulosUmAUm(parametros, erro.ultimaSaida as capaIA.SaidaCapaNoticia);
+    if (aproveitados.length === 0) throw erro;
+    logger.warn({ clienteId, noticiaId, aproveitados: aproveitados.length }, "capa: a lista foi reprovada duas vezes e os titulos que passam um a um foram mantidos");
+    titulos = aproveitados;
+  }
+  return { titulos: titulosParaATela(titulos).slice(0, 5), veiculo: noticia.veiculo, data: dataDaCapa(noticia.publicadoEm), manchete: noticia.titulo };
 }
 
 /** Uma geração por vez por marca (a trava do carrossel); o teto do teste é lido de novo dentro da trava. */

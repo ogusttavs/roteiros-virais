@@ -47,6 +47,8 @@ export const textosCriar = {
     trazerDeOutroJeito: "Trazer para o meu ramo de outro jeito",
     semEncaixe: {
       origem: "Em alta no Brasil hoje",
+      calmo: "Hoje nada do que está em alta no Brasil combina com o seu ramo. Os temas do seu setor estão no Hoje.",
+      verMesmoAssim: "Ver o que está em alta mesmo assim",
       titulo: "Nada disso cabe bem no seu ramo hoje",
       trazer: "Trazer para o meu ramo",
       trazerAria: (assunto: string) => `Trazer para o meu ramo: ${assunto}`,

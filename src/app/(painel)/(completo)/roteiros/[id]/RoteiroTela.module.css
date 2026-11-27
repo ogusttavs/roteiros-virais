@@ -56,6 +56,11 @@
   box-shadow: var(--sombra-foco);
 }
 
+/* T112: a seta de voltar é um alvo de 44 px com o ícone no meio; sem isto o ícone começava 12 px para dentro da borda em que o título e a coluna do texto começam. */
+.botaoVoltar {
+  margin-left: calc(-1 * var(--espaco-3));
+}
+
 /* ---------- Conteúdo ---------- */
 
 /* Sem o `+ 64px` de antes: eram da cápsula das abas, que some nesta tela (a barra de ações fica em `bottom: 0`), V7, item 2 do PROXIMO.md. */
@@ -167,6 +172,15 @@
  * (a coluna nunca chega perto disso); linhas implícitas a mais que ninguém
  * usa não ocupam espaço.
  */
+/*
+ * T112 (26/11/2026), o ritmo vertical: um espaço só entre um bloco e outro da coluna (`--espaco-8`), em toda largura. Antes cada bloco trazia a própria margem (de 0 a 20 px, alguns
+ * sem nenhuma, como "Outros ganchos" grudado no primeiro bloco da fala). Margem e não `gap` porque, do computador para cima, o cartão do lado atravessa 20 linhas da grade
+ * (`span 20`, abaixo), e cada linha vazia ganharia um `gap` a mais no fim da coluna.
+ */
+.corpoComLado > * + * {
+  margin-top: var(--espaco-8);
+}
+
 @media (min-width: 1024px) {
   .corpoComLado {
     position: relative;
@@ -185,6 +199,7 @@
     grid-column: 2;
     grid-row: 1;
     position: absolute;
+    margin-top: 0;
   }
 
   .corpoComLado > .ladoGrudado {
@@ -195,7 +210,14 @@
   .ladoGrudado {
     position: sticky;
     top: var(--topo-lado-fixo);
+  }
+
+  /* Dois seletores de classe: vence o ritmo da coluna (`.corpoComLado > * + *`), que aqui não vale (o lado começa onde "De onde veio" termina). */
+  .corpoComLado > .ladoGrudado {
     margin-top: var(--altura-de-onde-veio, 0px);
+  }
+
+  .ladoGrudado {
     /*
      * Achado do uso real no iPad deitado (22/10/2026): com os porquês abertos o cartão do lado fica mais alto que a tela, e a
      * parte de baixo dele ficava atrás da barra de ações fixa, sem como rolar até ela (o cartão gruda e só solta no fim da grade).
@@ -229,6 +251,69 @@
 .cabecalhoTela {
   display: grid;
   gap: var(--espaco-1);
+}
+
+/*
+ * T112: a linha de ações do texto, no alto dele: "Editar" e "Ver os porquês" juntos à esquerda e a chave "Marcas de fala" à direita (na linha de baixo, quando não cabe), com o fio
+ * embaixo separando as ferramentas do texto. Antes: "Editar" ao lado do título, "Ver os porquês" sozinho à direita e a chave numa linha própria.
+ */
+.linhaAcoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2) var(--espaco-6);
+  padding-bottom: var(--espaco-3);
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.acoesDoTexto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-1) var(--espaco-6);
+}
+
+/* A chave das marcas traz o próprio fio de baixo; aqui o fio é da linha inteira. */
+.linhaAcoes > [data-linha-marcas-de-fala] {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+/* Dois seletores de classe: vence `.verTodos` de `PorQue.module.css` (sublinhado e empurrado para a direita), qualquer que seja a ordem dos módulos no pacote. */
+.linhaAcoes .acaoDoTexto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  font: var(--peso-medio) var(--tamanho-secundario) / 1 var(--fonte-texto);
+  color: var(--cor-titulo);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.linhaAcoes .acaoDoTexto svg {
+  flex: none;
+  color: var(--cor-texto-suave);
+}
+
+.linhaAcoes .acaoDoTexto:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.linhaAcoes .acaoDoTexto:active {
+  opacity: 0.7;
+}
+
+.linhaAcoes .acaoDoTexto:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
 }
 
 .metaRoteiro {
@@ -266,6 +351,13 @@
   cursor: pointer;
 }
 
+/* T112: o mesmo ritmo dentro do cartão do roteiro (a linha de ações, "Outros ganchos", os blocos da fala). */
+.blocos,
+.blocosLongos {
+  display: grid;
+  gap: var(--espaco-8);
+}
+
 .blocos {
   max-width: 34ch;
 }
@@ -276,11 +368,11 @@
   }
 }
 
-/* "Como editar" e "Por que assim" do Reels falado, empilhados na mesma caixa do lado (uma depois da outra, nunca na mesma área). */
+/* "Como editar" e "Por que assim" do Reels falado, empilhados na mesma caixa do lado (uma depois da outra, nunca na mesma área), no mesmo ritmo da coluna. */
 .pilhaDoLado {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-6);
+  gap: var(--espaco-8);
 }
 
 .referenciaVazia {
@@ -355,36 +447,6 @@
   color: var(--cor-texto-suave);
 }
 
-/** E40, item 1: o título e o botão "Editar" na mesma linha, acima do roteiro. */
-.topoRoteiro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--espaco-3);
-}
-
-.botaoEditar {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--altura-toque);
-  padding: 0 var(--espaco-2);
-  border: 0;
-  background: transparent;
-  font-size: var(--tamanho-secundario);
-  font-weight: var(--peso-medio);
-  color: var(--cor-acao);
-  cursor: pointer;
-}
-
-.botaoEditar:hover {
-  text-decoration: underline;
-}
-
-.botaoEditar:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
 /** E40, item 1: um campo por bloco editável, a mesma ordem de leitura. */
 .camposEdicao {
   display: grid;
@@ -416,7 +478,6 @@
  * na barra de ações (E27, parte 1).
  */
 .julgar {
-  margin-top: var(--espaco-5);
   padding-top: var(--espaco-5);
   border-top: var(--largura-borda) solid var(--cor-divisor);
   font-size: var(--tamanho-secundario);
@@ -497,9 +558,15 @@
   display: none;
 }
 
+/*
+ * T112: a barra de ações começa onde a barra lateral termina, com a largura que ela tem de verdade (`--lateral-da-casca`): recolhida até 1179 px, aberta a partir de 1180, e a
+ * escolha do botão de recolher (`html[data-barra-lateral]`, `(painel)/layout.module.css`) vence as duas. Antes a barra seguia só a largura da tela: com a lateral aberta no
+ * notebook ela cobria o fim da lateral (o seletor de marca cortado e os botões em pílula por cima), e com a lateral recolhida no monitor largo sobrava um vão.
+ */
 @media (min-width: 768px) {
   .barraAcoes {
-    left: var(--largura-barra-recolhida);
+    --lateral-da-casca: var(--largura-barra-recolhida);
+    left: var(--lateral-da-casca);
     bottom: 0;
     padding-inline: var(--espaco-6);
     justify-content: flex-start;
@@ -516,8 +583,18 @@
 
 @media (min-width: 1180px) {
   .barraAcoes {
-    left: var(--largura-barra-lateral);
+    --lateral-da-casca: var(--largura-barra-lateral);
     padding-inline: var(--espaco-10);
+  }
+}
+
+@media (min-width: 768px) {
+  :global(html[data-barra-lateral="recolhida"]) .barraAcoes {
+    --lateral-da-casca: var(--largura-barra-recolhida);
+  }
+
+  :global(html[data-barra-lateral="aberta"]) .barraAcoes {
+    --lateral-da-casca: var(--largura-barra-lateral);
   }
 }
 
@@ -530,7 +607,7 @@
   .barraAcoes {
     padding-left: max(
       var(--espaco-10),
-      calc((100% - var(--largura-barra-lateral) - var(--largura-painel)) / 2)
+      calc((100% - var(--lateral-da-casca) - var(--largura-painel)) / 2)
     );
   }
 }
@@ -993,7 +1070,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--espaco-2);
   align-items: start;
-  margin: var(--espaco-3) 0 var(--espaco-5);
+  margin: var(--espaco-2) 0 0;
   font-size: var(--tamanho-rodape);
   color: var(--cor-texto-suave);
 }
@@ -1022,7 +1099,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--espaco-2);
   align-items: start;
-  margin: var(--espaco-3) 0 var(--espaco-5);
+  margin: var(--espaco-2) 0 0;
   font-size: var(--tamanho-rodape);
   color: var(--cor-texto-suave);
 }
@@ -1043,7 +1120,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--espaco-2) var(--espaco-3);
   align-items: start;
-  margin: var(--espaco-4) 0 var(--espaco-5);
+  margin: var(--espaco-3) 0 0;
   padding: var(--espaco-4);
   border-radius: var(--raio-md);
   background: var(--cor-superficie-recuada);
@@ -1087,12 +1164,7 @@
   background: var(--cor-superficie-hover);
 }
 
-/* O "De onde veio" do momento: uma linha por fonte do assunto, e a ligação com o ramo. Até 1023px os blocos fluem na ordem do documento: o espaço vem de cima, como o de "Como editar". */
-@media (max-width: 1023px) {
-  .deOndeVeioMomento {
-    margin: var(--espaco-6) 0;
-  }
-}
+/* O "De onde veio" do momento: uma linha por fonte do assunto, e a ligação com o ramo. O espaço em volta é o ritmo da coluna (`.corpoComLado > * + *`, T112). */
 
 .fontesMomento {
   display: grid;
@@ -1170,7 +1242,6 @@
 .atencaoRoteiro {
   display: grid;
   gap: var(--espaco-2);
-  margin-block: var(--espaco-4);
   padding: var(--espaco-4) var(--espaco-5);
   border-left: 3px solid var(--cor-atencao);
   border-radius: 0 var(--raio-md) var(--raio-md) 0;
@@ -1199,7 +1270,6 @@
 .fontesPesquisa {
   display: grid;
   gap: var(--espaco-3);
-  margin-block: var(--espaco-3);
   padding: var(--espaco-5);
   background: var(--cor-superficie);
   border: var(--largura-borda) solid var(--cor-borda);
@@ -1305,10 +1375,4 @@
 /* E52 (PR 4b): o roteiro longo usa a largura de leitura inteira também no celular (os cartões dos capítulos não são a coluna estreita dos quatro blocos). */
 .blocosLongos {
   max-width: var(--largura-leitura);
-}
-
-/* E50 parte 2, PR 4: "Ver os porquês" no alto do roteiro, à direita da linha das chaves. */
-.linhaPorques {
-  display: flex;
-  justify-content: flex-end;
 }

@@ -477,7 +477,7 @@ export const textosAdmin = {
      */
     campoTipoMarca: "tipo de conteúdo",
     confirmarTrocarTipo:
-      "Trocar o tipo de conteúdo apaga o briefing desta marca: as doze respostas, as notas e o perfil. Quem tem acesso vai precisar responder tudo de novo, com as perguntas do tipo novo.",
+      "Trocar o tipo de conteúdo apaga o briefing desta marca: todas as respostas, as notas e o perfil. Quem tem acesso vai precisar responder tudo de novo, com as perguntas do tipo novo.",
     trocarTipo: "trocar mesmo assim",
     cancelar: "cancelar",
     tipoSalvo: "salvo; o briefing foi apagado",

@@ -11,7 +11,7 @@ import { EMOJI, encontrarJargaoDoMotor, encontrarProblemas, MOTIVO_EMOJI, MOTIVO
 import { dadosForaDasFontes } from "@/servicos/conferencia-da-pesquisa";
 
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
-import { ErroIA } from "./erro";
+import { ErroReprovadoDuasVezes } from "./erro";
 import { NUMEROS_REGRAS_STORY } from "./prompts/regras-formato";
 import * as repararFato from "./prompts/repararFato";
 import type { InstrucaoAbertura } from "./prompts/roteiro";
@@ -814,7 +814,7 @@ export async function gerarComVerificacao<T>(
   const reparado = segunda.reparavel ? await repararOQueSobrou(params, segunda) : null;
   if (reparado) return reparado;
 
-  throw new ErroIA(`tarefa "${params.tarefa}" reprovada duas vezes: ${segunda.motivos.join("; ")}`);
+  throw new ErroReprovadoDuasVezes(`tarefa "${params.tarefa}" reprovada duas vezes: ${segunda.motivos.join("; ")}`, segunda.dados);
 }
 
 /** O que a segunda tentativa lê a mais quando a primeira reprovou por fato sem apoio (T80): tirar a frase, não reescrever o slide e não inventar outro costume. */
@@ -933,7 +933,7 @@ type ConferenciaDaSaida<T> = { aprovado: boolean; dados: T; motivos: string[]; e
  * A conferência de uma saída (locais, correção mecânica, `verificarExtra` e o verificador de texto), sem gerar nada: serve à saída de uma tentativa e à saída consertada pelo reparo. `reparavel`
  * diz que o que reprovou é só fato sem apoio (o verificador de texto apontou o fato) ou o que a tarefa aceita consertar por reparo (`repararFato.motivoReparavel`, a promessa em saúde do carrossel).
  */
-async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, dadosDaSaida: T, tentativa: 1 | 2): Promise<ConferenciaDaSaida<T>> {
+export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, dadosDaSaida: T, tentativa: 1 | 2): Promise<ConferenciaDaSaida<T>> {
   let dados = dadosDaSaida;
   let campos = params.extrairCampos(dados);
   let evidencias = params.extrairEvidencias?.(dados) ?? [];
@@ -1000,6 +1000,10 @@ async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, dadosDaS
         fontes: params.citarProibicaoVale && params.fontesDosFatos ? verificarTexto.fontesSemProibicoes(params.fontesDosFatos) : params.fontesDosFatos,
       }),
     });
+    // 1.11.0: o caso recontado com outras palavras, apoiado por uma frase que as fontes trazem de fato, não reprova (`fatoApoiadoPelasFontes`); o aprovado vale também para o registro abaixo.
+    if (!verificacao.dados.aprovado && verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDosFatos)) {
+      verificacao.dados = { ...verificacao.dados, aprovado: true, motivo: null };
+    }
     aprovado = verificacao.dados.aprovado;
     // Reprovando por fato, o motivo carrega o fato e a frase mais próxima das fontes (`motivoDaConferencia`): é o que a segunda tentativa recebe para corrigir.
     motivos = verificacao.dados.aprovado ? [] : [verificarTexto.motivoDaConferencia(verificacao.dados)];

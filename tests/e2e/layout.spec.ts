@@ -420,7 +420,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
      * Cliente proprio para Comecar (estados "perguntas" e "folha", item 5 do
      * PROXIMO.md): dados fixos preenchidos (cai direto no bloco 1) e o
      * bloco 1 com uma nota em cada faixa (na meta, neutra, baixa), para a
-     * folha das doze notas ter conteudo de verdade, nao so "sem nota".
+     * folha das treze notas ter conteudo de verdade, nao so "sem nota".
      */
     await db().insert(user).values({ id: "e2e-layout-comecar", name: "[teste] Layout Comecar", email: EMAIL_COMECAR });
     await db()
@@ -778,7 +778,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await expect(campo).toHaveValue("o gancho");
     });
 
-    /** V7, item 1: a folha "Suas marcas" (celular) e as doze notas fecham por Voltar e Esc, sem sair da tela. */
+    /** V7, item 1: a folha "Suas marcas" (celular) e as treze notas fecham por Voltar e Esc, sem sair da tela. */
     if (largura < 768) {
       test(`Hoje, folha "Suas marcas" fecha por Voltar, Esc, toque fora e arrastar, em ${rotulo}px`, async ({ page }) => {
         await page.setViewportSize({ width: largura, height: altura });
@@ -988,11 +988,11 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
    * mesma posição, sobrepostos, quando `.ladoGrudado` não atravessava a linha certa).
    *
    * R1, acabamento (achado do Gustavo, repassado pela Fable): os dois ficavam colados, sem
-   * respiro nenhum; o vazio certo é `--espaco-6` (1.5rem), não zero nem o `VAZIO_MAXIMO_COLUNA_PX`
-   * de folga geral da coluna.
+   * respiro nenhum; o vazio certo é `--espaco-8` (2rem, o ritmo único entre os blocos da tela desde a T112, 26/11/2026; era
+   * `--espaco-6`), não zero nem o `VAZIO_MAXIMO_COLUNA_PX` de folga geral da coluna.
    */
   for (const largura of [1024, 1280, 1920]) {
-    test(`Roteiro: "Como editar" vem logo abaixo de "De onde veio", com o respiro de --espaco-6, em ${largura}px`, async ({
+    test(`Roteiro: "Como editar" vem logo abaixo de "De onde veio", com o respiro de --espaco-8, em ${largura}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: largura, height: 900 });
@@ -1008,10 +1008,10 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       expect(vazio, `vazio de ${vazio}px entre "De onde veio" e "Como editar"`).toBeLessThanOrEqual(
         VAZIO_MAXIMO_COLUNA_PX,
       );
-      const ESPACO_6_PX = 24;
+      const ESPACO_8_PX = 32;
       expect(
-        Math.abs(vazio - ESPACO_6_PX),
-        `vazio de ${vazio}px, esperado perto de --espaco-6 (${ESPACO_6_PX}px)`,
+        Math.abs(vazio - ESPACO_8_PX),
+        `vazio de ${vazio}px, esperado perto de --espaco-8 (${ESPACO_8_PX}px)`,
       ).toBeLessThanOrEqual(2);
     });
   }
@@ -1046,22 +1046,22 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await page.setViewportSize({ width: largura, height: altura });
       await entrarComo(page, EMAIL_COMECAR);
       await expect(page).toHaveURL(/\/comecar/);
-      await page.getByRole("button", { name: "as doze notas" }).click();
-      await expect(page.getByRole("dialog", { name: "as doze notas" })).toBeVisible();
+      await page.getByRole("button", { name: "as treze notas" }).click();
+      await expect(page.getByRole("dialog", { name: "as treze notas" })).toBeVisible();
       await conferirLayout(page);
     });
 
-    /** V7, item 1: as doze notas fecham por Voltar, Esc e toque fora (a folha não desenha alça: sem arrastar). */
-    test(`Começar, folha "as doze notas" fecha por Voltar, Esc e toque fora, em ${rotulo}px`, async ({ page }) => {
+    /** V7, item 1: as treze notas fecham por Voltar, Esc e toque fora (a folha não desenha alça: sem arrastar). */
+    test(`Começar, folha "as treze notas" fecha por Voltar, Esc e toque fora, em ${rotulo}px`, async ({ page }) => {
       await page.setViewportSize({ width: largura, height: altura });
       await entrarComo(page, EMAIL_COMECAR);
       await expect(page).toHaveURL(/\/comecar/);
       await page.waitForLoadState("networkidle");
       await conferirFolhaFecha(page, {
         abrir: async () => {
-          await page.getByRole("button", { name: "as doze notas" }).click();
+          await page.getByRole("button", { name: "as treze notas" }).click();
         },
-        dialogo: page.getByRole("dialog", { name: "as doze notas" }),
+        dialogo: page.getByRole("dialog", { name: "as treze notas" }),
         arrasta: false,
       });
     });

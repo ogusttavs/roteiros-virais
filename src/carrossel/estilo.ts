@@ -289,6 +289,6 @@ export const ESTILO_DOS_SLIDES = `
 .slide.veu-leve .s-corpo { align-self: center; max-height: 100%; padding: 48px 28px; margin: 0 -28px; border-radius: 36px; background: color-mix(in srgb, var(--s-fundo) var(--painel, 93%), transparent); }
 .s-ilustrativa { font: 600 22px/1 "JetBrains Mono", Consolas, monospace; letter-spacing: .04em; color: var(--s-titulo-cor); text-align: center; }
 
-/* ---------- Responsavel tecnica (so o lugar: sem campo nem tela por enquanto) ---------- */
+/* ---------- Responsavel tecnica (a linha vem da Conta; vazia, nao se desenha) ---------- */
 .s-resp { font: 500 24px/1.3 "JetBrains Mono", Consolas, monospace; color: var(--s-suave); }
 `;

@@ -1,0 +1,18 @@
+/* O espaço para completar na fala (26/11/2026): o mesmo destaque do carrossel (`CarrosselTela.module.css`, `.colchete`), com a borda só onde o trecho abre e fecha. */
+.colchete {
+  background: var(--cor-atencao-fundo);
+  color: var(--cor-atencao);
+  font-weight: var(--peso-semibold);
+}
+
+.abre {
+  padding-left: var(--espaco-1);
+  border-top-left-radius: var(--raio-sm);
+  border-bottom-left-radius: var(--raio-sm);
+}
+
+.fecha {
+  padding-right: var(--espaco-1);
+  border-top-right-radius: var(--raio-sm);
+  border-bottom-right-radius: var(--raio-sm);
+}

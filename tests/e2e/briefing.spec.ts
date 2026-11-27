@@ -156,7 +156,7 @@ test.describe("briefing pela tela", () => {
     // nota geral so precisa chegar a 8,0 (secao 4 da rubrica); com respostas
     // concretas isso pode acontecer antes da ultima pergunta, entao o loop
     // abaixo para assim que a liberacao aparecer, em vez de sempre preencher
-    // as doze.
+    // as treze.
     const passos: ({ rotulo: string; texto: string } | { bloco: number })[] = [
       {
         rotulo: "produto ou serviço que mais vende",
@@ -212,10 +212,16 @@ test.describe("briefing pela tela", () => {
         texto:
           'A camera pode mostrar a recepcao, a sala de raio-x, os 3 equipamentos novos da Clinica Sorriso Novo, dizendo "que resultado incrivel", e a equipe toda de jaleco.',
       },
+      // E76 PR 2: a P12 virou duas, os concorrentes na P12 e os perfis admirados na P13.
+      {
+        rotulo: "seus concorrentes",
+        texto:
+          "Concorrente direto e a Clinica Vida Nova, que fica a 2 quarteiroes: la so atende com hora marcada, e eu encaixo no mesmo dia quem chega com dor.",
+      },
       {
         rotulo: "perfis que você admira",
         texto:
-          "Admiro @sorrisodouradooficial pela didatica. Concorrente direto e a Clinica Vida Nova, que fica a 2 quarteiroes, e o Espaco Sorriso Feliz.",
+          "Admiro @sorrisodouradooficial pela didatica, e o Espaco Sorriso Feliz pelos 3 videos de bastidor que posta toda semana.",
       },
     ];
 
@@ -389,14 +395,14 @@ test.describe("briefing pela tela", () => {
     await page.goto("/briefing");
     await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
 
-    // "Copiar para a sua IA" existe em toda pergunta; P12 é a última do documento.
+    // "Copiar para a sua IA" existe em toda pergunta; a P13 (os perfis admirados, desde a E76 PR 2) é a última do documento.
     await page.getByRole("button", { name: "Copiar para a sua IA" }).last().click();
     await expect(page.getByText("Copiado. Cole na sua IA e traga a resposta para cá.").last()).toBeVisible();
     const copiado = await page.evaluate(() => navigator.clipboard.readText());
-    expect(copiado).toContain("Cite os concorrentes e os perfis que você admira");
+    expect(copiado).toContain("Quais são os perfis que você admira");
     expect(copiado).toContain("Responda como se fosse eu");
 
-    // os dois editores de P12, pelo titulo de cada lista.
+    // os dois editores de @, pelo titulo de cada lista: os concorrentes na P12, os admirados na P13 (E76 PR 2).
     const listaConcorrentes = page.getByRole("heading", { name: "Concorrentes", level: 4 }).locator("..");
     const listaAdmira = page.getByRole("heading", { name: "Perfis que você admira", level: 4 }).locator("..");
 
@@ -629,14 +635,14 @@ test.describe("briefing pela tela", () => {
   /**
    * brief-frontend.md 6.2, "Ajuste de 06/09/2026" (revisao do PR #27, item
    * 1): no celular a folha (BarraNotaGeral.module.css, `.folha`) tem altura
-   * menor que a lista das doze notas, entao a lista rola por dentro. Sem
+   * menor que a lista das treze notas, entao a lista rola por dentro. Sem
    * `overscroll-behavior: contain`, rolar a lista ate o fim encadeava o
    * scroll para o documento, e o `scroll` da window fechava a folha com o
    * cliente ainda lendo. Viewport de celular so neste bloco (`test.use`),
    * as outras tres tests deste arquivo continuam no viewport padrao.
    */
   /**
-   * O cliente das doze notas (um briefing completo, com "melhorar" grande em cada resposta) e a folha aberta
+   * O cliente das treze notas (um briefing completo, com "melhorar" grande em cada resposta) e a folha aberta
    * pela barra fina do topo. Um id por teste: cada teste cria o proprio usuario, sem depender dos outros.
    */
   async function prepararCliente(id: string) {
@@ -706,8 +712,8 @@ test.describe("briefing pela tela", () => {
     await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
 
     // barra fina fixa no topo (barraCelular): abre a folha ao tocar.
-    await page.getByRole("button", { name: "as doze notas" }).click();
-    const folha = page.getByRole("dialog", { name: "as doze notas" });
+    await page.getByRole("button", { name: "as treze notas" }).click();
+    const folha = page.getByRole("dialog", { name: "as treze notas" });
     await expect(folha).toBeVisible();
 
     const caixa = await folha.boundingBox();

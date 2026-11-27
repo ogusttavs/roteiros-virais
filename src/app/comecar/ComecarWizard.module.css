@@ -73,6 +73,23 @@
   cursor: pointer;
 }
 
+/* Convite de grupo: o atalho para "Suas empresas e a equipe", do tamanho e do jeito do Sair. */
+.linkEmpresas {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border-radius: var(--raio-pill);
+  color: var(--cor-acao);
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.linkEmpresas:hover {
+  background: var(--cor-superficie-hover);
+}
+
 .botaoSair:hover {
   background: var(--cor-superficie-hover);
 }

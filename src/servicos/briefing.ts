@@ -12,6 +12,7 @@ import {
   clientes,
   type AvaliacaoResposta,
   type Briefing,
+  type FonteContextoMarca,
   type PerfilCompilado,
   type TipoMarca,
 } from "@/db/schema";
@@ -22,13 +23,15 @@ import * as organizarFalaBriefingIA from "@/ia/prompts/organizarFalaBriefing";
 import { registrarGeracao } from "@/ia/registro";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { config } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { modoVerComoLigado } from "@/lib/ver-como";
 
 import { perguntaPorId, perguntasDoBriefing } from "../config/briefing";
 
-import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial } from "./briefing-regras";
+import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial, enunciadoParaLer } from "./briefing-regras";
+import { conferirSugestao, montarFontesDaSugestao } from "./briefing-sugestao";
 import { clientePorId } from "./clientes";
-import { contextoConfirmadoDoCliente, enfileirarEntenderMarca, marcaTemFonteParaLer } from "./contexto-marca";
+import { contextoConfirmadoDoCliente, enfileirarEntenderMarca, lidoDaMarcaParaSugestao, marcaTemFonteParaLer } from "./contexto-marca";
 import { ROTULO_CATEGORIA } from "./contexto-marca-regras";
 import { pedirFiltroDeNoticiasDaMarca } from "./filtro-de-noticias";
 import { formatarPerfilComArroba, perfisCitadosDoCliente } from "./perfis-citados";
@@ -154,6 +157,75 @@ export type ResultadoAvaliarResposta = {
   reusada: boolean;
 };
 
+/** E76 PR 1: o que vale para todas as perguntas da marca (o lido do site e das redes e os dados fixos), lido uma vez. */
+type BaseDasFontes = {
+  lidoDaMarca: { origem: FonteContextoMarca; texto: string }[];
+  dadosFixos: (string | null | undefined)[];
+};
+
+/** E76 PR 1: as FONTES DA MARCA de uma pergunta: o que vai ao prompt e o texto inteiro que a conferência por código lê. */
+type FontesDaSugestao = BaseDasFontes & {
+  outrasRespostas: { enunciado: string; resposta: string }[];
+  texto: string;
+};
+
+async function carregarBaseDasFontes(clienteId: number): Promise<BaseDasFontes> {
+  const cliente = await clientePorId(clienteId);
+  if (!cliente) return { lidoDaMarca: [], dadosFixos: [] };
+  return {
+    lidoDaMarca: await lidoDaMarcaParaSugestao(cliente),
+    dadosFixos: [cliente.nome, cliente.regiao, cliente.pais, cliente.paises, cliente.ramoOutro],
+  };
+}
+
+function fontesDaPergunta(
+  base: BaseDasFontes,
+  perguntaId: string,
+  resposta: string,
+  respostas: Record<string, string>,
+  avaliacoes: Record<string, AvaliacaoResposta>,
+  tipo: TipoMarca,
+): FontesDaSugestao {
+  // E76 PR 2: a P12 antiga, que ainda cobre a P13, entra com o enunciado de antes da separação.
+  const outrasRespostas = perguntasDoBriefing(tipo)
+    .filter((p) => p.id !== perguntaId)
+    .map((p) => ({ enunciado: enunciadoParaLer(p, avaliacoes, tipo), resposta: respostas[p.id] ?? "" }))
+    .filter((r) => r.resposta.trim().length > 0);
+  const texto = montarFontesDaSugestao({ resposta, outrasRespostas, lidoDaMarca: base.lidoDaMarca, dadosFixos: base.dadosFixos });
+  return { ...base, outrasRespostas, texto };
+}
+
+/**
+ * E76 PR 1: a sugestão de resposta com todo dado sem fonte trocado por colchete, ou vazia quando passou do limite de trocas
+ * (`conferirSugestao`). Sem IA. A mesma avaliação volta quando nada mudou.
+ */
+function comSugestaoConferida(avaliacao: AvaliacaoResposta, fontes: string): AvaliacaoResposta {
+  if (!avaliacao.exemplo) return avaliacao;
+  const { texto } = conferirSugestao(avaliacao.exemplo, fontes);
+  return texto === avaliacao.exemplo ? avaliacao : { ...avaliacao, exemplo: texto };
+}
+
+/**
+ * E76 PR 1: as avaliações guardadas com a sugestão conferida contra as fontes de HOJE, para a tela (o briefing e o Começar). Uma
+ * avaliação gravada antes desta conferência, ou antes de a pessoa tirar um item do site, pode trazer um dado sem fonte: a tela
+ * nunca o mostra. Só lê (nada é gravado, e o "ver como" também passa por aqui) e não chama IA.
+ */
+export async function avaliacoesParaMostrar(
+  clienteId: number,
+  briefing: Pick<Briefing, "respostas" | "avaliacoes">,
+  tipo: TipoMarca,
+): Promise<Record<string, AvaliacaoResposta>> {
+  const comSugestao = Object.entries(briefing.avaliacoes).filter(([, avaliacao]) => Boolean(avaliacao?.exemplo));
+  if (comSugestao.length === 0) return briefing.avaliacoes;
+  const base = await carregarBaseDasFontes(clienteId);
+  const resultado = { ...briefing.avaliacoes };
+  for (const [perguntaId, avaliacao] of comSugestao) {
+    const fontes = fontesDaPergunta(base, perguntaId, briefing.respostas[perguntaId] ?? "", briefing.respostas, briefing.avaliacoes, tipo);
+    resultado[perguntaId] = comSugestaoConferida(avaliacao, fontes.texto);
+  }
+  return resultado;
+}
+
 /**
  * Avalia uma resposta (ou reusa a avaliacao guardada se o texto nao mudou),
  * recalcula a nota geral, atualiza o gate de liberacao e, quando o
@@ -196,12 +268,22 @@ export async function avaliarResposta(
   const briefing = await garantirBriefing(clienteId);
   const avaliacaoGuardada = briefing.avaliacoes[perguntaId];
   const respostaGuardada = briefing.respostas[perguntaId];
+  // E76 PR 1: as FONTES DA MARCA desta pergunta, com a resposta nova no lugar da guardada (o prompt e a conferência leem as mesmas).
+  const fontes = fontesDaPergunta(
+    await carregarBaseDasFontes(clienteId),
+    perguntaId,
+    resposta,
+    { ...briefing.respostas, [perguntaId]: resposta },
+    briefing.avaliacoes,
+    tipo,
+  );
 
   let avaliacao: AvaliacaoResposta;
   let reusada = false;
 
   if (avaliacaoGuardada && respostaGuardada === resposta) {
-    avaliacao = avaliacaoGuardada;
+    // Uma avaliação gravada antes da conferência por código também passa por ela (sem IA), e é gravada assim.
+    avaliacao = comSugestaoConferida(avaliacaoGuardada, fontes.texto);
     reusada = true;
   } else {
     ({ dados: avaliacao } = await gerarComVerificacao({
@@ -217,6 +299,8 @@ export async function avaliarResposta(
         oQueAIAProcura: pergunta.oQueAIAProcura,
         resposta,
         tipo,
+        outrasRespostas: fontes.outrasRespostas,
+        lidoDaMarca: fontes.lidoDaMarca,
       }),
       generoTexto: "analise",
       extrairCampos: (d) => ({
@@ -227,11 +311,23 @@ export async function avaliarResposta(
         impacto: d.impacto,
       }),
     }));
+    // E76 PR 1: a trava não depende só do prompt. O que a IA escreveu fica em `geracoes_ia` como veio; a pessoa só vê (e só aceita) a conferida.
+    const conferida = conferirSugestao(avaliacao.exemplo ?? "", fontes.texto);
+    if (conferida.trocados.length > 0) {
+      logger.info(
+        { tarefa: "avaliarResposta", clienteId, perguntaId, trocas: conferida.trocados.length, descartada: conferida.descartada },
+        "sugestão do briefing com dado sem fonte: trocado por colchete",
+      );
+      avaliacao = { ...avaliacao, exemplo: conferida.texto };
+    }
+    // E76 PR 2: a avaliação nova diz qual enunciado leu (a P12 depois da separação), para a nota saber que ela não cobre mais a P13.
+    if (pergunta.versao !== undefined) avaliacao = { ...avaliacao, versaoPergunta: pergunta.versao };
   }
 
   const {
     avaliacao: avaliacaoFinal,
     respostas,
+    avaliacoes: avaliacoesGravadas,
     notaGeral,
     completo,
     deveCompilarPerfil,
@@ -270,6 +366,7 @@ export async function avaliarResposta(
     return {
       avaliacao: avaliacoes[perguntaId] ?? avaliacao,
       respostas,
+      avaliacoes,
       notaGeral,
       completo,
       deveCompilarPerfil,
@@ -278,7 +375,7 @@ export async function avaliarResposta(
   });
 
   if (deveCompilarPerfil) {
-    await compilarEGravarPerfil(clienteId, briefing.id, respostas, tipo);
+    await compilarEGravarPerfil(clienteId, briefing.id, respostas, avaliacoesGravadas, tipo);
   }
 
   /**
@@ -313,11 +410,13 @@ async function compilarEGravarPerfil(
   clienteId: number,
   briefingId: number,
   respostas: Record<string, string>,
+  avaliacoes: Record<string, AvaliacaoResposta>,
   tipo: TipoMarca,
 ): Promise<void> {
+  // E76 PR 2: a P12 antiga, que ainda cobre a P13, vai com o enunciado de antes, para os admirados dela não virarem concorrentes.
   const respostasPorEnunciado: Record<string, string> = {};
   for (const pergunta of perguntasDoBriefing(tipo)) {
-    respostasPorEnunciado[pergunta.enunciado] = respostas[pergunta.id] ?? "";
+    respostasPorEnunciado[enunciadoParaLer(pergunta, avaliacoes, tipo)] = respostas[pergunta.id] ?? "";
   }
 
   const { dados: perfil } = await gerarComVerificacao({

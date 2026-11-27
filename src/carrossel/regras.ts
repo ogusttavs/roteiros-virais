@@ -22,7 +22,7 @@ import {
 import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 
 import { distribuirFotos } from "./fotos";
-import { rotularItens } from "./metodo";
+import { promessaDeContagem, rotularItens } from "./metodo";
 
 export function contarPalavras(texto: string): number {
   return texto.trim() === "" ? 0 : texto.trim().split(/\s+/).length;
@@ -57,7 +57,7 @@ const limpo = (v: string | undefined): string => (v ?? "").trim();
 /**
  * Da saída da IA para o que o slide guarda: cada tipo fica só com os campos que usa, com os nomes do desenho; o número e o total dos passos, o rodapé de saúde e o fim do contexto da fala são escritos por código.
  */
-export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolean }): SlideDoCarrossel[] {
+export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolean; responsavelTecnico?: string | null }): SlideDoCarrossel[] {
   const totalDePassos = saida.filter((s) => s.tipo === "passo").length;
   let passo = 0;
   return rotularItens(saida.map((s): SlideDoCarrossel => {
@@ -84,7 +84,7 @@ export function slidesDaSaida(saida: SlideDaSaida[], opcoes: { ramoSaude: boolea
       case "resumo":
         return { tipo: s.tipo, titulo: limpo(s.titulo), linhas: s.linhas.map(limpo).filter(Boolean) };
       case "chamada":
-        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), acoes: s.acoes.map(limpo).filter(Boolean) };
+        return { tipo: s.tipo, titulo: limpo(s.titulo), texto: limpo(s.texto), acoes: s.acoes.map(limpo).filter(Boolean), ...(opcoes.ramoSaude && opcoes.responsavelTecnico ? { responsavel: opcoes.responsavelTecnico } : {}) };
       case "noticia":
         return { tipo: s.tipo, titulo: limpo(s.titulo), veiculo: limpo(s.fonte), data: limpo(s.referencia) };
     }
@@ -96,8 +96,15 @@ export function textoDoSlide(s: SlideDoCarrossel): string[] {
   return [s.rotulo, s.titulo, s.sub, s.texto, s.antes, s.depois, s.valor && `${s.valor}${s.unidade ?? ""}`, s.frase, s.fonte, s.citacao, s.quem, s.contexto, ...(s.linhas ?? []), ...(s.acoes ?? [])].filter((t): t is string => Boolean(t && t.trim()));
 }
 
-/** A ordem e a forma da lista: quantidade, capa primeiro, chamada por último, nunca três do mesmo tipo seguidos. */
-export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide }[], quantidade: number): string[] {
+/** Os tipos que formam a lista que a capa promete ("3 sinais", "5 passos"). */
+const TIPOS_DA_LISTA_DA_CAPA: ReadonlySet<TipoDeSlide> = new Set(["item", "passo"]);
+
+/**
+ * A ordem e a forma da lista: quantidade, capa primeiro, chamada por último, nunca três do mesmo tipo seguidos. A exceção (T114, ensaio de 26/11/2026) é a lista que a capa promete: com "3 sinais" em
+ * 5 slides só cabem os 3 itens no meio, e a regra dos três seguidos obrigava a trocar um deles por outro tipo, o que quebrava a contagem da capa. Itens (ou passos) seguidos até o número que a capa
+ * promete são o esperado; a regra continua valendo para os outros tipos, para a capa sem número e para a sequência que passa do número.
+ */
+export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide; titulo?: string; sub?: string }[], quantidade: number): string[] {
   const motivos: string[] = [];
   if (slides.length !== quantidade) motivos.push(`carrossel: ${slides.length} slides, o pedido era de exatamente ${quantidade}`);
   if (slides.length > 0 && !ehCapa(slides[0].tipo)) motivos.push('carrossel: o primeiro slide precisa ser uma capa (capa-foto ou capa-texto)');
@@ -106,10 +113,13 @@ export function verificarOrdemDosSlides(slides: { tipo: TipoDeSlide }[], quantid
     if (i > 0 && ehCapa(s.tipo)) motivos.push(`slide ${i + 1}: o tipo "${s.tipo}" só pode ser o primeiro`);
     if (i < slides.length - 1 && s.tipo === "chamada") motivos.push(`slide ${i + 1}: o tipo "chamada" só pode ser o último`);
   });
+  const capa = slides[0];
+  const promessa = capa && ehCapa(capa.tipo) ? promessaDeContagem(`${capa.titulo ?? ""}. ${capa.sub ?? ""}`) : null;
   let seguidos = 1;
   for (let i = 1; i < slides.length; i += 1) {
     seguidos = slides[i].tipo === slides[i - 1].tipo ? seguidos + 1 : 1;
-    if (seguidos > MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO) {
+    const listaDaCapa = promessa !== null && TIPOS_DA_LISTA_DA_CAPA.has(slides[i].tipo) && seguidos <= promessa.quantidade;
+    if (seguidos > MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO && !listaDaCapa) {
       motivos.push(`slides ${i - seguidos + 2} a ${i + 1}: ${seguidos} slides seguidos do tipo "${slides[i].tipo}", misture os tipos`);
       break;
     }

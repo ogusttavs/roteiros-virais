@@ -7,8 +7,10 @@ import { sessaoDoPainel } from "@/lib/ver-como";
 import { assinaturasDaMarca, ehDonoDaMarca } from "@/servicos/assinatura";
 import { situacaoDaAssinatura } from "@/servicos/assinatura-tela";
 import { garantirBriefing } from "@/servicos/briefing";
+import { marcaEhDeSaude } from "@/servicos/carrossel";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { candidatasDaMarca, contaLigadaDaMarca, ehDonoDaMarca as ehDonoParaInstagram, ligacaoDisponivel } from "@/servicos/conta-conectada";
+import { empresaEhDoGrupo, ehDonoDeEmpresaDoGrupo, membrosParaODono, situacaoDasEmpresas } from "@/servicos/convite-de-grupo";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
@@ -20,11 +22,13 @@ import { AvisoDeManha } from "./AvisoDeManha";
 import { BotaoSair } from "./BotaoSair";
 import { BriefingLinha } from "./BriefingLinha";
 import { FormularioConta } from "./FormularioConta";
+import { SuasEmpresas } from "./GrupoDaConta";
 import { InformacoesDoAparelhoAdmin } from "./InformacoesDoAparelhoAdmin";
 import { InstalarNoCelular } from "./InstalarNoCelular";
 import { LinkPostPronto } from "./LinkPostPronto";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
+import { ResponsavelTecnico } from "./ResponsavelTecnico";
 import { codigoDoRetorno, montarVisaoSeuInstagram } from "./seu-instagram-visao";
 import { SeuInstagram } from "./SeuInstagram";
 import { SuaAssinatura } from "./SuaAssinatura";
@@ -47,9 +51,16 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
   const onde = cliente ? dadosOndeIniciais(cliente) : null;
   const membros = cliente ? await membrosDaMarca(cliente.id) : [];
   const briefing = cliente ? await garantirBriefing(cliente.id) : null;
+  // Convite de grupo: no "ver como" nada disto aparece (quem olha é o admin, não a pessoa).
+  const empresasDoGrupo = sessao.verComo ? null : await situacaoDasEmpresas(sessao.user.id);
+  const donoDoGrupo = cliente && !sessao.verComo ? await ehDonoDeEmpresaDoGrupo(sessao.user.id, cliente.id) : false;
+  // Quem não é a dona de uma empresa do grupo lê "quem dá acesso é quem a criou" no lugar do "fale com a gente".
+  const empresaDoGrupo = cliente && !sessao.verComo && !donoDoGrupo ? await empresaEhDoGrupo(cliente.id) : false;
   const ramoAtual = await ramoAtualDoCliente(cliente?.nichoId);
   const pedidoAberto = cliente ? await pedidoAbertoDaMarca(cliente.id) : null;
   const alternativos = cliente ? await ramosAlternativosDaMarca(cliente.id) : [];
+  // O responsável técnico só existe para marca de saúde (a linha sai no último slide do carrossel).
+  const ehSaude = cliente ? await marcaEhDeSaude(cliente.id, ramoAtual?.ramoSlug ?? null) : false;
   const tiposDaMarca = cliente ? await formatosDaMarcaComEstado(cliente.id) : [];
   const notaBriefing = briefing?.notaGeral ? Number(briefing.notaGeral) : null;
   // E22 PR 2: o cartão "Sua assinatura" só aparece com a cobrança ligada ou com assinatura no histórico da marca (desligada e sem assinatura, Conta fica como sempre foi).
@@ -114,11 +125,15 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
           paisesInicial={onde?.paises ?? null}
           desligadoVerComo={sessao.verComo ? textosVerComo.contaSalvarDesligado(sessao.user.name) : undefined}
         />
+        {cliente && ehSaude ? (
+          <ResponsavelTecnico inicial={cliente.responsavelTecnico ?? ""} desligadoVerComo={sessao.verComo ? textosVerComo.contaSalvarDesligado(sessao.user.name) : undefined} />
+        ) : null}
       </div>
       {cliente ? (
-        <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
+        <QuemTemAcesso nomeMarca={cliente.nome} membros={donoDoGrupo ? membrosParaODono(membros) : membros} usuarioIdAtual={sessao.user.id} donoDoGrupo={donoDoGrupo} empresaDoGrupo={empresaDoGrupo} />
       ) : null}
       <div className={styles.colunaPrincipal}>
+        {empresasDoGrupo ? <SuasEmpresas usadas={empresasDoGrupo.usadas} maximo={empresasDoGrupo.maximo} /> : null}
         {mostrarAssinatura && situacaoAssinatura ? <SuaAssinatura situacao={situacaoAssinatura} dono={donoDaMarca} verComo={sessao.verComo !== null} /> : null}
         {visaoInstagram ? <SeuInstagram visao={visaoInstagram} /> : null}
         {/* E56 PR 2: a entrada de "Publicar post pronto" (com a chave aberta, o Instagram ligado e a dona da marca fora do "ver como"). */}
