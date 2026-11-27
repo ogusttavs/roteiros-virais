@@ -6,6 +6,7 @@ import { config } from "@/lib/config";
 import { COR_FUNDO_CLARO, COR_FUNDO_ESCURO } from "@/lib/cores-do-aparelho";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { TAMANHO_DA_PREVIA, textosPreviaDeLink } from "@/textos/previa-de-link";
 import { OuvinteToque } from "@/ui/componentes/OuvinteToque";
 import { CorDaBarraDoSistema } from "@/ui/CorDaBarraDoSistema";
 
@@ -45,7 +46,29 @@ const caveat = localFont({
   preload: false,
 });
 
-export const metadata: Metadata = {
+/**
+ * A prévia do link (Open Graph, 27/11/2026): `metadataBase` vem do `APP_URL` lido na hora do pedido (por isso `generateMetadata`, e não um objeto montado na carga do
+ * módulo, que no build leria o endereço local), e toda página herda a imagem geral. O convite troca título, descrição e imagem (`convite/[codigo]/page.tsx`).
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const p = textosPreviaDeLink.geral;
+  return {
+    ...metadata,
+    metadataBase: new URL(config.appUrl),
+    description: p.descricao,
+    openGraph: {
+      type: "website",
+      siteName: config.appName,
+      locale: "pt_BR",
+      title: config.appName,
+      description: p.descricao,
+      images: [{ url: p.imagem, ...TAMANHO_DA_PREVIA, alt: p.textoDaImagem }],
+    },
+    twitter: { card: "summary_large_image", title: config.appName, description: p.descricao, images: [p.imagem] },
+  };
+}
+
+const metadata: Metadata = {
   title: config.appName,
   description: config.appName,
   icons: {
