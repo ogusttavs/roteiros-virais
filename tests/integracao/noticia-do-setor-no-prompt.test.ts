@@ -153,7 +153,7 @@ describe("o roteiro que nasce de uma notícia do setor", () => {
   it("a reescrita mantém a notícia, com o veículo, o dia e o aviso de novo", async () => {
     const primeiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", noticiaId });
     vi.mocked(verificador.gerarComVerificacao).mockClear();
-    const novo = await reprovarERescrever(primeiro.id, ["gancho_fraco"]);
+    const novo = await reprovarERescrever(primeiro.id, primeiro.clienteId, ["gancho_fraco"]);
     expect(novo.noticiaId).toBe(noticiaId);
     const entrada = entradaDoUltimo();
     expect(entrada).toContain("<noticias_do_assunto>");

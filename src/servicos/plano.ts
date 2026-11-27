@@ -403,7 +403,7 @@ export async function aceitar(
       formato,
       objetivoDoVideo: objetivoDoVideo ?? null,
     })
-    .where(eq(planoGravacoes.id, itemId));
+    .where(and(eq(planoGravacoes.id, itemId), eq(planoGravacoes.clienteId, cliente.id)));
 
   return roteiro;
 }
@@ -411,25 +411,25 @@ export async function aceitar(
 /** "Pular" (item 3): some do bloco, sem gerar nada. */
 export async function pular(itemId: number, clienteId: number): Promise<void> {
   await itemPorId(itemId, clienteId);
-  await db().update(planoGravacoes).set({ estado: "pulado" }).where(eq(planoGravacoes.id, itemId));
+  await db().update(planoGravacoes).set({ estado: "pulado" }).where(and(eq(planoGravacoes.id, itemId), eq(planoGravacoes.clienteId, clienteId)));
 }
 
 /**
- * "Já gravei" no roteiro fecha o círculo (item 3): ligado pelo `roteiroId`,
- * não pelo `clienteId` (a Server Action de `marcarGravado` do roteiro já
- * confirmou a posse dele). Sem item ligado a este roteiro, não faz nada.
+ * "Já gravei" no roteiro fecha o círculo (item 3): ligado pelo `roteiroId` e, desde o M3 da auditoria de 26/11/2026, também pelo `clienteId`
+ * da sessão, dentro do próprio SQL (o serviço se defende sozinho, sem confiar que quem chama já conferiu a posse). Sem item ligado a este
+ * roteiro nesta marca, não faz nada.
  */
-export async function marcarGravado(roteiroId: number): Promise<void> {
+export async function marcarGravado(roteiroId: number, clienteId: number): Promise<void> {
   await db()
     .update(planoGravacoes)
     .set({ estado: "gravado" })
-    .where(and(eq(planoGravacoes.roteiroId, roteiroId), eq(planoGravacoes.estado, "aceito")));
+    .where(and(eq(planoGravacoes.roteiroId, roteiroId), eq(planoGravacoes.clienteId, clienteId), eq(planoGravacoes.estado, "aceito")));
 }
 
-/** O inverso de `marcarGravado`: "Ainda não gravei" devolve o item do plano a "aceito". Sem item gravado ligado a este roteiro, não faz nada. */
-export async function desmarcarGravado(roteiroId: number): Promise<void> {
+/** O inverso de `marcarGravado`: "Ainda não gravei" devolve o item do plano a "aceito". Sem item gravado ligado a este roteiro nesta marca, não faz nada. */
+export async function desmarcarGravado(roteiroId: number, clienteId: number): Promise<void> {
   await db()
     .update(planoGravacoes)
     .set({ estado: "aceito" })
-    .where(and(eq(planoGravacoes.roteiroId, roteiroId), eq(planoGravacoes.estado, "gravado")));
+    .where(and(eq(planoGravacoes.roteiroId, roteiroId), eq(planoGravacoes.clienteId, clienteId), eq(planoGravacoes.estado, "gravado")));
 }

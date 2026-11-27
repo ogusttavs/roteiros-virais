@@ -232,7 +232,7 @@ describe("o roteiro que nasce de uma notícia de assunto", () => {
   it("a reescrita mantém a origem e o prompt da reescrita recebe o título e o resumo de novo", async () => {
     const primeiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "o que o debate muda para a minha loja", objetivo: "alcance", noticiaAssuntoId: noticiaId });
     vi.mocked(verificador.gerarComVerificacao).mockClear();
-    const novo = await reprovarERescrever(primeiro.id, ["gancho_fraco"]);
+    const novo = await reprovarERescrever(primeiro.id, primeiro.clienteId, ["gancho_fraco"]);
     expect(novo.noticiaDoAssunto).toEqual(primeiro.noticiaDoAssunto);
     const entrada = entradaDoUltimoRoteiro();
     expect(entrada).toContain(TITULO);
@@ -246,7 +246,7 @@ describe("o roteiro que nasce de uma notícia de assunto", () => {
     const primeiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "o que o debate muda para a minha loja", objetivo: "alcance", noticiaAssuntoId: noticiaId });
     await db().update(assuntosDaMarca).set({ ativo: false }).where(eq(assuntosDaMarca.id, assuntoId));
     vi.mocked(verificador.gerarComVerificacao).mockClear();
-    const novo = await reprovarERescrever(primeiro.id, ["gancho_fraco"]);
+    const novo = await reprovarERescrever(primeiro.id, primeiro.clienteId, ["gancho_fraco"]);
     expect(novo.noticiaDoAssunto).toEqual(primeiro.noticiaDoAssunto);
     expect(entradaDoUltimoRoteiro()).toContain(RESUMO);
   });
@@ -260,7 +260,7 @@ describe("o roteiro que nasce de uma notícia de assunto", () => {
     expect(guardado.noticiaDoAssunto?.titulo).toBe(TITULO);
 
     vi.mocked(verificador.gerarComVerificacao).mockClear();
-    const novo = await reprovarERescrever(primeiro.id, ["gancho_fraco"]);
+    const novo = await reprovarERescrever(primeiro.id, primeiro.clienteId, ["gancho_fraco"]);
     expect(novo.noticiaDoAssunto).toEqual(primeiro.noticiaDoAssunto);
     const entrada = entradaDoUltimoRoteiro();
     expect(entrada).toContain(TITULO);

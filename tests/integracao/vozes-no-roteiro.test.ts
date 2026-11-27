@@ -150,7 +150,7 @@ describe("as vozes do público no roteiro", () => {
     await porVozes(nichoId, vozes([voz("Serve em tecido de camurça?", 14)]));
     const primeiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
     vi.mocked(verificador.gerarComVerificacao).mockClear();
-    await reprovarERescrever(primeiro.id, ["gancho_fraco"]);
+    await reprovarERescrever(primeiro.id, primeiro.clienteId, ["gancho_fraco"]);
     expect(ultimaChamada().entrada).toContain("pergunta 1 | 14 comentários | YouTube | Serve em tecido de camurça?");
   });
 });

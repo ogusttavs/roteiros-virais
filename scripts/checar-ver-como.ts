@@ -1,13 +1,15 @@
 /**
- * Ponto de entrada de linha de comando (npm run checar-ver-como). As regras estão em checar-ver-como-regras.ts, sem process.exit, para dar para testar.
+ * Ponto de entrada de linha de comando (npm run checar-ver-como). As regras estão em checar-ver-como-regras.ts, sem process.exit, para dar para testar. Confere as Server Actions do
+ * painel e, desde o M3 da auditoria de segurança de 26/11/2026, as rotas `/api` que escrevem.
  */
-import { listarArquivos, verificarArquivo } from "./checar-ver-como-regras";
+import { listarArquivos, verificarArquivo, verificarRotasDoRepositorio } from "./checar-ver-como-regras";
 
 const arquivos = listarArquivos();
-const problemas = arquivos.flatMap(verificarArquivo);
+const rotas = verificarRotasDoRepositorio();
+const problemas = [...arquivos.flatMap(verificarArquivo), ...rotas.problemas];
 
 if (problemas.length === 0) {
-  console.log(`checar-ver-como: ${arquivos.length} arquivo(s) de Server Actions verificado(s), nenhum problema.`);
+  console.log(`checar-ver-como: ${arquivos.length} arquivo(s) de Server Actions e ${rotas.rotas} rota(s) /api verificado(s), nenhum problema.`);
   process.exit(0);
 }
 

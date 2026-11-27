@@ -190,7 +190,7 @@ describe("o roteiro que responde a uma pergunta do público", () => {
     await porVozes(nichoId, vozes([voz("Outra pergunta que apareceu depois?", 20)]));
     vi.mocked(verificador.gerarComVerificacao).mockClear();
 
-    const novo = await reprovarERescrever(primeiro.id, ["gancho_fraco"]);
+    const novo = await reprovarERescrever(primeiro.id, primeiro.clienteId, ["gancho_fraco"]);
     expect(novo.perguntaDoPublico).toMatchObject({ chave: CHAVE, texto: PERGUNTA, vezes: 14 });
     const { entrada } = ultimaChamada("roteiro");
     expect(entrada).toContain(`<pergunta_do_publico>${PERGUNTA}</pergunta_do_publico>`);

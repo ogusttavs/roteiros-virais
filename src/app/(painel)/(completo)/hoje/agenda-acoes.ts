@@ -46,8 +46,8 @@ function revalidarAgenda() {
 export async function arquivarAtrasadoAction(roteiroId: number): Promise<void> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  await roteiroDoClienteOuFalha(roteiroId);
-  await arquivarRoteiro(roteiroId);
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
+  await arquivarRoteiro(roteiroId, roteiro.clienteId);
   revalidarAgenda();
 }
 
@@ -55,8 +55,8 @@ export async function arquivarAtrasadoAction(roteiroId: number): Promise<void> {
 export async function desarquivarAction(roteiroId: number): Promise<void> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  await roteiroDoClienteOuFalha(roteiroId);
-  await desarquivarRoteiro(roteiroId);
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
+  await desarquivarRoteiro(roteiroId, roteiro.clienteId);
   revalidarAgenda();
 }
 
@@ -67,9 +67,9 @@ export async function desarquivarAction(roteiroId: number): Promise<void> {
 export async function mudarDataAtrasadoAction(roteiroId: number, novaData: string): Promise<ResultadoAcao<null>> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  await roteiroDoClienteOuFalha(roteiroId);
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
   try {
-    await mudarDataRoteiro(roteiroId, novaData);
+    await mudarDataRoteiro(roteiroId, roteiro.clienteId, novaData);
   } catch (erro) {
     if (erro instanceof ErroRoteiro) return { ok: false, erro: erro.message };
     throw erro;
@@ -102,8 +102,8 @@ export type RespostaAindaVale = { vale: true } | { vale: false; assunto: string;
 export async function conferirAindaValeAction(roteiroId: number): Promise<RespostaAindaVale> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  await roteiroDoClienteOuFalha(roteiroId);
-  const resultado = await conferirAindaVale(roteiroId);
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
+  const resultado = await conferirAindaVale(roteiroId, roteiro.clienteId);
   revalidarAgenda();
 
   if (resultado.vale) return { vale: true };

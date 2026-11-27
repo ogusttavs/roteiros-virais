@@ -671,7 +671,7 @@ async function concluir(linha: Publicacao, resultado: { midiaId: string | null; 
     // Já marcado como postado (a pessoa colou o link antes, ou publicou o outro tipo): não cria um segundo vídeo para a curva.
     if (roteiro && roteiro.status !== "postado") {
       const endereco = resultado.permalink ?? enderecoDoPerfil(nomeDaConta);
-      await marcarPostado(roteiro.id, endereco);
+      await marcarPostado(roteiro.id, linha.clienteId, endereco);
       if (resultado.midiaId) {
         await db()
           .update(videosCliente)
