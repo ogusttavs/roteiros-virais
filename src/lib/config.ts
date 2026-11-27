@@ -623,12 +623,13 @@ verificarSegredosDeProducao();
  * chamada do modelo forte no pior caso (16 mil tokens de saída a US$ 25 por milhão, mais uns 20 mil de entrada a US$ 5) fica perto de US$ 0,50; um dia normal de uma marca gasta uns US$ 0,50
  * a 1 (a tabela de custo por perfil da `apresentacao-preco.html`). Um dia pesado de verdade, com as 20 versões do teto, 10 roteiros refeitos, edições, carrosséis e as 3 pesquisas na hora,
  * chega a uns US$ 18; uma hora de demonstração intensa, a uns US$ 5. Os limites ficam acima disso com folga: US$ 8 por hora e US$ 25 por dia.
- * `FREIO_IA=0` desliga o freio inteiro. `FREIO_IA_SIMULTANEAS` é quantas chamadas de uma marca correm ao mesmo tempo por processo; a seguinte espera a vez (não é recusada), para uma
+ * `FREIO_IA_POR_DIA_CORTESIA_USD` (padrão US$ 60) é o teto do dia da marca com cortesia e da do plano sem limite, que não têm o teto comum do dia mas também não ficam só com o da hora (US$ 8 por hora
+ * deixariam até US$ 192 por dia). `FREIO_IA_ESPERA_MAX_S` (padrão 120) é quanto uma chamada espera a vaga: passou disso, segue sem a vaga (melhor deixar passar do que travar a tela). Como nos outros, zero, negativo ou texto voltam ao padrão. `FREIO_IA=0` desliga o freio inteiro. `FREIO_IA_SIMULTANEAS` é quantas chamadas de uma marca correm ao mesmo tempo por processo; a seguinte espera a vez (não é recusada), para uma
  * rajada de pedidos juntos não passar inteira antes de a primeira chamada ser contada.
  */
-export type LimitesDoFreioDaIA = { ativo: boolean; porHoraUsd: number; porDiaUsd: number; simultaneas: number };
+export type LimitesDoFreioDaIA = { ativo: boolean; porHoraUsd: number; porDiaUsd: number; porDiaCortesiaUsd: number; simultaneas: number; esperaMaxS: number };
 
-export const PADROES_DO_FREIO_DA_IA = { porHoraUsd: 8, porDiaUsd: 25, simultaneas: 4 } as const;
+export const PADROES_DO_FREIO_DA_IA = { porHoraUsd: 8, porDiaUsd: 25, porDiaCortesiaUsd: 60, simultaneas: 4, esperaMaxS: 120 } as const;
 
 export function limitesDoFreioDaIA(): LimitesDoFreioDaIA {
   const positivo = (nome: string, padrao: number) => {
@@ -639,7 +640,9 @@ export function limitesDoFreioDaIA(): LimitesDoFreioDaIA {
     ativo: process.env.FREIO_IA !== "0",
     porHoraUsd: positivo("FREIO_IA_POR_HORA_USD", PADROES_DO_FREIO_DA_IA.porHoraUsd),
     porDiaUsd: positivo("FREIO_IA_POR_DIA_USD", PADROES_DO_FREIO_DA_IA.porDiaUsd),
+    porDiaCortesiaUsd: positivo("FREIO_IA_POR_DIA_CORTESIA_USD", PADROES_DO_FREIO_DA_IA.porDiaCortesiaUsd),
     simultaneas: Math.max(1, Math.floor(positivo("FREIO_IA_SIMULTANEAS", PADROES_DO_FREIO_DA_IA.simultaneas))),
+    esperaMaxS: positivo("FREIO_IA_ESPERA_MAX_S", PADROES_DO_FREIO_DA_IA.esperaMaxS),
   };
 }
 

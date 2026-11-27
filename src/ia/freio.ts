@@ -5,9 +5,11 @@
  *
  * - **O que conta:** o custo que ficou em `geracoes_ia` da marca na última hora e nas últimas 24 horas (janelas que andam com o relógio, sem "virada" à meia-noite).
  * - **Por hora** (`porHoraUsd`): vale para toda marca, inclusive a de cortesia e a do plano sem limite. É proteção contra abuso (um laço, uma conta roubada), não regra de plano.
- * - **Por dia** (`porDiaUsd`): vale para toda marca, menos a de cortesia e a do plano sem limite, que já são escolhas do admin de deixar usar à vontade; para elas o freio por hora basta.
+ * - **Por dia** (`porDiaUsd`): vale para a marca comum. A de cortesia e a do plano sem limite são escolhas do admin de deixar usar à vontade, mas têm um teto do dia só delas (`porDiaCortesiaUsd`,
+ *   padrão US$ 60): o da hora sozinho deixaria até US$ 192 por dia.
  * - **Ao mesmo tempo** (`simultaneas`): quantas chamadas de uma marca correm juntas neste processo. A seguinte espera a vez, sem recusa. Sem isso, cem pedidos disparados juntos passariam
- *   todos pela conferência antes de o primeiro custo ser gravado.
+ *   todos pela conferência antes de o primeiro custo ser gravado. A espera tem prazo (`esperaMaxS`): passou dele, a chamada segue para a conferência sem a vaga e o log avisa, para uma chamada
+ *   presa não travar a tela. O limite é por processo: o app e o worker somam.
  * - **Recusa:** `ErroFreioDeGasto` (um `ErroIA` sem causa, para não virar o aviso de "a IA está trancada" das outras marcas), com a frase própria para a pessoa; um aviso no log e o
  *   e-mail do alarme da IA para o admin, uma vez por dia por marca (`avisarFreioDeGasto`).
  * - **Falha ao conferir:** se a leitura do gasto cair (banco fora), a chamada passa e o erro vai ao log. O freio protege o saldo; ele não pode ser o motivo de a IA parar para todo mundo.
@@ -28,9 +30,9 @@ import type { TarefaIA } from "./tipos";
 const HORA_MS = 60 * 60 * 1000;
 const DIA_MS = 24 * HORA_MS;
 
-export type JanelaDoFreio = "hora" | "dia";
+export type JanelaDoFreio = "hora" | "dia" | "dia_cortesia";
 
-/** O que a marca gastou nas duas janelas, em dólar, e se o teto do dia vale para ela. */
+/** O que a marca gastou nas duas janelas, em dólar, e se ela é de cortesia ou sem limite (então vale o teto do dia da cortesia, e não o comum). */
 export type GastoRecenteDaMarca = { nome: string; hora: number; dia: number; semTetoDoDia: boolean };
 
 export type Freada = { janela: JanelaDoFreio; gastoUsd: number; limiteUsd: number };
@@ -41,7 +43,7 @@ export class ErroFreioDeGasto extends ErroIA {
 
   constructor(clienteId: number, tarefa: TarefaIA, freada: Freada) {
     super(
-      `freio de gasto da IA: a marca ${clienteId} gastou US$ ${freada.gastoUsd.toFixed(2)} ${freada.janela === "hora" ? "na ultima hora" : "nas ultimas 24 horas"} (limite US$ ${freada.limiteUsd.toFixed(2)}); tarefa "${tarefa}" recusada`,
+      `freio de gasto da IA: a marca ${clienteId} gastou US$ ${freada.gastoUsd.toFixed(2)} ${freada.janela === "hora" ? "na ultima hora" : freada.janela === "dia" ? "nas ultimas 24 horas" : "nas ultimas 24 horas (teto da cortesia)"} (limite US$ ${freada.limiteUsd.toFixed(2)}); tarefa "${tarefa}" recusada`,
       textosFreioDaIA.cliente[freada.janela],
     );
     this.janela = freada.janela;
@@ -50,9 +52,10 @@ export class ErroFreioDeGasto extends ErroIA {
 }
 
 /** Pura, para testar: a marca passa do limite de alguma janela? A hora vem primeiro (é a que vale para todo mundo e a que volta mais cedo). */
-export function decidirFreio(gasto: Pick<GastoRecenteDaMarca, "hora" | "dia" | "semTetoDoDia">, limites: Pick<LimitesDoFreioDaIA, "porHoraUsd" | "porDiaUsd">): Freada | null {
+export function decidirFreio(gasto: Pick<GastoRecenteDaMarca, "hora" | "dia" | "semTetoDoDia">, limites: Pick<LimitesDoFreioDaIA, "porHoraUsd" | "porDiaUsd" | "porDiaCortesiaUsd">): Freada | null {
   if (gasto.hora >= limites.porHoraUsd) return { janela: "hora", gastoUsd: gasto.hora, limiteUsd: limites.porHoraUsd };
-  if (!gasto.semTetoDoDia && gasto.dia >= limites.porDiaUsd) return { janela: "dia", gastoUsd: gasto.dia, limiteUsd: limites.porDiaUsd };
+  if (gasto.semTetoDoDia) return gasto.dia >= limites.porDiaCortesiaUsd ? { janela: "dia_cortesia", gastoUsd: gasto.dia, limiteUsd: limites.porDiaCortesiaUsd } : null;
+  if (gasto.dia >= limites.porDiaUsd) return { janela: "dia", gastoUsd: gasto.dia, limiteUsd: limites.porDiaUsd };
   return null;
 }
 
@@ -108,16 +111,31 @@ export async function frearSePrecisar(clienteId: number, tarefa: TarefaIA, agora
 /** As chamadas em andamento de cada marca neste processo, e quem espera a vez. */
 const vagas = new Map<number, { ocupadas: number; fila: Array<() => void> }>();
 
-/** Pega uma vaga da marca: na hora, se houver; senão espera a próxima que soltar, na ordem de chegada. */
-async function pegarVaga(clienteId: number, maximo: number): Promise<void> {
+/**
+ * Pega uma vaga da marca: na hora, se houver; senão espera a próxima que soltar, na ordem de chegada, até `esperaMaxS` segundos. Devolve se pegou a vaga: passado o prazo, sai da fila e
+ * devolve `false` (a chamada segue sem a vaga, e quem chamou não solta nada).
+ */
+async function pegarVaga(clienteId: number, maximo: number, esperaMaxS: number): Promise<boolean> {
   const estado = vagas.get(clienteId) ?? { ocupadas: 0, fila: [] };
   vagas.set(clienteId, estado);
   if (estado.ocupadas < maximo) {
     estado.ocupadas += 1;
-    return;
+    return true;
   }
   // A vaga passa direto de quem soltou para quem espera (`ocupadas` não muda): ninguém fura a fila.
-  await new Promise<void>((liberar) => estado.fila.push(liberar));
+  return new Promise<boolean>((resolver) => {
+    const liberar = () => {
+      clearTimeout(prazo);
+      resolver(true);
+    };
+    const prazo = setTimeout(() => {
+      const i = estado.fila.indexOf(liberar);
+      if (i >= 0) estado.fila.splice(i, 1);
+      logger.warn({ clienteId, esperaMaxS }, "freio de gasto da IA: a espera pela vaga passou do prazo; a chamada segue sem a vaga");
+      resolver(false);
+    }, esperaMaxS * 1000);
+    estado.fila.push(liberar);
+  });
 }
 
 function soltarVaga(clienteId: number): void {
@@ -146,11 +164,11 @@ export async function comFreioDeGasto<T>(clienteId: number | undefined, tarefa: 
   if (clienteId === undefined) return fazer();
   const limites = limitesDoFreioDaIA();
   if (!limites.ativo) return fazer();
-  await pegarVaga(clienteId, limites.simultaneas);
+  const temVaga = await pegarVaga(clienteId, limites.simultaneas, limites.esperaMaxS);
   try {
     await frearSePrecisar(clienteId, tarefa, new Date(), limites);
     return await fazer();
   } finally {
-    soltarVaga(clienteId);
+    if (temVaga) soltarVaga(clienteId);
   }
 }
