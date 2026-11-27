@@ -382,6 +382,30 @@ describe("o roteiro longo escrito", () => {
   });
 });
 
+describe("1.12.0: as fontes da marca que chegam ao verificador (só o que a pessoa escreveu ou confirmou)", () => {
+  it("o curto manda `fontesDaMarca` com o perfil e o tema, sem a evidência de outros vídeos que as `fontesDosFatos` trazem", async () => {
+    await medirORamo();
+    await semearCurto(TEMA);
+    await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
+    const [params] = chamadasDoCurto()[chamadasDoCurto().length - 1];
+    expect(String(params.fontesDosFatos)).toContain("olha essa mancha saindo do estofado");
+    expect(params.fontesDaMarca).toContain("produtos de limpeza");
+    expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
+    expect(params.fontesDaMarca).not.toContain("olha essa mancha saindo do estofado");
+    expect(params.fontesDaMarca).not.toContain("Evidência");
+  });
+
+  it("o longo manda `fontesDaMarca` com o perfil e o tema, sem a evidência", async () => {
+    await medirORamo();
+    await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
+    const { params } = ultimaChamadaDoLongo();
+    expect(params.fontesDaMarca).toContain("produtos de limpeza");
+    expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
+    expect(params.fontesDaMarca).not.toContain("Evidência");
+    expect(params.fontesDaMarca).not.toMatch(/Notícia|Dados da pesquisa|Marca citada/);
+  });
+});
+
 describe("o verificador confere os capítulos por código", () => {
   it("um capítulo de 4 segundos reprova a primeira tentativa, a segunda recebe o motivo e passa", async () => {
     await medirORamo();

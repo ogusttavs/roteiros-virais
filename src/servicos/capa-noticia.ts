@@ -12,6 +12,7 @@ import { COR_NEUTRA, QUANTIDADE_DA_CAPA, TITULOS_DA_CAPA, type SlideDoCarrossel 
 import { db } from "@/db";
 import { carrosseis, clientes, type Carrossel } from "@/db/schema";
 import { ErroReprovadoDuasVezes } from "@/ia/erro";
+import { montarFontesDaMarca } from "@/ia/fontes-da-marca";
 import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 import * as capaIA from "@/ia/prompts/capaNoticia";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
@@ -113,6 +114,8 @@ export async function titulosDaCapa(clienteId: number, noticiaId: number, agora:
       capasRecentes: recentes.flatMap((r) => r.slides.map((s) => s.titulo)).filter(Boolean),
     }),
     fontesDosFatos,
+    // 1.12.0: o tema da capa é o título da notícia (de terceiros): a fonte da marca é só o perfil e a camada.
+    fontesDaMarca: montarFontesDaMarca({ perfilCompilado, camadaExclusiva }),
     conferirNumerosNasFontes: true,
     lembreteFinal: capaIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,

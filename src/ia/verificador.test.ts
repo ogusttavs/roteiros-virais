@@ -14,6 +14,8 @@ vi.mock("./registro", () => ({
 import type { CartaoStory } from "@/db/schema";
 
 import { ErroIA } from "./erro";
+import { montarFontesDaMarca } from "./fontes-da-marca";
+import { montarFontesDosFatos } from "./prompts/roteiro";
 import { ehMotivoMecanico, gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, temAlgoParaGuardar, verificarLocalmente } from "./verificador";
 
 const usoZero = { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0 };
@@ -1241,9 +1243,54 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
           modelo: "mock",
           ...usoZero,
         });
-      const ok = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: FONTES });
+      const ok = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: FONTES, fontesDaMarca: FONTES });
       expect(ok.dados).toEqual(texto);
       expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("1.12.0: a paráfrase de um fato da FICHA, com as fontes montadas pelos montadores, continua aprovando", async () => {
+      const dados = { perfilCompilado: "Clínica de ortodontia.", camadaExclusiva: "Caso: uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer." };
+      const texto = { corpo: "Uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer." };
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce({
+          dados: { aprovado: false, motivo: "fato sem apoio", fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer", fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer" },
+          modelo: "mock",
+          ...usoZero,
+        });
+      const ok = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: montarFontesDosFatos(dados), fontesDaMarca: montarFontesDaMarca(dados) });
+      expect(ok.dados).toEqual(texto);
+    });
+
+    it("1.12.0: o gancho de OUTRO dentista, que está só na evidência, copiado pelo roteiro, reprova (não é fato da marca)", async () => {
+      const dados = {
+        perfilCompilado: "Clínica odontológica de bairro.",
+        camadaExclusiva: "",
+        tema: "medo de anestesia",
+        evidencias: [{ assunto: "medo de dentista", gancho: "Minha paciente chegou chorando com medo da anestesia", estrutura: "história em primeira pessoa", fechamento: "", chamadaFinal: "" }],
+      };
+      const copia = { corpo: "Uma paciente minha chegou chorando com medo da anestesia." };
+      const reprovado = {
+        dados: { aprovado: false, motivo: "fato sem apoio", fatoEspecifico: "uma paciente minha chegou chorando com medo da anestesia", fonteMaisProxima: "Minha paciente chegou chorando com medo da anestesia" },
+        modelo: "mock",
+        ...usoZero,
+      };
+      gerarEstruturadoMock.mockResolvedValueOnce({ dados: copia, modelo: "mock", ...usoZero }).mockResolvedValueOnce(reprovado).mockResolvedValueOnce({ dados: copia, modelo: "mock", ...usoZero }).mockResolvedValueOnce(reprovado);
+      await expect(
+        gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: montarFontesDosFatos(dados), fontesDaMarca: montarFontesDaMarca(dados) }),
+      ).rejects.toThrow();
+    });
+
+    it("1.12.0: sem `fontesDaMarca`, nada é desfeito, nem com a frase presente nas fontesDosFatos (o padrão é o seguro)", async () => {
+      const FONTES = "Caso: uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer.";
+      const texto = { corpo: "Uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer." };
+      const reprovado = {
+        dados: { aprovado: false, motivo: "fato sem apoio", fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer", fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer" },
+        modelo: "mock",
+        ...usoZero,
+      };
+      gerarEstruturadoMock.mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero }).mockResolvedValueOnce(reprovado).mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero }).mockResolvedValueOnce(reprovado);
+      await expect(gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: FONTES })).rejects.toThrow();
     });
 
     it("1.11.0: fato novo, com 'nenhuma' como fonte mais próxima, reprova como antes", async () => {

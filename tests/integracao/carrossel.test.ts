@@ -16,12 +16,19 @@ import { TETO_DO_TESTE } from "@/config/cadastro";
 import { LINHA_FIXA_ANTES_DEPOIS_SAUDE, SEM_FOTO } from "@/config/carrossel";
 import { db, getPool } from "@/db";
 import { briefings, cadastrosProprios, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, ramosDaConta, user, videos, type PerfilCompilado } from "@/db/schema";
+import * as verificador from "@/ia/verificador";
 import { logger } from "@/lib/log";
 import { lerCorpoComTeto } from "@/lib/porta-do-carrossel";
 import { barreiraDoCadastro } from "@/servicos/cadastro-travas";
 import { ErroCarrossel, arrobaDaMarca, trocarCor, apagarFoto, carrosselDaMarca, carrosseisDaMarca, enviarFoto, fotoDaMarca, fotosDoCarrossel, gerarCarrossel, gerarCarrosselComTrava, tipoPelosBytes, trocarSlide } from "@/servicos/carrossel";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
+
+/** Passa para o verificador de verdade, mas deixa ver o que cada chamada recebeu. */
+vi.mock("@/ia/verificador", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/ia/verificador")>();
+  return { ...original, gerarComVerificacao: vi.fn(original.gerarComVerificacao) };
+});
 
 const PERFIL: PerfilCompilado = {
   fatos: {
@@ -111,6 +118,19 @@ afterEach(async () => {
 const pedidoLivre = (texto: string, quantidade = 7) => ({ quantidade, de: { origem: "tema" as const, texto } });
 
 describe("gerarCarrossel", () => {
+  it("1.12.0: manda `fontesDaMarca` só com o perfil, o tema e o pedido dela, sem a evidência que as `fontesDosFatos` trazem", async () => {
+    const clienteId = await criarCliente();
+    await criarVideo("ev-fontes-marca", "mancha de vinho no estofado");
+    vi.mocked(verificador.gerarComVerificacao).mockClear();
+    await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado", 5));
+    const [params] = vi.mocked(verificador.gerarComVerificacao).mock.calls.filter(([p]) => p.tarefa === "carrossel").at(-1)!;
+    expect(String(params.fontesDosFatos)).toContain("olha essa mancha saindo do estofado");
+    expect(params.fontesDaMarca).toContain("lava estofados em domicilio");
+    expect(params.fontesDaMarca).toContain("Tema: mancha de vinho no estofado");
+    expect(params.fontesDaMarca).not.toContain("olha essa mancha saindo do estofado");
+    expect(params.fontesDaMarca).not.toContain("Evidência");
+  });
+
   it.each([5, 7, 9])("gera %i slides: capa primeiro, chamada por último, nunca três iguais seguidos, e registra a geração", async (quantidade) => {
     const clienteId = await criarCliente();
     const videoId = await criarVideo(`ev-${quantidade}`, "mancha de vinho no estofado");

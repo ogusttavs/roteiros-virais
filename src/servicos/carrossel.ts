@@ -33,6 +33,7 @@ import { formatoPorChave } from "@/config/formatos";
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import { carrosselFotos, carrosseis, clientes, type Carrossel, type CarrosselFoto } from "@/db/schema";
+import { montarFontesDaMarca } from "@/ia/fontes-da-marca";
 import * as carrosselIA from "@/ia/prompts/carrossel";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
@@ -332,6 +333,8 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       carrosseisRecentes: recentes.map((r) => r.tema),
     }),
     fontesDosFatos,
+    // 1.12.0: só o que a pessoa escreveu ou confirmou. Com origem em notícia o tema é o título dela (de terceiros) e fica de fora; o roteiro de origem é texto da IA e também.
+    fontesDaMarca: montarFontesDaMarca({ perfilCompilado, camadaExclusiva, tema: origem.noticia ? undefined : origem.tema, observacao: pedido.observacao }),
     conferirNumerosNasFontes: true,
     // T80: o que sobra reprovado depois das duas tentativas por fato sem apoio ou promessa em saúde é consertado por um reparo barato, só nos campos apontados.
     repararFato: { aplicarCampos: (d, trocas) => aplicarTrocasNosCampos(d, trocas, ramoSaude), motivoReparavel: motivoReparavelDoCarrossel },

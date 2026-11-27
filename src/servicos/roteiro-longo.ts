@@ -296,6 +296,8 @@ export type DadosDoRoteiroLongo = {
   observacao?: string;
   /** O que vale como fato (o perfil, o tema, o momento, a notícia, as vozes do público), montado por quem chama: o verificador reprova o fato afirmado fora disto. */
   fontesDosFatos: string;
+  /** 1.12.0: só o que a pessoa escreveu ou confirmou (`montarFontesDaMarca`); é o único texto que pode desfazer a reprovação por paráfrase. */
+  fontesDaMarca?: string;
   roteirosRecentes: { tema: string; objetivo: Objetivo; status: string; gancho: string }[];
   ganchosUltimos5: string[];
   anguloParaEvitar?: { gancho: string; motivos: string[]; motivoTexto?: string };
@@ -381,6 +383,7 @@ export async function gerarConteudoLongo(dados: DadosDoRoteiroLongo): Promise<Co
       proibicoesComoAviso: dados.temaDaPessoa ? dados.proibicoes : undefined,
     }),
     fontesDosFatos: dados.fontesDosFatos,
+    fontesDaMarca: dados.fontesDaMarca,
     lembreteFinal: roteiroLongoIA.LEMBRETE_ACENTUACAO,
     proibicoes: dados.proibicoes,
     citarProibicaoVale: dados.temaDaPessoa,

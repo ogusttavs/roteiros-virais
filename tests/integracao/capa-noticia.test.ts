@@ -5,16 +5,23 @@
 import { deflateSync } from "node:zlib";
 
 import { and, eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { pngDoCarrossel } from "@/carrossel/entrega";
 import { crc32 } from "@/carrossel/zip";
 import { db, getPool } from "@/db";
 import { briefings, carrosseis, clientes, geracoesIA, nichos, noticias, user, type PerfilCompilado } from "@/db/schema";
+import * as verificador from "@/ia/verificador";
 import { criarCapa, criarCapaComTrava, titulosDaCapa, titulosDaCapaComTrava } from "@/servicos/capa-noticia";
 import { carrosselDaMarca, carrosseisDaMarca, enviarFoto, ErroCarrossel, gerarCarrossel } from "@/servicos/carrossel";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
+
+/** Passa para o verificador de verdade, mas deixa ver o que cada chamada recebeu. */
+vi.mock("@/ia/verificador", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/ia/verificador")>();
+  return { ...original, gerarComVerificacao: vi.fn(original.gerarComVerificacao) };
+});
 
 const PERFIL: PerfilCompilado = {
   fatos: {
@@ -109,6 +116,18 @@ afterEach(async () => {
 });
 
 describe("os títulos da capa", () => {
+  it("1.12.0: manda `fontesDaMarca` só com o perfil e a camada, sem a notícia nem o título dela (de terceiros)", async () => {
+    const clienteId = await criarCliente(nichoSaude);
+    const noticiaId = await criarNoticia(nichoSaude);
+    vi.mocked(verificador.gerarComVerificacao).mockClear();
+    await titulosDaCapaComTrava(clienteId, noticiaId, async () => null);
+    const [params] = vi.mocked(verificador.gerarComVerificacao).mock.calls.filter(([p]) => p.tarefa === "capaNoticia").at(-1)!;
+    expect(String(params.fontesDosFatos)).toContain("Clareamento dental com luz LED");
+    expect(params.fontesDaMarca).toContain("clinica odontologica de bairro");
+    expect(params.fontesDaMarca).not.toContain("Clareamento dental com luz LED");
+    expect(params.fontesDaMarca).not.toMatch(/Notícia|Tema:/);
+  });
+
   it("saem da notícia da marca: de 3 a 5, e o veículo e a data são os da notícia", async () => {
     const clienteId = await criarCliente(nichoSaude);
     const noticiaId = await criarNoticia(nichoSaude, { publicadoEm: new Date("2026-11-24T15:00:00Z") });

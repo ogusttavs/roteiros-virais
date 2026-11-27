@@ -700,6 +700,12 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
    * está aqui (ver `prompts/verificarTexto.ts`). Ausente, a conferência não roda (as outras tarefas não mudam).
    */
   fontesDosFatos?: string;
+  /**
+   * Só o que a pessoa escreveu ou confirmou (`montarFontesDaMarca`, em `ia/fontes-da-marca.ts`): o perfil, a ficha, a camada exclusiva, o tema, o momento, o objetivo e o pedido dela. É o único texto que
+   * pode desfazer uma reprovação por fato (`fatoApoiadoPelasFontes`, 1.12.0), porque as `fontesDosFatos` trazem também a evidência de vídeos de outras pessoas, as notícias, a pesquisa na hora e as vozes do
+   * público, e o fato de outro criador não pode passar por fato da marca. Ausente, a reprovação nunca é desfeita (o padrão seguro).
+   */
+  fontesDaMarca?: string;
   /** V9c, item 3: o formato do roteiro, e como extrair os cartões e o "por que assim" da saída, quando houver. */
   formato?: FormatoRoteiro;
   /** M4, item 4: o estilo do roteiro; sem fala troca a checagem de cartões (ver `verificarLocalmente`). */
@@ -1001,7 +1007,8 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
       }),
     });
     // 1.11.0: o caso recontado com outras palavras, apoiado por uma frase que as fontes trazem de fato, não reprova (`fatoApoiadoPelasFontes`); o aprovado vale também para o registro abaixo.
-    if (!verificacao.dados.aprovado && verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDosFatos)) {
+    // 1.12.0: só as fontes DA MARCA valem aqui (`fontesDaMarca`), nunca a evidência, as notícias ou a pesquisa que vêm junto nas `fontesDosFatos`.
+    if (!verificacao.dados.aprovado && verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDaMarca)) {
       verificacao.dados = { ...verificacao.dados, aprovado: true, motivo: null };
     }
     aprovado = verificacao.dados.aprovado;

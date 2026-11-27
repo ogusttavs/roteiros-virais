@@ -48,6 +48,7 @@ import {
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
+import { montarFontesDaMarca } from "@/ia/fontes-da-marca";
 import * as aindaValeIA from "@/ia/prompts/aindaValeRoteiro";
 import * as filtrarEvidenciaPorMarca from "@/ia/prompts/filtrarEvidenciaPorMarca";
 import { NUMEROS_REGRAS_STORY, regrasDoReels } from "@/ia/prompts/regras-formato";
@@ -1269,6 +1270,17 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       : undefined,
     pesquisa: pesquisaNaEntrada,
   });
+  // 1.12.0: só o que a pessoa escreveu ou confirmou; é o único texto que pode desfazer a reprovação por paráfrase (sem a evidência, as notícias, a pesquisa e os comentários).
+  const fontesDaMarca = montarFontesDaMarca({
+    perfilCompilado,
+    camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
+    tema: dados.momento ? undefined : dados.tema,
+    momento: dados.momento
+      ? { onde: dados.momento.onde, oQueEstaAcontecendo: dados.momento.oQueEstaAcontecendo, oQueDaParaMostrar: dados.momento.oQueDaParaMostrar }
+      : undefined,
+    objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
+    observacao: dados.observacao,
+  });
 
   if (ehLongo) {
     try {
@@ -1291,6 +1303,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
         observacao: dados.observacao,
         fontesDosFatos,
+        fontesDaMarca,
         roteirosRecentes,
         ganchosUltimos5: ultimosRoteiros.map((r) => r.gancho),
         anguloParaEvitar: dados.anguloParaEvitar
@@ -1405,6 +1418,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       provaVisualDeOutro,
     }),
     fontesDosFatos,
+    fontesDaMarca,
     // E54 (parte 2): com pesquisa, todo número com cara de dado do roteiro (porcentagem, valor, ano) tem de estar nas fontes acima, com a mesma unidade e escala.
     conferirNumerosNasFontes: Boolean(pesquisaNaEntrada),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais

@@ -16,6 +16,10 @@ vi.mock("@/ia/cliente", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/ia/cliente")>();
   return { ...original, gerarEstruturado: vi.fn(original.gerarEstruturado) };
 });
+vi.mock("@/ia/verificador", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/ia/verificador")>();
+  return { ...original, gerarComVerificacao: vi.fn(original.gerarComVerificacao) };
+});
 vi.mock("@/lib/ver-como", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/ver-como")>();
   return { ...original, recusaDoVerComo: vi.fn(original.recusaDoVerComo) };
@@ -25,6 +29,7 @@ import { db, getPool } from "@/db";
 import { briefings, clientes, geracoesIA, membrosMarca, nichos, roteiros, user, type ConteudoRoteiro, type PerfilCompilado, type TipoAbertura } from "@/db/schema";
 import * as cliente from "@/ia/cliente";
 import { versao as versaoDoPrompt } from "@/ia/prompts/ganchosAlternativos";
+import * as verificador from "@/ia/verificador";
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { recusaDoVerComo } from "@/lib/ver-como";
@@ -135,6 +140,18 @@ afterAll(async () => {
 });
 
 describe("pedir os ganchos alternativos", () => {
+  it("1.12.0: manda `fontesDaMarca` só com o perfil e o tema, sem o texto do roteiro (da IA) que vai nas `fontesDosFatos`", async () => {
+    const r = await novoRoteiro(marcaA);
+    vi.mocked(verificador.gerarComVerificacao).mockClear();
+    await pedirGanchosAlternativos(marcaA, r.id, AGORA);
+    const [params] = vi.mocked(verificador.gerarComVerificacao).mock.calls.filter(([p]) => p.tarefa === "ganchosAlternativos").at(-1)!;
+    expect(String(params.fontesDosFatos)).toContain(GANCHO_ORIGINAL);
+    expect(params.fontesDaMarca).toContain("lava sofá a seco em Campinas");
+    expect(params.fontesDaMarca).toContain("Tema: tirar mancha de café do sofá");
+    expect(params.fontesDaMarca).not.toContain(GANCHO_ORIGINAL);
+    expect(params.fontesDaMarca).not.toContain("O roteiro (o que o vídeo diz)");
+  });
+
   it("devolve de 3 a 5 ganchos, de tipos diferentes entre si e do original, cada um com tipo e emoção, na ordem do modelo", async () => {
     const r = await novoRoteiro(marcaA);
     const visao = await pedirGanchosAlternativos(marcaA, r.id, AGORA);

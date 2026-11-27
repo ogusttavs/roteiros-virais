@@ -111,8 +111,12 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * (1) o critério ganha o caso recontado (o mesmo cliente, a mesma cena ou o mesmo número da ficha dito de outro jeito, com os mesmos elementos, é paráfrase e aprova; reprova só o elemento que a
  * ficha não tem); (2) por código, `fatoApoiadoPelasFontes` desfaz a reprovação quando a própria saída do verificador cita como fonte mais próxima uma frase que está mesmo nas fontes, o fato
  * repete o sentido dela e todo número do fato está nas fontes. Fato sem frase de apoio ("nenhuma"), frase que não está nas fontes ou número novo continuam reprovando. Versão 1.11.0.
+ *
+ * 1.12.0 (achado da revisão de 27/11/2026 sobre a 1.11.0): `fatoApoiadoPelasFontes` conferia a frase citada contra as `fontesDosFatos` inteiras, que trazem também a evidência de vídeos de outras
+ * pessoas, as notícias, a pesquisa na hora e as vozes do público; o gancho de outro criador copiado pelo roteiro saía aprovado como paráfrase de um fato da marca. Agora o verificador só desfaz a
+ * reprovação contra `fontesDaMarca` (o que a pessoa escreveu ou confirmou; `ia/fontes-da-marca.ts`); sem esse campo, nada é desfeito. O texto do prompt não muda. Versão 1.12.0.
  */
-export const versao = "1.11.0";
+export const versao = "1.12.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 

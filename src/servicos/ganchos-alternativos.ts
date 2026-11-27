@@ -13,6 +13,7 @@ import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import { geracoesIA, roteiros, type ConteudoRoteiro, type GanchoAlternativo, type GanchosDoRoteiro, type TipoAbertura } from "@/db/schema";
 import { ErroReprovadoDuasVezes } from "@/ia/erro";
+import { montarFontesDaMarca } from "@/ia/fontes-da-marca";
 import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 import * as ganchosIA from "@/ia/prompts/ganchosAlternativos";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
@@ -353,6 +354,8 @@ async function pedirSemTrava(clienteId: number, roteiroId: number, agora: Date):
       chamadaFinal: corpo.chamadaFinal,
     }),
     fontesDosFatos: fontes,
+    // 1.12.0: o roteiro (texto da IA) que vai junto nas `fontes` não conta como fonte da marca.
+    fontesDaMarca: montarFontesDaMarca({ perfilCompilado, camadaExclusiva, tema: roteiro.tema, objetivoDoVideo: roteiro.objetivoDoVideo }),
     conferirNumerosNasFontes: true,
     lembreteFinal: ganchosIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,
