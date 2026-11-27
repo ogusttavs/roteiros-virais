@@ -19,6 +19,7 @@ import {
   membrosMarca,
   nichos,
   preferenciasUsuario,
+  roteiros,
   user,
   type Alcance,
   type Cliente,
@@ -253,6 +254,20 @@ export async function trocarMarca(usuarioId: string, clienteId: number): Promise
   const cookieStore = await cookies();
   cookieStore.set(NOME_COOKIE_MARCA_ATIVA, valorCookieMarcaAtiva(clienteId), OPCOES_COOKIE_MARCA_ATIVA);
   return cliente;
+}
+
+/**
+ * De que marca é um roteiro, SÓ quando a pessoa tem acesso a essa marca (é membro dela). Serve para a tela do roteiro dizer "este roteiro é da marca X" a quem abriu um link com outra
+ * marca ativa. Roteiro que não existe, ou de marca a que a pessoa não pertence, volta `null`: o nome de uma marca de fora nunca sai daqui.
+ */
+export async function marcaDoRoteiroDoUsuario(usuarioId: string, roteiroId: number): Promise<{ id: number; nome: string } | null> {
+  const [linha] = await db()
+    .select({ id: clientes.id, nome: clientes.nome })
+    .from(roteiros)
+    .innerJoin(membrosMarca, eq(membrosMarca.clienteId, roteiros.clienteId))
+    .innerJoin(clientes, eq(clientes.id, roteiros.clienteId))
+    .where(and(eq(roteiros.id, roteiroId), eq(membrosMarca.usuarioId, usuarioId), eq(clientes.ativo, true)));
+  return linha ?? null;
 }
 
 export type MembroDaMarca = { usuarioId: string; nome: string; email: string; papel: PapelMarca };

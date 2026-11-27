@@ -7,6 +7,8 @@ import {
   listarArquivos,
   listarRotas,
   metodosQueEscrevem,
+  PADRAO_ROTAS,
+  portasImportadasPelaRota,
   ROTAS_LIVRES,
   semComentarios,
   verificarArquivo,
@@ -126,10 +128,12 @@ describe("checar-ver-como nas rotas /api", () => {
   const ROTA = "src/app/api/x/route.ts";
   const rotas = new Set([ROTA, "src/app/api/alvo/route.ts"]);
   const rota = (...linhas: string[]) => linhas.join("\n");
+  const IMPORTA_A_PORTA = 'import { marcaDoCarrossel } from "@/lib/porta-do-carrossel";';
   const motivos = (fonte: string, caminho = ROTA) => verificarRota(caminho, fonte, rotas).map((p) => p.motivo.split(":")[0]);
 
   it("aceita os três jeitos de recusar o modo como primeiro await", () => {
     const fonte = rota(
+      IMPORTA_A_PORTA,
       "export async function POST(request: Request) {",
       "  if (await modoVerComoLigado()) return NextResponse.json({ erro: MENSAGEM_VER_COMO_DESLIGADO }, { status: 403 });",
       "  const sessao = await sessaoAtual();",
@@ -171,6 +175,50 @@ describe("checar-ver-como nas rotas /api", () => {
     expect(motivos(rota("export async function POST() {", "  const sessao = await sessaoDoPainel();", "  await gravar(sessao.user.id);", "  if (sessao.verComo !== null) return null;", "}"))).toEqual(["POST"]);
     // Uma função qualquer com nome de porta não vale: só as de PORTAS_DE_ROTA.
     expect(motivos(rota("export async function POST() {", "  const marca = await outraPorta();", "  if (marca instanceof NextResponse) return marca;", "}"))).toEqual(["POST"]);
+  });
+
+  it("a porta só vale se a rota a importa do arquivo da porta (alias ou caminho relativo)", () => {
+    const corpo = ["export async function POST() {", "  const marca = await marcaDoCarrossel();", "  if (marca instanceof NextResponse) return marca;", "  await gravar(marca.clienteId);", "}"];
+    // Bom: pelo alias, pelo caminho relativo, e com apelido (`as`).
+    expect(motivos(rota(IMPORTA_A_PORTA, ...corpo))).toEqual([]);
+    expect(motivos(rota('import { marcaDoCarrossel } from "../../../lib/porta-do-carrossel";', ...corpo))).toEqual([]);
+    expect(motivos(rota('import { marcaDoCarrossel as marcaDoCarrossel, outra } from "@/lib/porta-do-carrossel.ts";', ...corpo))).toEqual([]);
+    expect(motivos(rota('import { marcaDoCarrossel as entrada } from "@/lib/porta-do-carrossel";', ...corpo.map((l) => l.replace("marcaDoCarrossel", "entrada"))))).toEqual([]);
+    // Ruim: sem import (nem declarada ali), função local, importada de outro lugar, de pacote, ou só como tipo.
+    expect(motivos(rota(...corpo))).toEqual(["POST"]);
+    expect(motivos(rota("async function marcaDoCarrossel() { return { clienteId: 1 }; }", ...corpo))).toEqual(["POST"]);
+    expect(motivos(rota('import { marcaDoCarrossel } from "@/lib/outra-porta";', ...corpo))).toEqual(["POST"]);
+    expect(motivos(rota('import { marcaDoCarrossel } from "pacote-externo";', ...corpo))).toEqual(["POST"]);
+    expect(motivos(rota('import type { marcaDoCarrossel } from "@/lib/porta-do-carrossel";', ...corpo))).toEqual(["POST"]);
+    // Importar outro nome do arquivo da porta não faz de uma função local a porta.
+    expect(motivos(rota('import { SEM_CACHE } from "@/lib/porta-do-carrossel";', "async function marcaDoCarrossel() {}", ...corpo))).toEqual(["POST"]);
+    // Um comentário com o import não vale.
+    expect(motivos(rota('// import { marcaDoCarrossel } from "@/lib/porta-do-carrossel";', ...corpo))).toEqual(["POST"]);
+  });
+
+  it("as listas só valem por propriedade própria: `toString` e `constructor` não são porta", () => {
+    expect(portasImportadasPelaRota(ROTA, 'import { toString, constructor } from "@/lib/porta-do-carrossel";').size).toBe(0);
+    const corpo = ["export async function POST() {", "  const marca = await toString();", "  if (marca instanceof NextResponse) return marca;", "}"];
+    expect(motivos(rota('import { toString } from "@/lib/porta-do-carrossel";', ...corpo))).toEqual(["POST"]);
+    // A porta de verdade continua sendo reconhecida.
+    expect(portasImportadasPelaRota(ROTA, IMPORTA_A_PORTA)).toEqual(new Set(["marcaDoCarrossel"]));
+  });
+
+  it("olha todo route handler do app que o Next aceita, e deixa de fora o admin", () => {
+    expect(PADRAO_ROTAS).toBe("src/app/**/route.{ts,tsx,js,mjs}");
+    const lista = listarRotas();
+    expect(lista.some((r) => r.startsWith("src/app/api/"))).toBe(true);
+    expect(lista.some((r) => r.startsWith("src/app/api/admin/") || r.startsWith("src/app/admin/"))).toBe(false);
+    // Fora de /api: uma rota que escreve sem recusar reprova, em qualquer extensão; com a recusa passa; reexportar de uma rota .tsx conferida vale.
+    const sem = ["export async function POST() {", "  await gravar();", "}"];
+    const com = ["export async function POST() {", "  if (await modoVerComoLigado()) return null;", "}"];
+    for (const caminho of ["src/app/webhook/route.ts", "src/app/(painel)/baixar/route.tsx", "src/app/feed/route.js", "src/app/feed/route.mjs"]) {
+      expect(motivos(rota(...sem), caminho)).toEqual(["POST"]);
+      expect(motivos(rota(...com), caminho)).toEqual([]);
+    }
+    const conferidas = new Set(["src/app/a/route.ts", "src/app/b/route.tsx"]);
+    expect(verificarRota("src/app/a/route.ts", 'export { POST } from "../b/route";', conferidas)).toEqual([]);
+    expect(verificarRota("src/app/a/route.ts", 'export { POST } from "../sumiu/route";', conferidas)).toHaveLength(1);
   });
 
   it("o GET fica de fora, e um comentário com a recusa não vale", () => {

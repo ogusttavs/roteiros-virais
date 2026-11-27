@@ -160,7 +160,7 @@ export function verificarConteudo(caminho: string, conteudo: string): Problema[]
   }
 
   for (const f of funcoesExportadas(codigo)) {
-    if (`${caminho}:${f.nome}` in LEITURA_LIVRE) continue;
+    if (Object.hasOwn(LEITURA_LIVRE, `${caminho}:${f.nome}`)) continue;
     const primeiroAwait = /\bawait\s+([\w.]+)\(/.exec(f.corpo);
     const chamada = primeiroAwait?.[1];
     if (chamada === "exigirForaDoVerComo") continue;
@@ -180,16 +180,19 @@ export function verificarArquivo(caminho: string): Problema[] {
 }
 
 /**
- * As rotas `/api` (M3 da auditoria de segurança de 26/11/2026): a regra 5 do "ver como" também para elas. Toda `route.ts` de `src/app/api/` (fora de `api/admin/`, que age como o
- * próprio admin e tem o `checar-admin-protegido`) que exporta POST, PUT, PATCH ou DELETE recusa o modo como PRIMEIRO `await` do método, num destes três jeitos:
+ * As rotas (M3 da auditoria de segurança de 26/11/2026): a regra 5 do "ver como" também para elas. Todo route handler de `src/app/` que o Next aceita (`route.ts`, `route.tsx`, `route.js`,
+ * `route.mjs`, dentro ou fora de `api/`; fora de `api/admin/` e `admin/`, que agem como o próprio admin e têm o `checar-admin-protegido`) que exporta POST, PUT, PATCH ou DELETE recusa o modo como PRIMEIRO `await` do método, num destes três jeitos:
  *  1. `if (await modoVerComoLigado()) return ...`;
- *  2. `const x = await <porta>(); if (x instanceof NextResponse) return x;`, com a porta em PORTAS_DE_ROTA (a porta também é conferida: o primeiro `await` dela é o jeito 1);
+ *  2. `const x = await <porta>(); if (x instanceof NextResponse) return x;`, com a porta em PORTAS_DE_ROTA E importada pela rota do arquivo da porta (uma função local, ou importada de outro lugar, com o mesmo nome não vale; a porta também é conferida: o primeiro `await` dela é o jeito 1);
  *  3. `const s = await sessaoDoPainel();` e, antes do `await` seguinte, `if (s.verComo !== null) return ...`.
  * Ou o método está em ROTAS_LIVRES, por `arquivo:MÉTODO`, com o motivo. Uma reexportação (`export { POST } from "..."`) vale se aponta para outra rota conferida aqui. Um método que escreve
  * exportado de um jeito que esta conferência não lê (desestruturado, `export function` sem `async`, embrulhado noutra função) só passa pela lista. Uma entrada da lista que aponta para algo
  * que não existe mais reprova. O GET fica de fora: ler no modo é o propósito do modo (as rotas GET que mexem em algo, como `/api/meta/conectar`, recusam à mão).
  */
-export const PADRAO_ROTAS = "src/app/api/**/route.ts";
+export const PADRAO_ROTAS = "src/app/**/route.{ts,tsx,js,mjs}";
+
+/** Onde moram as rotas que esta conferência não olha: o admin age como o próprio admin e tem o `checar-admin-protegido`. */
+export const PASTAS_DO_ADMIN = ["src/app/api/admin/", "src/app/admin/"] as const;
 
 export const METODOS_QUE_ESCREVEM = ["POST", "PUT", "PATCH", "DELETE"] as const;
 
@@ -209,7 +212,7 @@ export const PORTAS_DE_ROTA: Record<string, string> = {
 export function listarRotas(): string[] {
   return globSync(PADRAO_ROTAS)
     .map((c) => c.split(sep).join("/"))
-    .filter((c) => !c.startsWith("src/app/api/admin/"))
+    .filter((c) => !PASTAS_DO_ADMIN.some((pasta) => c.startsWith(pasta)))
     .sort();
 }
 
@@ -261,7 +264,7 @@ export function metodosQueEscrevem(codigoSemComentarios: string): MetodoDaRota[]
 }
 
 /** O primeiro `await` do corpo é a recusa do modo, num dos três jeitos do cabeçalho desta seção? */
-export function recusaComoPrimeiroAwait(corpo: string): boolean {
+export function recusaComoPrimeiroAwait(corpo: string, portasImportadas: ReadonlySet<string> = new Set()): boolean {
   const primeiro = /\bawait\s+([\w.]+)\(/.exec(corpo);
   if (!primeiro) return false;
   const nome = primeiro[1];
@@ -275,7 +278,7 @@ export function recusaComoPrimeiroAwait(corpo: string): boolean {
   if (!variavel) return false;
 
   // Jeito 2: a porta comum, com a resposta dela devolvida.
-  if (nome in PORTAS_DE_ROTA) {
+  if (portasImportadas.has(nome)) {
     const m = /^await\s+\w+\(\)\s*;\s*if\s*\(\s*(\w+)\s+instanceof\s+NextResponse\s*\)\s*return\s+(\w+)\s*;/.exec(depois);
     return m !== null && m[1] === variavel && m[2] === variavel;
   }
@@ -291,6 +294,33 @@ export function recusaComoPrimeiroAwait(corpo: string): boolean {
   return false;
 }
 
+/** `@/lib/x` e `./x` (a partir da rota) viram `src/lib/x`, sem a extensão: o jeito de comparar com o arquivo de uma porta. Nulo para pacote (`next/server`). */
+function caminhoDoImport(caminhoDaRota: string, alvo: string): string | null {
+  let resolvido: string;
+  if (alvo.startsWith("@/")) resolvido = posix.join("src", alvo.slice(2));
+  else if (alvo.startsWith(".")) resolvido = posix.join(posix.dirname(caminhoDaRota), alvo);
+  else return null;
+  return posix.normalize(resolvido).replace(/\.(?:tsx?|jsx?|mjs)$/, "");
+}
+
+/** Os nomes (como a rota os chama) de PORTAS_DE_ROTA que ela importa do arquivo da porta, pelo `@/` ou por caminho relativo. Importar de outro lugar, ou declarar a função ali mesmo, não conta. */
+export function portasImportadasPelaRota(caminhoDaRota: string, codigoSemComentarios: string): Set<string> {
+  const portas = new Set<string>();
+  const reImport = /^import\s+(?!type\b)\{([^}]*)\}\s*from\s*["']([^"']+)["']/gm;
+  for (let m = reImport.exec(codigoSemComentarios); m; m = reImport.exec(codigoSemComentarios)) {
+    const origem = caminhoDoImport(caminhoDaRota, m[2]);
+    if (origem === null) continue;
+    for (const parte of m[1].split(",")) {
+      const item = parte.trim();
+      if (!item || item.startsWith("type ")) continue;
+      const [importado, local = importado] = item.split(/\s+as\s+/).map((x) => x.trim());
+      if (!Object.hasOwn(PORTAS_DE_ROTA, importado)) continue;
+      if (caminhoDoImport(caminhoDaRota, `@/${PORTAS_DE_ROTA[importado].replace(/^src\//, "")}`) === origem) portas.add(local);
+    }
+  }
+  return portas;
+}
+
 /** Resolve o caminho de uma reexportação relativa (`../../transcrever/route`) para o arquivo da rota, como o glob o devolve. */
 export function caminhoDaReexportacao(caminhoDaRota: string, alvo: string): string | null {
   if (!alvo.startsWith(".")) return null;
@@ -301,11 +331,13 @@ export function caminhoDaReexportacao(caminhoDaRota: string, alvo: string): stri
 /** Os problemas de uma rota. `rotas` são as rotas conferidas (a reexportação só vale para uma delas). */
 export function verificarRota(caminho: string, conteudo: string, rotas: ReadonlySet<string>): Problema[] {
   const problemas: Problema[] = [];
-  for (const m of metodosQueEscrevem(semComentarios(conteudo))) {
-    if (`${caminho}:${m.metodo}` in ROTAS_LIVRES) continue;
+  const codigo = semComentarios(conteudo);
+  const portas = portasImportadasPelaRota(caminho, codigo);
+  for (const m of metodosQueEscrevem(codigo)) {
+    if (Object.hasOwn(ROTAS_LIVRES, `${caminho}:${m.metodo}`)) continue;
     if (m.reexportaDe !== null) {
       const alvo = caminhoDaReexportacao(caminho, m.reexportaDe);
-      if (alvo !== null && alvo !== caminho && rotas.has(alvo)) continue;
+      if (alvo !== null && alvo !== caminho && (rotas.has(alvo) || ["tsx", "js", "mjs"].some((ext) => rotas.has(alvo.replace(/\.ts$/, `.${ext}`))))) continue;
       problemas.push({ arquivo: caminho, linha: m.linha, motivo: `${m.metodo}: reexporta de "${m.reexportaDe}", que não é outra rota /api conferida pelo checar-ver-como (aponte para a rota ou ponha em ROTAS_LIVRES, com o motivo)` });
       continue;
     }
@@ -313,7 +345,7 @@ export function verificarRota(caminho: string, conteudo: string, rotas: Readonly
       problemas.push({ arquivo: caminho, linha: m.linha, motivo: `${m.metodo}: exportado de um jeito que o checar-ver-como não lê; escreva export async function ${m.metodo} com a recusa do modo, ou ponha em ROTAS_LIVRES de scripts/checar-ver-como-regras.ts, com o motivo` });
       continue;
     }
-    if (recusaComoPrimeiroAwait(m.corpo)) continue;
+    if (recusaComoPrimeiroAwait(m.corpo, portas)) continue;
     problemas.push({
       arquivo: caminho,
       linha: m.linha,

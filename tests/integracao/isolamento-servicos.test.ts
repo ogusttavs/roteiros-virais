@@ -22,17 +22,22 @@ vi.mock("@/jobs/fila", async (importarOriginal) => {
 });
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, geracoesIA, nichos, perfisCitados, planoGravacoes, roteiros, user, videosCliente, type PerfilCompilado } from "@/db/schema";
+import { briefings, clientes, geracoesIA, membrosMarca, nichos, noticias, perfisCitados, pesquisasNaHora, planoGravacoes, roteiros, user, versoesDoRoteiro as tabelaDeVersoes, videosCliente, type PerfilCompilado } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
+import { compilarEGravarPerfil } from "@/servicos/briefing";
+import { marcaDoRoteiroDoUsuario } from "@/servicos/clientes";
 import { curvasDoHistorico } from "@/servicos/curva";
+import { noticiaPorId } from "@/servicos/noticias";
 import { enfileirarAnaliseDePerfil } from "@/servicos/perfis-analisados";
-import { desmarcarGravado as desmarcarGravadoNoPlano, marcarGravado as marcarGravadoNoPlano, pular } from "@/servicos/plano";
+import { confirmarPesquisa, lerPesquisa, marcarAchados, pesquisaParaORoteiro, registrarPosicao } from "@/servicos/pesquisa-na-hora";
+import { aceitar, desmarcarGravado as desmarcarGravadoNoPlano, ErroPlano, marcarGravado as marcarGravadoNoPlano, pular } from "@/servicos/plano";
 import {
   arquivarRoteiro,
   avaliarRoteiro,
   conferirAindaVale,
   desarquivarRoteiro,
   editarRoteiro,
+  ErroRoteiro,
   marcarGravado,
   marcarPostado,
   mudarDataRoteiro,
@@ -40,6 +45,7 @@ import {
   somarDiasISO,
   versoesDoRoteiro,
 } from "@/servicos/roteiro";
+import { ficarComVersao } from "@/servicos/versoes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -173,25 +179,32 @@ describe("roteiro.ts: o roteiro de outra marca é 'não achei', nunca lido nem g
     expect((await versoesDoRoteiro(deB.id, b.id)).map((v) => v.id)).toEqual([deB.id]);
   });
 
-  it("arquivar, desarquivar e mudar o dia não mexem no roteiro de outra marca", async () => {
+  it("arquivar, desarquivar e mudar o dia lançam e não mexem no roteiro de outra marca", async () => {
     const a = await criarMarca();
     const b = await criarMarca();
     const deB = await criarRoteiro(b.id);
-    await arquivarRoteiro(deB.id, a.id);
+    await expect(arquivarRoteiro(deB.id, a.id)).rejects.toThrow(ErroRoteiro);
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).toBeNull();
 
     await arquivarRoteiro(deB.id, b.id);
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).not.toBeNull();
-    await desarquivarRoteiro(deB.id, a.id);
+    await expect(desarquivarRoteiro(deB.id, a.id)).rejects.toThrow(ErroRoteiro);
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).not.toBeNull();
     await desarquivarRoteiro(deB.id, b.id);
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).toBeNull();
 
     const daquiATres = somarDiasISO(hojeISO(), 3);
-    await mudarDataRoteiro(deB.id, a.id, daquiATres);
+    await expect(mudarDataRoteiro(deB.id, a.id, daquiATres)).rejects.toThrow(ErroRoteiro);
     expect((await linhaDoRoteiro(deB.id)).data).toBe(hojeISO());
     await mudarDataRoteiro(deB.id, b.id, daquiATres);
     expect((await linhaDoRoteiro(deB.id)).data).toBe(daquiATres);
+  });
+
+  it("arquivar, desarquivar e mudar o dia de um roteiro que não existe lançam o mesmo erro", async () => {
+    const a = await criarMarca();
+    await expect(arquivarRoteiro(999_999, a.id)).rejects.toThrow("roteiro nao encontrado.");
+    await expect(desarquivarRoteiro(999_999, a.id)).rejects.toThrow("roteiro nao encontrado.");
+    await expect(mudarDataRoteiro(999_999, a.id, somarDiasISO(hojeISO(), 2))).rejects.toThrow("roteiro nao encontrado.");
   });
 
   it("conferirAindaVale não confere nem guarda a resposta no roteiro de outra marca", async () => {
@@ -272,5 +285,164 @@ describe("curva.ts: a curva do vídeo de outra marca não aparece no histórico 
 
     expect((await curvasDoHistorico(a.id, [deB.id])).has(deB.id)).toBe(false);
     expect((await curvasDoHistorico(b.id, [deB.id])).get(deB.id)).toEqual({ status: "sem_acompanhamento" });
+  });
+});
+
+describe("a pesquisa na hora de outra marca não é lida, marcada nem confirmada", () => {
+  async function pesquisaPronta(clienteId: number) {
+    const [linha] = await db()
+      .insert(pesquisasNaHora)
+      .values({
+        clienteId,
+        pedido: "quanto custa lavar um sofá",
+        status: "pronta",
+        achados: [{ id: 1, texto: "um dado", fonteNome: "IBGE", fonteTipo: "oficial", url: "https://exemplo.invalido/d", titulo: null, dataDaPagina: null, dataTexto: null, antigo: false, citacao: "trecho" }],
+        terminadoEm: new Date(),
+      })
+      .returning();
+    return linha;
+  }
+  async function linhaDaPesquisa(id: number) {
+    const [linha] = await db().select().from(pesquisasNaHora).where(eq(pesquisasNaHora.id, id));
+    return linha;
+  }
+
+  it("lerPesquisa, marcarAchados, registrarPosicao, confirmarPesquisa e pesquisaParaORoteiro só valem para a marca dona", async () => {
+    const a = await criarMarca();
+    const b = await criarMarca();
+    const deB = await pesquisaPronta(b.id);
+    try {
+      expect(await lerPesquisa(a.id, deB.id)).toBeNull();
+      await expect(marcarAchados(a.id, deB.id, [1])).rejects.toThrow();
+      await expect(registrarPosicao(a.id, deB.id, "a minha posição")).rejects.toThrow();
+      await expect(confirmarPesquisa(a.id, deB.id, { ids: [1] })).rejects.toThrow();
+      await expect(pesquisaParaORoteiro(a.id, deB.id)).rejects.toThrow();
+      const depois = await linhaDaPesquisa(deB.id);
+      expect(depois.selecionados).toEqual([]);
+      expect(depois.posicaoDaPessoa).toBeNull();
+      expect(depois.confirmadaEm).toBeNull();
+
+      // A própria marca faz tudo isso normalmente.
+      expect((await lerPesquisa(b.id, deB.id))?.id).toBe(deB.id);
+      await confirmarPesquisa(b.id, deB.id, { ids: [1] });
+      expect((await linhaDaPesquisa(deB.id)).selecionados).toEqual([1]);
+      expect((await pesquisaParaORoteiro(b.id, deB.id)).dados).toHaveLength(1);
+    } finally {
+      await db().delete(pesquisasNaHora);
+    }
+  });
+});
+
+describe("versoes.ts: a versão de outra marca não vira roteiro", () => {
+  it("ficarComVersao recusa a versão de outra marca e não cria roteiro; a dona fica com ela", async () => {
+    const a = await criarMarca();
+    const b = await criarMarca();
+    const modelo = await criarRoteiro(b.id);
+    const valores: Record<string, unknown> = { ...modelo };
+    for (const coluna of ["id", "clienteId", "criadoEm"]) delete valores[coluna];
+    await db().delete(roteiros).where(eq(roteiros.id, modelo.id));
+    const [versao] = await db()
+      .insert(tabelaDeVersoes)
+      .values({ clienteId: b.id, grupo: `grupo-isolamento-${contador}`, ordem: 1, parametros: { pedido: {} }, valores })
+      .returning();
+    try {
+      await expect(ficarComVersao(a.id, versao.id)).rejects.toThrow(ErroRoteiro);
+      expect(await db().select().from(roteiros)).toHaveLength(0);
+      const [intacta] = await db().select().from(tabelaDeVersoes).where(eq(tabelaDeVersoes.id, versao.id));
+      expect(intacta.escolhidaEm).toBeNull();
+      expect(intacta.roteiroId).toBeNull();
+
+      const roteiro = await ficarComVersao(b.id, versao.id);
+      expect(roteiro.clienteId).toBe(b.id);
+    } finally {
+      await db().delete(tabelaDeVersoes);
+    }
+  });
+});
+
+describe("noticias.ts: a notícia de outro setor não abre", () => {
+  it("noticiaPorId só devolve a notícia do setor da marca que pede", async () => {
+    const [outroSetor] = await db().insert(nichos).values({ slug: "isolamento-outro-setor", nome: "Outro setor" }).returning();
+    const [noticia] = await db().insert(noticias).values({ nichoId, titulo: "Notícia do setor", url: "https://exemplo.invalido/noticia-isolamento" }).returning();
+    try {
+      expect(await noticiaPorId(noticia.id, outroSetor.id)).toBeNull();
+      expect((await noticiaPorId(noticia.id, nichoId))?.id).toBe(noticia.id);
+    } finally {
+      await db().delete(noticias).where(eq(noticias.id, noticia.id));
+      await db().delete(nichos).where(eq(nichos.id, outroSetor.id));
+    }
+  });
+});
+
+describe("plano.ts: aceitar um item de outra marca não gera roteiro", () => {
+  it("aceitar recusa o item da marca B pedido em nome da marca A e deixa o item e os roteiros como estavam", async () => {
+    const a = await criarMarca();
+    const b = await criarMarca();
+    const [item] = await db()
+      .insert(planoGravacoes)
+      .values({ clienteId: b.id, dia: hojeISO(), ordem: 1, lugar: "loja", situacao: "dia de movimento", oQueMostrar: "o balcão", objetivo: "engajamento", estado: "sugerido" })
+      .returning();
+    const dados = { onde: "na loja", oQueEstaAcontecendo: "movimento", oQueDaParaMostrar: "o balcão", objetivo: "engajamento" as const };
+    await expect(aceitar(item.id, a, dados)).rejects.toThrow(ErroPlano);
+    const [depois] = await db().select().from(planoGravacoes).where(eq(planoGravacoes.id, item.id));
+    expect(depois.estado).toBe("sugerido");
+    expect(depois.roteiroId).toBeNull();
+    expect(await db().select().from(roteiros)).toHaveLength(0);
+  });
+});
+
+describe("briefing.ts: o perfil compilado de uma marca não é gravado no briefing de outra", () => {
+  it("compilarEGravarPerfil em nome da marca A com o briefing da B não toca o briefing da B", async () => {
+    const a = await criarMarca();
+    const b = await criarMarca();
+    const [briefingDeB] = await db().select().from(briefings).where(eq(briefings.clienteId, b.id));
+    const antes = JSON.stringify(briefingDeB.perfil);
+    await compilarEGravarPerfil(a.id, briefingDeB.id, { P1: "lavo estofados" }, {}, "negocio");
+    const [depois] = await db().select().from(briefings).where(eq(briefings.id, briefingDeB.id));
+    expect(JSON.stringify(depois.perfil)).toBe(antes);
+  });
+});
+
+describe("a pessoa com acesso a duas marcas: a marca ativa decide o que ela pode fazer", () => {
+  async function darAcesso(usuarioId: string, clienteId: number) {
+    await db().insert(membrosMarca).values({ usuarioId, clienteId, papel: "membro" }).onConflictDoNothing();
+  }
+
+  it("com a B ativa não age no roteiro da A pelos serviços; com a A ativa age", async () => {
+    const a = await criarMarca();
+    const b = await criarMarca();
+    const deA = await criarRoteiro(a.id);
+    // A mesma pessoa pertence às duas marcas (a dona da A, mais acesso à B).
+    await darAcesso(a.usuarioId!, b.id);
+
+    // Marca B ativa: o `clienteId` que a sessão entrega é o da B.
+    await expect(editarRoteiro(deA.id, b.id, { gancho: "escrito com a marca B ativa" })).rejects.toThrow("roteiro nao encontrado.");
+    await expect(arquivarRoteiro(deA.id, b.id)).rejects.toThrow(ErroRoteiro);
+    await expect(marcarGravado(deA.id, b.id)).rejects.toThrow("roteiro nao encontrado.");
+    const depoisDoErro = await linhaDoRoteiro(deA.id);
+    expect(depoisDoErro.conteudo.gancho).toBe("o gancho original");
+    expect(depoisDoErro.arquivadoEm).toBeNull();
+    expect(depoisDoErro.status).toBe("gerado");
+
+    // Marca A ativa: a mesma pessoa age.
+    expect((await editarRoteiro(deA.id, a.id, { gancho: "escrito com a marca A ativa" })).conteudo.gancho).toBe("escrito com a marca A ativa");
+    await arquivarRoteiro(deA.id, a.id);
+    expect((await linhaDoRoteiro(deA.id)).arquivadoEm).not.toBeNull();
+  });
+
+  it("marcaDoRoteiroDoUsuario diz de que marca é o roteiro só a quem tem acesso a ela", async () => {
+    const a = await criarMarca();
+    const b = await criarMarca();
+    const deA = await criarRoteiro(a.id);
+    await darAcesso(a.usuarioId!, a.id);
+    await darAcesso(b.usuarioId!, b.id);
+    await darAcesso(a.usuarioId!, b.id);
+
+    // A pessoa das duas marcas, com a B ativa, descobre que o roteiro é da A.
+    expect(await marcaDoRoteiroDoUsuario(a.usuarioId!, deA.id)).toEqual({ id: a.id, nome: a.nome });
+    // Quem só tem a B não descobre nem o nome da A (nem que o roteiro existe).
+    expect(await marcaDoRoteiroDoUsuario(b.usuarioId!, deA.id)).toBeNull();
+    // Roteiro que não existe.
+    expect(await marcaDoRoteiroDoUsuario(a.usuarioId!, 999_999)).toBeNull();
   });
 });

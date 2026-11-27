@@ -406,7 +406,8 @@ export async function avaliarResposta(
  * V12c item 1) e o que vende como termos de busca, escopo 5.6). Roda na
  * liberacao e a cada edicao posterior.
  */
-async function compilarEGravarPerfil(
+/** Exportada só para o teste de isolamento por marca (`tests/integracao/isolamento-servicos.test.ts`); o resto do código chega aqui por `avaliarResposta`. */
+export async function compilarEGravarPerfil(
   clienteId: number,
   briefingId: number,
   respostas: Record<string, string>,

@@ -1,0 +1,33 @@
+.tela {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espaco-4);
+  padding: var(--espaco-7) 0;
+  color: var(--cor-texto-suave);
+}
+
+.frase {
+  margin: 0;
+  color: var(--cor-texto);
+  max-width: 36ch;
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-4);
+}
+
+.voltar {
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+  text-decoration: underline;
+}
+
+.erro {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+}

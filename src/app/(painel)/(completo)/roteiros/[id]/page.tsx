@@ -6,7 +6,7 @@ import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { visaoDaAnimacao } from "@/servicos/animacao";
-import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, marcaDoRoteiroDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
 import { visaoDeEditar } from "@/servicos/edicao-tela";
 import { momentoDoRoteiro } from "@/servicos/em-alta";
 import { fontesDosParagrafos, pesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
@@ -20,6 +20,7 @@ import { visaoDePublicar } from "@/servicos/publicar-instagram";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
 import { grupoDoRoteiro } from "@/servicos/versoes";
 
+import { RoteiroDeOutraMarca } from "./RoteiroDeOutraMarca";
 import { RoteiroTela } from "./RoteiroTela";
 
 type Props = { params: Promise<{ id: string }> };
@@ -45,6 +46,9 @@ export default async function Roteiro({ params }: Props) {
 
   const roteiro = await roteiroPorId(roteiroId, cliente.id);
   if (!roteiro) {
+    // Quem tem mais de uma marca pode abrir o link do roteiro de outra marca sua com esta ativa: diz de qual é e oferece trocar. Sem acesso à marca do roteiro (ou sem roteiro), segue como antes, sem nome algum.
+    const daOutra = await marcaDoRoteiroDoUsuario(sessao.user.id, roteiroId);
+    if (daOutra && daOutra.id !== cliente.id) return <RoteiroDeOutraMarca marca={daOutra} />;
     redirect("/hoje");
   }
 
