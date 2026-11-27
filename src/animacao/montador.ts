@@ -53,22 +53,25 @@ function arredondar(n: number): number {
 export function montarLinhaDoTempo(cenas: CenaDeEntrada[], opcoes: { seguraDoFinalS?: number } = {}): LinhaDoTempo {
   const L = LIMITES_DA_ANIMACAO;
   const limpas = cenas
-    .map((c) => ({ ...c, texto: limparTexto(String(c.texto ?? "")) }))
+    .map((c) => ({ ...c, texto: limparTexto(String(c.texto ?? "")), traducao: limparTexto(String(c.traducao ?? "")) }))
     .filter((c) => c.texto.length > 0);
   if (limpas.length === 0) throw new ErroDaAnimacao("sem cenas com texto", "entrada");
   if (limpas.length > L.maxCenas) throw new ErroDaAnimacao("cenas demais", "entrada");
   let cursor = 0;
   const saida = limpas.map((c) => {
-    if (c.texto.length > L.maxCaracteresPorCena)
+    if (c.texto.length > L.maxCaracteresPorCena || c.traducao.length > L.maxCaracteresPorCena)
       throw new ErroDaAnimacao("uma cena passou do tamanho do bloco curto", "entrada");
     const palavras = c.texto.split(" ");
-    const lida = palavras.length * L.segundosPorPalavra + L.entradaS;
+    // Com tradução, quem assiste lê um idioma só: a outra linha soma metade do tempo dela (o olho passa por ela).
+    const daTraducao = c.traducao ? c.traducao.split(" ").length * L.segundosPorPalavra * 0.5 : 0;
+    const lida = palavras.length * L.segundosPorPalavra + L.entradaS + daTraducao;
     const pedida =
       typeof c.duracaoS === "number" && Number.isFinite(c.duracaoS) ? c.duracaoS : lida;
     const duracao = Math.min(L.duracaoMaximaDaCenaS, Math.max(L.duracaoMinimaDaCenaS, pedida));
     const cena = {
       texto: c.texto,
       palavras,
+      traducao: c.traducao || null,
       inicioS: arredondar(cursor),
       fimS: arredondar(cursor + duracao),
     };
@@ -93,6 +96,14 @@ const COR = /^#[0-9a-fA-F]{6}$/;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 /** O @ como o Instagram aceita: letras sem acento, algarismos, ponto e sublinhado, até 30. Só isso vai para o HTML (e ainda escapado). */
 const ARROBA = /^@[A-Za-z0-9._]{1,30}$/;
+/** Um PNG começa sempre pela assinatura do formato (89 50 4E 47 0D 0A 1A 0A), que em base64 é este começo. */
+const ASSINATURA_DO_PNG = "iVBORw0KGgo";
+/** Endereço de site sem protocolo e sem caminho: nome, ponto, domínio ("clinica.com.br"). Só letras sem acento, algarismos e hífen. */
+const SITE = /^(?=.{4,60}$)[a-z0-9]([a-z0-9-]*[a-z0-9])?([.][a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+/** A sigla do idioma no selo da tradução: duas ou três letras maiúsculas sem acento. */
+const SIGLA = /^[A-Z]{2,3}$/;
+/** O maior arquivo embutido (letra ou imagem), em caracteres de base64. */
+const MAIOR_ARQUIVO_EMBUTIDO = 2_000_000;
 
 /**
  * O @ a partir do que a marca guardou em `perfis.instagram` (o nome, o @ ou o endereço do perfil). A mesma regra de `arrobaDaMarca` do carrossel, repetida aqui para o contêiner de render não
@@ -115,24 +126,36 @@ export const MARCA_PADRAO: MarcaResolvida = {
   corDestaque: "#e8c15a",
   fonteBase64: null,
   arroba: null,
+  logoPngBase64: null,
+  simboloPngBase64: null,
+  site: null,
+  fonteRotuloBase64: null,
+  rotuloDaTraducao: null,
 };
 
-/** A marca que o cliente pode ter (cores e letra); valor fora do formato cai no padrão, nunca vai para o CSS. */
+/** Arquivo embutido em base64 (letra ou imagem): só o alfabeto do base64, com teto de tamanho e, se pedido, o começo certo. Fora disso, `null`: nunca chega ao HTML. */
+function arquivoEmBase64(valor: unknown, comeco = ""): string | null {
+  return typeof valor === "string" && valor.length > 0 && valor.length < MAIOR_ARQUIVO_EMBUTIDO && BASE64.test(valor) && valor.startsWith(comeco)
+    ? valor
+    : null;
+}
+
+/** A marca que o cliente pode ter (cores, letras, logo, site); valor fora do formato cai no padrão, nunca vai para o CSS nem para o HTML. */
 export function resolverMarca(marca?: MarcaDaAnimacao): MarcaResolvida {
   const cor = (v: string | undefined, padrao: string) =>
     typeof v === "string" && COR.test(v) ? v.toLowerCase() : padrao;
-  const fonte =
-    typeof marca?.fonteBase64 === "string" &&
-    marca.fonteBase64.length > 0 &&
-    marca.fonteBase64.length < 2_000_000 &&
-    BASE64.test(marca.fonteBase64)
-      ? marca.fonteBase64
-      : null;
+  const site = typeof marca?.site === "string" ? marca.site.trim().toLowerCase() : "";
   return {
     corFundo: cor(marca?.corFundo, MARCA_PADRAO.corFundo),
     corTexto: cor(marca?.corTexto, MARCA_PADRAO.corTexto),
     corDestaque: cor(marca?.corDestaque, MARCA_PADRAO.corDestaque),
-    fonteBase64: fonte,
+    fonteBase64: arquivoEmBase64(marca?.fonteBase64),
     arroba: typeof marca?.arroba === "string" && ARROBA.test(marca.arroba) ? marca.arroba : null,
+    logoPngBase64: arquivoEmBase64(marca?.logoPngBase64, ASSINATURA_DO_PNG),
+    simboloPngBase64: arquivoEmBase64(marca?.simboloPngBase64, ASSINATURA_DO_PNG),
+    site: SITE.test(site) ? site : null,
+    fonteRotuloBase64: arquivoEmBase64(marca?.fonteRotuloBase64),
+    rotuloDaTraducao:
+      typeof marca?.rotuloDaTraducao === "string" && SIGLA.test(marca.rotuloDaTraducao) ? marca.rotuloDaTraducao : null,
   };
 }
