@@ -319,7 +319,7 @@ export const NOME_SEM_NOME_AINDA = "Sem nome ainda";
  * (insert direto, nao `auth.api.createUser`, que nao aceita senha pronta
  * fora do fluxo de signup completo).
  */
-async function criarUsuarioComSenhaGerada(email: string, nome: string): Promise<{ usuarioId: string; senha: string }> {
+export async function criarUsuarioComSenhaGerada(email: string, nome: string): Promise<{ usuarioId: string; senha: string }> {
   const usuarioId = randomUUID();
   const senha = gerarSenhaLegivel();
   await db()

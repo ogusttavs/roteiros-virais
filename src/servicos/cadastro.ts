@@ -41,7 +41,7 @@ export type ResultadoDoCadastro =
 const limitadorPorIp = criarLimitador(LIMITES_DO_CADASTRO.porIp);
 
 /** Tira o que não é texto de gente (controle, quebra de linha), junta os espaços e apara. */
-function limparTexto(valor: unknown): string {
+export function limparTexto(valor: unknown): string {
   if (typeof valor !== "string") return "";
   return valor
     .slice(0, TAMANHO_DO_CADASTRO.brutoMax)
@@ -50,7 +50,7 @@ function limparTexto(valor: unknown): string {
     .trim();
 }
 
-const FORMATO_EMAIL = /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]{2,}$/;
+export const FORMATO_EMAIL = /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]{2,}$/;
 
 export function validarCadastro(bruto: unknown): { ok: true; dados: DadosDoCadastro } | { ok: false; erros: ErrosDoCadastro } {
   const entrada = typeof bruto === "object" && bruto !== null ? (bruto as Record<string, unknown>) : {};
