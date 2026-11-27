@@ -78,7 +78,7 @@ test("link inventado mostra a mesma frase, sem formulário", async ({ page }) =>
 
 test("a prévia do link no WhatsApp: título, descrição e imagem do convite, com endereço completo, e a imagem abre sem login", async ({ page, request }) => {
   await page.goto(`/convite/${randomBytes(32).toString("base64url")}`);
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", /^Seu convite para o /);
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", /^Um convite para você usar o /);
   await expect(page.locator('meta[property="og:description"]')).toHaveAttribute("content", /Crie o seu acesso/);
   const imagem = await page.locator('meta[property="og:image"]').getAttribute("content");
   expect(imagem).toMatch(/^https?:\/\/.+\/marca\/previa-convite\.png$/);

@@ -3,7 +3,8 @@ import { config } from "@/lib/config";
 /**
  * A prévia que o WhatsApp, o Instagram e o navegador mostram quando alguém cola um link do aplicativo (Open Graph, 27/11/2026, pedido do Gustavo para o convite do grupo de
  * clínicas). As imagens ficam em `public/marca/` (pasta que o middleware não protege, então quem busca a prévia não cai em `/entrar`), têm 1200x630 e menos de 300 KB (acima
- * disso o WhatsApp não mostra a imagem) e saem da identidade: fundo `#050506`, logotipo branco com a luz da marca, Mona Sans e JetBrains Mono. O nome do produto está desenhado
+ * disso o WhatsApp não mostra a imagem) e saem da identidade: fundo claro `#f7f7f5`, logotipo com a luz da marca, o destaque do título como marca-texto na luz, o rótulo em
+ * verde-oliva `#3e5c00` e o cartão do roteiro do dia com a letra à mão (Caveat), no estilo da prévia do convite do OdontoTech que o Gustavo mostrou. O nome do produto está desenhado
  * nas imagens: se `APP_NAME` mudar, elas precisam ser geradas de novo.
  */
 export const textosPreviaDeLink = {
@@ -13,10 +14,10 @@ export const textosPreviaDeLink = {
     textoDaImagem: `${config.appName}: todo dia, o roteiro pronto para você gravar`,
   },
   convite: {
-    titulo: `Seu convite para o ${config.appName}`,
-    descricao: "Crie o seu acesso, cadastre a sua empresa e receba todo dia o roteiro pronto para gravar no celular.",
+    titulo: `Um convite para você usar o ${config.appName}`,
+    descricao: "Todo dia, o roteiro pronto para você gravar no celular. Crie o seu acesso e cadastre a sua empresa.",
     imagem: "/marca/previa-convite.png",
-    textoDaImagem: `Convite para o ${config.appName}`,
+    textoDaImagem: `Convite para o ${config.appName}: você aparece, o resto é com a gente`,
   },
 };
 
