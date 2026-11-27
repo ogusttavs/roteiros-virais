@@ -81,11 +81,12 @@ test("a prévia do link no WhatsApp: título, descrição e imagem do convite, c
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", /^Um convite para você usar o /);
   await expect(page.locator('meta[property="og:description"]')).toHaveAttribute("content", /Crie o seu acesso/);
   const imagem = await page.locator('meta[property="og:image"]').getAttribute("content");
-  expect(imagem).toMatch(/^https?:\/\/.+\/marca\/previa-convite\.png$/);
+  expect(imagem).toMatch(/^https?:\/\/.+\/marca\/previa-convite\.jpg$/);
+  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", /\/convite\//);
   await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
-  const resposta = await request.get("/marca/previa-convite.png", { maxRedirects: 0 });
+  const resposta = await request.get("/marca/previa-convite.jpg", { maxRedirects: 0 });
   expect(resposta.status()).toBe(200);
-  expect(resposta.headers()["content-type"]).toContain("image/png");
-  expect((await resposta.body()).length).toBeLessThan(300 * 1024);
+  expect(resposta.headers()["content-type"]).toContain("image/jpeg");
+  expect((await resposta.body()).length).toBeLessThan(100 * 1024);
 });
