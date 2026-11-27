@@ -183,7 +183,7 @@ export default function Fundacao() {
             rotuloMeta="meta 8"
             dica="a P5 é a que mais ajuda agora"
             semNota="sem nota"
-            tituloFolha="as doze notas"
+            tituloFolha="as treze notas"
             notas={[
               { id: "p1", rotulo: "P1 · o que você faz", nota: 6.5, melhorarResumo: "Falta dizer para quem." },
               { id: "p2", rotulo: "P2 · o que mais vende", nota: 9.2 },

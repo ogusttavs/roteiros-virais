@@ -18,7 +18,7 @@
 import { and, desc, eq, gte, isNotNull, ne, or, sql, type SQL } from "drizzle-orm";
 
 import { db } from "@/db";
-import { clientes, contas, videos } from "@/db/schema";
+import { briefings, clientes, contas, videos } from "@/db/schema";
 import { palavrasDeConteudo } from "@/ia/verificador";
 import { hojeISO } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
@@ -65,6 +65,37 @@ const PROMESSA = [
   "garantid", "garantia", "perfeit", "milagr", "cura", "curar", "curei", "curou", "definitiv", "semdor", "semrisco", "100porcento", "resultadoimediato", "emagrec", "eliminar", "tratamentoimediato", "efeitoimediato",
   "melhor", "indolor", "semcirurgia", "promocao", "gratis", "gratuit", "desconto",
 ];
+
+/**
+ * T114 (ensaio de 26/11/2026): gênero de humor e de entretenimento. Num ramo em que viraliza vídeo de humor, a hashtag diz o jeito do vídeo de OUTRA pessoa, não o serviço da marca (o roteiro de
+ * dentista saiu com "#comedia #humor #dentista"). Só entra quando a própria marca fala com humor (`marcaFalaComHumor`). Procuradas dentro da hashtag, sem acento, por radical: "humor" barra
+ * #humordentista e #bomhumor; "meme" barra #memes. Lista nossa e curta; crescer aqui é barato.
+ */
+const GENERO_DE_HUMOR = [
+  "humor", "comedi", "comico", "comica", "piada", "zoeira", "zueira", "zuera", "engracad", "risada", "kkk", "meme", "entretenimento", "pegadinha", "esquete", "parodia", "besteirol",
+];
+
+export function hashtagDeHumor(chave: string): boolean {
+  return GENERO_DE_HUMOR.some((g) => chave.includes(g));
+}
+
+/** O tom de humor dito pela marca: "brincalhão" (a palavra da pergunta do tom), "engraçado", "humor", "comédia", "piada", "zoeira". "Bom humor" e "mau humor" são de ânimo, não de tom. */
+const TOM_DE_HUMOR = /(?<!\b(?:bom|mau|mal) )\bhumor|\bbrincalh|\bengracad|\bcomedi|\bcomic[oa]s?\b|\bpiadas?\b|\bzoeira|\bzueira|\bzuera/g;
+const NEGA_O_TOM = new Set(["nao", "nunca", "sem", "nada", "nenhum", "nenhuma", "jamais", "evito", "evita", "evitar"]);
+
+/**
+ * A marca fala com humor? Lê o que ela mesma escreveu sobre o jeito de falar (a resposta da pergunta das frases e do tom, e o resumo do perfil compilado). Uma palavra de humor logo depois de uma
+ * negação ("nunca faço piada", "sem humor") não conta.
+ */
+export function marcaFalaComHumor(textos: (string | null | undefined)[]): boolean {
+  const baixo = textos.filter((t): t is string => Boolean(t)).join(". ").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  for (const m of baixo.matchAll(TOM_DE_HUMOR)) {
+    const antes = baixo.slice(0, m.index ?? 0).split(/[.!?;\n]/).pop() ?? "";
+    const palavras = antes.split(/[^a-z]+/).filter(Boolean).slice(-3);
+    if (!palavras.some((p) => NEGA_O_TOM.has(p))) return true;
+  }
+  return false;
+}
 
 export type CandidatoDeHashtag = {
   /** A chave de comparação: minúsculas, sem acento (o que se compara). */
@@ -188,17 +219,19 @@ export type OpcoesDeEscolha = {
   cidades?: (string | null | undefined)[];
   /** Sem efeito desde 25/11/2026: o filtro de promessa vale em todos os ramos. Fica só para quem ainda passa o campo. */
   ramoSaude?: boolean;
+  /** A marca fala com humor (`marcaFalaComHumor`): só então a hashtag de gênero de humor ou de entretenimento entra (T114). Ausente vale não. */
+  humorDaMarca?: boolean;
   maximo?: number;
 };
 
 /**
  * Escolhe até 5 (puro): uma da região quando a marca vende local e há hashtag da cidade nos dados; até duas do assunto do tema; o resto, as de
  * maior peso do ramo (duas ou três, quando há assunto e região). Uma hashtag entra só com 2 vídeos de 2 contas (a da região vale com 1, porque
- * é a cidade da própria marca). Nos ramos de saúde, nenhuma que prometa resultado.
+ * é a cidade da própria marca). Em todos os ramos, nenhuma que prometa resultado, e nenhuma de humor ou entretenimento quando a marca não fala com humor.
  */
 export function escolherHashtags(candidatas: CandidatoDeHashtag[], opcoes: OpcoesDeEscolha = {}): string[] {
   const maximo = Math.min(opcoes.maximo ?? MAXIMO_DE_HASHTAGS, MAXIMO_DE_HASHTAGS);
-  const permitidas = candidatas.filter((c) => !prometeResultado(c.chave));
+  const permitidas = candidatas.filter((c) => !prometeResultado(c.chave) && (opcoes.humorDaMarca === true || !hashtagDeHumor(c.chave)));
   const porPeso = (a: CandidatoDeHashtag, b: CandidatoDeHashtag) => b.peso - a.peso || b.videos - a.videos || a.chave.localeCompare(b.chave);
   const solidas = permitidas.filter((c) => c.videos >= MINIMO_DE_VIDEOS && c.contas >= MINIMO_DE_CONTAS).sort(porPeso);
 
@@ -299,7 +332,9 @@ export async function hashtagsDoPost(args: { clienteId: number; tema: string }):
     const candidatas = await candidatasDosSetores(setores);
     if (candidatas.length === 0) return [];
     const cidades = marca.alcance === "local" ? [marca.cidade, marca.regiao] : [];
-    return escolherHashtags(candidatas, { tema: args.tema, cidades });
+    const [briefing] = await db().select({ respostas: briefings.respostas, perfil: briefings.perfil }).from(briefings).where(eq(briefings.clienteId, args.clienteId));
+    const humorDaMarca = marcaFalaComHumor([briefing?.respostas?.p9, briefing?.perfil?.resumo]);
+    return escolherHashtags(candidatas, { tema: args.tema, cidades, humorDaMarca });
   } catch (erro) {
     logger.warn({ err: erro, clienteId: args.clienteId }, "hashtags-do-post: nao foi possivel escolher as hashtags");
     return [];

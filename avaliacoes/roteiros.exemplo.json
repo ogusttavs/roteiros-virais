@@ -657,5 +657,58 @@
     ],
     "roteirosRecentes": [],
     "pontoPrincipal": "E59, sem figura pública: tema de cozinha, sem pessoa, fala pública nem notícia, e o banco só mostra recurso do próprio trabalho (close, antes e depois). O 'como editar' NÃO sugere tela dividida, foto ou trecho de outra pessoa; fala só de cenas do próprio negócio, com a pessoa no quadro."
+  },
+  {
+    "tema": "o trailer do novo filme de super-herói que deu o que falar: o que ele ensina para a página de produto da sua loja",
+    "objetivo": "conversao",
+    "ficha": "me_chamem",
+    "perfilCompilado": "Consultoria de quem faz pequena empresa vender pela internet. Já ajudou lojas de nicho a vender no site e no Instagram, com atendimento de segunda a sábado. Cliente ideal é o dono de loja virtual pequena que tem tráfego e vende pouco. Medo do cliente: gastar com anúncio e a página não converter. Frase que fala: mostra o produto funcionando antes de falar de preço. Cenas filmáveis: a tela do computador com a página da loja, o painel de vendas, a mesa de trabalho. Caso real da ficha: uma loja de panelas de ferro, cliente de março, passou de 11 para 34 pedidos no mês depois que a página abriu com um vídeo de 8 segundos da panela fritando um ovo.",
+    "camadaExclusiva": "Cidade: Curitiba. Concorrente citado: agências de tráfego que só falam de anúncio.",
+    "modeloNicho": "Duração típica: 25 a 40 segundos. Assuntos quentes: página que não converte, anúncio caro, foto de produto. Ganchos que funcionam: comparar com algo que todo mundo viu (alta frequência). Estruturas comuns: situação, o que mudou, resultado. Fechamentos comuns: resultado em uma frase. Chamadas finais comuns: chama no direct para ver a página.",
+    "evidencias": [
+      {
+        "id": 901,
+        "assunto": "anúncio que mostra o produto funcionando vende mais",
+        "gancho": "o anúncio que andou foi o que mostra o produto funcionando",
+        "estrutura": "mostra a página parada, depois o vídeo curto do produto em uso",
+        "fechamento": "resultado em uma frase",
+        "chamadaFinal": "chama no direct que eu olho a sua página",
+        "foraDaCurva": 5.1,
+        "momentoChave": "aos 3s, o produto em uso no lugar da foto parada"
+      },
+      {
+        "id": 902,
+        "assunto": "página de produto com foto parada",
+        "gancho": "sua página de produto é um cartaz, não um filme",
+        "estrutura": "compara a foto parada com o vídeo de 8 segundos",
+        "fechamento": "antes e depois do pedido por mês",
+        "chamadaFinal": "comenta quantos pedidos você faz por mês",
+        "foraDaCurva": 3.8
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "Defeito de 25/11/2026 (onda 2 de texto): tema vindo de notícia de cultura pop. O gancho do filme só vale se a primeira frase do corpo ligar ao negócio com o caso da ficha (a loja de panelas, de 11 para 34 pedidos). Reprovar: analogia que só compara o trailer com a página; corpo sem cliente, número ou cena; muleta de abertura (\"cara, é o seguinte\", \"olha só\"); fecho com pergunta de confirmação (\"sabe?\", \"né?\"); fecho \"não é A, é B\". Conferir uma lente narrativa só, do gancho ao fechamento."
+  },
+  {
+    "tema": "a notícia do novo aparelho de scanner que dentistas de outros países estão usando: o que isso muda para quem vai no dentista",
+    "objetivo": "alcance",
+    "ficha": "veja",
+    "perfilCompilado": "Clínica odontológica de bairro em Belo Horizonte, bairro Savassi. Vende consulta de avaliação a partir de R$ 150 e tratamentos de ortodontia e implante. Cliente ideal é a família da região. Medo do cliente: dor e orçamento que cresce no meio do tratamento. Frase que fala: aqui a gente mostra o plano inteiro antes de começar. Cenas filmáveis: consultório, sala de espera, a equipe. Fato da ficha: a clínica entrega o plano de tratamento impresso com os valores na primeira consulta, e uma paciente de ortodontia contou que foi o que a fez voltar depois de ter fugido do orçamento de outro lugar.",
+    "camadaExclusiva": "Cidade: Belo Horizonte, bairro Savassi. Concorrente citado: clínica de rede do shopping.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: ortodontia, implante, medo de dentista. Ganchos que funcionam: notícia de fora explicada para o paciente (média frequência). Estruturas comuns: o que saiu, o que muda para você. Fechamentos comuns: o que levar na consulta. Chamadas finais comuns: chama no WhatsApp para agendar.",
+    "evidencias": [
+      {
+        "id": 911,
+        "assunto": "tecnologia nova de dentista explicada para o paciente",
+        "gancho": "um aparelho novo promete acabar com o molde que dá ânsia",
+        "estrutura": "conta a notícia, mostra o que muda na consulta",
+        "fechamento": "o que o paciente deve perguntar ao dentista",
+        "chamadaFinal": "chama no WhatsApp para agendar uma avaliação",
+        "foraDaCurva": 4.4,
+        "momentoChave": "aos 5s, a pessoa mostrando o consultório"
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "Defeito de 25/11/2026 (onda 2 de texto): tema vindo de notícia de fora do ramo, sem cliente na fala. A primeira frase do corpo liga a notícia à clínica com um fato da ficha (o plano impresso com valores na primeira consulta, a paciente que voltou); nada de afirmar experiência vaga (\"nos meus anos de consultório\"). Sem promessa de resultado nem preço grátis (R-CONF-07). Reprovar: muleta de abertura, fecho com pergunta de confirmação e \"não é A, é B\". Uma lente narrativa só."
   }
 ]

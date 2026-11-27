@@ -53,6 +53,13 @@ describe("os títulos da capa", () => {
     expect(verificarTitulosDaCapa([...bons, "Quarto título aqui", "Quinto título aqui", "Sexto título aqui"], NOTICIA, { ramoSaude: false }).join()).toMatch(/6 títulos/);
   });
 
+  it("T114: na 2ª tentativa e título a título basta um (o que reprova sai da lista), e nenhum continua reprovando", () => {
+    expect(verificarTitulosDaCapa([bons[0]], NOTICIA, { ramoSaude: false, minimo: 1 })).toEqual([]);
+    expect(verificarTitulosDaCapa(bons.slice(0, 2), NOTICIA, { ramoSaude: false, minimo: 1 })).toEqual([]);
+    expect(verificarTitulosDaCapa([], NOTICIA, { ramoSaude: false, minimo: 1 }).join()).toMatch(/0 títulos, o pedido é de 1 a 5/);
+    expect(verificarTitulosDaCapa(["palavra ".repeat(20).trim()], NOTICIA, { ramoSaude: false, minimo: 1 }).join()).toMatch(/14 palavras/);
+  });
+
   it("número que a notícia não tem reprova; o que ela tem passa, com ou sem separador", () => {
     expect(numerosForaDaNoticia("87% erram isso", NOTICIA.titulo + " " + NOTICIA.resumo)).toEqual(["87"]);
     expect(numerosForaDaNoticia("3 cidades e 80% de umidade", NOTICIA.titulo + " " + NOTICIA.resumo)).toEqual([]);

@@ -43,7 +43,7 @@ export const textosCarrossel = {
   soFotoDePacienteAqui: "O antes e depois e o resultado só usam foto de paciente. Escolha uma delas, ou mande uma nova abaixo.",
   semFotosDePacienteAinda: "Ainda não há foto de paciente neste carrossel. Mande uma, com a autorização marcada.",
   soFotoDoLugarAqui: "Este slide usa foto do lugar, da equipe ou do trabalho. Foto de paciente só entra no antes e depois ou no resultado.",
-  fotosAviso: "Só fotos suas, ou que você pode usar. A gente não cria imagem. Sem foto, o carrossel sai só com texto, na cor da sua marca.",
+  fotosAviso: "Use só fotos suas, ou que você pode usar. Sem foto, o carrossel sai com texto na cor da sua marca.",
   fotoGrandeDemais: "Essa foto passa de 6 MB. Mande uma menor.",
   fotoNaoValida: "Mande fotos em jpg, png ou webp.",
 
@@ -88,6 +88,7 @@ export const textosCarrossel = {
   // Pronto
   prontoData: (n: number) => `Pronto · ${n} slides`,
   prontoTitulo: "O seu carrossel está pronto",
+  dicaDoMetodoRotulo: "Uma ideia para melhorar",
   prontoAjuda: "Arraste para ver todos. Toque num slide para trocar o texto ou as fotos.",
   faixaAria: (n: number) => `Os ${n} slides`,
   slideAria: (n: number, total: number) => `Slide ${n} de ${total}`,

@@ -259,14 +259,14 @@ describe("pedir", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const a = await linha(r.animacao.id);
-    expect(a).toMatchObject({ clienteId: marcaA, roteiroId: roteiroA, estado: "pedida", molde: "tipografico-1", progresso: null, tentativas: 0, criadaPor: "an-dono-a" });
+    expect(a).toMatchObject({ clienteId: marcaA, roteiroId: roteiroA, estado: "pedida", molde: "tipografico-2", progresso: null, tentativas: 0, criadaPor: "an-dono-a" });
     expect(a.cenas.map((c) => c.texto)).toEqual(["Você lava a louça do jeito errado.", "O primeiro erro é deixar de molho a noite toda.", "O segundo é usar esponja suja.", "Faça diferente hoje.", "Chame no WhatsApp."]);
     expect(Number(a.duracaoS)).toBeGreaterThan(5);
     expect(estado.enfileirados).toHaveLength(1);
     expect(estado.enfileirados[0]).toMatchObject({ fila: FILAS.renderizarAnimacao, dados: { animacaoId: a.id, perfil: "previa" }, opcoes: { singletonKey: `animacao-previa-${a.id}-0` } });
     // O que a tela recebe não tem caminho nem erro técnico, e já diz quanto leva.
     expect(r.animacao).toMatchObject({ estado: "pedida", progresso: null, motivo: null });
-    expect(r.animacao.tempoDaPrevia).toMatch(/^uns \d+ segundos$/);
+    expect(r.animacao.tempoDaPrevia).toBe("uns 2 minutos");
   });
 
   it("roteiro de outra marca, vídeo longo e roteiro sem texto são recusados com a frase certa", async () => {

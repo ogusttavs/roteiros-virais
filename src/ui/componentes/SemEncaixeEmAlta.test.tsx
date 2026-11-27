@@ -22,6 +22,7 @@ describe("o bloco do que está em alta e não coube no ramo (E55 PR 2b)", () => 
   it("lista os assuntos, cada um com o botão que leva o assunto (a chave dele) ao Tema livre, e explica por que não há tema", () => {
     const aoTrazer = vi.fn();
     render(<SemEncaixeEmAlta assuntos={[A, B, C]} aoTrazer={aoTrazer} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ver o que está em alta mesmo assim" }));
 
     const bloco = screen.getByRole("region", { name: "Nada disso cabe bem no seu ramo hoje" });
     expect(within(bloco).getAllByRole("listitem")).toHaveLength(3);
@@ -33,10 +34,21 @@ describe("o bloco do que está em alta e não coube no ramo (E55 PR 2b)", () => 
     expect(aoTrazer).toHaveBeenCalledWith(B);
   });
 
+  it("nenhum assunto cabe: só a linha calma e o link, sem lista nem botão de trazer, até o toque", () => {
+    render(<SemEncaixeEmAlta assuntos={[A, B, C]} aoTrazer={() => {}} />);
+    expect(screen.getByText(/Hoje nada do que está em alta no Brasil combina com o seu ramo/)).toBeTruthy();
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+    expect(screen.queryByText("Final da Copa do Brasil")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Trazer para o meu ramo/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ver o que está em alta mesmo assim" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+  });
+
   it("sem assunto nenhum não mostra o bloco, e desabilitado trava os botões", () => {
     const { container, rerender } = render(<SemEncaixeEmAlta assuntos={[]} aoTrazer={() => {}} />);
     expect(container.firstChild).toBeNull();
     rerender(<SemEncaixeEmAlta assuntos={[A]} desabilitado aoTrazer={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ver o que está em alta mesmo assim" }));
     expect((screen.getByRole("button", { name: /Trazer para o meu ramo/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

@@ -865,11 +865,6 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
             <p>{t.prontoAjuda}</p>
           </div>
 
-          {(carrossel.avisos ?? []).map((a) => (
-            <p key={a} className={estilos.alerta}>
-              {a}
-            </p>
-          ))}
           {aviso ? (
             <p className={estilos.alerta} role="alert">
               {aviso}
@@ -935,6 +930,15 @@ export function CarrosselTela({ temasDeHoje, corMarca, arroba, ramoSaude, idInic
                 {t.tentarDeNovo}
               </button>
             </p>
+          ) : null}
+
+          {(carrossel.avisos ?? []).length > 0 ? (
+            <details className={estilos.dicaDoMetodo} data-testid="dicas-do-metodo">
+              <summary>{t.dicaDoMetodoRotulo}</summary>
+              {(carrossel.avisos ?? []).map((a) => (
+                <p key={a}>{a}</p>
+              ))}
+            </details>
           ) : null}
 
           <div className={estilos.depois}>

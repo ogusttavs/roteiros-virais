@@ -38,7 +38,9 @@ export type FamiliaDeFormula =
   | "intensificador-vazio"
   | "cada-vez-mais"
   | "paralelismo-de-slogan"
-  | "revelacao-vazia";
+  | "revelacao-vazia"
+  | "muleta-de-abertura"
+  | "fecho-de-confirmacao";
 
 export type TextoParaConferir = Partial<Record<BlocoDoTexto, string>>;
 
@@ -293,6 +295,34 @@ function acharRevelacao(texto: string): string | null {
   return trecho;
 }
 
+// --- 9. Muleta de abertura de bloco (onda 2, 25/11/2026) --------------------------------------
+
+// Só no COMEÇO do bloco: "olha o que muda agora" no meio do corpo é o reaviso que a R-ROTEIRO-10 pede.
+// "olha" e "olha só" só são muleta com pontuação logo depois ("olha só:", "então, olha,"): seguidos de palavra
+// ("olha só a diferença", "então, olha o antes e depois") são o apontar da câmera do antes e depois, e passam
+// (ajuste da segunda opinião sobre o PR #300, 26/11/2026).
+const MULETA = new RegExp(
+  [
+    // "cara, e o seguinte:", "gente, o seguinte:", "seguinte:" (com ":" ou "," depois, para "o seguinte caso" passar)
+    "^[^a-z0-9]*(?:(?:cara|gente|pessoal|galera|bom|bem|entao|ai|olha)[ ,]+)*(?:e |eh )?(?:o )?seguinte(?=[ ]*[:,.;!?]|$)",
+    "^[^a-z0-9]*(?:(?:entao|bom|bem|ai)[ ,]+)?olha(?: so)?(?=[ ]*[:,.;!?]|$)",
+  ].join("|"),
+);
+
+function acharMuleta(texto: string): string | null {
+  return MULETA.exec(texto)?.[0].replace(/^[^a-z]+/, "").trim() ?? null;
+}
+
+// --- 10. Fecho com pergunta de confirmação (onda 2) --------------------------------------------
+
+// Só a pergunta que pede o "de acordo" depois de uma afirmação: depois de vírgula, ou como frase solta.
+// "Faz sentido para o seu caso?" e "Quem sabe?" não casam: a pergunta tem objeto ou não vem depois de afirmação.
+const FECHO_CONFIRMACAO = /(?:,|^|[.!?;][ ]+)[ ]*(?:ne|sabe|entendeu|percebeu|percebe|viu|faz sentido|ta bom|fez sentido)[ ]*\?/;
+
+function acharFechoDeConfirmacao(texto: string): string | null {
+  return FECHO_CONFIRMACAO.exec(texto)?.[0].replace(/^[^a-z]+/, "").trim() ?? null;
+}
+
 // --- A lista fechada ---------------------------------------------------------------------------
 
 const FAMILIAS: Familia[] = [
@@ -351,6 +381,20 @@ const FAMILIAS: Familia[] = [
     conselho: "diga qual é a coisa em vez de prometer revelar",
     blocos: ["titulo", "tema", "gancho"],
     achar: acharRevelacao,
+  },
+  {
+    id: "muleta-de-abertura",
+    nome: "muleta de abertura de bloco (\"cara, é o seguinte\", \"olha só:\")",
+    conselho: "comece a frase pelo fato ou pela cena, sem a muleta que só ganha tempo",
+    blocos: ["corpo", "fechamento"],
+    achar: acharMuleta,
+  },
+  {
+    id: "fecho-de-confirmacao",
+    nome: "fecho com pergunta de confirmação (\"sabe?\", \"né?\", \"faz sentido?\")",
+    conselho: "termine afirmando e pedindo a ação, sem perguntar se a pessoa concordou",
+    blocos: ["fechamento", "chamada"],
+    achar: acharFechoDeConfirmacao,
   },
 ];
 

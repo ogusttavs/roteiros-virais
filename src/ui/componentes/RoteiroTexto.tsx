@@ -1,10 +1,12 @@
 import { Mic } from "lucide-react";
 
+import { temColchete } from "@/carrossel/colchetes";
 import type { TomDoBloco } from "@/lib/marcas-de-fala";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 import { textosPesquisa } from "@/textos/pesquisa";
 import { textosRoteiro } from "@/textos/roteiro";
 
+import { TextoComColchetes } from "./Colchetes";
 import { FalaMarcada } from "./FalaMarcada";
 import { PorQueAberto, PorQueBotao } from "./PorQue";
 import styles from "./RoteiroTexto.module.css";
@@ -40,6 +42,18 @@ type Props = {
 };
 
 /**
+ * 26/11/2026: o roteiro que a tela mostra tem algum trecho entre colchetes para completar? Olha o que `RoteiroTexto` desenha com o destaque: a fala de cada bloco e, com `comCenas`,
+ * a cena e o texto na tela. O aviso do alto do roteiro só aparece quando há o que destacar.
+ */
+export function blocosComColchete(blocos: Pick<BlocoRoteiro, "paragrafos" | "mostrar" | "cenas">[], comCenas: boolean): boolean {
+  return blocos.some(
+    (bloco) =>
+      bloco.paragrafos.some(temColchete) ||
+      (comCenas && ((bloco.mostrar ?? []).some(temColchete) || (bloco.cenas ?? []).some((cena) => temColchete(cena.momento) || temColchete(cena.oQueFazer)))),
+  );
+}
+
+/**
  * O roteiro diagramado: gancho em destaque, o resto em leitura corrida
  * (RoteiroTela). Maximo 34ch de largura para nao esticar a linha.
  */
@@ -55,7 +69,7 @@ export function RoteiroTexto({ blocos, modoGravacao = false, comCenas = false, c
           <div className={styles.fala}>
             {bloco.paragrafos.map((paragrafo, i) => (
               <p key={i} className={indice === 0 && !modoGravacao ? styles.gancho : styles.paragrafo}>
-                {comMarcas && bloco.marcado && bloco.marcado.length === bloco.paragrafos.length ? <FalaMarcada marcado={bloco.marcado[i]} /> : paragrafo}
+                {comMarcas && bloco.marcado && bloco.marcado.length === bloco.paragrafos.length ? <FalaMarcada marcado={bloco.marcado[i]} comColchetes /> : <TextoComColchetes texto={paragrafo} />}
                 {bloco.fontes?.[i]?.length ? (
                   <span className={styles.refFonte} data-ref-fonte>
                     <span aria-hidden="true">{bloco.fontes[i].join(", ")}</span>
@@ -78,12 +92,15 @@ export function RoteiroTexto({ blocos, modoGravacao = false, comCenas = false, c
               <span className={styles.rotuloCena}>{textosRoteiro.cartaoStory.oQueMostrar}</span>
               {(bloco.cenas ?? []).map((cena, i) => (
                 <p key={`c${i}`} className={styles.textoCena}>
-                  <span className={styles.momentoCena}>{cena.momento}</span> {cena.oQueFazer}
+                  <span className={styles.momentoCena}>
+                    <TextoComColchetes texto={cena.momento} />
+                  </span>{" "}
+                  <TextoComColchetes texto={cena.oQueFazer} />
                 </p>
               ))}
               {(bloco.mostrar ?? []).map((linha, i) => (
                 <p key={`m${i}`} className={styles.textoCena}>
-                  {linha}
+                  <TextoComColchetes texto={linha} />
                 </p>
               ))}
             </div>

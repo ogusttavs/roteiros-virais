@@ -100,7 +100,7 @@ test.describe("briefing da pessoa (P1)", () => {
     // Item 8: responde, avalia, e a resposta continua no campo, com a analise abaixo.
     const resposta = "Sou dono de academias e crio conteúdo sobre rotina, treino e os bastidores do negócio.";
     await campoP1.fill(resposta);
-    // As doze perguntas ficam montadas o tempo todo (V7, item 4 do PROXIMO.md); p2 e p3, do
+    // As treze perguntas ficam montadas o tempo todo (V7, item 4 do PROXIMO.md); p2 e p3, do
     // mesmo bloco, tambem mostram "Avaliar esta resposta" (desabilitado, sem texto ainda).
     await page.getByRole("button", { name: "Avaliar esta resposta" }).first().click();
     await expect(page.getByText("O que está bom")).toBeVisible();

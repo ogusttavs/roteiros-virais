@@ -399,7 +399,7 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     await page.goto("/briefing");
     await expect(itemNaTela(page, "bico de spray")).toBeVisible();
 
-    // A primeira Server Action de uma sessão nova (a lista de perfis citados, que roda ao montar a P12) grava o cookie da marca
+    // A primeira Server Action de uma sessão nova (a lista de perfis citados, que roda ao montar a P12 e a P13) grava o cookie da marca
     // ativa, e uma Server Action que grava cookie devolve a página inteira de novo. Se a leitura trocasse o texto antes disso, a
     // página já chegaria com o texto novo e o clique confirmaria o que a pessoa viu, sem provar o que o teste quer provar (falhou
     // 3 vezes em 10 sozinho, achado em 03/10 rodando o e2e do M5c). Espera a ação assentar antes de mexer no banco.

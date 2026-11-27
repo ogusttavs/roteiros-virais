@@ -1,6 +1,6 @@
 /**
  * E37a, item 3: "Copiar para a sua IA" monta o texto por código, sem chamar IA nenhuma. Este
- * teste prova que o texto sai certo para as 24 perguntas (negócio e pessoa), nunca só para uma
+ * teste prova que o texto sai certo para as 26 perguntas (negócio e pessoa), nunca só para uma
  * de exemplo.
  */
 import { describe, expect, it } from "vitest";
@@ -13,15 +13,15 @@ describe("montarTextoParaIA", () => {
   for (const tipo of ["negocio", "pessoa"] as const) {
     const perguntas = perguntasDoBriefing(tipo);
 
-    it(`${tipo}: monta o texto certo para as 12 perguntas`, () => {
-      expect(perguntas).toHaveLength(12);
+    it(`${tipo}: monta o texto certo para as 13 perguntas`, () => {
+      expect(perguntas).toHaveLength(13);
       for (const pergunta of perguntas) {
         const texto = montarTextoParaIA(pergunta);
 
         expect(texto).toContain(pergunta.enunciado);
         expect(texto).toContain(pergunta.oQueUmaBoaRespostaTem);
         expect(texto).toContain("Uma boa resposta tem:");
-        // As instrucoes fixas, iguais para as 24 perguntas.
+        // As instrucoes fixas, iguais para as 26 perguntas.
         expect(texto).toContain("em primeira pessoa");
         expect(texto).toContain("Sem lista de tópicos");
         // Nunca vazio, nunca cortado pela metade.

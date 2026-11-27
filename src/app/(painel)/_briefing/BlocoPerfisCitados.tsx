@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import type { Plataforma } from "@/db/schema";
+import type { Plataforma, TipoPerfilCitado } from "@/db/schema";
 import { textosBriefing } from "@/textos/briefing";
 import { ListaPerfisCitados, type ItemPerfilCitado } from "@/ui/componentes/ListaPerfisCitados";
 
@@ -10,75 +10,72 @@ import { adicionarPerfilCitadoAction, listarPerfisCitadosAction, removerPerfilCi
 
 const LIMITE_POR_LISTA = 10;
 
+type ListasCitadas = Awaited<ReturnType<typeof listarPerfisCitadosAction>>;
+
 /**
- * V12c, item 7, a E37b (design v2, `Briefing.dc.html`, `.perfis-citados`):
- * as duas listas acima do campo de texto da P12, só na P12. Busca a lista
- * ao montar (a marca sempre vem da sessão, na Server Action); cada
- * adicionar/tirar fala com o servidor direto, sem esperar "Avaliar esta
- * resposta" (item 8, nesta etapa só guarda e mostra).
+ * E76 PR 2: a P12 e a P13 montam juntas (o briefing vivo mostra todas as perguntas, e o Começar deixa os cinco blocos
+ * montados), e cada uma pede a sua lista. Uma busca só para as duas: a segunda que monta enquanto a primeira está no ar
+ * pega a mesma resposta. Depois que ela chega, a próxima montagem busca de novo (nunca uma lista velha).
  */
-export function BlocoPerfisCitados() {
-  const [concorrentes, setConcorrentes] = useState<ItemPerfilCitado[] | null>(null);
-  const [admira, setAdmira] = useState<ItemPerfilCitado[] | null>(null);
+let buscaEmCurso: Promise<ListasCitadas> | null = null;
+
+function buscarListas(): Promise<ListasCitadas> {
+  if (!buscaEmCurso) {
+    buscaEmCurso = listarPerfisCitadosAction().finally(() => {
+      buscaEmCurso = null;
+    });
+  }
+  return buscaEmCurso;
+}
+
+/**
+ * V12c, item 7, a E37b (design v2, `Briefing.dc.html`, `.perfis-citados`): a lista de @ acima do
+ * campo de texto. E76 PR 2: eram as duas na P12; agora os concorrentes ficam na P12 e os perfis
+ * admirados na P13, uma lista por pergunta (`tipo`). Busca a lista ao montar (a marca sempre vem da
+ * sessão, na Server Action); cada adicionar/tirar fala com o servidor direto, sem esperar "Avaliar
+ * esta resposta" (item 8, nesta etapa só guarda e mostra).
+ */
+export function BlocoPerfisCitados({ tipo }: { tipo: TipoPerfilCitado }) {
+  const [itens, setItens] = useState<ItemPerfilCitado[] | null>(null);
   const t = textosBriefing.perfisCitados;
 
   useEffect(() => {
     let cancelado = false;
-    listarPerfisCitadosAction()
+    buscarListas()
       .then((resultado) => {
-        if (cancelado) return;
-        setConcorrentes(resultado.concorrentes);
-        setAdmira(resultado.admira);
+        if (!cancelado) setItens(tipo === "concorrente" ? resultado.concorrentes : resultado.admira);
       })
       .catch(() => {
-        // Sem a lista por falha de rede: as duas listas ficam vazias, a pessoa ainda adiciona
-        // (o adicionar tenta de novo); o campo de texto embaixo continua funcionando normalmente.
-        if (!cancelado) {
-          setConcorrentes([]);
-          setAdmira([]);
-        }
+        // Sem a lista por falha de rede: a lista fica vazia, a pessoa ainda adiciona (o adicionar
+        // tenta de novo); o campo de texto embaixo continua funcionando normalmente.
+        if (!cancelado) setItens([]);
       });
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [tipo]);
 
-  if (concorrentes === null || admira === null) return null;
+  if (itens === null) return null;
+  const lista = itens;
 
-  async function adicionar(
-    tipo: "concorrente" | "admira",
-    itens: ItemPerfilCitado[],
-    setItens: (itens: ItemPerfilCitado[]) => void,
-    rede: Plataforma,
-    handle: string,
-  ) {
+  async function adicionar(rede: Plataforma, handle: string) {
     const criado = await adicionarPerfilCitadoAction(tipo, { rede, handle });
-    setItens([...itens, { id: criado.id, rede: criado.rede, handle: criado.handle }]);
+    setItens([...lista, { id: criado.id, rede: criado.rede, handle: criado.handle }]);
   }
 
-  async function remover(itens: ItemPerfilCitado[], setItens: (itens: ItemPerfilCitado[]) => void, id: number) {
-    setItens(itens.filter((item) => item.id !== id));
+  async function remover(id: number) {
+    setItens(lista.filter((item) => item.id !== id));
     await removerPerfilCitadoAction(id);
   }
 
   return (
     <div>
       <ListaPerfisCitados
-        titulo={t.concorrentes}
-        ajuda={t.ajudaConcorrentes}
-        itens={concorrentes}
-        onAdicionar={(rede, handle) => adicionar("concorrente", concorrentes, setConcorrentes, rede, handle)}
-        onRemover={(id) => void remover(concorrentes, setConcorrentes, id)}
-        textoAdicionar={t.adicionarOutro}
-        textoTirar={t.tirar}
-        avisoInvalido={t.perfilInvalido}
-        limite={LIMITE_POR_LISTA}
-      />
-      <ListaPerfisCitados
-        titulo={t.admira}
-        itens={admira}
-        onAdicionar={(rede, handle) => adicionar("admira", admira, setAdmira, rede, handle)}
-        onRemover={(id) => void remover(admira, setAdmira, id)}
+        titulo={tipo === "concorrente" ? t.concorrentes : t.admira}
+        ajuda={t.ajudaPerfil}
+        itens={lista}
+        onAdicionar={(rede, handle) => adicionar(rede, handle)}
+        onRemover={(id) => void remover(id)}
         textoAdicionar={t.adicionarOutro}
         textoTirar={t.tirar}
         avisoInvalido={t.perfilInvalido}

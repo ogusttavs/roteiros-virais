@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { LIMITES_DA_ANIMACAO } from "@/config/animacao";
 
 import {
+  arrobaDoPerfil,
   escaparTexto,
   limparTexto,
   MARCA_PADRAO,
@@ -102,5 +103,36 @@ describe("resolverMarca", () => {
   it("a letra embutida só passa se for base64", () => {
     expect(resolverMarca({ fonteBase64: "QUJD" }).fonteBase64).toBe("QUJD");
     expect(resolverMarca({ fonteBase64: ")};alert(1)//" }).fonteBase64).toBeNull();
+  });
+});
+
+describe("montarLinhaDoTempo: a chamada final segurada", () => {
+  it("estica só a última cena, e o total junto", () => {
+    const sem = montarLinhaDoTempo([{ texto: "um dois" }, { texto: "Chame no WhatsApp" }]);
+    const com = montarLinhaDoTempo([{ texto: "um dois" }, { texto: "Chame no WhatsApp" }], { seguraDoFinalS: 2 });
+    expect(com.cenas[0]).toEqual(sem.cenas[0]);
+    expect(com.cenas[1].fimS).toBeCloseTo(sem.cenas[1].fimS + 2, 3);
+    expect(com.duracaoS).toBe(com.cenas[1].fimS);
+  });
+  it("nunca passa do teto: segura só o que sobra, e valor estranho não segura nada", () => {
+    const cheias = Array.from({ length: 8 }, () => ({ texto: "oi", duracaoS: 7.5 }));
+    expect(montarLinhaDoTempo(cheias, { seguraDoFinalS: 2 }).duracaoS).toBe(LIMITES_DA_ANIMACAO.duracaoMaximaTotalS);
+    expect(montarLinhaDoTempo([{ texto: "oi" }], { seguraDoFinalS: Number.NaN }).duracaoS).toBe(montarLinhaDoTempo([{ texto: "oi" }]).duracaoS);
+    expect(montarLinhaDoTempo([{ texto: "oi" }], { seguraDoFinalS: -3 }).duracaoS).toBe(montarLinhaDoTempo([{ texto: "oi" }]).duracaoS);
+  });
+});
+
+describe("arrobaDoPerfil", () => {
+  it("aceita o nome, o @ ou o endereço do perfil e devolve o @", () => {
+    expect(arrobaDoPerfil("clinica.sorriso")).toBe("@clinica.sorriso");
+    expect(arrobaDoPerfil("@@clinica_1")).toBe("@clinica_1");
+    expect(arrobaDoPerfil("https://www.instagram.com/clinica.sorriso/?hl=pt")).toBe("@clinica.sorriso");
+  });
+  it("fora do formato do Instagram, nada", () => {
+    expect(arrobaDoPerfil(null)).toBeNull();
+    expect(arrobaDoPerfil("")).toBeNull();
+    expect(arrobaDoPerfil("clínica sorriso")).toBeNull();
+    expect(arrobaDoPerfil("<script>")).toBeNull();
+    expect(arrobaDoPerfil("a".repeat(31))).toBeNull();
   });
 });

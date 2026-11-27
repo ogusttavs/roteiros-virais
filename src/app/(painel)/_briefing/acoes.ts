@@ -25,8 +25,9 @@ export async function organizarFalaBriefingAction(pergunta: string, textoFalado:
 }
 
 /**
- * V12c, item 7, a E37b: os dois editores de @ acima do campo de texto da P12. A marca sempre vem
- * da sessão, mesmo padrão do resto do painel; `EditorPerfisCitados` busca a lista ao montar.
+ * V12c, item 7, a E37b: os dois editores de @ acima do campo de texto (E76 PR 2: os concorrentes na
+ * P12, os admirados na P13). A marca sempre vem da sessão, mesmo padrão do resto do painel;
+ * `BlocoPerfisCitados` busca as listas ao montar.
  */
 export async function listarPerfisCitadosAction(): Promise<{ concorrentes: PerfilCitado[]; admira: PerfilCitado[] }> {
   const cliente = await clienteDaSessaoAtual();

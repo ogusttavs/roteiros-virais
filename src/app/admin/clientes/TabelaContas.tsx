@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Search, User, Users } from "lucide-react";
 import Link from "next/link";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 
+import { TOTAL_PERGUNTAS } from "@/config/briefing";
 import type { ContaAdmin, EstadoDoDia } from "@/servicos/admin-contas";
 import { rotuloDaCobranca, textosContasAdmin as t } from "@/textos/admin-contas";
 import { Botao } from "@/ui/componentes/Botao";
@@ -68,7 +69,7 @@ function CelulaDoBriefing({ conta }: { conta: ContaAdmin }) {
   return (
     <span className={styles.marcaNao} data-briefing={b.tipo}>
       <AlertTriangle size={16} strokeWidth={1.5} aria-hidden="true" />
-      {b.tipo === "pronto" ? `${formatarNota(b.nota)}, abaixo` : b.tipo === "incompleto" ? `incompleto, ${b.respondidas} de 12` : "sem briefing"}
+      {b.tipo === "pronto" ? `${formatarNota(b.nota)}, abaixo` : b.tipo === "incompleto" ? `incompleto, ${b.respondidas} de ${TOTAL_PERGUNTAS}` : "sem briefing"}
     </span>
   );
 }

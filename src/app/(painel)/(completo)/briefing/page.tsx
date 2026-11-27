@@ -4,7 +4,7 @@ import { config } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { regrasDoCliente } from "@/servicos/aprendizado";
-import { garantirBriefing } from "@/servicos/briefing";
+import { avaliacoesParaMostrar, garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { secaoDoCliente } from "@/servicos/contexto-marca";
 import { focoParaATela } from "@/servicos/foco-da-conta";
@@ -31,6 +31,8 @@ export default async function Briefing() {
     secaoDoCliente(cliente),
     formatosDaMarcaComEstado(cliente.id),
   ]);
+  // E76 PR 1: a sugestão de resposta guardada passa pela conferência das fontes antes de chegar à tela (sem IA, sem gravar).
+  const avaliacoes = await avaliacoesParaMostrar(cliente.id, briefing, cliente.tipo);
   // "Respondido em 3 de outubro": a resposta mais recente do cliente, se ele já respondeu algum tipo.
   const respostas = tipos.map((t) => t.respostaDoClienteEm).filter((d): d is Date => d !== null);
   const maisRecente = respostas.length > 0 ? new Date(Math.max(...respostas.map((d) => d.getTime()))) : null;
@@ -38,7 +40,7 @@ export default async function Briefing() {
   return (
     <BriefingVivo
       respostasIniciais={briefing.respostas}
-      avaliacoesIniciais={briefing.avaliacoes}
+      avaliacoesIniciais={avaliacoes}
       notaGeralInicial={Number(briefing.notaGeral ?? 0)}
       perfil={briefing.perfil}
       regrasIniciais={regras}

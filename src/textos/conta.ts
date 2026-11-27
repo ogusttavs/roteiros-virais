@@ -96,4 +96,25 @@ export const textosConta = {
       passos: "toque no botão de menu do navegador e escolha Instalar aplicativo.",
     },
   },
+  /** Carrossel de saúde: a linha do responsável técnico no último slide. Só aparece para marca de ramo de saúde. */
+  responsavel: {
+    titulo: "Responsável técnico",
+    ajuda: "Sai numa linha pequena no último slide do carrossel, como \"Dra. Maria Souza, CRO-SP 12345\". O aplicativo nunca inventa esse dado: se ficar em branco, a linha não aparece.",
+    rotuloDoCampo: "Nome, conselho e número de registro",
+    exemplo: "Dra. Maria Souza, CRO-SP 12345",
+    salvar: "salvar",
+    salvando: "salvando",
+    salvo: "salvo",
+    /** Nome do botão para o leitor de tela: a Conta já tem o "salvar" do formulário, e os dois não podem ter o mesmo nome. */
+    nomeDoBotao: {
+      salvar: "salvar o responsável técnico",
+      salvando: "salvando o responsável técnico",
+      salvo: "responsável técnico salvo",
+    },
+    erro: "não conseguimos salvar agora; tente de novo em um minuto",
+    longo: (maximo: number) => `escreva em até ${maximo} caracteres`,
+    link: "tire links e arrobas: a linha é só o nome e o registro",
+    colchete: "tire os colchetes: escreva o nome e o registro como são",
+    semAcesso: "essa linha é só para marca da área da saúde",
+  },
 };

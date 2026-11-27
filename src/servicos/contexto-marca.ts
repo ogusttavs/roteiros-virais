@@ -89,6 +89,17 @@ export function marcaTemFonteParaLer(cliente: Pick<Cliente, "site" | "perfis">):
   return Boolean(cliente.site?.trim() || cliente.perfis?.instagram?.trim() || cliente.perfis?.youtube?.trim());
 }
 
+/** As fontes que a Conta tem hoje (o TikTok não conta: não é lido). */
+function fontesDaContaHoje(cliente: Pick<Cliente, "site" | "perfis">): Set<FonteContextoMarca> {
+  return new Set<FonteContextoMarca>(
+    [
+      cliente.site?.trim() ? "site" : null,
+      cliente.perfis?.instagram?.trim() ? "instagram" : null,
+      cliente.perfis?.youtube?.trim() ? "youtube" : null,
+    ].filter((fonte): fonte is FonteContextoMarca => fonte !== null),
+  );
+}
+
 /**
  * O que a seção do briefing mostra. Ordem fixa por categoria e depois por id: um item que a
  * pessoa confirma não muda de lugar na lista (mesma regra de `regrasDoCliente`).
@@ -107,13 +118,7 @@ export async function secaoDoCliente(
   // As fontes que a Conta tem hoje. O que veio de uma fonte que a pessoa tirou (o site apagado, o Instagram trocado por outro) e que
   // ela nunca confirmou não é mais dela: some da tela na hora, sem esperar uma leitura (que nem acontece quando não sobrou fonte
   // nenhuma). O que ela confirmou ou corrigiu continua à vista, porque continua entrando em todo roteiro.
-  const fontesDaConta = new Set<FonteContextoMarca>(
-    [
-      cliente.site?.trim() ? "site" : null,
-      cliente.perfis?.instagram?.trim() ? "instagram" : null,
-      cliente.perfis?.youtube?.trim() ? "youtube" : null,
-    ].filter((fonte): fonte is FonteContextoMarca => fonte !== null),
-  );
+  const fontesDaConta = fontesDaContaHoje(cliente);
 
   const itens: ItemDaSecao[] = itensDoBanco
     .filter((item) => itemVisivel(item) && (item.textoConfirmado !== null || fontesDaConta.has(item.origem)))
@@ -178,6 +183,28 @@ export async function secaoDoCliente(
     // Sem nenhuma fonte na Conta nenhuma leitura vai acontecer: não se anuncia "a próxima leitura é em ...".
     proximaLeituraEm: estado === "sem_fonte" ? null : proximaLeitura,
   };
+}
+
+/**
+ * E76 PR 1: o que lemos do site e das redes que serve de fonte para a sugestão de resposta do briefing (`avaliarResposta`). É o
+ * que a seção mostra (mesmo filtro de `secaoDoCliente`: nada que a pessoa tirou, nada de uma fonte que ela tirou da Conta sem
+ * nunca confirmar), com o texto em vigor quando existe e a proposta quando ainda não há nada confirmado. A proposta entra porque
+ * é o que o site ou a rede diz, e a sugestão marca com a fonte o que usar daqui ("(do seu site)"), para a pessoa conferir antes
+ * de aceitar. Ordem fixa por categoria e depois por id.
+ */
+export async function lidoDaMarcaParaSugestao(
+  cliente: Pick<Cliente, "id" | "site" | "perfis">,
+): Promise<{ origem: FonteContextoMarca; texto: string }[]> {
+  const fontesDaConta = fontesDaContaHoje(cliente);
+  const itens = await db()
+    .select()
+    .from(contextoMarcaItens)
+    .where(eq(contextoMarcaItens.clienteId, cliente.id))
+    .orderBy(asc(contextoMarcaItens.id));
+  return itens
+    .filter((item) => itemVisivel(item) && (item.textoConfirmado !== null || fontesDaConta.has(item.origem)))
+    .sort((a, b) => ORDEM_CATEGORIA[a.categoria] - ORDEM_CATEGORIA[b.categoria] || a.id - b.id)
+    .map((item) => ({ origem: item.origem, texto: item.textoConfirmado ?? item.texto }));
 }
 
 /**

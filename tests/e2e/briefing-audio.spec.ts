@@ -67,7 +67,7 @@ test.describe("responder o briefing falando (P2, item 2)", () => {
     await expect(page).toHaveURL(/\/comecar/);
     await expect(page.getByText("bloco 1 de 5")).toBeVisible();
 
-    // Os doze campos ficam montados e escondidos por bloco (mesmo achado de `briefing.spec.ts`);
+    // Os treze campos ficam montados e escondidos por bloco (mesmo achado de `briefing.spec.ts`);
     // escopar pela pergunta P1 evita casar com o botao/dica das outras onze.
     const cartaoP1 = page.locator("#pergunta-p1");
     const campo = page.getByLabel("o que o seu negócio faz hoje");

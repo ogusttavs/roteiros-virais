@@ -63,13 +63,13 @@ function itensDoPerfil(perfil: PerfilCompilado) {
       titulo: textosBriefing.briefing.perfilPosicionamentos,
       texto: (perfil.fatos.posicionamentos ?? []).join(" "),
     },
-    /** V12c, item 8: os perfis citados nas duas listas da P12 (`?? []`: perfil compilado antes desta etapa não tem). */
+    /** V12c, item 8: os perfis citados nas listas de @ da P12 e da P13 (`?? []`: perfil compilado antes desta etapa não tem). */
     { titulo: textosBriefing.briefing.perfilConcorrentes, texto: (perfil.perfisCitados?.concorrentes ?? []).join(", ") },
     { titulo: textosBriefing.briefing.perfilAdmira, texto: (perfil.perfisCitados?.admira ?? []).join(", ") },
   ].filter((item) => item.texto.trim().length > 0);
 }
 
-/** O briefing vivo (brief-frontend.md, 6.8): as doze respostas com nota, editaveis, e o perfil compilado. */
+/** O briefing vivo (brief-frontend.md, 6.8): as treze respostas com nota, editaveis, e o perfil compilado. */
 export function BriefingVivo({
   respostasIniciais,
   avaliacoesIniciais,

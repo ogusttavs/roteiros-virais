@@ -29,11 +29,18 @@ export const LIMITES_DA_ANIMACAO = {
 } as const;
 
 /**
- * Tempo máximo do render inteiro (captura mais ffmpeg), em milissegundos. A fase 0 mediu 1,6 minuto para 30 s de final, e o servidor deve ser 1,5 a 2 vezes mais lento; o limite é seis vezes a duração
- * do vídeo para o final (com piso de 2 minutos) e três vezes para a prévia (piso de 1 minuto), com teto de 15 minutos: passou disso, algo travou e o render é derrubado.
+ * O limite de cada qualidade, em vezes a duração do vídeo, com piso e teto em milissegundos (T114). Medido no servidor em 26/11/2026 (`roteiros-render`, 1 vCPU): a prévia andou uns 0,28 s de vídeo por
+ * segundo, ou seja, leva uns 3,6 vezes a duração (57 s de vídeo pediam uns 200 s, e o limite antigo de 3 vezes derrubou as duas tentativas perto de 85%). Seis vezes dá folga de 1,7 vez sobre o medido;
+ * o piso de 3 minutos cobre o vídeo curto (30 s pedem uns 110 s) e o teto de 8 minutos só vale como trava (60 s, o vídeo mais longo, dão 6 minutos). O final tem quatro vezes os pixels da prévia
+ * (a fase 0 mediu 2,3 vezes mais tempo na resolução cheia) e não foi medido no servidor: deve levar perto de 8 vezes a duração, então o limite antigo de 6 vezes também cairia; 12 vezes dá folga de 1,5.
  */
+export const LIMITE_DO_RENDER_DA_ANIMACAO = {
+  previa: { razao: 6, pisoMs: 180_000, tetoMs: 480_000 },
+  final: { razao: 12, pisoMs: 180_000, tetoMs: 900_000 },
+} as const satisfies Record<QualidadeDaAnimacao, { razao: number; pisoMs: number; tetoMs: number }>;
+
+/** Tempo máximo do render inteiro (captura mais ffmpeg), em milissegundos: passou disso, algo travou e o render é derrubado (os números estão em `LIMITE_DO_RENDER_DA_ANIMACAO`). */
 export function limiteDaAnimacaoMs(qualidade: QualidadeDaAnimacao, duracaoS: number): number {
-  const razao = qualidade === "final" ? 6 : 3;
-  const piso = qualidade === "final" ? 120_000 : 60_000;
-  return Math.round(Math.min(900_000, Math.max(piso, duracaoS * razao * 1000)));
+  const { razao, pisoMs, tetoMs } = LIMITE_DO_RENDER_DA_ANIMACAO[qualidade];
+  return Math.round(Math.min(tetoMs, Math.max(pisoMs, duracaoS * razao * 1000)));
 }

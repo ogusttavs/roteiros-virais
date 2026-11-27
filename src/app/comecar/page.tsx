@@ -6,13 +6,14 @@ import { config } from "@/lib/config";
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { barreiraDoCadastroNaSessao } from "@/lib/portao-cadastro";
 import { sessaoDoPainel } from "@/lib/ver-como";
-import { blocoInicial, garantirBriefing, lerBriefing } from "@/servicos/briefing";
+import { avaliacoesParaMostrar, blocoInicial, garantirBriefing, lerBriefing } from "@/servicos/briefing";
 import {
   clienteAtivoDoUsuario,
   clienteTemOndeEscolhido,
   dadosOndeIniciais,
   marcasDoUsuario,
 } from "@/servicos/clientes";
+import { situacaoDasEmpresas } from "@/servicos/convite-de-grupo";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
@@ -64,11 +65,12 @@ export default async function Comecar() {
    * desta rodada). `marcas` (V12b, item 0): quem tem mais de uma marca troca
    * daqui tambem, sem ficar presa no briefing incompleto de uma so.
    */
-  const [briefing, ramoAtual, marcas, pedidoAberto] = await Promise.all([
+  const [briefing, ramoAtual, marcas, pedidoAberto, empresasDoGrupo] = await Promise.all([
     garantirBriefing(cliente.id),
     ramoAtualDoCliente(cliente.nichoId),
     marcasDoUsuario(sessao.user.id),
     pedidoAbertoDaMarca(cliente.id),
+    situacaoDasEmpresas(sessao.user.id),
   ]);
 
   if (briefing.completo) {
@@ -76,6 +78,8 @@ export default async function Comecar() {
   }
 
   const dadosFixosCompletos = clienteTemOndeEscolhido(cliente) && Boolean(cliente.nichoId || cliente.ramoOutro);
+  // E76 PR 1: a sugestão de resposta guardada passa pela conferência das fontes antes de chegar à tela (sem IA, sem gravar).
+  const avaliacoes = await avaliacoesParaMostrar(cliente.id, briefing, cliente.tipo);
 
   return (
     <ConexaoDaTela>
@@ -84,6 +88,7 @@ export default async function Comecar() {
           marcaAtiva={{ id: cliente.id, nome: cliente.nome }}
           marcas={marcas.map((m) => ({ id: m.id, nome: m.nome }))}
           nomePessoa={sessao.user.name}
+          linkDasEmpresas={empresasDoGrupo !== null}
           dadosFixosCompletos={dadosFixosCompletos}
           dadosFixosIniciais={{
             nome: cliente.nome,
@@ -106,7 +111,7 @@ export default async function Comecar() {
             quemGrava: cliente.quemGrava,
           }}
           respostasIniciais={briefing.respostas}
-          avaliacoesIniciais={briefing.avaliacoes}
+          avaliacoesIniciais={avaliacoes}
           notaGeralInicial={Number(briefing.notaGeral ?? 0)}
           blocoInicial={blocoInicial(briefing.avaliacoes, cliente.tipo)}
           meta={config.regras.notaMinimaBriefing}
