@@ -18,7 +18,8 @@ import { FormularioDoConvite } from "./FormularioDoConvite";
  * A prévia do link do convite no WhatsApp (27/11/2026): título, descrição e imagem próprios, iguais para todo código (a prévia não diz se o link vale, nem de quem é).
  * O `metadataBase` e o resto vêm do layout.
  */
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ codigo: string }> }): Promise<Metadata> {
+  const { codigo } = await params;
   const p = textosPreviaDeLink.convite;
   return {
     title: p.titulo,
@@ -27,6 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       siteName: config.appName,
       locale: "pt_BR",
+      url: `/convite/${encodeURIComponent(codigo)}`,
       title: p.titulo,
       description: p.descricao,
       images: [{ url: p.imagem, ...TAMANHO_DA_PREVIA, alt: p.textoDaImagem }],
