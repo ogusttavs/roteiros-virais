@@ -607,8 +607,8 @@ describe("o momento e a reescrita", () => {
     const v1 = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
     // os longos saem da janela (ou do banco): a medida some, e a reescrita não passa pela porta de `montarRoteiro`
     await db().update(videos).set({ publicadoEm: new Date(Date.now() - 400 * DIA_MS) });
-    await expect(reprovarERescrever(v1.id, ["gancho_fraco"])).rejects.toThrow(textosRoteiro.longo.semLongos);
-    await expect(reprovarERescrever(v1.id, ["gancho_fraco"])).rejects.toBeInstanceOf(ErroRoteiro);
+    await expect(reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"])).rejects.toThrow(textosRoteiro.longo.semLongos);
+    await expect(reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"])).rejects.toBeInstanceOf(ErroRoteiro);
     const [depois] = await db().select().from(roteiros).where(eq(roteiros.id, v1.id));
     expect(depois.reprovadoEm).toBeNull();
     expect(await db().select().from(roteiros)).toHaveLength(1);
@@ -618,14 +618,14 @@ describe("o momento e a reescrita", () => {
     await medirORamo();
     const v1 = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
     await db().update(roteiros).set({ estilo: "sem_fala" }).where(eq(roteiros.id, v1.id));
-    await expect(reprovarERescrever(v1.id, ["gancho_fraco"])).rejects.toThrow(textosRoteiro.longo.soVideoFalado);
+    await expect(reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"])).rejects.toThrow(textosRoteiro.longo.soVideoFalado);
     expect((await geracoesDa("roteiroLongo")).length).toBe(1);
   });
 
   it("reprovar e reescrever mantém o vídeo longo: a v2 é longa, com capítulos, e a entrada pede outra divisão sem repetir o gancho", async () => {
     await medirORamo();
     const v1 = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
-    const v2 = await reprovarERescrever(v1.id, ["gancho_fraco"]);
+    const v2 = await reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"]);
 
     expect(v2.versao).toBe(2);
     expect(v2.duracaoDoVideo).toBe("longo");
@@ -647,7 +647,7 @@ describe("a edição de um capítulo e o que sai para fora (E52, PR 4b)", () => 
   it("editar um capítulo muda só ele (o gancho e os pontos) e refaz o texto corrido, as cenas e o fechamento a partir dos capítulos", async () => {
     const antes = await longoPronto();
     const caps = antes.conteudo.capitulos!;
-    const depois = await editarRoteiro(antes.id, { capitulo: { indice: 1, ganchoParaOProximo: "E o erro seguinte é o que ninguém percebe até ser tarde", pontos: ["Primeiro ponto novo", "Segundo ponto novo"] } });
+    const depois = await editarRoteiro(antes.id, antes.clienteId, { capitulo: { indice: 1, ganchoParaOProximo: "E o erro seguinte é o que ninguém percebe até ser tarde", pontos: ["Primeiro ponto novo", "Segundo ponto novo"] } });
 
     const novos = depois.conteudo.capitulos!;
     expect(novos).toHaveLength(caps.length);
@@ -673,14 +673,14 @@ describe("a edição de um capítulo e o que sai para fora (E52, PR 4b)", () => 
   it("editar o último capítulo refaz o fechamento, e o gancho que chega para ele é ignorado (a chamada não segura até nenhum próximo)", async () => {
     const antes = await longoPronto();
     const ultimo = antes.conteudo.capitulos!.length - 1;
-    const depois = await editarRoteiro(antes.id, { capitulo: { indice: ultimo, ganchoParaOProximo: "Isto não vale", pontos: ["Resuma o que viu", "Peça a mensagem"] } });
+    const depois = await editarRoteiro(antes.id, antes.clienteId, { capitulo: { indice: ultimo, ganchoParaOProximo: "Isto não vale", pontos: ["Resuma o que viu", "Peça a mensagem"] } });
     expect(depois.conteudo.capitulos![ultimo].ganchoParaOProximo).toBeNull();
     expect(depois.conteudo.fechamento).toBe("Resuma o que viu; Peça a mensagem");
   });
 
   it("o corpo e o fechamento que chegam de fora não valem num roteiro longo: o texto corrido é sempre o dos capítulos", async () => {
     const antes = await longoPronto();
-    const depois = await editarRoteiro(antes.id, { corpo: "texto solto que não é dos capítulos", fechamento: "outro texto solto", gancho: "Um gancho novo para o vídeo inteiro" });
+    const depois = await editarRoteiro(antes.id, antes.clienteId, { corpo: "texto solto que não é dos capítulos", fechamento: "outro texto solto", gancho: "Um gancho novo para o vídeo inteiro" });
     expect(depois.conteudo.corpo).toBe(antes.conteudo.corpo);
     expect(depois.conteudo.fechamento).toBe(antes.conteudo.fechamento);
     expect(depois.conteudo.gancho).toBe("Um gancho novo para o vídeo inteiro");
@@ -689,11 +689,11 @@ describe("a edição de um capítulo e o que sai para fora (E52, PR 4b)", () => 
   it("índice fora da lista, nenhum ponto ou pontos demais é recusado com a frase, e nada é gravado", async () => {
     const antes = await longoPronto();
     const total = antes.conteudo.capitulos!.length;
-    await expect(editarRoteiro(antes.id, { capitulo: { indice: total, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
-    await expect(editarRoteiro(antes.id, { capitulo: { indice: -1, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
-    await expect(editarRoteiro(antes.id, { capitulo: { indice: 0, pontos: [] } })).rejects.toThrow(ErroRoteiro);
-    await expect(editarRoteiro(antes.id, { capitulo: { indice: 0, pontos: ["   ", ""] } })).rejects.toThrow(ErroRoteiro);
-    await expect(editarRoteiro(antes.id, { capitulo: { indice: 0, pontos: Array.from({ length: 9 }, (_, i) => `ponto ${i}`) } })).rejects.toThrow(ErroRoteiro);
+    await expect(editarRoteiro(antes.id, antes.clienteId, { capitulo: { indice: total, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
+    await expect(editarRoteiro(antes.id, antes.clienteId, { capitulo: { indice: -1, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
+    await expect(editarRoteiro(antes.id, antes.clienteId, { capitulo: { indice: 0, pontos: [] } })).rejects.toThrow(ErroRoteiro);
+    await expect(editarRoteiro(antes.id, antes.clienteId, { capitulo: { indice: 0, pontos: ["   ", ""] } })).rejects.toThrow(ErroRoteiro);
+    await expect(editarRoteiro(antes.id, antes.clienteId, { capitulo: { indice: 0, pontos: Array.from({ length: 9 }, (_, i) => `ponto ${i}`) } })).rejects.toThrow(ErroRoteiro);
     const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, antes.id));
     expect(linha.editadoPelaPessoa).toBe(false);
     expect(linha.conteudo.capitulos).toEqual(antes.conteudo.capitulos);
@@ -701,7 +701,7 @@ describe("a edição de um capítulo e o que sai para fora (E52, PR 4b)", () => 
 
   it("pontos que não são uma lista de texto, ou um gancho que não é texto (chamada forjada), são recusados com a frase e nada é gravado", async () => {
     const antes = await longoPronto();
-    const forjado = (capitulo: unknown) => editarRoteiro(antes.id, { capitulo } as never);
+    const forjado = (capitulo: unknown) => editarRoteiro(antes.id, antes.clienteId, { capitulo } as never);
     await expect(forjado({ indice: 0, pontos: "abc" })).rejects.toThrow(ErroRoteiro);
     await expect(forjado({ indice: 0, pontos: [1, 2] })).rejects.toThrow(ErroRoteiro);
     await expect(forjado({ indice: 0, pontos: ["a"], ganchoParaOProximo: null })).rejects.toThrow(ErroRoteiro);
@@ -712,7 +712,7 @@ describe("a edição de um capítulo e o que sai para fora (E52, PR 4b)", () => 
 
   it("um roteiro curto não aceita a edição por capítulo", async () => {
     const curto = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
-    await expect(editarRoteiro(curto.id, { capitulo: { indice: 0, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
+    await expect(editarRoteiro(curto.id, curto.clienteId, { capitulo: { indice: 0, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
   });
 
   it("a folha do PDF do longo tem uma seção por capítulo, com o tempo no título, e termina com a lista para colar na descrição, numa página nova", async () => {

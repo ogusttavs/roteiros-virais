@@ -246,7 +246,7 @@ describe("gerarVersoesAction com ficha", () => {
   it("reprovar e reescrever mantém a ficha da versão anterior", async () => {
     const { reprovarERescrever } = await import("@/servicos/roteiro");
     const original = await gerar("comentem");
-    const nova = await reprovarERescrever(original.id, ["muito_longo"]);
+    const nova = await reprovarERescrever(original.id, original.clienteId, ["muito_longo"]);
     expect(nova.ficha).toBe("comentem");
     expect(nova.objetivo).toBe("engajamento");
   });

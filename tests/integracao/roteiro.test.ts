@@ -766,7 +766,7 @@ describe("V9c, formato (Story)", () => {
       formato: "story",
     });
 
-    const v2 = await reprovarERescrever(v1.id, ["ja_falei_disso"]);
+    const v2 = await reprovarERescrever(v1.id, v1.clienteId, ["ja_falei_disso"]);
 
     expect(v2.formato).toBe("story");
     expect(v2.conteudo.cartoes).not.toBeNull();
@@ -848,7 +848,7 @@ describe("M4, estilo (sem fala)", () => {
       estilo: "sem_fala",
     });
 
-    const v2 = await reprovarERescrever(v1.id, ["ja_falei_disso"]);
+    const v2 = await reprovarERescrever(v1.id, v1.clienteId, ["ja_falei_disso"]);
 
     expect(v2.estilo).toBe("sem_fala");
     expect(v2.conteudo.cartoes).not.toBeNull();
@@ -991,7 +991,7 @@ describe("reprovarERescrever", () => {
       objetivo: "engajamento",
     });
 
-    const v2 = await reprovarERescrever(v1.id, ["gancho_fraco", "muito_longo"], "comeca devagar demais");
+    const v2 = await reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco", "muito_longo"], "comeca devagar demais");
 
     expect(v2.versao).toBe(2);
     expect(v2.versaoDe).toBe(v1.id);
@@ -1020,7 +1020,7 @@ describe("reprovarERescrever", () => {
       objetivo: "engajamento",
     });
 
-    await expect(reprovarERescrever(v1.id, [])).rejects.toThrow(ErroRoteiro);
+    await expect(reprovarERescrever(v1.id, v1.clienteId, [])).rejects.toThrow(ErroRoteiro);
 
     const [v1Recarregado] = await db().select().from(roteiros).where(eq(roteiros.id, v1.id));
     expect(v1Recarregado.reprovadoEm).toBeNull();
@@ -1056,7 +1056,7 @@ describe("reprovarERescrever", () => {
     // o teste quer simular como "a IA fora do ar" de verdade.
     gerarEstruturadoMock.mockRejectedValueOnce(new ErroIA("simulado: filtro de evidencia fora do ar"));
     gerarEstruturadoMock.mockRejectedValueOnce(new ErroIA("simulado: IA fora do ar"));
-    await expect(reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco")).rejects.toThrow(ErroIA);
+    await expect(reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"], "comeca fraco")).rejects.toThrow(ErroIA);
 
     const [v1Recarregado] = await db().select().from(roteiros).where(eq(roteiros.id, v1.id));
     expect(v1Recarregado.reprovadoEm).toBeNull();
@@ -1087,7 +1087,7 @@ describe("reprovarERescrever", () => {
       textoTema: "erro comum ao limpar estofado",
       objetivo: "engajamento",
     });
-    await reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco");
+    await reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"], "comeca fraco");
 
     const jobs = await db().execute(sql`
       select 1 from pgboss.job
@@ -1138,8 +1138,8 @@ describe("reprovarERescrever", () => {
       textoTema: "cheiro de bicho de estimacao no sofa",
       objetivo: "engajamento",
     });
-    await reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco");
-    await reprovarERescrever(v3.id, ["muito_longo"], "ficou longo");
+    await reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"], "comeca fraco");
+    await reprovarERescrever(v3.id, v3.clienteId, ["muito_longo"], "ficou longo");
 
     const jobs = await db().execute(sql`
       select count(*)::int as total from pgboss.job
@@ -1160,7 +1160,7 @@ describe("reprovarERescrever", () => {
     });
 
     const envioEspiao = vi.spyOn(boss(), "send").mockRejectedValueOnce(new Error("ECONNREFUSED simulado"));
-    const v2 = await reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco");
+    const v2 = await reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"], "comeca fraco");
     envioEspiao.mockRestore();
 
     expect(v2.versao).toBe(2);
@@ -1284,7 +1284,7 @@ describe("V9a, o momento (item 1, 2 e 4 do PROXIMO.md)", () => {
     expect(entrada).not.toContain("segredo da marca alheia");
 
     // A reescrita herda o mesmo momento (com o marcaId gravado): a posse é conferida de novo, e o perfil continua fora.
-    const nova = await reprovarERescrever(roteiro.id, ["muito_longo"]);
+    const nova = await reprovarERescrever(roteiro.id, roteiro.clienteId, ["muito_longo"]);
     const [geracaoNova] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, nova.geracaoId!));
     expect((geracaoNova.entradas as { entrada: string }).entrada).not.toContain("segredo da marca alheia");
   });
@@ -1309,7 +1309,7 @@ describe("V9a, o momento (item 1, 2 e 4 do PROXIMO.md)", () => {
     evidenciaParaRoteiroMock.mockClear();
     evidenciaPorIdsMock.mockClear();
 
-    const v2 = await reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco");
+    const v2 = await reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"], "comeca fraco");
 
     expect(evidenciaParaRoteiroMock).not.toHaveBeenCalled();
     expect(v2.origem).toBe("momento");
@@ -1353,14 +1353,14 @@ describe("marcarGravado e marcarPostado", () => {
       objetivo: "alcance",
     });
 
-    const atualizado = await marcarGravado(roteiro.id);
+    const atualizado = await marcarGravado(roteiro.id, roteiro.clienteId);
     expect(atualizado.status).toBe("gravado");
   });
 
   it("desmarcarGravado volta o roteiro gravado para gerado e limpa a hora", async () => {
     const clienteId = await criarCliente();
     const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "limpeza de sofa", objetivo: "alcance" });
-    const gravado = await marcarGravado(roteiro.id);
+    const gravado = await marcarGravado(roteiro.id, roteiro.clienteId);
     expect(gravado.gravadoEm).not.toBeNull();
 
     const desfeito = await desmarcarGravado(roteiro.id, clienteId);
@@ -1378,8 +1378,8 @@ describe("marcarGravado e marcarPostado", () => {
     await expect(desmarcarGravado(gerado.id, clienteId)).rejects.toThrow(ErroRoteiro);
 
     const postado = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "limpeza de tapete", objetivo: "alcance" });
-    await marcarGravado(postado.id);
-    await marcarPostado(postado.id, "https://www.tiktok.com/@sofalimpo/video/987654321");
+    await marcarGravado(postado.id, postado.clienteId);
+    await marcarPostado(postado.id, postado.clienteId, "https://www.tiktok.com/@sofalimpo/video/987654321");
     await expect(desmarcarGravado(postado.id, clienteId)).rejects.toThrow(ErroRoteiro);
     const lido = await roteiroPorId(postado.id, clienteId);
     expect(lido?.status).toBe("postado");
@@ -1390,7 +1390,7 @@ describe("marcarGravado e marcarPostado", () => {
     const dono = await criarCliente();
     const outro = await criarCliente();
     const roteiro = await gerarRoteiro(dono, { origem: "livre", textoTema: "limpeza de cortina", objetivo: "alcance" });
-    await marcarGravado(roteiro.id);
+    await marcarGravado(roteiro.id, roteiro.clienteId);
 
     await expect(desmarcarGravado(roteiro.id, outro)).rejects.toThrow(ErroRoteiro);
 
@@ -1411,6 +1411,7 @@ describe("marcarGravado e marcarPostado", () => {
 
     const atualizado = await marcarPostado(
       roteiro.id,
+      roteiro.clienteId,
       "https://www.tiktok.com/@sofalimpo/video/1234567890",
     );
 
@@ -1539,7 +1540,7 @@ describe("editarRoteiro (E40, item 1)", () => {
     const ganchoOriginal = roteiro.conteudo.gancho;
     const chamadasAntes = gerarEstruturadoMock.mock.calls.length;
 
-    const primeiraEdicao = await editarRoteiro(roteiro.id, { gancho: "um gancho diferente, escrito por mim" });
+    const primeiraEdicao = await editarRoteiro(roteiro.id, roteiro.clienteId, { gancho: "um gancho diferente, escrito por mim" });
 
     // Sem IA nenhuma: o mock nao foi chamado de novo so por causa da edicao.
     expect(gerarEstruturadoMock.mock.calls.length).toBe(chamadasAntes);
@@ -1550,7 +1551,7 @@ describe("editarRoteiro (E40, item 1)", () => {
     // Os outros campos do conteudo, intocados, continuam os mesmos da versao que a IA escreveu.
     expect(primeiraEdicao.conteudo.corpo).toBe(roteiro.conteudo.corpo);
 
-    const segundaEdicao = await editarRoteiro(roteiro.id, { gancho: "mudei de novo, segunda vez" });
+    const segundaEdicao = await editarRoteiro(roteiro.id, roteiro.clienteId, { gancho: "mudei de novo, segunda vez" });
 
     // conteudoOriginal nunca muda depois da primeira edicao: continua sendo o que a IA escreveu.
     expect(segundaEdicao.conteudoOriginal?.gancho).toBe(ganchoOriginal);
@@ -1569,7 +1570,7 @@ describe("editarRoteiro (E40, item 1)", () => {
     const cartoesOriginais = roteiro.conteudo.cartoes!;
     expect(cartoesOriginais.length).toBeGreaterThan(0);
 
-    const editado = await editarRoteiro(roteiro.id, {
+    const editado = await editarRoteiro(roteiro.id, roteiro.clienteId, {
       cartoes: cartoesOriginais.map((c, i) => (i === 0 ? { ...c, oQueFalar: "o que eu quero falar de verdade" } : c)),
     });
 
@@ -1590,15 +1591,15 @@ describe("editarRoteiro (E40, item 1)", () => {
     });
 
     // trim: espaco nas pontas nao conta para o teto nem fica salvo.
-    const comEspacos = await editarRoteiro(roteiro.id, { gancho: "   um gancho com espaco nas pontas   " });
+    const comEspacos = await editarRoteiro(roteiro.id, roteiro.clienteId, { gancho: "   um gancho com espaco nas pontas   " });
     expect(comEspacos.conteudo.gancho).toBe("um gancho com espaco nas pontas");
 
     const textoNoLimite = "a".repeat(2000);
-    const noLimite = await editarRoteiro(roteiro.id, { gancho: textoNoLimite });
+    const noLimite = await editarRoteiro(roteiro.id, roteiro.clienteId, { gancho: textoNoLimite });
     expect(noLimite.conteudo.gancho).toHaveLength(2000);
 
     const textoDemais = "a".repeat(2001);
-    await expect(editarRoteiro(roteiro.id, { gancho: textoDemais })).rejects.toThrow(ErroRoteiro);
+    await expect(editarRoteiro(roteiro.id, roteiro.clienteId, { gancho: textoDemais })).rejects.toThrow(ErroRoteiro);
 
     // a falha num campo nao escreve nada: o gancho continua o do ultimo salvamento valido.
     const [aposFalha] = await db().select().from(roteiros).where(eq(roteiros.id, roteiro.id));
@@ -1618,7 +1619,7 @@ describe("editarRoteiro (E40, item 1)", () => {
 
     const cartaoExtra = { oQueFalar: "um cartao a mais", oQueMostrar: "x", textoNaTela: "x", figurinha: "nenhuma" as const };
     await expect(
-      editarRoteiro(roteiro.id, { cartoes: [...cartoesOriginais, cartaoExtra] }),
+      editarRoteiro(roteiro.id, roteiro.clienteId, { cartoes: [...cartoesOriginais, cartaoExtra] }),
     ).rejects.toThrow(ErroRoteiro);
 
     // nao escreveu nada: a lista continua do tamanho original.
@@ -1635,7 +1636,7 @@ describe("editarRoteiro (E40, item 1)", () => {
       textoTema: "cheiro de bicho de estimacao no sofa",
       objetivo: "engajamento",
     });
-    await editarRoteiro(roteiro.id, { gancho: "editado pelo cliente A" });
+    await editarRoteiro(roteiro.id, roteiro.clienteId, { gancho: "editado pelo cliente A" });
 
     expect(await roteiroPorId(roteiro.id, clienteA)).not.toBeNull();
     expect(await roteiroPorId(roteiro.id, clienteB)).toBeNull();
@@ -1655,7 +1656,7 @@ describe("editarRoteiro (E40, item 1)", () => {
       objetivo: "engajamento",
     });
 
-    await editarRoteiro(roteiro.id, { gancho: "editado, deve enfileirar" });
+    await editarRoteiro(roteiro.id, roteiro.clienteId, { gancho: "editado, deve enfileirar" });
 
     const jobs = await db().execute(sql`
       select 1 from pgboss.job
@@ -1710,7 +1711,7 @@ describe("gerarRoteiro e reprovarERescrever, quemAparece (V12c, item 3)", () => 
       quemAparece: "equipe",
     });
 
-    const reescrito = await reprovarERescrever(roteiro.id, ["gancho_fraco"]);
+    const reescrito = await reprovarERescrever(roteiro.id, roteiro.clienteId, ["gancho_fraco"]);
 
     expect(reescrito.quemAparece).toBe("equipe");
   });

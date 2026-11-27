@@ -405,10 +405,10 @@ describe("editar o texto apaga as marcas", () => {
     await marcarFalaDoRoteiro(clienteId, id);
     expect(await marcasGuardadas(id)).not.toBeNull();
 
-    await editarRoteiro(id, { legenda: "uma legenda nova" });
+    await editarRoteiro(id, clienteId, { legenda: "uma legenda nova" });
     expect(await marcasGuardadas(id)).not.toBeNull();
 
-    await editarRoteiro(id, { gancho: "A mancha voltou e agora eu explico o porquê." });
+    await editarRoteiro(id, clienteId, { gancho: "A mancha voltou e agora eu explico o porquê." });
     expect(await marcasGuardadas(id)).toBeNull();
 
     // Ligar de novo escreve as marcas do texto novo.
@@ -422,7 +422,7 @@ describe("editar o texto apaga as marcas", () => {
     const id = await criarRoteiro();
     await marcarFalaDoRoteiro(clienteId, id);
     expect(await marcasGuardadas(id)).not.toBeNull();
-    await editarRoteiro(id, { corpo: conteudo().corpo.replace(". Passe", ".\nPasse") });
+    await editarRoteiro(id, clienteId, { corpo: conteudo().corpo.replace(". Passe", ".\nPasse") });
     expect(await marcasGuardadas(id)).toBeNull();
   });
 

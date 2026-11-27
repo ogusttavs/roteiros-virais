@@ -437,7 +437,7 @@ describe("marcarGravado", () => {
       objetivo: "engajamento",
     });
 
-    await marcarGravado(roteiro.id);
+    await marcarGravado(roteiro.id, roteiro.clienteId);
 
     const [linha] = await db().select().from(planoGravacoes).where(eq(planoGravacoes.id, item.id));
     expect(linha.estado).toBe("gravado");
@@ -452,9 +452,9 @@ describe("marcarGravado", () => {
       oQueDaParaMostrar: "as amostras",
       objetivo: "engajamento",
     });
-    await marcarGravado(roteiro.id);
+    await marcarGravado(roteiro.id, roteiro.clienteId);
 
-    await desmarcarGravado(roteiro.id);
+    await desmarcarGravado(roteiro.id, roteiro.clienteId);
 
     const [linha] = await db().select().from(planoGravacoes).where(eq(planoGravacoes.id, item.id));
     expect(linha.estado).toBe("aceito");
@@ -489,6 +489,6 @@ describe("marcarGravado", () => {
       })
       .returning();
 
-    await expect(marcarGravado(roteiro.id)).resolves.toBeUndefined();
+    await expect(marcarGravado(roteiro.id, roteiro.clienteId)).resolves.toBeUndefined();
   });
 });

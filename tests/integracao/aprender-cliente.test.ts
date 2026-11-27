@@ -121,7 +121,7 @@ async function criarVideoEvidencia(idExterno: string, assunto: string): Promise<
 async function gerarEReprovar(clienteId: number, tema: string, motivos: IdMotivoReprovacao[]) {
   await criarVideoEvidencia(`ev-${tema}`, tema);
   const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: tema, objetivo: "engajamento" });
-  await reprovarERescrever(roteiro.id, motivos);
+  await reprovarERescrever(roteiro.id, roteiro.clienteId, motivos);
   return roteiro;
 }
 
@@ -280,7 +280,7 @@ describe("rodarAprenderCliente", () => {
       textoTema: "tema sem padrao claro nas reprovacoes",
       objetivo: "engajamento",
     });
-    await reprovarERescrever(roteiro.id, ["outro_motivo"], "[exemplo] sem regra aqui, nada de especifico");
+    await reprovarERescrever(roteiro.id, roteiro.clienteId, ["outro_motivo"], "[exemplo] sem regra aqui, nada de especifico");
 
     const verificarTextoAntes = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "verificarTexto"));
 
@@ -324,7 +324,7 @@ describe("rodarAprenderCliente", () => {
       objetivo: "engajamento",
     });
     const ganchoOriginal = roteiro.conteudo.gancho;
-    await editarRoteiro(roteiro.id, { gancho: "um jeito diferente de abrir, do meu jeito" });
+    await editarRoteiro(roteiro.id, roteiro.clienteId, { gancho: "um jeito diferente de abrir, do meu jeito" });
 
     const resumo = await rodarAprenderCliente(clienteId);
     expect(resumo).toMatchObject({ reprovacoesConsideradas: 0, edicoesConsideradas: 1 });

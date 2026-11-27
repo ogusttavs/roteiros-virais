@@ -4,7 +4,7 @@
  * nota geral ponderada, gate de liberacao, perfil compilado e camada
  * exclusiva.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -442,7 +442,8 @@ async function compilarEGravarPerfil(
     },
   };
 
-  await db().update(briefings).set({ perfil: perfilCompleto }).where(eq(briefings.id, briefingId));
+  // M3 da auditoria de 26/11/2026: o briefing pelo id e pela marca, no próprio SQL; o perfil de uma marca nunca é gravado no briefing de outra.
+  await db().update(briefings).set({ perfil: perfilCompleto }).where(and(eq(briefings.id, briefingId), eq(briefings.clienteId, clienteId)));
 
   const cliente = await clientePorId(clienteId);
   const regiaoComoTermo = cliente?.alcance === "local" ? cliente.regiao : undefined;

@@ -49,7 +49,8 @@ export async function listarPerfisIndicados(
 /** Dispara a análise de um perfil citado, sem esperar (mesmo padrão de `resolverMetaIgId` em
  * `salvarPerfilConta`: enfileirar é rápido, a conferência na API pode não ser). */
 export async function enfileirarAnaliseDePerfil(clienteId: number, perfilCitadoId: number): Promise<void> {
-  const [citado] = await db().select().from(perfisCitados).where(eq(perfisCitados.id, perfilCitadoId));
+  // M3 da auditoria de 26/11/2026: o perfil citado só da marca, no próprio SQL; o de outra marca nunca entra na fila em nome desta.
+  const [citado] = await db().select().from(perfisCitados).where(and(eq(perfisCitados.id, perfilCitadoId), eq(perfisCitados.clienteId, clienteId)));
   if (!citado) return;
   await garantirBossPronto();
   await boss().send(FILAS.analisarPerfil, {

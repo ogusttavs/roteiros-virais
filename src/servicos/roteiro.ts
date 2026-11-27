@@ -935,12 +935,20 @@ async function ultimosRoteirosParaAbertura(
   return linhas.map((r) => ({ tipoAbertura: r.tipoAbertura, gancho: r.conteudo.gancho }));
 }
 
-/** Todas as versões da mesma série (etapa 11, decisão 4): a raiz e quem aponta para ela. */
-async function buscarSerie(raizId: number): Promise<RoteiroLinha[]> {
+/**
+ * M3 da auditoria de 26/11/2026: o roteiro pelo id SÓ da marca, dentro do próprio SQL. Toda função deste arquivo que recebe um `roteiroId` vindo de fora recebe também o `clienteId` da
+ * sessão e filtra por ele aqui, em vez de confiar que quem chama já conferiu a posse: um roteiro de outra marca é "não achei" (ou nada acontece), nunca lido nem gravado.
+ */
+function doRoteiroDaMarca(roteiroId: number, clienteId: number) {
+  return and(eq(roteiros.id, roteiroId), eq(roteiros.clienteId, clienteId));
+}
+
+/** Todas as versões da mesma série (etapa 11, decisão 4): a raiz e quem aponta para ela, só da marca (M3). */
+async function buscarSerie(raizId: number, clienteId: number): Promise<RoteiroLinha[]> {
   return db()
     .select()
     .from(roteiros)
-    .where(or(eq(roteiros.id, raizId), eq(roteiros.versaoDe, raizId)))
+    .where(and(eq(roteiros.clienteId, clienteId), or(eq(roteiros.id, raizId), eq(roteiros.versaoDe, raizId))))
     .orderBy(desc(roteiros.versao));
 }
 
@@ -1669,6 +1677,7 @@ export async function montarRoteiro(
  */
 export async function reprovarERescrever(
   roteiroId: number,
+  clienteId: number,
   motivosIds: IdMotivoReprovacao[],
   motivoTexto?: string,
 ): Promise<RoteiroLinha> {
@@ -1676,14 +1685,14 @@ export async function reprovarERescrever(
     throw new ErroRoteiro("selecione pelo menos um motivo para reprovar o roteiro.");
   }
 
-  const [atual] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroId));
+  const [atual] = await db().select().from(roteiros).where(doRoteiroDaMarca(roteiroId, clienteId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
 
   const cliente = await clientePorId(atual.clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
 
   const raizId = atual.versaoDe ?? atual.id;
-  const serie = await buscarSerie(raizId);
+  const serie = await buscarSerie(raizId, clienteId);
   const proximaVersao = Math.max(...serie.map((r) => r.versao)) + 1;
 
   // V9a, item 1: um roteiro de momento reescrito continua sem busca de evidência, com o mesmo bloco na entrada.
@@ -1780,7 +1789,7 @@ export async function reprovarERescrever(
       .set({ avaliacao: "reprovado", motivosAvaliacao: motivosIds, motivoAvaliacao: motivoTexto })
       .where(eq(geracoesIA.id, atual.geracaoId));
   }
-  await db().update(roteiros).set({ reprovadoEm: new Date() }).where(eq(roteiros.id, roteiroId));
+  await db().update(roteiros).set({ reprovadoEm: new Date() }).where(doRoteiroDaMarca(roteiroId, clienteId));
 
   /**
    * A memória do cliente (E27, parte 2, item 2): por evento, não bloqueia a
@@ -1893,9 +1902,10 @@ function editarUmCapitulo(
  */
 export async function editarRoteiro(
   roteiroId: number,
+  clienteId: number,
   campos: CamposEditaveisRoteiro,
 ): Promise<RoteiroLinha> {
-  const [atual] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroId));
+  const [atual] = await db().select().from(roteiros).where(doRoteiroDaMarca(roteiroId, clienteId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
 
   const conteudoAtual = atual.conteudo;
@@ -1957,7 +1967,7 @@ export async function editarRoteiro(
       editadoEm: new Date(),
       ...(falaMudou ? { marcasDeFala: null } : {}),
     })
-    .where(eq(roteiros.id, roteiroId))
+    .where(doRoteiroDaMarca(roteiroId, clienteId))
     .returning();
   if (!roteiro) throw new ErroRoteiro("roteiro nao encontrado.");
 
@@ -1978,11 +1988,11 @@ export async function editarRoteiro(
   return roteiro;
 }
 
-export async function marcarGravado(roteiroId: number): Promise<RoteiroLinha> {
+export async function marcarGravado(roteiroId: number, clienteId: number): Promise<RoteiroLinha> {
   const [roteiro] = await db()
     .update(roteiros)
     .set({ status: "gravado", gravadoEm: new Date() })
-    .where(eq(roteiros.id, roteiroId))
+    .where(doRoteiroDaMarca(roteiroId, clienteId))
     .returning();
   if (!roteiro) throw new ErroRoteiro("roteiro nao encontrado.");
   return roteiro;
@@ -2043,8 +2053,8 @@ function inferirPlataforma(url: string): {
  * `videos_cliente` (a base do acompanhamento da curva, fase 3), com a
  * plataforma e o id externo inferidos da URL quando dá.
  */
-export async function marcarPostado(roteiroId: number, url: string): Promise<RoteiroLinha> {
-  const [atual] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroId));
+export async function marcarPostado(roteiroId: number, clienteId: number, url: string): Promise<RoteiroLinha> {
+  const [atual] = await db().select().from(roteiros).where(doRoteiroDaMarca(roteiroId, clienteId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
 
   const { plataforma, idExterno } = inferirPlataforma(url);
@@ -2065,7 +2075,7 @@ export async function marcarPostado(roteiroId: number, url: string): Promise<Rot
       postadoEm: new Date(),
       gravadoEm: atual.gravadoEm ?? new Date(),
     })
-    .where(eq(roteiros.id, roteiroId))
+    .where(doRoteiroDaMarca(roteiroId, clienteId))
     .returning();
   if (!roteiro) throw new ErroRoteiro("roteiro nao encontrado.");
   return roteiro;
@@ -2074,12 +2084,13 @@ export async function marcarPostado(roteiroId: number, url: string): Promise<Rot
 /** "gostei" ou "não gostei" (etapa 11, decisão 4): gravado na geração deste roteiro. */
 export async function avaliarRoteiro(
   roteiroId: number,
+  clienteId: number,
   avaliacao: "gostei" | "nao_gostei",
 ): Promise<void> {
   const [atual] = await db()
     .select({ geracaoId: roteiros.geracaoId })
     .from(roteiros)
-    .where(eq(roteiros.id, roteiroId));
+    .where(doRoteiroDaMarca(roteiroId, clienteId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
   if (!atual.geracaoId) return;
 
@@ -2104,15 +2115,15 @@ export type VersaoRoteiro = {
  * na geração dela (`geracoesIA`), para o bloco de versões mostrar "você
  * reprovou por: X e Y".
  */
-export async function versoesDoRoteiro(roteiroId: number): Promise<VersaoRoteiro[]> {
+export async function versoesDoRoteiro(roteiroId: number, clienteId: number): Promise<VersaoRoteiro[]> {
   const [atual] = await db()
     .select({ id: roteiros.id, versaoDe: roteiros.versaoDe })
     .from(roteiros)
-    .where(eq(roteiros.id, roteiroId));
+    .where(doRoteiroDaMarca(roteiroId, clienteId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
 
   const raizId = atual.versaoDe ?? atual.id;
-  const serie = await buscarSerie(raizId);
+  const serie = await buscarSerie(raizId, clienteId);
   const maisRecente = serie[0]?.id;
 
   const idsGeracaoReprovada = serie
@@ -2418,29 +2429,29 @@ export async function atrasados(clienteId: number, hoje: string): Promise<ItemAt
  * E39b, item (b): "Arquivar" num atrasado. O roteiro continua existindo (aparece no Histórico),
  * só sai da lista de atrasados e da agenda do dia que ele tinha.
  */
-export async function arquivarRoteiro(roteiroId: number): Promise<void> {
-  await db().update(roteiros).set({ arquivadoEm: new Date() }).where(eq(roteiros.id, roteiroId));
+export async function arquivarRoteiro(roteiroId: number, clienteId: number): Promise<void> {
+  await db().update(roteiros).set({ arquivadoEm: new Date() }).where(doRoteiroDaMarca(roteiroId, clienteId));
 }
 
 /**
  * E39c, parte 2a: o "desfazer" do toast de "Arquivar" no menu de três ações. Alguns segundos para
  * voltar atrás sem precisar procurar o roteiro no Histórico.
  */
-export async function desarquivarRoteiro(roteiroId: number): Promise<void> {
-  await db().update(roteiros).set({ arquivadoEm: null }).where(eq(roteiros.id, roteiroId));
+export async function desarquivarRoteiro(roteiroId: number, clienteId: number): Promise<void> {
+  await db().update(roteiros).set({ arquivadoEm: null }).where(doRoteiroDaMarca(roteiroId, clienteId));
 }
 
 /**
  * E39b, item (b): "Mudar o dia" e "Gravar hoje" num atrasado usam a mesma troca, só muda qual
  * data chega (a de hoje, no segundo caso). `validarData` já garante que não é no passado.
  */
-export async function mudarDataRoteiro(roteiroId: number, novaData: string): Promise<void> {
+export async function mudarDataRoteiro(roteiroId: number, clienteId: number, novaData: string): Promise<void> {
   const validada = validarData(novaData);
   if (!validada) throw new ErroRoteiro("data invalida.");
   // E55 PR 2: o roteiro do tema do momento é para hoje (o assunto está em alta hoje): a tela nem oferece trocar o dia, e o servidor recusa mesmo assim. Trazer para hoje continua valendo.
-  const [linha] = await db().select({ temaDoMomento: roteiros.temaDoMomento }).from(roteiros).where(eq(roteiros.id, roteiroId));
+  const [linha] = await db().select({ temaDoMomento: roteiros.temaDoMomento }).from(roteiros).where(doRoteiroDaMarca(roteiroId, clienteId));
   if (linha?.temaDoMomento && validada !== hojeISO()) throw new ErroRoteiro(textosHoje.emAlta.naoMudaDeDia);
-  await db().update(roteiros).set({ data: validada }).where(eq(roteiros.id, roteiroId));
+  await db().update(roteiros).set({ data: validada }).where(doRoteiroDaMarca(roteiroId, clienteId));
 }
 
 /**
@@ -2466,8 +2477,8 @@ const LIMITE_CANDIDATOS_AINDA_VALE = 15;
  * `roteiros.aindaValeChecadoEm`/`aindaValeResultado`, então abrir a tela de novo no mesmo dia não
  * repete a chamada de IA, só mostra o que já foi respondido.
  */
-export async function conferirAindaVale(roteiroId: number): Promise<AindaValeResultado> {
-  const [atual] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroId));
+export async function conferirAindaVale(roteiroId: number, clienteId: number): Promise<AindaValeResultado> {
+  const [atual] = await db().select().from(roteiros).where(doRoteiroDaMarca(roteiroId, clienteId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
   const jaConferidoHoje = aindaValeDeHoje(atual);
   if (jaConferidoHoje) return jaConferidoHoje;
@@ -2525,7 +2536,7 @@ export async function conferirAindaVale(roteiroId: number): Promise<AindaValeRes
   await db()
     .update(roteiros)
     .set({ aindaValeChecadoEm: new Date(), aindaValeResultado: resultado })
-    .where(eq(roteiros.id, roteiroId));
+    .where(doRoteiroDaMarca(roteiroId, clienteId));
 
   return resultado;
 }

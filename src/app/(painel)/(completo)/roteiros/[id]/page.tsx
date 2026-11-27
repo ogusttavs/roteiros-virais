@@ -51,7 +51,7 @@ export default async function Roteiro({ params }: Props) {
   const preferencias = await preferenciasDoUsuario(sessao.user.id);
   const [video, versoes, momento, grupoDeVersoes, publicar, hashtags] = await Promise.all([
     roteiro.referenciaVideoId ? videoPorId(roteiro.referenciaVideoId) : Promise.resolve(null),
-    versoesDoRoteiro(roteiroId),
+    versoesDoRoteiro(roteiroId, cliente.id),
     // E55 PR 2b: o roteiro que nasceu de um assunto em alta diz se o assunto ainda está em alta (selo e linha de prazo) ou já passou (selo neutro e aviso). Uma falha aqui só tira o selo.
     roteiro.temaDoMomento
       ? momentoDoRoteiro({ data: roteiro.data, temaDoMomento: roteiro.temaDoMomento }, hojeISO()).catch(() => null)

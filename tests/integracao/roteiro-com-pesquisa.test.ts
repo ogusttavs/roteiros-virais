@@ -232,7 +232,7 @@ describe("os dados que a pessoa aprovou continuam os mesmos", () => {
     await marcarAchados(clienteId, pesquisaId, [5]);
     vi.mocked(verificador.gerarComVerificacao).mockClear();
 
-    const novo = await reprovarERescrever(primeiro.id, ["gancho_fraco"]);
+    const novo = await reprovarERescrever(primeiro.id, primeiro.clienteId, ["gancho_fraco"]);
     expect(novo.pesquisaNaHora!.dados.map((d) => d.id)).toEqual(primeiro.pesquisaNaHora!.dados.map((d) => d.id));
     expect(novo.conteudo.entregaDaPesquisa).toBeTruthy();
     expect(ultimaChamada().entrada).toContain("<dados_da_pesquisa>");
@@ -279,7 +279,7 @@ describe("os dados que a pessoa aprovou continuam os mesmos", () => {
     const entrega = roteiro.conteudo.entregaDaPesquisa!;
     expect(entrega.ganchos[0]).toEqual({ texto: roteiro.conteudo.gancho, recomendado: true });
 
-    const editado = await editarRoteiro(roteiro.id, { gancho: "Um gancho do meu jeito" });
+    const editado = await editarRoteiro(roteiro.id, roteiro.clienteId, { gancho: "Um gancho do meu jeito" });
     const depois = editado.conteudo.entregaDaPesquisa!;
     expect(depois.ganchos[0]).toEqual({ texto: "Um gancho do meu jeito", recomendado: true });
     expect(depois.ganchos.slice(1).every((g) => !g.recomendado)).toBe(true);

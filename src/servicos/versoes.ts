@@ -567,7 +567,7 @@ export async function ficarComVersao(clienteId: number, versaoId: number): Promi
       .where(and(eq(versoesDoRoteiro.id, versaoId), eq(versoesDoRoteiro.clienteId, clienteId), isNull(versoesDoRoteiro.roteiroId)))
       .returning();
     if (!reivindicada) {
-      const [atual] = await tx.select().from(versoesDoRoteiro).where(eq(versoesDoRoteiro.id, versaoId));
+      const [atual] = await tx.select().from(versoesDoRoteiro).where(and(eq(versoesDoRoteiro.id, versaoId), eq(versoesDoRoteiro.clienteId, clienteId)));
       const feito = atual?.roteiroId ? await jaVirou(atual.roteiroId) : null;
       if (feito) return feito;
       throw new ErroRoteiro(textosRoteiro.versoes.jaSendoEscolhida);
@@ -580,7 +580,7 @@ export async function ficarComVersao(clienteId: number, versaoId: number): Promi
       .insert(roteiros)
       .values({ clienteId, ...(versao.valores as unknown as ValoresDoRoteiro), data: dia })
       .returning();
-    await tx.update(versoesDoRoteiro).set({ roteiroId: roteiro.id }).where(eq(versoesDoRoteiro.id, versaoId));
+    await tx.update(versoesDoRoteiro).set({ roteiroId: roteiro.id }).where(and(eq(versoesDoRoteiro.id, versaoId), eq(versoesDoRoteiro.clienteId, clienteId)));
     return roteiro;
   });
 }

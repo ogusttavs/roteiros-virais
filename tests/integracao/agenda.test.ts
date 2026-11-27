@@ -257,7 +257,7 @@ describe("agendaDoDia", () => {
     const diaPassado = somarDiasISO(hoje, -5);
     const roteiro = await criarRoteiro(marcaA.id, diaPassado, { formato: "reels", titulo: "vai ser arquivado" });
 
-    await arquivarRoteiro(roteiro.id);
+    await arquivarRoteiro(roteiro.id, roteiro.clienteId);
     const agenda = await agendaDoDia(marcaA.id, diaPassado);
 
     expect(agenda.reels).toEqual([]);
@@ -272,7 +272,7 @@ describe("atrasados", () => {
     await criarRoteiro(marcaA.id, somarDiasISO(hoje, -2), { formato: "reels", titulo: "gravado, nao conta", status: "gravado" });
     await criarRoteiro(marcaA.id, hoje, { formato: "reels", titulo: "hoje, nao e atrasado" });
     const arquivado = await criarRoteiro(marcaA.id, somarDiasISO(hoje, -4), { formato: "reels", titulo: "arquivado, nao conta" });
-    await arquivarRoteiro(arquivado.id);
+    await arquivarRoteiro(arquivado.id, arquivado.clienteId);
 
     // marcaA acumula roteiros de outros testes deste arquivo (sem limpeza entre `it`s, convenção
     // já usada aqui); confere só os títulos novos, por conteúdo e ordem, não a lista inteira.
@@ -301,7 +301,7 @@ describe("arquivarRoteiro", () => {
     const hoje = hojeISO();
     const roteiro = await criarRoteiro(marcaA.id, somarDiasISO(hoje, -2), { formato: "reels", titulo: "para arquivar" });
 
-    await arquivarRoteiro(roteiro.id);
+    await arquivarRoteiro(roteiro.id, roteiro.clienteId);
 
     const atual = await roteiroPorId(roteiro.id, marcaA.id);
     expect(atual?.arquivadoEm).not.toBeNull();
@@ -315,7 +315,7 @@ describe("mudarDataRoteiro", () => {
     const hoje = hojeISO();
     const roteiro = await criarRoteiro(marcaA.id, somarDiasISO(hoje, -2), { formato: "reels", titulo: "vai mudar de dia" });
 
-    await mudarDataRoteiro(roteiro.id, somarDiasISO(hoje, 3));
+    await mudarDataRoteiro(roteiro.id, roteiro.clienteId, somarDiasISO(hoje, 3));
 
     const atual = await roteiroPorId(roteiro.id, marcaA.id);
     expect(atual?.data).toBe(somarDiasISO(hoje, 3));
@@ -325,7 +325,7 @@ describe("mudarDataRoteiro", () => {
     const hoje = hojeISO();
     const roteiro = await criarRoteiro(marcaA.id, somarDiasISO(hoje, -2), { formato: "reels", titulo: "nao pode voltar" });
 
-    await expect(mudarDataRoteiro(roteiro.id, somarDiasISO(hoje, -1))).rejects.toThrow(ErroRoteiro);
+    await expect(mudarDataRoteiro(roteiro.id, roteiro.clienteId, somarDiasISO(hoje, -1))).rejects.toThrow(ErroRoteiro);
   });
 });
 
@@ -334,7 +334,7 @@ describe("conferirAindaVale", () => {
     const hoje = hojeISO();
     const roteiro = await criarRoteiro(marcaA.id, hoje, { formato: "reels", titulo: "feito ha 3 dias", criadoEm: diasAtras(3) });
 
-    const resultado = await conferirAindaVale(roteiro.id);
+    const resultado = await conferirAindaVale(roteiro.id, roteiro.clienteId);
 
     expect(resultado).toEqual({ vale: true });
     const atual = await roteiroPorId(roteiro.id, marcaA.id);
@@ -352,7 +352,7 @@ describe("conferirAindaVale", () => {
       .set({ aindaValeChecadoEm: ontem, aindaValeResultado: { vale: false, videoId: 999999, assunto: "resposta velha" } })
       .where(eq(roteiros.id, roteiro.id));
 
-    const resultado = await conferirAindaVale(roteiro.id);
+    const resultado = await conferirAindaVale(roteiro.id, roteiro.clienteId);
 
     expect(resultado).toEqual({ vale: true });
     const atual = await roteiroPorId(roteiro.id, marcaA.id);
@@ -369,7 +369,7 @@ describe("conferirAindaVale", () => {
     await criarVideoSubindo(nichoForte.id, { idExterno: "av-forte", assunto: "um jeito novo de limpar estofado", velocidadeRelativa: 6.2 });
     const roteiro = await criarRoteiro(clienteForte.id, hoje, { formato: "reels", titulo: "feito ha 3 dias", criadoEm: diasAtras(3) });
 
-    const resultado = await conferirAindaVale(roteiro.id);
+    const resultado = await conferirAindaVale(roteiro.id, roteiro.clienteId);
 
     expect(resultado).toEqual({ vale: false, videoId: expect.any(Number), assunto: "um jeito novo de limpar estofado" });
   });
@@ -378,8 +378,8 @@ describe("conferirAindaVale", () => {
     const hoje = hojeISO();
     const roteiro = await criarRoteiro(marcaA.id, hoje, { formato: "reels", titulo: "feito ha 3 dias de novo", criadoEm: diasAtras(3) });
 
-    const primeira = await conferirAindaVale(roteiro.id);
-    const segunda = await conferirAindaVale(roteiro.id);
+    const primeira = await conferirAindaVale(roteiro.id, roteiro.clienteId);
+    const segunda = await conferirAindaVale(roteiro.id, roteiro.clienteId);
 
     expect(segunda).toEqual(primeira);
   });
@@ -405,7 +405,7 @@ describe("mesDaAgenda", () => {
     const diaArquivado = somarDiasISO(hoje, -1);
     await criarRoteiro(marca.id, diaAtrasado, { formato: "reels", titulo: "atrasado no mes" });
     const arquivado = await criarRoteiro(marca.id, diaArquivado, { formato: "story", titulo: "arquivado no mes" });
-    await arquivarRoteiro(arquivado.id);
+    await arquivarRoteiro(arquivado.id, arquivado.clienteId);
 
     const dias = await mesDaAgenda(marca.id, hoje.slice(0, 7));
 

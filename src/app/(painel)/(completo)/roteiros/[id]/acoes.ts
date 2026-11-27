@@ -39,10 +39,10 @@ async function roteiroDoClienteOuFalha(roteiroId: number) {
 export async function marcarGravadoAction(roteiroId: number): Promise<void> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  await roteiroDoClienteOuFalha(roteiroId);
-  await marcarGravado(roteiroId);
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
+  await marcarGravado(roteiroId, roteiro.clienteId);
   // V9b, item 3: fecha o círculo do plano quando este roteiro veio de um item aceito (sem-op sem plano).
-  await marcarGravadoNoPlano(roteiroId);
+  await marcarGravadoNoPlano(roteiroId, roteiro.clienteId);
 }
 
 /**
@@ -54,14 +54,14 @@ export async function desmarcarGravadoAction(roteiroId: number): Promise<void> {
   await exigirAssinaturaValida();
   const roteiro = await roteiroDoClienteOuFalha(roteiroId);
   await desmarcarGravado(roteiroId, roteiro.clienteId);
-  await desmarcarGravadoNoPlano(roteiroId);
+  await desmarcarGravadoNoPlano(roteiroId, roteiro.clienteId);
 }
 
 export async function marcarPostadoAction(roteiroId: number, url: string): Promise<void> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  await roteiroDoClienteOuFalha(roteiroId);
-  await marcarPostado(roteiroId, url);
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
+  await marcarPostado(roteiroId, roteiro.clienteId, url);
 }
 
 export async function reprovarERescreverAction(
@@ -71,8 +71,8 @@ export async function reprovarERescreverAction(
 ): Promise<{ id: number }> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  await roteiroDoClienteOuFalha(roteiroId);
-  const novaVersao = await reprovarERescrever(roteiroId, motivosIds, motivoTexto);
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
+  const novaVersao = await reprovarERescrever(roteiroId, roteiro.clienteId, motivosIds, motivoTexto);
   return { id: novaVersao.id };
 }
 
@@ -82,8 +82,8 @@ export async function avaliarRoteiroAction(
 ): Promise<void> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  await roteiroDoClienteOuFalha(roteiroId);
-  await avaliarRoteiro(roteiroId, avaliacao);
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
+  await avaliarRoteiro(roteiroId, roteiro.clienteId, avaliacao);
 }
 
 /** E40, item 1: salva a edição manual da pessoa, sem chamar IA. */
@@ -93,8 +93,8 @@ export async function salvarEdicaoAction(
 ): Promise<{ id: number }> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
-  await roteiroDoClienteOuFalha(roteiroId);
-  const atualizado = await editarRoteiro(roteiroId, campos);
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
+  const atualizado = await editarRoteiro(roteiroId, roteiro.clienteId, campos);
   return { id: atualizado.id };
 }
 

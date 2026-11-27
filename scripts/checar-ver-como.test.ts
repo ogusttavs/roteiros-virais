@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { funcoesExportadas, LEITURA_LIVRE, listarArquivos, semComentarios, verificarArquivo, verificarConteudo } from "./checar-ver-como-regras";
+import {
+  entradasPodres,
+  funcoesExportadas,
+  LEITURA_LIVRE,
+  listarArquivos,
+  listarRotas,
+  metodosQueEscrevem,
+  ROTAS_LIVRES,
+  semComentarios,
+  verificarArquivo,
+  verificarConteudo,
+  verificarPorta,
+  verificarRota,
+  verificarRotasDoRepositorio,
+} from "./checar-ver-como-regras";
 
 const LIVRE = "src/app/(painel)/(completo)/criar/objetivo/acoes.ts";
 
@@ -104,5 +118,116 @@ describe("checar-ver-como", () => {
     const arquivos = listarArquivos();
     expect(arquivos.length).toBeGreaterThan(30);
     expect(arquivos.flatMap(verificarArquivo)).toEqual([]);
+  });
+});
+
+// M3 da auditoria de segurança de 26/11/2026: as rotas /api que escrevem. Cada regra tem o caso que passa e o caso que reprova (a mutação da regra).
+describe("checar-ver-como nas rotas /api", () => {
+  const ROTA = "src/app/api/x/route.ts";
+  const rotas = new Set([ROTA, "src/app/api/alvo/route.ts"]);
+  const rota = (...linhas: string[]) => linhas.join("\n");
+  const motivos = (fonte: string, caminho = ROTA) => verificarRota(caminho, fonte, rotas).map((p) => p.motivo.split(":")[0]);
+
+  it("aceita os três jeitos de recusar o modo como primeiro await", () => {
+    const fonte = rota(
+      "export async function POST(request: Request) {",
+      "  if (await modoVerComoLigado()) return NextResponse.json({ erro: MENSAGEM_VER_COMO_DESLIGADO }, { status: 403 });",
+      "  const sessao = await sessaoAtual();",
+      "}",
+      "export async function PATCH(request: Request, contexto: { params: Promise<{ id: string }> }) {",
+      "  const marca = await marcaDoCarrossel();",
+      "  if (marca instanceof NextResponse) return marca;",
+      "  await gravar(marca.clienteId);",
+      "}",
+      "export async function PUT(request: Request) {",
+      '  if (!(request.headers.get("content-type") ?? "").startsWith("application/json")) return new Response(null, { status: 415 });',
+      "  const sessao = await sessaoDoPainel();",
+      "  if (!sessao) return NextResponse.json({}, { status: 401 });",
+      "  if (sessao.verComo !== null) return NextResponse.json({}, { status: 403 });",
+      "  await gravar(sessao.user.id);",
+      "}",
+    );
+    expect(verificarRota(ROTA, fonte, rotas)).toEqual([]);
+  });
+
+  it("reprova o método que escreve sem recusar, ou que recusa depois de outro await", () => {
+    const fonte = rota(
+      "export async function POST(request: Request) {",
+      "  const corpo = await request.json();",
+      "  if (await modoVerComoLigado()) return NextResponse.json({}, { status: 403 });",
+      "}",
+      "export async function DELETE() {",
+      "  await apagar();",
+      "}",
+    );
+    expect(motivos(fonte)).toEqual(["POST", "DELETE"]);
+  });
+
+  it("chamar a recusa sem devolver a resposta não vale, em nenhum dos três jeitos", () => {
+    expect(motivos(rota("export async function POST() {", "  await modoVerComoLigado();", "  await gravar();", "}"))).toEqual(["POST"]);
+    expect(motivos(rota("export async function POST() {", "  const ligado = await modoVerComoLigado();", "  await gravar();", "}"))).toEqual(["POST"]);
+    expect(motivos(rota("export async function POST() {", "  const marca = await marcaDoCarrossel();", "  await gravar();", "}"))).toEqual(["POST"]);
+    expect(motivos(rota("export async function POST() {", "  const marca = await marcaDoCarrossel();", "  if (outra instanceof NextResponse) return outra;", "}"))).toEqual(["POST"]);
+    expect(motivos(rota("export async function POST() {", "  const sessao = await sessaoDoPainel();", "  await gravar(sessao.user.id);", "  if (sessao.verComo !== null) return null;", "}"))).toEqual(["POST"]);
+    // Uma função qualquer com nome de porta não vale: só as de PORTAS_DE_ROTA.
+    expect(motivos(rota("export async function POST() {", "  const marca = await outraPorta();", "  if (marca instanceof NextResponse) return marca;", "}"))).toEqual(["POST"]);
+  });
+
+  it("o GET fica de fora, e um comentário com a recusa não vale", () => {
+    expect(motivos(rota("export async function GET() {", "  return NextResponse.json(await ler());", "}"))).toEqual([]);
+    expect(motivos(rota("export async function POST() {", "  // if (await modoVerComoLigado()) return null;", "  await gravar();", "}"))).toEqual(["POST"]);
+  });
+
+  it("vê as outras formas de exportar: seta, desestruturada, export function sem async e embrulhada", () => {
+    expect(motivos(rota("export const POST = async (request: Request) => {", "  await gravar();", "};"))).toEqual(["POST"]);
+    expect(motivos(rota("export const PUT = async (request: Request) => {", "  if (await modoVerComoLigado()) return null;", "};"))).toEqual([]);
+    expect(motivos(rota("export const { GET, POST } = toNextJsHandler(auth);"))).toEqual(["POST"]);
+    expect(motivos(rota("export function DELETE() {", "  return apagar();", "}"))).toEqual(["DELETE"]);
+    expect(motivos(rota("export const PATCH = comLimite(async () => gravar());"))).toEqual(["PATCH"]);
+    expect(motivos(rota("async function gravarTudo() {}", "export { gravarTudo as POST };"))).toEqual(["POST"]);
+  });
+
+  it("a reexportação vale só para outra rota conferida", () => {
+    const daRota = 'export { POST } from "../alvo/route";';
+    expect(motivos(daRota)).toEqual([]);
+    expect(motivos('export { POST } from "../sumiu/route";')).toEqual(["POST"]);
+    expect(motivos('export { POST } from "@/lib/qualquer";')).toEqual(["POST"]);
+  });
+
+  it("a lista de rotas livres vale por arquivo e método, e a entrada podre reprova", () => {
+    const auth = "src/app/api/auth/[...all]/route.ts";
+    expect(Object.keys(ROTAS_LIVRES)).toContain(`${auth}:POST`);
+    const fonte = "export const { GET, POST } = toNextJsHandler(auth);";
+    expect(verificarRota(auth, fonte, rotas)).toEqual([]);
+    expect(verificarRota("src/app/api/outra/route.ts", fonte, rotas)).toHaveLength(1);
+    expect(metodosQueEscrevem(fonte).map((m) => m.metodo)).toEqual(["POST"]);
+    const tudo = new Map(Object.keys(ROTAS_LIVRES).map((chave) => [chave.slice(0, chave.lastIndexOf(":")), new Set([chave.slice(chave.lastIndexOf(":") + 1)])]));
+    expect(entradasPodres(tudo)).toEqual([]);
+    tudo.delete(auth);
+    expect(entradasPodres(tudo).map((p) => p.arquivo)).toEqual([auth]);
+  });
+
+  it("a porta comum precisa continuar recusando o modo como primeiro await", () => {
+    const certa = rota(
+      "export async function marcaDoCarrossel(): Promise<{ clienteId: number } | NextResponse> {",
+      '  if (!carrosselAtivo()) return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });',
+      "  if (await modoVerComoLigado()) return respostaDeErro(MENSAGEM_VER_COMO_DESLIGADO, 403);",
+      "  const sessao = await sessaoAtual();",
+      "}",
+    );
+    expect(verificarPorta("marcaDoCarrossel", "p.ts", certa)).toEqual([]);
+    const semRecusa = certa.replace("  if (await modoVerComoLigado()) return respostaDeErro(MENSAGEM_VER_COMO_DESLIGADO, 403);\n", "");
+    expect(verificarPorta("marcaDoCarrossel", "p.ts", semRecusa)).toHaveLength(1);
+    const recusaTarde = certa.replace("  const sessao = await sessaoAtual();", "").replace("  if (await modoVerComoLigado())", "  const sessao = await sessaoAtual();\n  if (await modoVerComoLigado())");
+    expect(verificarPorta("marcaDoCarrossel", "p.ts", recusaTarde)).toHaveLength(1);
+    expect(verificarPorta("marcaDoCarrossel", "p.ts", "export async function outra() {}")).toHaveLength(1);
+  });
+
+  it("todas as rotas /api do repositório estão em ordem, e as do admin ficam de fora", () => {
+    const lista = listarRotas();
+    expect(lista.length).toBeGreaterThan(30);
+    expect(lista).toContain("src/app/api/carrossel/route.ts");
+    expect(lista.some((r) => r.startsWith("src/app/api/admin/"))).toBe(false);
+    expect(verificarRotasDoRepositorio().problemas).toEqual([]);
   });
 });
