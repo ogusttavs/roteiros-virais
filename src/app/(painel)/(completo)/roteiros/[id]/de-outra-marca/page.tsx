@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound, redirect, RedirectType } from "next/navigation";
 
 import { destinoSemMarca } from "@/lib/destino-sem-marca";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
@@ -26,9 +26,9 @@ export default async function RoteiroDeOutraMarcaPagina({ params }: Props) {
   if (!cliente) redirect(destinoSemMarca(sessao.user.role));
   if (roteiroId === null) notFound();
 
-  if (await roteiroPorId(roteiroId, cliente.id)) redirect(`/roteiros/${roteiroId}`);
+  if (await roteiroPorId(roteiroId, cliente.id)) redirect(`/roteiros/${roteiroId}`, RedirectType.replace);
   const daOutra = sessao.verComo != null ? null : await marcaDoRoteiroDoUsuario(sessao.user.id, roteiroId);
-  if (!daOutra) redirect("/hoje");
+  if (!daOutra) redirect("/hoje", RedirectType.replace);
 
-  return <RoteiroDeOutraMarca marca={daOutra} />;
+  return <RoteiroDeOutraMarca marca={daOutra} roteiroId={roteiroId} />;
 }

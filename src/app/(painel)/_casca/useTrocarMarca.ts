@@ -1,12 +1,16 @@
 "use client";
 
+import { unstable_rethrow, usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { textosConexao } from "@/textos/conexao";
 import { textosNav } from "@/textos/nav";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
-import { trocarMarcaAction } from "./marca-acoes";
+import { trocarMarcaAction, type DestinoDaTroca } from "./marca-acoes";
+
+/** /roteiros/<id> e qualquer filho dele (gravar, imprimir): o roteiro é da marca de antes, então a troca leva ao Hoje da marca nova. */
+const RE_ROTEIRO_ABERTO = /^\/roteiros\/\d+(\/|$)/;
 
 /**
  * A troca de marca (V3, item 3): grava o cookie pela Server Action, que
@@ -32,12 +36,14 @@ export function useTrocarMarca() {
   const [erro, setErro] = useState<string | null>(null);
   const { avisarRedeOk } = useConexao();
   const tratarFalha = useTratarFalha();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!pendente) setMarcaAlvo(null);
   }, [pendente]);
 
-  function trocar(clienteId: number, nomeMarca: string) {
+  function trocar(clienteId: number, nomeMarca: string, destino?: DestinoDaTroca) {
+    const destinoFinal = destino ?? (RE_ROTEIRO_ABERTO.test(pathname) ? "hoje" : undefined);
     setErro(null);
     setMarcaAlvo(nomeMarca);
     iniciarTransicao(async () => {
@@ -46,9 +52,11 @@ export function useTrocarMarca() {
         // apaga é `Conexao` (`registrarEscopo`) quando o painel reabre com a marca nova, não daqui. Apagar
         // antes da ação tiraria a cópia da marca atual justo quando a troca falha por falta de rede, e
         // apagar depois disputaria com o escopo novo que `Conexao` acabou de gravar.
-        await trocarMarcaAction(clienteId);
+        await trocarMarcaAction(clienteId, destinoFinal);
         avisarRedeOk();
       } catch (falha) {
+        // O redirect da troca chega aqui como rejeição: não é falha, é a navegação (que o Next só faz se o erro continuar subindo).
+        unstable_rethrow(falha);
         setErro(tratarFalha(falha, textosNav.erroTrocarMarca, textosConexao.trocarDeMarcaSemRede));
       }
     });

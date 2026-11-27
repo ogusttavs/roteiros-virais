@@ -29,6 +29,7 @@ import {
   type TemaDoDia,
 } from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
+import { somarDiasISO } from "../../src/servicos/roteiro";
 import { textosNav } from "../../src/textos/nav";
 
 const SLUGS_NICHO = ["e2e-marcas-um", "e2e-marcas-dois"];
@@ -71,6 +72,8 @@ function briefingCompletoExemplo() {
 }
 
 let roteiroCompartilhadoId: number;
+let roteiroDaUmId: number;
+let roteiroDaDoisId: number;
 
 test.describe("trocar de marca pela tela", () => {
   test.beforeAll(async () => {
@@ -208,6 +211,16 @@ test.describe("trocar de marca pela tela", () => {
       .returning();
     roteiroCompartilhadoId = roteiro.id;
 
+    // Um roteiro para cada uma das duas marcas da troca, num dia que ainda não chegou (o Hoje de hoje não pode virar "seu roteiro está pronto").
+    for (const [marca, titulo] of [[marcaUm, "o roteiro da marca um"], [marcaDois, "o roteiro da marca dois"]] as const) {
+      const [criado] = await db()
+        .insert(roteiros)
+        .values({ clienteId: marca.id, data: somarDiasISO(hojeISO(), 5), tema: titulo, origem: "sugerido", objetivo: "conversao", conteudo: { ...conteudo, titulo } })
+        .returning();
+      if (marca.id === marcaUm.id) roteiroDaUmId = criado.id;
+      else roteiroDaDoisId = criado.id;
+    }
+
     // Pessoa B: so membro da Marca Compartilhada, para o teste de duas pessoas vendo o mesmo roteiro.
     await db().insert(user).values({ id: "e2e-marcas-b", name: "[teste] Marcas B", email: EMAIL_B });
     await db()
@@ -300,5 +313,46 @@ test.describe("trocar de marca pela tela", () => {
       paginaB.getByRole("heading", { name: "o roteiro compartilhado da marca", level: 1 }),
     ).toBeVisible();
     await contextoB.close();
+  });
+
+  /** Deixa a marca pedida ativa pelo seletor do desktop (viewport padrão) e espera a troca terminar. */
+  async function ativarMarca(page: Page, nome: string) {
+    await page.getByRole("button", { name: /^Trocar de marca/ }).click();
+    await page.getByRole("menuitemradio", { name: nome }).click();
+    const botao = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(nome) });
+    await expect(botao).toBeVisible();
+    await expect(botao).toBeEnabled();
+  }
+
+  test("trocar de marca lendo um roteiro leva ao Hoje da marca nova, não à tela do roteiro da marca de antes", async ({ page }) => {
+    await entrar(page, EMAIL_A);
+    await ativarMarca(page, NOME_MARCA_UM);
+    await page.goto(`/roteiros/${roteiroDaUmId}`);
+    await expect(page.getByRole("heading", { name: "o roteiro da marca um", level: 1 })).toBeVisible();
+
+    await ativarMarca(page, NOME_MARCA_DOIS);
+    await expect(page).toHaveURL(/\/hoje$/);
+    await expect(page.locator("[data-roteiro-de-outra-marca]")).toHaveCount(0);
+  });
+
+  test("o link do roteiro de outra marca oferece abrir a marca, mostra o roteiro e o Voltar volta à página de antes", async ({ page }) => {
+    await entrar(page, EMAIL_A);
+    await ativarMarca(page, NOME_MARCA_UM);
+    await page.goto("/criar/temas");
+    await expect(page.getByRole("heading", { name: "tema exclusivo da marca um" })).toBeVisible();
+
+    await page.goto(`/roteiros/${roteiroDaDoisId}`);
+    await expect(page).toHaveURL(new RegExp(`/roteiros/${roteiroDaDoisId}/de-outra-marca$`));
+    await expect(page.getByText(`Este roteiro é da marca ${NOME_MARCA_DOIS}`)).toBeVisible();
+
+    await page.getByRole("button", { name: `Abrir ${NOME_MARCA_DOIS}` }).click();
+    await expect(page.getByRole("heading", { name: "o roteiro da marca dois", level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/roteiros/${roteiroDaDoisId}$`));
+
+    // O Voltar leva à página de antes (os redirects substituem a entrada do histórico), não ao roteiro de novo.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/criar\/temas/);
+    // A marca ativa agora é a Dois, então a página de antes mostra os temas dela.
+    await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible();
   });
 });

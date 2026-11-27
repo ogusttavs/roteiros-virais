@@ -99,6 +99,18 @@ async function criarRoteiro(clienteId: number, extra: Partial<typeof roteiros.$i
   return roteiro;
 }
 
+/** A chamada recusa com a classe e a mensagem certas (o Vitest compara só `name` e `message` em `toThrow(new Erro(...))`, então a classe se confere à parte). */
+async function esperarRecusa(chamada: Promise<unknown>, classe: new (mensagem: string) => Error, mensagem: string) {
+  const erro = await chamada.then(
+    () => {
+      throw new Error("a chamada deveria ter sido recusada");
+    },
+    (e: unknown) => e,
+  );
+  expect(erro).toBeInstanceOf(classe);
+  expect((erro as Error).message).toBe(mensagem);
+}
+
 async function linhaDoRoteiro(id: number) {
   const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, id));
   return linha;
@@ -184,18 +196,18 @@ describe("roteiro.ts: o roteiro de outra marca é 'não achei', nunca lido nem g
     const a = await criarMarca();
     const b = await criarMarca();
     const deB = await criarRoteiro(b.id);
-    await expect(arquivarRoteiro(deB.id, a.id)).rejects.toThrow(new ErroRoteiro("roteiro nao encontrado."));
+    await esperarRecusa(arquivarRoteiro(deB.id, a.id), ErroRoteiro, "roteiro nao encontrado.");
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).toBeNull();
 
     await arquivarRoteiro(deB.id, b.id);
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).not.toBeNull();
-    await expect(desarquivarRoteiro(deB.id, a.id)).rejects.toThrow(new ErroRoteiro("roteiro nao encontrado."));
+    await esperarRecusa(desarquivarRoteiro(deB.id, a.id), ErroRoteiro, "roteiro nao encontrado.");
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).not.toBeNull();
     await desarquivarRoteiro(deB.id, b.id);
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).toBeNull();
 
     const daquiATres = somarDiasISO(hojeISO(), 3);
-    await expect(mudarDataRoteiro(deB.id, a.id, daquiATres)).rejects.toThrow(new ErroRoteiro("roteiro nao encontrado."));
+    await esperarRecusa(mudarDataRoteiro(deB.id, a.id, daquiATres), ErroRoteiro, "roteiro nao encontrado.");
     expect((await linhaDoRoteiro(deB.id)).data).toBe(hojeISO());
     await mudarDataRoteiro(deB.id, b.id, daquiATres);
     expect((await linhaDoRoteiro(deB.id)).data).toBe(daquiATres);
@@ -319,12 +331,10 @@ describe("a pesquisa na hora de outra marca não é lida, marcada nem confirmada
       expect(antes.selecionados).toEqual([1]);
 
       expect(await lerPesquisa(a.id, deB.id)).toBeNull();
-      await expect(marcarAchados(a.id, deB.id, [1, 2])).rejects.toThrow(new ErroPesquisa("Essa pesquisa não está pronta para marcar."));
-      await expect(registrarPosicao(a.id, deB.id, "a minha posição")).rejects.toThrow(new ErroPesquisa("Pesquisa não encontrada."));
-      await expect(confirmarPesquisa(a.id, deB.id, { ids: [2] })).rejects.toThrow(ErroPesquisa);
-      await expect(confirmarPesquisa(a.id, deB.id, { ids: [2] })).rejects.toThrow("Essa pesquisa não está pronta. Espere ela terminar, ou escreva sem pesquisa.");
-      await expect(pesquisaParaORoteiro(a.id, deB.id)).rejects.toThrow(ErroPesquisa);
-      await expect(pesquisaParaORoteiro(a.id, deB.id)).rejects.toThrow("Essa pesquisa não está pronta. Espere ela terminar, ou escreva sem pesquisa.");
+      await esperarRecusa(marcarAchados(a.id, deB.id, [1, 2]), ErroPesquisa, "Essa pesquisa não está pronta para marcar.");
+      await esperarRecusa(registrarPosicao(a.id, deB.id, "a minha posição"), ErroPesquisa, "Pesquisa não encontrada.");
+      await esperarRecusa(confirmarPesquisa(a.id, deB.id, { ids: [2] }), ErroPesquisa, "Essa pesquisa não está pronta. Espere ela terminar, ou escreva sem pesquisa.");
+      await esperarRecusa(pesquisaParaORoteiro(a.id, deB.id), ErroPesquisa, "Essa pesquisa não está pronta. Espere ela terminar, ou escreva sem pesquisa.");
       const depois = await linhaDaPesquisa(deB.id);
       expect(depois.selecionados).toEqual([1]);
       expect(depois.posicaoDaPessoa).toBeNull();
@@ -352,7 +362,7 @@ describe("versoes.ts: a versão de outra marca não vira roteiro", () => {
       .values({ clienteId: b.id, grupo: `grupo-isolamento-${contador}`, ordem: 1, parametros: { pedido: {} }, valores })
       .returning();
     try {
-      await expect(ficarComVersao(a.id, versao.id)).rejects.toThrow(new ErroRoteiro(textosRoteiro.versoes.naoEncontrada));
+      await esperarRecusa(ficarComVersao(a.id, versao.id), ErroRoteiro, textosRoteiro.versoes.naoEncontrada);
       expect(await db().select().from(roteiros)).toHaveLength(0);
       const [intacta] = await db().select().from(tabelaDeVersoes).where(eq(tabelaDeVersoes.id, versao.id));
       expect(intacta.escolhidaEm).toBeNull();
@@ -389,7 +399,7 @@ describe("plano.ts: aceitar um item de outra marca não gera roteiro", () => {
       .values({ clienteId: b.id, dia: hojeISO(), ordem: 1, lugar: "loja", situacao: "dia de movimento", oQueMostrar: "o balcão", objetivo: "engajamento", estado: "sugerido" })
       .returning();
     const dados = { onde: "na loja", oQueEstaAcontecendo: "movimento", oQueDaParaMostrar: "o balcão", objetivo: "engajamento" as const };
-    await expect(aceitar(item.id, a, dados)).rejects.toThrow(new ErroPlano("item do plano nao encontrado."));
+    await esperarRecusa(aceitar(item.id, a, dados), ErroPlano, "item do plano nao encontrado.");
     const [depois] = await db().select().from(planoGravacoes).where(eq(planoGravacoes.id, item.id));
     expect(depois.estado).toBe("sugerido");
     expect(depois.roteiroId).toBeNull();
@@ -423,7 +433,7 @@ describe("a pessoa com acesso a duas marcas: a marca ativa decide o que ela pode
 
     // Marca B ativa: o `clienteId` que a sessão entrega é o da B.
     await expect(editarRoteiro(deA.id, b.id, { gancho: "escrito com a marca B ativa" })).rejects.toThrow("roteiro nao encontrado.");
-    await expect(arquivarRoteiro(deA.id, b.id)).rejects.toThrow(new ErroRoteiro("roteiro nao encontrado."));
+    await esperarRecusa(arquivarRoteiro(deA.id, b.id), ErroRoteiro, "roteiro nao encontrado.");
     await expect(marcarGravado(deA.id, b.id)).rejects.toThrow("roteiro nao encontrado.");
     const depoisDoErro = await linhaDoRoteiro(deA.id);
     expect(depoisDoErro.conteudo.gancho).toBe("o gancho original");

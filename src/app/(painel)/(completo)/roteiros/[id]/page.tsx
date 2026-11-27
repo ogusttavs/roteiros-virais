@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound, redirect, RedirectType } from "next/navigation";
 
 import { hojeISO } from "@/lib/config";
 import { conviteDeInstalarPodeAparecer } from "@/lib/convite-instalar";
@@ -47,7 +47,7 @@ export default async function Roteiro({ params }: Props) {
   if (!roteiro) {
     // Quem tem mais de uma marca pode abrir o link do roteiro de outra marca sua com esta ativa: a tela que diz de qual é fica noutro caminho (nunca guardada sem rede). Sem acesso à marca do roteiro, e no "ver como" (a troca é recusada), segue como antes, sem nome algum.
     const daOutra = sessao.verComo != null ? null : await marcaDoRoteiroDoUsuario(sessao.user.id, roteiroId);
-    if (daOutra && daOutra.id !== cliente.id) redirect(`/roteiros/${roteiroId}/de-outra-marca`);
+    if (daOutra && daOutra.id !== cliente.id) redirect(`/roteiros/${roteiroId}/de-outra-marca`, RedirectType.replace);
     redirect("/hoje");
   }
 
