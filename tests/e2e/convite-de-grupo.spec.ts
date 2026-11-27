@@ -76,6 +76,21 @@ test("link inventado mostra a mesma frase, sem formulário", async ({ page }) =>
   await expect(page.getByLabel("Nome da empresa")).toHaveCount(0);
 });
 
+test("a porta do convite para o WhatsApp: /convite?c= é estática, tem a prévia e leva ao convite; sem código, avisa", async ({ page, request }) => {
+  const resposta = await request.get("/convite?c=codigo-que-nao-existe-123456", { maxRedirects: 0 });
+  expect(resposta.status()).toBe(200);
+  const html = await resposta.text();
+  expect(html).toContain('<meta property="og:image" content="https://klaki.app/marca/previa-convite.jpg">');
+  expect(html).toContain('<meta property="og:url" content="https://klaki.app/convite">');
+  expect(html.indexOf('property="og:image"')).toBeLessThan(2000);
+  const codigo = randomBytes(32).toString("base64url");
+  await page.goto(`/convite?c=${codigo}`);
+  await expect(page).toHaveURL(new RegExp(`/convite/${codigo}$`));
+  await expect(page.getByRole("heading", { name: "Este link não vale mais" })).toBeVisible();
+  await page.goto("/convite?c=<script>");
+  await expect(page.getByRole("heading", { name: "Este link está incompleto" })).toBeVisible();
+});
+
 test("a prévia do link no WhatsApp: título, descrição e imagem do convite, com endereço completo, e a imagem abre sem login", async ({ page, request }) => {
   await page.goto(`/convite/${randomBytes(32).toString("base64url")}`);
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", /^Um convite para você usar o /);
