@@ -51,7 +51,7 @@
 # o servico `roteiros-pot` do Compose.
 FROM node:24-slim
 
-ARG YT_DLP_VERSION=2026.08.19
+ARG YT_DLP_VERSION=2026.11.23
 ARG DENO_VERSION=2.9.6
 ARG BGUTIL_POT_VERSION=2.0.0
 
