@@ -315,7 +315,7 @@ export function montarEntrada(dados: { texto: string; proibicoes: string[]; font
 }
 
 
-const PALAVRAS_SEM_PESO = new Set(["para", "como", "mais", "mas", "com", "uma", "uns", "umas", "que", "por", "dos", "das", "nos", "nas", "sua", "seu", "isso", "esse", "essa", "esta", "este", "muito", "ainda", "porque", "quando", "onde", "pela", "pelo", "entre", "sobre", "depois", "antes", "tambem", "aqui", "tudo", "cada", "ficou", "esta"]);
+const PALAVRAS_SEM_PESO = new Set(["para", "como", "mais", "mas", "com", "uma", "uns", "umas", "que", "por", "dos", "das", "nos", "nas", "sua", "seu", "isso", "esse", "essa", "esta", "este", "muito", "ainda", "porque", "quando", "onde", "pela", "pelo", "entre", "sobre", "depois", "antes", "tambem", "aqui", "tudo", "cada", "ficou", "esta", "quis", "saber", "dava", "davam", "podia", "pode", "queria", "estava", "tinha", "hora", "horas"]);
 
 function normalizarParaComparar(texto: string): string {
   return texto
@@ -335,9 +335,41 @@ function raizesDeConteudo(texto: string): string[] {
     .map((p) => p.slice(0, 5));
 }
 
+const NUMEROS_POR_EXTENSO = new Set(["dois", "duas", "tres", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove", "vinte", "trinta", "cem", "mil", "meia"]);
+const QUANTIFICADORES = new Set(["um", "uma", "alguns", "algumas", "poucos", "poucas", "varios", "varias"]);
+const UNIDADES_DE_PRAZO = new Set(["hora", "horas", "dia", "dias", "semana", "semanas", "mes", "meses", "ano", "anos"]);
+const RESULTADO_OU_PROMESSA = /(^| )(cura|curou|curad[oa]s?|curam|garantia|garante|garantid[oa]|sem dor|resultado|resultados|definitiv[oa]|para sempre|nunca mais)( |$)/g;
+
+const raizDaUnidade = (u: string): string => (u === "meses" ? "mes" : u.replace(/s$/, ""));
+
+/**
+ * Os acréscimos que a conferência de raízes não vê (1.11.0, revisão da Central): número por extenso ("duas semanas"), unidade de prazo e palavra de resultado ou de promessa que o fato traz e as fontes não. Devolve true
+ * quando o fato acrescenta algo assim. "um/uma" só contam antes de unidade de prazo; "hora" e "dia" só contam depois de número, quantificador ou "em/após/durante/por/dentro de/depois de" ("na hora de comer" não é prazo).
+ */
+function acrescentaPrazoOuResultado(fatoNormalizado: string, baseNormalizada: string): boolean {
+  const palavrasDaBase = new Set(baseNormalizada.split(" "));
+  const t = fatoNormalizado.split(" ");
+  for (let i = 0; i < t.length; i++) {
+    if (NUMEROS_POR_EXTENSO.has(t[i]) && !palavrasDaBase.has(t[i])) return true;
+    if (!UNIDADES_DE_PRAZO.has(t[i])) continue;
+    const anterior = t[i - 1] ?? "";
+    const antes = t[i - 2] ?? "";
+    const comoPrazo = NUMEROS_POR_EXTENSO.has(anterior) || QUANTIFICADORES.has(anterior) || ["em", "apos", "durante", "por"].includes(anterior) || (anterior === "de" && ["dentro", "depois"].includes(antes));
+    if (!comoPrazo) continue;
+    if (QUANTIFICADORES.has(anterior) && !palavrasDaBase.has(anterior)) return true;
+    const raiz = raizDaUnidade(t[i]);
+    if (![...palavrasDaBase].some((p) => UNIDADES_DE_PRAZO.has(p) && raizDaUnidade(p) === raiz)) return true;
+  }
+  for (const m of ` ${fatoNormalizado} `.matchAll(RESULTADO_OU_PROMESSA)) {
+    if (!` ${baseNormalizada} `.includes(` ${m[2]} `)) return true;
+  }
+  return false;
+}
+
 /**
  * 1.11.0: o verificador reprovou por fato, mas o caso pode ser a paráfrase de algo que as fontes trazem. Só é apoiado quando: a frase que ele mesmo cita como fonte mais próxima existe de fato nas fontes
- * (nada de "nenhuma" nem de frase inventada); o fato repete pelo menos 60% do peso dessa frase (raízes das palavras); e todo número do fato aparece nas fontes. Pura.
+ * (nada de "nenhuma" nem de frase inventada); o fato repete pelo menos 60% do peso dessa frase (raízes das palavras) e traz no máximo UMA raiz de peso que a frase não tem (o acréscimo de um elemento novo
+ * inteiro não passa); todo número do fato aparece nas fontes; e o fato não acrescenta prazo nem resultado ou promessa (`acrescentaPrazoOuResultado`). Pura.
  */
 export function fatoApoiadoPelasFontes(fatoEspecifico: string | null, fonteMaisProxima: string | null, fontes: string | undefined): boolean {
   if (!fatoEspecifico || !fonteMaisProxima || !fontes) return false;
@@ -347,9 +379,11 @@ export function fatoApoiadoPelasFontes(fatoEspecifico: string | null, fonteMaisP
   if (!base.includes(frase)) return false;
   const numeros = fatoEspecifico.match(/[0-9]+/g) ?? [];
   if (numeros.some((n) => !base.includes(n))) return false;
+  if (acrescentaPrazoOuResultado(normalizarParaComparar(fatoEspecifico), base)) return false;
   const raizesDoFato = [...new Set(raizesDeConteudo(fatoEspecifico))];
   if (raizesDoFato.length === 0) return false;
   const raizesDaFrase = new Set(raizesDeConteudo(fonteMaisProxima));
   const cobertas = raizesDoFato.filter((r) => raizesDaFrase.has(r)).length;
+  if (raizesDoFato.length - cobertas > 1) return false;
   return cobertas / raizesDoFato.length >= 0.6;
 }
