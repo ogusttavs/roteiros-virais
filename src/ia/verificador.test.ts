@@ -12,6 +12,7 @@ vi.mock("./registro", () => ({
 }));
 
 import type { CartaoStory } from "@/db/schema";
+import { logger } from "@/lib/log";
 
 import { ErroIA } from "./erro";
 import { montarFontesDaMarca } from "./fontes-da-marca";
@@ -1239,7 +1240,7 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
       gerarEstruturadoMock
         .mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero })
         .mockResolvedValueOnce({
-          dados: { aprovado: false, motivo: "fato sem apoio", fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer", fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer" },
+          dados: { aprovado: false, soPorFato: true, motivo: "fato sem apoio", fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer", fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer" },
           modelo: "mock",
           ...usoZero,
         });
@@ -1254,7 +1255,7 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
       gerarEstruturadoMock
         .mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero })
         .mockResolvedValueOnce({
-          dados: { aprovado: false, motivo: "fato sem apoio", fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer", fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer" },
+          dados: { aprovado: false, soPorFato: true, motivo: "fato sem apoio", fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer", fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer" },
           modelo: "mock",
           ...usoZero,
         });
@@ -1271,7 +1272,7 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
       };
       const copia = { corpo: "Uma paciente minha chegou chorando com medo da anestesia." };
       const reprovado = {
-        dados: { aprovado: false, motivo: "fato sem apoio", fatoEspecifico: "uma paciente minha chegou chorando com medo da anestesia", fonteMaisProxima: "Minha paciente chegou chorando com medo da anestesia" },
+        dados: { aprovado: false, soPorFato: true, motivo: "fato sem apoio", fatoEspecifico: "uma paciente minha chegou chorando com medo da anestesia", fonteMaisProxima: "Minha paciente chegou chorando com medo da anestesia" },
         modelo: "mock",
         ...usoZero,
       };
@@ -1281,11 +1282,47 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
       ).rejects.toThrow();
     });
 
+    describe("1.12.0: o desfazer exige `soPorFato`", () => {
+      const FONTES_DA_MARCA = "Caso: uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer.";
+      const texto = { corpo: "Uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer." };
+      const apoiado = {
+        motivo: "o texto ataca o concorrente",
+        fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer",
+        fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer",
+      };
+      const rodar = (saida: Record<string, unknown>, vezes = 1) => {
+        for (let i = 0; i < vezes; i += 1) {
+          gerarEstruturadoMock.mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero }).mockResolvedValueOnce({ dados: saida, modelo: "mock", ...usoZero });
+        }
+        registrarGeracaoMock.mockClear();
+        return gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: FONTES_DA_MARCA, fontesDaMarca: FONTES_DA_MARCA });
+      };
+
+      it("reprovado por proibição ou ataque (`soPorFato: false`), mesmo com o fato apoiado nas fontes da marca: continua reprovado", async () => {
+        await expect(rodar({ aprovado: false, soPorFato: false, ...apoiado }, 2)).rejects.toThrow();
+      });
+
+      it("sem o campo `soPorFato` na saída do verificador: continua reprovado", async () => {
+        await expect(rodar({ aprovado: false, ...apoiado }, 2)).rejects.toThrow();
+      });
+
+      it("reprovado só por fato (`soPorFato: true`) e apoiado nas fontes da marca: aprova, e o registro e o log trazem o desfazer", async () => {
+        const info = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+        const ok = await rodar({ aprovado: false, soPorFato: true, ...apoiado });
+        expect(ok.dados).toEqual(texto);
+        const registro = registrarGeracaoMock.mock.calls.map((c) => c[0] as { tarefa: string; saida: Record<string, unknown> }).find((c) => c.tarefa === "verificarTexto");
+        expect(registro?.saida.aprovado).toBe(true);
+        expect(registro?.saida.desfeitoPorParafrase).toEqual({ fato: apoiado.fatoEspecifico, frase: apoiado.fonteMaisProxima });
+        expect(info).toHaveBeenCalledWith(expect.objectContaining({ tarefa: parametrosBase.tarefa, fato: apoiado.fatoEspecifico, frase: apoiado.fonteMaisProxima }), expect.stringContaining("desfeita"));
+        info.mockRestore();
+      });
+    });
+
     it("1.12.0: sem `fontesDaMarca`, nada é desfeito, nem com a frase presente nas fontesDosFatos (o padrão é o seguro)", async () => {
       const FONTES = "Caso: uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer.";
       const texto = { corpo: "Uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer." };
       const reprovado = {
-        dados: { aprovado: false, motivo: "fato sem apoio", fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer", fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer" },
+        dados: { aprovado: false, soPorFato: true, motivo: "fato sem apoio", fatoEspecifico: "uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer", fonteMaisProxima: "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer" },
         modelo: "mock",
         ...usoZero,
       };

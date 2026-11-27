@@ -6,6 +6,7 @@
  * ErroIA nomeado. As duas tentativas ficam registradas em geracoes_ia.
  */
 import type { CartaoStory, EstiloRoteiro, Ficha, FormatoRoteiro, TipoAbertura } from "@/db/schema";
+import { logger } from "@/lib/log";
 import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
 import { EMOJI, encontrarJargaoDoMotor, encontrarProblemas, MOTIVO_EMOJI, MOTIVO_TRAVESSAO } from "@/lib/regras-de-texto";
 import { dadosForaDasFontes } from "@/servicos/conferencia-da-pesquisa";
@@ -1008,8 +1009,16 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
     });
     // 1.11.0: o caso recontado com outras palavras, apoiado por uma frase que as fontes trazem de fato, não reprova (`fatoApoiadoPelasFontes`); o aprovado vale também para o registro abaixo.
     // 1.12.0: só as fontes DA MARCA valem aqui (`fontesDaMarca`), nunca a evidência, as notícias ou a pesquisa que vêm junto nas `fontesDosFatos`.
-    if (!verificacao.dados.aprovado && verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDaMarca)) {
+    // 1.12.0 (segunda mudança): só quando o verificador diz que o ÚNICO motivo é o fato (`soPorFato`); um motivo de tom, proibição ou ataque nunca some atrás de um fato apoiado.
+    let desfeitoPorParafrase: { fato: string; frase: string } | null = null;
+    if (
+      !verificacao.dados.aprovado &&
+      verificacao.dados.soPorFato === true &&
+      verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDaMarca)
+    ) {
+      desfeitoPorParafrase = { fato: verificacao.dados.fatoEspecifico as string, frase: verificacao.dados.fonteMaisProxima as string };
       verificacao.dados = { ...verificacao.dados, aprovado: true, motivo: null };
+      logger.info({ clienteId: params.clienteId, tarefa: params.tarefa, fato: desfeitoPorParafrase.fato, frase: desfeitoPorParafrase.frase }, "verificador: a reprovação por fato foi desfeita (paráfrase apoiada pelas fontes da marca)");
     }
     aprovado = verificacao.dados.aprovado;
     // Reprovando por fato, o motivo carrega o fato e a frase mais próxima das fontes (`motivoDaConferencia`): é o que a segunda tentativa recebe para corrigir.
@@ -1023,7 +1032,7 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
       nivel: verificarTexto.nivel,
       clienteId: params.clienteId,
       entradas: { texto: textoJunto },
-      saida: verificacao.dados,
+      saida: desfeitoPorParafrase ? { ...verificacao.dados, desfeitoPorParafrase } : verificacao.dados,
       uso: {
         tokensEntrada: verificacao.tokensEntrada,
         tokensSaida: verificacao.tokensSaida,
