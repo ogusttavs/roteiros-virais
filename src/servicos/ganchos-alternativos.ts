@@ -22,7 +22,7 @@ import { acharResultadoOuMedoEmSaude, temNumeroNoTexto, verificarConformidadeDoL
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 
-import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
+import { formatarPerfilCompilado, perfilDaMarca, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { inicioDoDiaEmSaoPaulo } from "./noticias-do-dia";
 import { leiturasDoCliente } from "./perfis-analisados";
@@ -355,7 +355,7 @@ async function pedirSemTrava(clienteId: number, roteiroId: number, agora: Date):
     }),
     fontesDosFatos: fontes,
     // 1.12.0: o roteiro (texto da IA) que vai junto nas `fontes` não conta como fonte da marca.
-    fontesDaMarca: montarFontesDaMarca({ perfilCompilado, camadaExclusiva, tema: roteiro.tema, objetivoDoVideo: roteiro.objetivoDoVideo }),
+    fontesDaMarca: montarFontesDaMarca({ perfilCompilado: perfilDaMarca(perfil), camadaExclusiva: formatarCamadaExclusiva(cliente, []), tema: roteiro.tema, objetivoDoVideo: roteiro.objetivoDoVideo }),
     conferirNumerosNasFontes: true,
     lembreteFinal: ganchosIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,

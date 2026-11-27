@@ -21,7 +21,7 @@ import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 
-import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
+import { formatarPerfilCompilado, perfilDaMarca, perfilDoCliente } from "./briefing";
 import { AVISO_DA_COR_CLARA, ErroCarrossel, marcaEhDeSaude, TRAVA_DA_GERACAO_DO_CARROSSEL } from "./carrossel";
 import { clientePorId } from "./clientes";
 import { noticiaPorId } from "./noticias";
@@ -115,7 +115,7 @@ export async function titulosDaCapa(clienteId: number, noticiaId: number, agora:
     }),
     fontesDosFatos,
     // 1.12.0: o tema da capa é o título da notícia (de terceiros): a fonte da marca é só o perfil e a camada.
-    fontesDaMarca: montarFontesDaMarca({ perfilCompilado, camadaExclusiva }),
+    fontesDaMarca: montarFontesDaMarca({ perfilCompilado: perfilDaMarca(perfil), camadaExclusiva: formatarCamadaExclusiva(cliente, []) }),
     conferirNumerosNasFontes: true,
     lembreteFinal: capaIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,

@@ -70,7 +70,7 @@ import { textosRoteiro } from "@/textos/roteiro";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa, noticiaDeOrigemGuardada, noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
-import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
+import { formatarPerfilCompilado, perfilDaMarca, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { desempenhoDaConta } from "./desempenho-da-conta";
 import { montarEntregaDaPesquisa, paraEntradaDaPesquisa } from "./entrega-da-pesquisa";
@@ -1272,8 +1272,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   });
   // 1.12.0: só o que a pessoa escreveu ou confirmou; é o único texto que pode desfazer a reprovação por paráfrase (sem a evidência, as notícias, a pesquisa e os comentários).
   const fontesDaMarca = montarFontesDaMarca({
-    perfilCompilado,
-    camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
+    perfilCompilado: perfilDaMarca(perfil),
+    camadaExclusiva: formatarCamadaExclusiva(dados.cliente, []),
     tema: dados.momento ? undefined : dados.tema,
     momento: dados.momento
       ? { onde: dados.momento.onde, oQueEstaAcontecendo: dados.momento.oQueEstaAcontecendo, oQueDaParaMostrar: dados.momento.oQueDaParaMostrar }
