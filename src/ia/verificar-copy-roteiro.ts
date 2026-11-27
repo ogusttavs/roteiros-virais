@@ -507,7 +507,8 @@ function roteiroPreenchido(e: EntradaCopyRoteiro): string | null {
  * colchete é permitido no corpo e na chamada, onde falta um fato que a ficha não traz. Reprova nas duas tentativas (sem gancho gravável o roteiro não vai ao ar); o motivo diz o que fazer.
  */
 function ganchoSemColchete(e: EntradaCopyRoteiro): string | null {
-  const achado = /\[[^\[\]]{0,200}\]/.exec(e.gancho);
+  // "[mock:...]" é marcador dos testes com a IA simulada, nunca saída do modelo.
+  const achado = /\[(?!mock:)[^\[\]]{0,200}\]/.exec(e.gancho);
   if (!achado) return null;
   return `R-ROTEIRO-01: o gancho tem um espaço entre colchetes ("${achado[0].slice(0, 60)}"); o gancho nunca leva colchete, porque é a primeira frase que a pessoa fala. Reescreva com o que a ficha ou o momento trazem (o assunto, o serviço, o lugar) e deixe o colchete só para o corpo`;
 }
