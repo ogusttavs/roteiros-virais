@@ -122,6 +122,20 @@ describe("a recusa", () => {
     await expect(gerar(comum)).resolves.toBeDefined();
   });
 
+  it("pelo dia da cortesia: a de cortesia e a sem limite acima de US$ 60 em 24 horas são recusadas com a mesma frase do dia; a comum com o mesmo gasto também (pelo teto comum)", async () => {
+    for (const marca of [cortesia, semLimite]) {
+      for (const horas of [3, 6, 9, 12]) await gastou(marca, 15.5, horas * HORA);
+    }
+    for (const marca of [cortesia, semLimite]) {
+      const erro = await gerar(marca).catch((e: unknown) => e);
+      expect(erro).toBeInstanceOf(ErroFreioDeGasto);
+      expect((erro as ErroFreioDeGasto).janela).toBe("dia_cortesia");
+      expect((erro as ErroFreioDeGasto).mensagemCliente).toBe(textosFreioDaIA.cliente.dia);
+    }
+    vi.stubEnv("FREIO_IA_POR_DIA_CORTESIA_USD", "100");
+    await expect(gerar(cortesia)).resolves.toBeDefined();
+  });
+
   it("os limites vêm do ambiente, e FREIO_IA=0 desliga o freio", async () => {
     await gastou(comum, 3, 5 * MINUTO);
     vi.stubEnv("FREIO_IA_POR_HORA_USD", "2");

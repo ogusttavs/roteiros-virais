@@ -5,6 +5,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { limitesDoFreioDaIA, PADROES_DO_FREIO_DA_IA } from "@/lib/config";
+import { textosFreioDaIA } from "@/textos/freio-ia";
 
 import { comFreioDeGasto, decidirFreio, vagasDaMarca } from "./freio";
 
@@ -15,7 +16,7 @@ vi.mock("@/db", () => ({
 }));
 vi.mock("@/servicos/aviso-da-ia", () => ({ avisarFreioDeGasto: vi.fn() }));
 
-const LIMITES = { porHoraUsd: 8, porDiaUsd: 25 };
+const LIMITES = { porHoraUsd: 8, porDiaUsd: 25, porDiaCortesiaUsd: 60 };
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -34,9 +35,31 @@ describe("decidirFreio", () => {
     expect(decidirFreio({ hora: 9, dia: 9, semTetoDoDia: true }, LIMITES)).toEqual({ janela: "hora", gastoUsd: 9, limiteUsd: 8 });
   });
 
-  it("freia pelo dia a marca comum, e não a de cortesia ou sem limite", () => {
+  it("freia pelo dia a marca comum no teto comum, e a de cortesia ou sem limite só no teto do dia da cortesia", () => {
     expect(decidirFreio({ hora: 1, dia: 25, semTetoDoDia: false }, LIMITES)).toEqual({ janela: "dia", gastoUsd: 25, limiteUsd: 25 });
-    expect(decidirFreio({ hora: 1, dia: 300, semTetoDoDia: true }, LIMITES)).toBeNull();
+    expect(decidirFreio({ hora: 1, dia: 59.99, semTetoDoDia: true }, LIMITES)).toBeNull();
+    expect(decidirFreio({ hora: 1, dia: 60, semTetoDoDia: true }, LIMITES)).toEqual({ janela: "dia_cortesia", gastoUsd: 60, limiteUsd: 60 });
+    expect(decidirFreio({ hora: 1, dia: 300, semTetoDoDia: true }, LIMITES)?.janela).toBe("dia_cortesia");
+  });
+
+  it("a marca comum não é afetada pelo teto da cortesia: entre US$ 25 e 60 ela já está freada pelo dia comum, e abaixo de 25 passa", () => {
+    expect(decidirFreio({ hora: 1, dia: 24, semTetoDoDia: false }, LIMITES)).toBeNull();
+    expect(decidirFreio({ hora: 1, dia: 40, semTetoDoDia: false }, { ...LIMITES, porDiaCortesiaUsd: 1000 })).toMatchObject({ janela: "dia", limiteUsd: 25 });
+  });
+
+  it("a recusa da cortesia usa a mesma frase para a pessoa que a do dia comum", () => {
+    expect(textosFreioDaIA.cliente.dia_cortesia).toBe(textosFreioDaIA.cliente.dia);
+  });
+
+  it("o e-mail de alarme diz qual teto foi e manda recriar os contêineres, não reiniciar", () => {
+    const base = { clienteId: 7, nome: "Marca", tarefa: "roteiro", gastoUsd: 61, limiteUsd: 60, em: new Date("2026-11-27T12:00:00Z") };
+    const cortesia = textosFreioDaIA.aviso.corpo({ ...base, janela: "dia_cortesia" }, "https://x/admin");
+    expect(cortesia).toContain("o teto do dia da cortesia");
+    expect(cortesia).toContain("FREIO_IA_POR_DIA_CORTESIA_USD");
+    expect(cortesia).toContain("docker compose up -d");
+    expect(cortesia).not.toContain("reinicie");
+    expect(textosFreioDaIA.aviso.corpo({ ...base, janela: "hora" }, "https://x/admin")).toContain("o teto da hora");
+    expect(textosFreioDaIA.aviso.corpo({ ...base, janela: "dia" }, "https://x/admin")).toContain("FREIO_IA_POR_DIA_USD");
   });
 
   it("com as duas janelas acima, diz a hora (a que volta mais cedo)", () => {
@@ -49,6 +72,8 @@ describe("limitesDoFreioDaIA", () => {
     vi.stubEnv("FREIO_IA", "");
     vi.stubEnv("FREIO_IA_POR_HORA_USD", "");
     vi.stubEnv("FREIO_IA_POR_DIA_USD", "");
+    vi.stubEnv("FREIO_IA_POR_DIA_CORTESIA_USD", "");
+    vi.stubEnv("FREIO_IA_ESPERA_MAX_S", "");
     vi.stubEnv("FREIO_IA_SIMULTANEAS", "");
     expect(limitesDoFreioDaIA()).toEqual({ ativo: true, ...PADROES_DO_FREIO_DA_IA });
   });
@@ -58,7 +83,12 @@ describe("limitesDoFreioDaIA", () => {
     vi.stubEnv("FREIO_IA_POR_HORA_USD", "12.5");
     vi.stubEnv("FREIO_IA_POR_DIA_USD", "0");
     vi.stubEnv("FREIO_IA_SIMULTANEAS", "abc");
-    expect(limitesDoFreioDaIA()).toEqual({ ativo: false, porHoraUsd: 12.5, porDiaUsd: PADROES_DO_FREIO_DA_IA.porDiaUsd, simultaneas: PADROES_DO_FREIO_DA_IA.simultaneas });
+    vi.stubEnv("FREIO_IA_POR_DIA_CORTESIA_USD", "0");
+    vi.stubEnv("FREIO_IA_ESPERA_MAX_S", "-5");
+    expect(limitesDoFreioDaIA()).toEqual({ ativo: false, ...PADROES_DO_FREIO_DA_IA, porHoraUsd: 12.5 });
+    vi.stubEnv("FREIO_IA_POR_DIA_CORTESIA_USD", "90");
+    vi.stubEnv("FREIO_IA_ESPERA_MAX_S", "30");
+    expect(limitesDoFreioDaIA()).toMatchObject({ porDiaCortesiaUsd: 90, esperaMaxS: 30 });
     vi.stubEnv("FREIO_IA_POR_HORA_USD", "-3");
     vi.stubEnv("FREIO_IA_SIMULTANEAS", "2.7");
     expect(limitesDoFreioDaIA()).toMatchObject({ porHoraUsd: PADROES_DO_FREIO_DA_IA.porHoraUsd, simultaneas: 2 });
@@ -102,6 +132,51 @@ describe("comFreioDeGasto", () => {
     soltar[2]();
     await expect(Promise.all([segunda, terceira])).resolves.toEqual([2, 3]);
     expect(vagasDaMarca(42)).toEqual({ ocupadas: 0, esperando: 0 });
+  });
+
+  it("passado o prazo, a chamada que esperava segue sem a vaga (relógio falso), não solta vaga que não pegou e deixa um aviso", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubEnv("FREIO_IA_SIMULTANEAS", "1");
+      vi.stubEnv("FREIO_IA_ESPERA_MAX_S", "120");
+      let soltarPrimeira: () => void = () => {};
+      const primeira = comFreioDeGasto(45, "roteiro", () => new Promise<string>((ok) => (soltarPrimeira = () => ok("primeira"))));
+      await vi.advanceTimersByTimeAsync(0);
+      const segunda = comFreioDeGasto(45, "roteiro", async () => "segunda");
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vagasDaMarca(45)).toEqual({ ocupadas: 1, esperando: 1 });
+
+      await vi.advanceTimersByTimeAsync(119_000);
+      expect(vagasDaMarca(45)).toEqual({ ocupadas: 1, esperando: 1 });
+      await vi.advanceTimersByTimeAsync(1_500);
+      await expect(segunda).resolves.toBe("segunda");
+      expect(vagasDaMarca(45)).toEqual({ ocupadas: 1, esperando: 0 });
+
+      soltarPrimeira();
+      await expect(primeira).resolves.toBe("primeira");
+      expect(vagasDaMarca(45)).toEqual({ ocupadas: 0, esperando: 0 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("se a vaga chega antes do prazo, a chamada pega a vaga e o prazo não derruba nada", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubEnv("FREIO_IA_SIMULTANEAS", "1");
+      let soltarPrimeira: () => void = () => {};
+      const primeira = comFreioDeGasto(46, "roteiro", () => new Promise<string>((ok) => (soltarPrimeira = () => ok("primeira"))));
+      await vi.advanceTimersByTimeAsync(0);
+      const segunda = comFreioDeGasto(46, "roteiro", async () => "segunda");
+      await vi.advanceTimersByTimeAsync(10_000);
+      soltarPrimeira();
+      await expect(primeira).resolves.toBe("primeira");
+      await expect(segunda).resolves.toBe("segunda");
+      await vi.advanceTimersByTimeAsync(200_000);
+      expect(vagasDaMarca(46)).toEqual({ ocupadas: 0, esperando: 0 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("com o freio desligado, nem a fila vale", async () => {

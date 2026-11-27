@@ -353,6 +353,19 @@ Entra desligado: sem os quatro dados abaixo no `.env` da VPS, ninguem consegue c
 - **O journal pula de `0089` para `0091`, e esta certo.** A `0090` foi gerada numa branch de 22/10/2026 e descartada antes de entrar na `main`; nunca existiu em nenhuma versao em producao. Nao renumerar: a `0091` e as seguintes ja foram aplicadas na VPS, e renumerar trocaria o nome de migracao ja registrada. O `drizzle-kit generate` usa o ultimo `idx` mais um, entao a numeracao segue de onde parou.
 - Regra do deploy sem pedir (`CLAUDE.md` do projeto, regra 14): so migracao de `ADD COLUMN` ou `CREATE TABLE`.
 
+## O freio de gasto da IA (achado A4, 26/11/2026)
+
+`src/ia/freio.ts` recusa a chamada paga de uma marca que passou do teto, com o aviso no log e o e-mail do alarme da IA ao admin (um por dia por marca). Todas as variaveis vem do `.env`, sao lidas a cada chamada e, quando o valor e zero, negativo ou texto, voltam ao padrao.
+
+- `FREIO_IA`: `0` desliga o freio inteiro; qualquer outro valor deixa ligado.
+- `FREIO_IA_POR_HORA_USD` (padrao 8): teto da ultima hora, para toda marca, inclusive cortesia e plano sem limite.
+- `FREIO_IA_POR_DIA_USD` (padrao 25): teto das ultimas 24 horas da marca comum.
+- `FREIO_IA_POR_DIA_CORTESIA_USD` (padrao 60): teto das ultimas 24 horas da marca de cortesia e da do plano sem limite (sem ele, so o da hora valeria: ate US$ 192 por dia).
+- `FREIO_IA_SIMULTANEAS` (padrao 4): quantas chamadas de uma marca correm ao mesmo tempo; a seguinte espera a vez. O limite e **por processo**: o app e o worker contam separado, entao somam (ate o dobro no total).
+- `FREIO_IA_ESPERA_MAX_S` (padrao 120): quanto a chamada espera a vaga; passou disso, segue para a conferencia de gasto sem a vaga e deixa um aviso no log.
+
+Mudar uma delas no `.env` so vale **recriando** os conteineres (`docker compose up -d`); `docker compose restart` nao le de novo o `.env`.
+
 ## Limites conhecidos
 
 - **Um processo web so.** A avaliacao do tema livre nao paga duas vezes o toque repetido porque a chamada em curso fica num `Map` na memoria do processo (`AVALIACOES_EM_CURSO` em `src/app/(painel)/(completo)/criar/tema-livre/acoes.ts`). Hoje ha um unico container `web` em producao, entao basta. Se um dia houver mais de um (ou uma troca de container no meio de uma avaliacao), o toque repetido pode pagar duas vezes: a saida e trocar o `Map` por uma trava no banco (`pg_advisory_xact_lock` ou uma linha com a chave e o prazo), como o webhook do Stripe ja faz.
