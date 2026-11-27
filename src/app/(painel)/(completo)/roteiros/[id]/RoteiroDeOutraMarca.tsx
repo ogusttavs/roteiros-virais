@@ -16,7 +16,7 @@ type Props = {
 
 /**
  * O roteiro existe e é de outra marca a que a pessoa também tem acesso (um link guardado, o histórico do navegador). Em vez de cair no Hoje sem explicação, diz de qual marca é e
- * oferece trocar para ela, pela mesma troca do seletor de marca do painel (que revalida a tela: ao terminar, esta mesma rota abre o roteiro).
+ * oferece trocar para ela, pela mesma troca do seletor de marca do painel. Ela revalida a rota, e a página que mostra esta tela leva ao roteiro quando ele já é da marca ativa.
  */
 export function RoteiroDeOutraMarca({ marca }: Props) {
   const { trocar, trocando, erro } = useTrocaMarca();

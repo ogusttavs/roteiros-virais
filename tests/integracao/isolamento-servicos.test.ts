@@ -1,7 +1,7 @@
 /**
  * M3 da auditoria de segurança de 26/11/2026: as funções de serviço que recebiam só o id e confiavam em quem chama para conferir a marca agora recebem o `clienteId` e filtram por
  * ele no próprio SQL. Este teste chama cada uma com o id de um dado da marca B em nome da marca A e confere que nada da marca B é lido nem gravado (e, para provar que o filtro
- * não recusa tudo, a mesma chamada em nome da marca B funciona). Contra o Postgres real; a IA fica simulada (nenhuma destas chamadas chega a ela no caso recusado).
+ * não recusa tudo, a mesma chamada em nome da marca B funciona). Contra o Postgres real; a IA fica simulada (nenhuma chamada recusada chega a ela; a exceção é `compilarEGravarPerfil`, que chama a IA (simulada) antes de gravar, e o teste confere que a gravação é que não acontece).
  */
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -29,7 +29,7 @@ import { marcaDoRoteiroDoUsuario } from "@/servicos/clientes";
 import { curvasDoHistorico } from "@/servicos/curva";
 import { noticiaPorId } from "@/servicos/noticias";
 import { enfileirarAnaliseDePerfil } from "@/servicos/perfis-analisados";
-import { confirmarPesquisa, lerPesquisa, marcarAchados, pesquisaParaORoteiro, registrarPosicao } from "@/servicos/pesquisa-na-hora";
+import { confirmarPesquisa, ErroPesquisa, lerPesquisa, marcarAchados, pesquisaParaORoteiro, registrarPosicao } from "@/servicos/pesquisa-na-hora";
 import { aceitar, desmarcarGravado as desmarcarGravadoNoPlano, ErroPlano, marcarGravado as marcarGravadoNoPlano, pular } from "@/servicos/plano";
 import {
   arquivarRoteiro,
@@ -46,6 +46,7 @@ import {
   versoesDoRoteiro,
 } from "@/servicos/roteiro";
 import { ficarComVersao } from "@/servicos/versoes";
+import { textosRoteiro } from "@/textos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -183,18 +184,18 @@ describe("roteiro.ts: o roteiro de outra marca é 'não achei', nunca lido nem g
     const a = await criarMarca();
     const b = await criarMarca();
     const deB = await criarRoteiro(b.id);
-    await expect(arquivarRoteiro(deB.id, a.id)).rejects.toThrow(ErroRoteiro);
+    await expect(arquivarRoteiro(deB.id, a.id)).rejects.toThrow(new ErroRoteiro("roteiro nao encontrado."));
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).toBeNull();
 
     await arquivarRoteiro(deB.id, b.id);
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).not.toBeNull();
-    await expect(desarquivarRoteiro(deB.id, a.id)).rejects.toThrow(ErroRoteiro);
+    await expect(desarquivarRoteiro(deB.id, a.id)).rejects.toThrow(new ErroRoteiro("roteiro nao encontrado."));
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).not.toBeNull();
     await desarquivarRoteiro(deB.id, b.id);
     expect((await linhaDoRoteiro(deB.id)).arquivadoEm).toBeNull();
 
     const daquiATres = somarDiasISO(hojeISO(), 3);
-    await expect(mudarDataRoteiro(deB.id, a.id, daquiATres)).rejects.toThrow(ErroRoteiro);
+    await expect(mudarDataRoteiro(deB.id, a.id, daquiATres)).rejects.toThrow(new ErroRoteiro("roteiro nao encontrado."));
     expect((await linhaDoRoteiro(deB.id)).data).toBe(hojeISO());
     await mudarDataRoteiro(deB.id, b.id, daquiATres);
     expect((await linhaDoRoteiro(deB.id)).data).toBe(daquiATres);
@@ -296,7 +297,7 @@ describe("a pesquisa na hora de outra marca não é lida, marcada nem confirmada
         clienteId,
         pedido: "quanto custa lavar um sofá",
         status: "pronta",
-        achados: [{ id: 1, texto: "um dado", fonteNome: "IBGE", fonteTipo: "oficial", url: "https://exemplo.invalido/d", titulo: null, dataDaPagina: null, dataTexto: null, antigo: false, citacao: "trecho" }],
+        achados: [1, 2].map((n) => ({ id: n, texto: `dado ${n}`, fonteNome: "IBGE", fonteTipo: "oficial" as const, url: `https://exemplo.invalido/d${n}`, titulo: null, dataDaPagina: null, dataTexto: null, antigo: false, citacao: "trecho" })),
         terminadoEm: new Date(),
       })
       .returning();
@@ -312,21 +313,26 @@ describe("a pesquisa na hora de outra marca não é lida, marcada nem confirmada
     const b = await criarMarca();
     const deB = await pesquisaPronta(b.id);
     try {
-      expect(await lerPesquisa(a.id, deB.id)).toBeNull();
-      await expect(marcarAchados(a.id, deB.id, [1])).rejects.toThrow();
-      await expect(registrarPosicao(a.id, deB.id, "a minha posição")).rejects.toThrow();
-      await expect(confirmarPesquisa(a.id, deB.id, { ids: [1] })).rejects.toThrow();
-      await expect(pesquisaParaORoteiro(a.id, deB.id)).rejects.toThrow();
-      const depois = await linhaDaPesquisa(deB.id);
-      expect(depois.selecionados).toEqual([]);
-      expect(depois.posicaoDaPessoa).toBeNull();
-      expect(depois.confirmadaEm).toBeNull();
-
-      // A própria marca faz tudo isso normalmente.
-      expect((await lerPesquisa(b.id, deB.id))?.id).toBe(deB.id);
+      // A marca B confirma primeiro, para a pesquisa ter dado marcado: a recusa para a marca A tem de vir do filtro por marca, não de "falta marcar um dado".
       await confirmarPesquisa(b.id, deB.id, { ids: [1] });
-      expect((await linhaDaPesquisa(deB.id)).selecionados).toEqual([1]);
-      expect((await pesquisaParaORoteiro(b.id, deB.id)).dados).toHaveLength(1);
+      const antes = await linhaDaPesquisa(deB.id);
+      expect(antes.selecionados).toEqual([1]);
+
+      expect(await lerPesquisa(a.id, deB.id)).toBeNull();
+      await expect(marcarAchados(a.id, deB.id, [1, 2])).rejects.toThrow(new ErroPesquisa("Essa pesquisa não está pronta para marcar."));
+      await expect(registrarPosicao(a.id, deB.id, "a minha posição")).rejects.toThrow(new ErroPesquisa("Pesquisa não encontrada."));
+      await expect(confirmarPesquisa(a.id, deB.id, { ids: [2] })).rejects.toThrow(ErroPesquisa);
+      await expect(confirmarPesquisa(a.id, deB.id, { ids: [2] })).rejects.toThrow("Essa pesquisa não está pronta. Espere ela terminar, ou escreva sem pesquisa.");
+      await expect(pesquisaParaORoteiro(a.id, deB.id)).rejects.toThrow(ErroPesquisa);
+      await expect(pesquisaParaORoteiro(a.id, deB.id)).rejects.toThrow("Essa pesquisa não está pronta. Espere ela terminar, ou escreva sem pesquisa.");
+      const depois = await linhaDaPesquisa(deB.id);
+      expect(depois.selecionados).toEqual([1]);
+      expect(depois.posicaoDaPessoa).toBeNull();
+      expect(depois.confirmadaEm).toEqual(antes.confirmadaEm);
+
+      // A própria marca continua lendo e usando.
+      expect((await lerPesquisa(b.id, deB.id))?.id).toBe(deB.id);
+      expect((await pesquisaParaORoteiro(b.id, deB.id)).dados.map((d) => d.id)).toEqual([1]);
     } finally {
       await db().delete(pesquisasNaHora);
     }
@@ -346,7 +352,7 @@ describe("versoes.ts: a versão de outra marca não vira roteiro", () => {
       .values({ clienteId: b.id, grupo: `grupo-isolamento-${contador}`, ordem: 1, parametros: { pedido: {} }, valores })
       .returning();
     try {
-      await expect(ficarComVersao(a.id, versao.id)).rejects.toThrow(ErroRoteiro);
+      await expect(ficarComVersao(a.id, versao.id)).rejects.toThrow(new ErroRoteiro(textosRoteiro.versoes.naoEncontrada));
       expect(await db().select().from(roteiros)).toHaveLength(0);
       const [intacta] = await db().select().from(tabelaDeVersoes).where(eq(tabelaDeVersoes.id, versao.id));
       expect(intacta.escolhidaEm).toBeNull();
@@ -383,7 +389,7 @@ describe("plano.ts: aceitar um item de outra marca não gera roteiro", () => {
       .values({ clienteId: b.id, dia: hojeISO(), ordem: 1, lugar: "loja", situacao: "dia de movimento", oQueMostrar: "o balcão", objetivo: "engajamento", estado: "sugerido" })
       .returning();
     const dados = { onde: "na loja", oQueEstaAcontecendo: "movimento", oQueDaParaMostrar: "o balcão", objetivo: "engajamento" as const };
-    await expect(aceitar(item.id, a, dados)).rejects.toThrow(ErroPlano);
+    await expect(aceitar(item.id, a, dados)).rejects.toThrow(new ErroPlano("item do plano nao encontrado."));
     const [depois] = await db().select().from(planoGravacoes).where(eq(planoGravacoes.id, item.id));
     expect(depois.estado).toBe("sugerido");
     expect(depois.roteiroId).toBeNull();
@@ -417,7 +423,7 @@ describe("a pessoa com acesso a duas marcas: a marca ativa decide o que ela pode
 
     // Marca B ativa: o `clienteId` que a sessão entrega é o da B.
     await expect(editarRoteiro(deA.id, b.id, { gancho: "escrito com a marca B ativa" })).rejects.toThrow("roteiro nao encontrado.");
-    await expect(arquivarRoteiro(deA.id, b.id)).rejects.toThrow(ErroRoteiro);
+    await expect(arquivarRoteiro(deA.id, b.id)).rejects.toThrow(new ErroRoteiro("roteiro nao encontrado."));
     await expect(marcarGravado(deA.id, b.id)).rejects.toThrow("roteiro nao encontrado.");
     const depoisDoErro = await linhaDoRoteiro(deA.id);
     expect(depoisDoErro.conteudo.gancho).toBe("o gancho original");

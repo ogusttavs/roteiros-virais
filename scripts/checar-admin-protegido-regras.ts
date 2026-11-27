@@ -7,6 +7,8 @@
  */
 import { globSync, readFileSync } from "node:fs";
 
+import { padraoDeRota } from "./extensoes-de-rota";
+
 export const PADRAO = "src/app/admin/**/page.tsx";
 
 export type Problema = { arquivo: string; linha: number; motivo: string };
@@ -105,10 +107,14 @@ export function verificarArquivoDeAcoes(caminho: string): Problema[] {
 }
 
 // ---------------------------------------------------------------------------
-// Rotas de API do admin (E69 PR A): `src/app/api/admin/**/route.ts`
+// Rotas de API do admin (E69 PR A): `src/app/api/admin/**/route.{ts,tsx,js,jsx}`
 // ---------------------------------------------------------------------------
 
-export const PADRAO_ROTAS = "src/app/api/admin/**/route.ts";
+/**
+ * Só `src/app/api/admin/**` (com as mesmas extensões de route handler do `checar-ver-como`). As rotas de `src/app/admin/**` não entram: `adminDaRota` também responde 404 com a ilustração desligada
+ * (regra da E69), o que não faz sentido para um handler qualquer da área do admin; hoje não existe nenhuma, e se aparecer uma ela precisa de regra própria.
+ */
+export const PADRAO_ROTAS = padraoDeRota("src/app/api/admin/**");
 
 /** Toda funcao exportada (GET, PUT, ...) de uma rota de API do admin chama `adminDaRota()` antes de qualquer outro await (so `await params` e `await contexto.params` podem vir antes). */
 export function verificarRota(caminho: string, conteudo: string): Problema[] {

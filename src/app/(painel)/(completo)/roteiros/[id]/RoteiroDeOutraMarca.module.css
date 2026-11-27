@@ -31,3 +31,10 @@
   color: var(--cor-erro);
   font-size: var(--tamanho-secundario);
 }
+
+/* O seletor de marca do tablet e do desktop já mostra o erro da troca; aqui só no celular. */
+@media (min-width: 768px) {
+  .erro {
+    display: none;
+  }
+}

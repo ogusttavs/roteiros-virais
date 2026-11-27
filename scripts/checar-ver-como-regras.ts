@@ -5,10 +5,12 @@
  * `.tsx`, com ou sem comentário antes da diretiva, e ignora comentários ao procurar o `await` (um `// await exigirForaDoVerComo()` não vale). `"use server"` dentro de uma função
  * (Server Action inline) reprova: tem de morar num arquivo de ações. Sem I/O de escrita nem process.exit aqui, para dar para testar; o ponto de entrada fica em checar-ver-como.ts.
  *
- * Desde o M3 da auditoria de segurança de 26/11/2026, a mesma regra vale para as rotas `/api` que escrevem (a segunda metade deste arquivo, a partir de `PADRAO_ROTAS`).
+ * Desde o M3 da auditoria de segurança de 26/11/2026, a mesma regra vale para as rotas que escrevem (a segunda metade deste arquivo, a partir de `PADRAO_ROTAS`).
  */
 import { globSync, readFileSync } from "node:fs";
-import { posix, sep } from "node:path";
+import { posix } from "node:path";
+
+import { EXTENSOES_DE_ROTA, padraoDeRota } from "./extensoes-de-rota";
 
 export const PADRAO = "src/app/**/*.{ts,tsx}";
 
@@ -181,7 +183,7 @@ export function verificarArquivo(caminho: string): Problema[] {
 
 /**
  * As rotas (M3 da auditoria de segurança de 26/11/2026): a regra 5 do "ver como" também para elas. Todo route handler de `src/app/` que o Next aceita (`route.ts`, `route.tsx`, `route.js`,
- * `route.mjs`, dentro ou fora de `api/`; fora de `api/admin/` e `admin/`, que agem como o próprio admin e têm o `checar-admin-protegido`) que exporta POST, PUT, PATCH ou DELETE recusa o modo como PRIMEIRO `await` do método, num destes três jeitos:
+ * `route.jsx`, dentro ou fora de `api/`; fora de `api/admin/` e `admin/`, que agem como o próprio admin; as de `api/admin/` têm o `checar-admin-protegido`, as de `admin/` ainda não têm conferência nenhuma) que exporta POST, PUT, PATCH ou DELETE recusa o modo como PRIMEIRO `await` do método, num destes três jeitos:
  *  1. `if (await modoVerComoLigado()) return ...`;
  *  2. `const x = await <porta>(); if (x instanceof NextResponse) return x;`, com a porta em PORTAS_DE_ROTA E importada pela rota do arquivo da porta (uma função local, ou importada de outro lugar, com o mesmo nome não vale; a porta também é conferida: o primeiro `await` dela é o jeito 1);
  *  3. `const s = await sessaoDoPainel();` e, antes do `await` seguinte, `if (s.verComo !== null) return ...`.
@@ -189,7 +191,7 @@ export function verificarArquivo(caminho: string): Problema[] {
  * exportado de um jeito que esta conferência não lê (desestruturado, `export function` sem `async`, embrulhado noutra função) só passa pela lista. Uma entrada da lista que aponta para algo
  * que não existe mais reprova. O GET fica de fora: ler no modo é o propósito do modo (as rotas GET que mexem em algo, como `/api/meta/conectar`, recusam à mão).
  */
-export const PADRAO_ROTAS = "src/app/**/route.{ts,tsx,js,mjs}";
+export const PADRAO_ROTAS = padraoDeRota("src/app/**");
 
 /** Onde moram as rotas que esta conferência não olha: o admin age como o próprio admin e tem o `checar-admin-protegido`. */
 export const PASTAS_DO_ADMIN = ["src/app/api/admin/", "src/app/admin/"] as const;
@@ -209,11 +211,16 @@ export const PORTAS_DE_ROTA: Record<string, string> = {
   marcaDoCarrossel: "src/lib/porta-do-carrossel.ts",
 };
 
-export function listarRotas(): string[] {
-  return globSync(PADRAO_ROTAS)
-    .map((c) => c.split(sep).join("/"))
+/** Os caminhos das rotas conferidas: com `/` (o glob do Windows devolve `\`), sem as pastas do admin, em ordem. Pura, para testar com uma lista fixa. */
+export function filtrarRotas(caminhos: readonly string[]): string[] {
+  return caminhos
+    .map((c) => c.replaceAll("\\", "/"))
     .filter((c) => !PASTAS_DO_ADMIN.some((pasta) => c.startsWith(pasta)))
     .sort();
+}
+
+export function listarRotas(): string[] {
+  return filtrarRotas(globSync(PADRAO_ROTAS));
 }
 
 export type MetodoDaRota = { metodo: string; linha: number; corpo: string | null; reexportaDe: string | null };
@@ -300,7 +307,7 @@ function caminhoDoImport(caminhoDaRota: string, alvo: string): string | null {
   if (alvo.startsWith("@/")) resolvido = posix.join("src", alvo.slice(2));
   else if (alvo.startsWith(".")) resolvido = posix.join(posix.dirname(caminhoDaRota), alvo);
   else return null;
-  return posix.normalize(resolvido).replace(/\.(?:tsx?|jsx?|mjs)$/, "");
+  return posix.normalize(resolvido).replace(new RegExp(`\\.(?:${EXTENSOES_DE_ROTA.join("|")}|mjs|cjs)$`), "");
 }
 
 /** Os nomes (como a rota os chama) de PORTAS_DE_ROTA que ela importa do arquivo da porta, pelo `@/` ou por caminho relativo. Importar de outro lugar, ou declarar a função ali mesmo, não conta. */
@@ -337,8 +344,8 @@ export function verificarRota(caminho: string, conteudo: string, rotas: Readonly
     if (Object.hasOwn(ROTAS_LIVRES, `${caminho}:${m.metodo}`)) continue;
     if (m.reexportaDe !== null) {
       const alvo = caminhoDaReexportacao(caminho, m.reexportaDe);
-      if (alvo !== null && alvo !== caminho && (rotas.has(alvo) || ["tsx", "js", "mjs"].some((ext) => rotas.has(alvo.replace(/\.ts$/, `.${ext}`))))) continue;
-      problemas.push({ arquivo: caminho, linha: m.linha, motivo: `${m.metodo}: reexporta de "${m.reexportaDe}", que não é outra rota /api conferida pelo checar-ver-como (aponte para a rota ou ponha em ROTAS_LIVRES, com o motivo)` });
+      if (alvo !== null && alvo !== caminho && (rotas.has(alvo) || EXTENSOES_DE_ROTA.some((ext) => rotas.has(alvo.replace(/\.ts$/, `.${ext}`))))) continue;
+      problemas.push({ arquivo: caminho, linha: m.linha, motivo: `${m.metodo}: reexporta de "${m.reexportaDe}", que não é outra rota conferida pelo checar-ver-como (aponte para a rota ou ponha em ROTAS_LIVRES, com o motivo)` });
       continue;
     }
     if (m.corpo === null) {
@@ -349,7 +356,7 @@ export function verificarRota(caminho: string, conteudo: string, rotas: Readonly
     problemas.push({
       arquivo: caminho,
       linha: m.linha,
-      motivo: `${m.metodo}: a rota /api que escreve precisa recusar o "ver como" como primeiro await (if (await modoVerComoLigado()) return ..., uma porta de PORTAS_DE_ROTA com a resposta devolvida, ou sessaoDoPainel com o verComo recusado logo depois), ou entrar em ROTAS_LIVRES de scripts/checar-ver-como-regras.ts com o motivo`,
+      motivo: `${m.metodo}: a rota que escreve precisa recusar o "ver como" como primeiro await (if (await modoVerComoLigado()) return ..., uma porta de PORTAS_DE_ROTA com a resposta devolvida, ou sessaoDoPainel com o verComo recusado logo depois), ou entrar em ROTAS_LIVRES de scripts/checar-ver-como-regras.ts com o motivo`,
     });
   }
   return problemas;

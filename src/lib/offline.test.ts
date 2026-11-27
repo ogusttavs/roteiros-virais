@@ -14,6 +14,7 @@ import { textosConexao } from "@/textos/conexao";
 import {
   CACHE_ESCOPO,
   chaveDoEscopo,
+  ehPaginaGuardavel,
   CHAVE_ESCOPO,
   ehFalhaDeRede,
   fraseDeFalha,
@@ -62,6 +63,33 @@ describe("nomes e escopo", () => {
     expect(valor("CACHE_ESCOPO")).toBe(CACHE_ESCOPO);
     expect(valor("CHAVE_ESCOPO")).toBe(CHAVE_ESCOPO);
     expect(valor("MARCA_GUARDADO")).toBe(MARCA_GUARDADO);
+  });
+});
+
+describe("quais páginas são guardadas para ler sem rede", () => {
+  /** A `ehPaginaPermitida` de `public/sw.js`, tirada do próprio arquivo (o worker não é módulo). */
+  function ehPaginaPermitidaDoWorker(): (pathname: string) => boolean {
+    const sw = readFileSync(path.join(RAIZ, "public", "sw.js"), "utf8");
+    const funcao = /function ehPaginaPermitida\(pathname\) \{[\s\S]*?^\}/m.exec(sw)?.[0];
+    expect(funcao).toBeTruthy();
+    return new Function(`${funcao}; return ehPaginaPermitida;`)() as (pathname: string) => boolean;
+  }
+
+  it("só /hoje e /roteiros/<id> (o worker aceita também o /gravar dele)", () => {
+    const worker = ehPaginaPermitidaDoWorker();
+    for (const caminho of ["/hoje", "/roteiros/12"]) {
+      expect(ehPaginaGuardavel(caminho)).toBe(true);
+      expect(worker(caminho)).toBe(true);
+    }
+    expect(worker("/roteiros/12/gravar")).toBe(true);
+  });
+
+  it("a tela de roteiro de outra marca nunca é guardada: nem pelo aplicativo nem pelo worker", () => {
+    const worker = ehPaginaPermitidaDoWorker();
+    for (const caminho of ["/roteiros/12/de-outra-marca", "/roteiros/12/de-outra-marca/", "/roteiros/de-outra-marca", "/roteiros/12/gravar/de-outra-marca"]) {
+      expect(ehPaginaGuardavel(caminho)).toBe(false);
+      expect(worker(caminho)).toBe(false);
+    }
   });
 });
 

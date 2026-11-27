@@ -20,7 +20,6 @@ import { visaoDePublicar } from "@/servicos/publicar-instagram";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
 import { grupoDoRoteiro } from "@/servicos/versoes";
 
-import { RoteiroDeOutraMarca } from "./RoteiroDeOutraMarca";
 import { RoteiroTela } from "./RoteiroTela";
 
 type Props = { params: Promise<{ id: string }> };
@@ -46,9 +45,9 @@ export default async function Roteiro({ params }: Props) {
 
   const roteiro = await roteiroPorId(roteiroId, cliente.id);
   if (!roteiro) {
-    // Quem tem mais de uma marca pode abrir o link do roteiro de outra marca sua com esta ativa: diz de qual é e oferece trocar. Sem acesso à marca do roteiro (ou sem roteiro), segue como antes, sem nome algum.
-    const daOutra = await marcaDoRoteiroDoUsuario(sessao.user.id, roteiroId);
-    if (daOutra && daOutra.id !== cliente.id) return <RoteiroDeOutraMarca marca={daOutra} />;
+    // Quem tem mais de uma marca pode abrir o link do roteiro de outra marca sua com esta ativa: a tela que diz de qual é fica noutro caminho (nunca guardada sem rede). Sem acesso à marca do roteiro, e no "ver como" (a troca é recusada), segue como antes, sem nome algum.
+    const daOutra = sessao.verComo != null ? null : await marcaDoRoteiroDoUsuario(sessao.user.id, roteiroId);
+    if (daOutra && daOutra.id !== cliente.id) redirect(`/roteiros/${roteiroId}/de-outra-marca`);
     redirect("/hoje");
   }
 
