@@ -593,3 +593,34 @@ describe("R-COPY-26: fórmula de texto de máquina (onda 1 de texto)", () => {
     expect(com(a.reprovam, "R-COPY-28") || com(a.reprovam, "R-COPY-29")).toBe(false);
   });
 });
+
+describe("onda 2, consertos da prova com chave (27/11/2026)", () => {
+  const SEM_NUMERO = {
+    gancho: "Tire a mancha do vidro sem esfregar nada.",
+    corpo: "Uma paciente perguntou se o clareamento dói. Molhe o vidro com vinagre. Deixe agir um pouco. Passe o rodo e pronto.",
+  };
+  it("R-COPY-08 em saúde: sem número nem nome próprio não reprova; fora da saúde continua reprovando", () => {
+    expect(com(reprovam({ ...SEM_NUMERO, ramoSaude: true }), "R-COPY-08")).toBe(false);
+    expect(com(reprovam({ ...SEM_NUMERO, ramoSaude: false }), "R-COPY-08")).toBe(true);
+  });
+  it("R-COPY-08 em saúde: o superlativo continua barrado", () => {
+    expect(com(reprovam({ ...SEM_NUMERO, corpo: SEM_NUMERO.corpo + " Somos o melhor do mercado.", ramoSaude: true }), "R-COPY-08")).toBe(true);
+  });
+  it("colchete no gancho reprova na 1ª e na 2ª tentativa, com o motivo de reescrever sem colchete", () => {
+    const g = { gancho: "Quantos pacientes você atende por semana? [o número real de pacientes por semana]" };
+    const r1 = reprovam({ ...g, tentativa: 1 });
+    expect(com(r1, "R-ROTEIRO-01")).toBe(true);
+    expect(r1.find((m) => m.startsWith("R-ROTEIRO-01"))).toContain("o gancho nunca leva colchete");
+    expect(com(reprovam({ ...g, tentativa: 2 }), "R-ROTEIRO-01")).toBe(true);
+  });
+  it("colchete no corpo continua permitido", () => {
+    expect(com(reprovam({ corpo: BOM.corpo + " Como foi [o caso de um cliente que...]?" }), "R-ROTEIRO-01")).toBe(false);
+  });
+});
+
+describe("colchete no gancho: o marcador dos testes com a IA simulada não conta", () => {
+  it("'[mock:...]' no gancho não reprova", () => {
+    expect(com(reprovam({ gancho: "Em 5 minutos: [mock:numero-fora-das-fontes]" }), "R-ROTEIRO-01")).toBe(false);
+    expect(com(reprovam({ gancho: "Em 5 minutos [notas 9.1 8.2 7.6]" }), "R-ROTEIRO-01")).toBe(false);
+  });
+});

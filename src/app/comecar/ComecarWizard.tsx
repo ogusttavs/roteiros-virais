@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleCheck, Clock, Mic, Pencil } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -14,6 +15,7 @@ import { config } from "@/lib/config";
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
 import { textosBriefing } from "@/textos/briefing";
+import { textosConviteDeGrupo } from "@/textos/convite-de-grupo";
 import { textosRamo } from "@/textos/ramo";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
@@ -33,6 +35,8 @@ type Props = {
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
   nomePessoa: string;
+  /** Convite de grupo: a pessoa é dona de grupo e vê o atalho "Suas empresas e a equipe" (a Conta fica atrás do briefing). */
+  linkDasEmpresas?: boolean;
   dadosFixosCompletos: boolean;
   dadosFixosIniciais: DadosFixosIniciais;
   respostasIniciais: Record<string, string>;
@@ -56,7 +60,7 @@ const ICONES_PROMESSA = [Clock, CircleCheck, Pencil];
  * pela largura) e a linha "Briefing da <marca>", para a pessoa saber onde
  * está e trocar sem ficar presa no briefing de uma marca só.
  */
-function CabecalhoSimples({ marcaAtiva, marcas, nomePessoa }: { marcaAtiva: MarcaResumo; marcas: MarcaResumo[]; nomePessoa: string }) {
+function CabecalhoSimples({ marcaAtiva, marcas, nomePessoa, linkDasEmpresas }: { marcaAtiva: MarcaResumo; marcas: MarcaResumo[]; nomePessoa: string; linkDasEmpresas?: boolean }) {
   const variasMarcas = marcas.length > 1;
   return (
     <header className={styles.cabecalhoEnvoltorio}>
@@ -75,6 +79,11 @@ function CabecalhoSimples({ marcaAtiva, marcas, nomePessoa }: { marcaAtiva: Marc
                 <SeletorMarcaDesktop marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
               </span>
             </>
+          ) : null}
+          {linkDasEmpresas ? (
+            <Link href="/empresas" className={styles.linkEmpresas}>
+              {textosConviteDeGrupo.empresas.atalho}
+            </Link>
           ) : null}
           <BotaoSair className={styles.botaoSair} />
         </div>
@@ -98,6 +107,7 @@ export function ComecarWizard({
   marcaAtiva,
   marcas,
   nomePessoa,
+  linkDasEmpresas,
   dadosFixosCompletos,
   dadosFixosIniciais,
   respostasIniciais,
@@ -188,7 +198,7 @@ export function ComecarWizard({
   if (etapa === "intro") {
     return (
       <div className={styles.pagina}>
-        <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
+        <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} linkDasEmpresas={linkDasEmpresas} />
         <div className={styles.corpoIntro}>
           <div className={styles.cabecalhoTela}>
             <span className={styles.data}>{textosBriefing.comecar.passoUm}</span>
@@ -219,7 +229,7 @@ export function ComecarWizard({
   if (etapa === "dadosFixos") {
     return (
       <div className={styles.pagina}>
-        <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
+        <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} linkDasEmpresas={linkDasEmpresas} />
         <div className={styles.corpo}>
           <div className={styles.cabecalhoTela}>
             <span className={styles.data}>{textosBriefing.dadosFixos.passoUm}</span>
@@ -240,7 +250,7 @@ export function ComecarWizard({
   if (etapa === "liberado") {
     return (
       <div className={styles.pagina}>
-        <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
+        <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} linkDasEmpresas={linkDasEmpresas} />
         <div className={styles.corpoLiberado}>
           <span className={styles.selo} aria-hidden="true">
             <CircleCheck size={28} strokeWidth={1.5} />
@@ -286,7 +296,7 @@ export function ComecarWizard({
 
   return (
     <div className={styles.pagina}>
-      <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
+      <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} linkDasEmpresas={linkDasEmpresas} />
       <div className={styles.corpoComNota}>
         <BarraNotaGeral
           notaAtual={notaGeral}

@@ -1,0 +1,12 @@
+/* Convite de grupo: /empresas. Só tokens. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-6);
+  max-width: var(--largura-leitura);
+}
+
+.titulo {
+  margin: 0;
+}

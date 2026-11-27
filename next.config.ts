@@ -32,7 +32,17 @@ const nextConfig: NextConfig = {
        * cabeçalhos globais (o Caddy é compartilhado com o OdontoTech) e as telas com imagem de fora já escolhem a própria política em cada `<img>`.
        */
       { source: "/redefinir-senha/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      /** O convite de grupo leva o código no endereço (`/convite?c=` e `/convite/<código>`): a mesma política, para o código não sair no `Referer`. */
+      { source: "/convite", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      { source: "/convite/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
     ];
+  },
+  /**
+   * A porta do convite para o WhatsApp (27/11/2026): `/convite?c=<código>` serve uma página estática (`public/marca/convite.html`, igual ao convite do OdontoTech) com as
+   * etiquetas da prévia no começo do arquivo, e ela leva a pessoa ao `/convite/<código>`. O caminho `/convite` sem código não tem página no App Router, então a troca vale.
+   */
+  async rewrites() {
+    return [{ source: "/convite", destination: "/marca/convite.html" }];
   },
 };
 
