@@ -75,3 +75,17 @@ test("link inventado mostra a mesma frase, sem formulário", async ({ page }) =>
   await expect(page.getByText("Peça um novo a quem te mandou.")).toBeVisible();
   await expect(page.getByLabel("Nome da empresa")).toHaveCount(0);
 });
+
+test("a prévia do link no WhatsApp: título, descrição e imagem do convite, com endereço completo, e a imagem abre sem login", async ({ page, request }) => {
+  await page.goto(`/convite/${randomBytes(32).toString("base64url")}`);
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", /^Seu convite para o /);
+  await expect(page.locator('meta[property="og:description"]')).toHaveAttribute("content", /Crie o seu acesso/);
+  const imagem = await page.locator('meta[property="og:image"]').getAttribute("content");
+  expect(imagem).toMatch(/^https?:\/\/.+\/marca\/previa-convite\.png$/);
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+  const resposta = await request.get("/marca/previa-convite.png", { maxRedirects: 0 });
+  expect(resposta.status()).toBe(200);
+  expect(resposta.headers()["content-type"]).toContain("image/png");
+  expect((await resposta.body()).length).toBeLessThan(300 * 1024);
+});
