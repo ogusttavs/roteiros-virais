@@ -1013,7 +1013,9 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
       }),
     });
     // 1.11.0: o caso recontado com outras palavras, apoiado por uma frase que as fontes trazem de fato, não reprova (`fatoApoiadoPelasFontes`); o aprovado vale também para o registro abaixo.
-    if (!verificacao.dados.aprovado && verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDosFatos)) {
+    // 1.12.0 (E76 PR 3): com vários idiomas, não. As travas dessa conferência (número por extenso, prazo, palavra de resultado ou promessa) são do português e não enxergam
+    // "in two days", "guaranteed" ou "sin dolor"; com o texto em inglês ou espanhol, vale o veredito do verificador, como antes da 1.11.0.
+    if (!verificacao.dados.aprovado && !params.variosIdiomas && verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDosFatos)) {
       verificacao.dados = { ...verificacao.dados, aprovado: true, motivo: null };
     }
     aprovado = verificacao.dados.aprovado;

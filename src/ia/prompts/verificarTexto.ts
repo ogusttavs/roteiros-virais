@@ -113,7 +113,8 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * repete o sentido dela e todo número do fato está nas fontes. Fato sem frase de apoio ("nenhuma"), frase que não está nas fontes ou número novo continuam reprovando. Versão 1.11.0.
  *
  * 1.12.0 (E76 PR 3, a estratégia de idioma): a marca que fala com mais de um país e escolheu escrever também em outro idioma recebe `CRITERIO_VARIOS_IDIOMAS`
- * (o idioma, sozinho, nunca reprova). Sem `variosIdiomas`, o sistema é o da 1.11.0, palavra por palavra.
+ * (o idioma, sozinho, nunca reprova). Sem `variosIdiomas`, o sistema é o da 1.11.0, palavra por palavra. Com `variosIdiomas`, o desfazer da reprovação por
+ * paráfrase (`fatoApoiadoPelasFontes`, chamado em `verificador.ts`) não roda: as travas dele são do português e não veem prazo nem promessa em inglês ou espanhol.
  */
 export const versao = "1.12.0";
 export const nivel: NivelIA = "barato";

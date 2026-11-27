@@ -14,6 +14,7 @@ vi.mock("./registro", () => ({
 import type { CartaoStory } from "@/db/schema";
 
 import { ErroIA } from "./erro";
+import { fatoApoiadoPelasFontes } from "./prompts/verificarTexto";
 import { ehMotivoMecanico, gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, temAlgoParaGuardar, verificarLocalmente } from "./verificador";
 
 const usoZero = { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0 };
@@ -1244,6 +1245,25 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
       const ok = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: FONTES });
       expect(ok.dados).toEqual(texto);
       expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("1.12.0: com vários idiomas, a paráfrase não desfaz a reprovação (as travas do prazo e da promessa são do português)", async () => {
+      const FONTES = "Caso: my client flew from Texas to get her veneers done.";
+      const texto = { corpo: "My client flew from Texas to get her veneers done in two days." };
+      const reprovado = {
+        dados: { aprovado: false, motivo: "prazo sem apoio", fatoEspecifico: "my client flew from Texas to get her veneers done in two days", fonteMaisProxima: "my client flew from Texas to get her veneers done" },
+        modelo: "mock",
+        ...usoZero,
+      };
+      // Sem a opção, a função de paráfrase não vê o "two days" e aprova: é o que a 1.12.0 impede com vários idiomas.
+      expect(fatoApoiadoPelasFontes(reprovado.dados.fatoEspecifico, reprovado.dados.fonteMaisProxima, FONTES)).toBe(true);
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce(reprovado)
+        .mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce(reprovado);
+      await expect(gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: FONTES, variosIdiomas: true })).rejects.toThrow();
+      expect(gerarEstruturadoMock).toHaveBeenCalledTimes(4);
     });
 
     it("1.11.0: fato novo, com 'nenhuma' como fonte mais próxima, reprova como antes", async () => {

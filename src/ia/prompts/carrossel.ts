@@ -20,7 +20,7 @@ import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, 
  * do carrossel (`blocoDoIdioma`, peça "carrossel": os slides no principal, porque o limite de cada campo não comporta dois idiomas; o segundo vai na
  * legenda e nas hashtags, do jeito escolhido), e a linha final e o lembrete passam a valer só para o que fica em português. A regra 3 deixa de
  * dizer "em português simples" e troca "Escreva sempre acentuado" por "O que for em português sai acentuado" nesse caso. Sem a estratégia, o
- * sistema é o da 2.2.0, palavra por palavra. O schema não muda.
+ * sistema é o da 2.3.0, palavra por palavra. O schema não muda.
  */
 export const versao = "2.4.0";
 

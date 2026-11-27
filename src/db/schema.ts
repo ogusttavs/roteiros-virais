@@ -282,7 +282,7 @@ export const clientes = pgTable("clientes", {
   /** E42a, item 1: texto livre ("Estados Unidos e Mexico"), so usado quando `alcance = "mais_de_um_pais"`. */
   paises: text("paises"),
   /**
-   * E76 PR 3, migração 0128: a estratégia de idioma (`EstrategiaIdioma`, acima), só com `alcance = "mais_de_um_pais"`. Nula em toda marca de um
+   * E76 PR 3, migração 0130 (era a 0128 até o merge de 27/11; renomeada para o generate do drizzle ler o snapshot certo, que ele escolhe pelo nome do arquivo): a estratégia de idioma (`EstrategiaIdioma`, acima), só com `alcance = "mais_de_um_pais"`. Nula em toda marca de um
    * país só e em quem ainda não escolheu: o roteiro, o carrossel e a legenda saem em português, como sempre. Quem troca o `alcance` para outro
    * valor apaga esta coluna junto (`salvarDadosFixosComPedido`, `salvarOndeConta`).
    */

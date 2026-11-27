@@ -376,6 +376,9 @@ function copyFatoEspecifico(e: EntradaCopyRoteiro): string | null {
   // Ramo de saúde (R-CONF-07 + R-COPY-30): o número de resultado e o prazo são proibidos e o caso da marca é a dúvida do paciente ou a cena do atendimento; exigir número ou nome próprio aqui fazia as
   // duas regras brigarem (prova com chave de 26/11/2026, caso 0: reprovou na 1ª tentativa). O superlativo acima continua barrado; o prompt pede o nome do serviço, do bairro ou da cidade quando há.
   if (e.ramoSaude) return null;
+  // E76 PR 3: o número por extenso que a R-COPY-29 pede ("ten minutes", "dos capas") só é reconhecido em português; com a fala em outro idioma, a metade
+  // "sem número nem nome" não tem como conferir e reprovava à toa. O superlativo acima continua valendo.
+  if (e.falaForaDoPortugues) return null;
   const base = `${e.gancho} ${e.corpo}`;
   if (!temNumeroOuNomeProprio(base) && !NUMERO_POR_EXTENSO.test(normalizar(emUmaLinha(base)))) {
     return "R-COPY-08: nem o gancho nem o corpo trazem um número ou um nome próprio; ponha um fato específico (número, prazo, quantidade ou nome) que esteja na ficha ou no momento";
@@ -480,7 +483,8 @@ function copyChamada(e: EntradaCopyRoteiro): string | null {
   if (canais.length >= 2) {
     return `R-COPY-25: a chamada pede mais de um caminho (${canais.join(" e ")}); escolha uma só ação, a mais fácil, num canal só`;
   }
-  if (SO_COMPRAR.test(n) && !OUTRO_VERBO_DE_ACAO.test(n)) {
+  // E76 PR 3: os outros verbos de ação são do português; em espanhol, "compra" casa e "escríbenos" não, e a chamada boa reprovava. A conta dos canais vale em qualquer idioma.
+  if (!e.falaForaDoPortugues && SO_COMPRAR.test(n) && !OUTRO_VERBO_DE_ACAO.test(n)) {
     return 'R-COPY-25: a chamada só manda comprar; ofereça antes um passo mais fácil (chamar, perguntar, pedir um orçamento, passar na loja)';
   }
   return null;
