@@ -999,6 +999,10 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
         fontes: params.citarProibicaoVale && params.fontesDosFatos ? verificarTexto.fontesSemProibicoes(params.fontesDosFatos) : params.fontesDosFatos,
       }),
     });
+    // 1.11.0: o caso recontado com outras palavras, apoiado por uma frase que as fontes trazem de fato, não reprova (`fatoApoiadoPelasFontes`); o aprovado vale também para o registro abaixo.
+    if (!verificacao.dados.aprovado && verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDosFatos)) {
+      verificacao.dados = { ...verificacao.dados, aprovado: true, motivo: null };
+    }
     aprovado = verificacao.dados.aprovado;
     // Reprovando por fato, o motivo carrega o fato e a frase mais próxima das fontes (`motivoDaConferencia`): é o que a segunda tentativa recebe para corrigir.
     motivos = verificacao.dados.aprovado ? [] : [verificarTexto.motivoDaConferencia(verificacao.dados)];

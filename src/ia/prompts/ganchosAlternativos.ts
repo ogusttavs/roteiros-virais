@@ -18,7 +18,8 @@ import { textoRegrasCopyRoteiro } from "./regras-copy-roteiro-uso";
  * 1.1.0 (26/11/2026, prova com chave real: gancho que servia para qualquer ramo, fato inventado e medo em saúde, tipo mal rotulado): cada gancho leva um detalhe concreto do roteiro ou do perfil
  * (regras 8 e 9), nada de resultado visto ou garantido que as fontes não contam e nada de medo sobre filho ou familiar (regra 10), e o tipo tem de bater com o texto (regra 11). O schema não muda.
  */
-export const versao = "1.1.0";
+/** 1.2.0 (27/11/2026, consertos da prova com chave da onda 2): o bloco de regras de texto traz a nota de saúde (como `R-COPY-08` e `R-COPY-30` se cumprem juntas) e proíbe colchete no gancho. */
+export const versao = "1.2.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 

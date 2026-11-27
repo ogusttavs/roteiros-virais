@@ -106,9 +106,13 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  *
  * 1.10.0 (onda 1 de texto, 25/11/2026, `R-COPY-27`): no gênero roteiro, com fontes, o verificador faz o teste "serve para qualquer ramo?" no título e no gancho (`CRITERIO_RAMO`): se os dois continuam
  * verdadeiros trocando o ramo, sem nenhum elemento que só existe nesta marca ou neste ramo (o serviço, o lugar, o público, um fato da ficha ou da evidência), o roteiro volta uma vez para refazer. Na dúvida,
- * aprova (o mesmo princípio do critério de fato). Precisa de prova com chave real antes de valer em produção.
+ * aprova (o mesmo princípio do critério de fato). Precisa de prova com chave real antes de valer em produção. *
+ * 1.11.0 (prova com chave de 26/11/2026 sobre a onda 2 do roteiro: o caso da marca recontado com outras palavras era lido como fato sem apoio, e a versão 2 do caso 24 reprovou nas duas tentativas):
+ * (1) o critério ganha o caso recontado (o mesmo cliente, a mesma cena ou o mesmo número da ficha dito de outro jeito, com os mesmos elementos, é paráfrase e aprova; reprova só o elemento que a
+ * ficha não tem); (2) por código, `fatoApoiadoPelasFontes` desfaz a reprovação quando a própria saída do verificador cita como fonte mais próxima uma frase que está mesmo nas fontes, o fato
+ * repete o sentido dela e todo número do fato está nas fontes. Fato sem frase de apoio ("nenhuma"), frase que não está nas fontes ou número novo continuam reprovando. Versão 1.11.0.
  */
-export const versao = "1.10.0";
+export const versao = "1.11.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -195,7 +199,7 @@ export const CRITERIO_FATOS =
   "\"fica\" nesse bairro), repetir ou reformular o TEMA ou o momento (eles são fonte), a frase ou o assunto que o cliente pediu para dizer (\"o que o vídeo precisa comunicar\", o pedido), " +
   "hashtags, instruções de gravação (sugerir como ou onde gravar, mesmo mudando um detalhe do que o momento diz), perguntas (uma pergunta, mesmo comparando dois produtos, não afirma nada), frase que está " +
   "literalmente nas fontes (o perfil traz \"nunca promete resultado\", \"Frase que fala: ...\" e o texto a repete) e o jeito de falar. FALAR COM O PÚBLICO sobre um medo, uma dor ou uma situação que o perfil lista para o cliente ideal (\"Medos do cliente: ...\") é o assunto do perfil dito a quem assiste, e não é fato: vale como pergunta (\"você já mandou lavar e o sofá voltou manchado?\") e também como afirmação dirigida a quem assiste (\"você já mandou lavar uma vez e ele voltou manchado\", \"quem já passou por isso sabe como é\", \"se o seu sofá já voltou manchado de outro lugar\"). O \"você já...\", o \"já mandou...\" e o \"quem já...\" falam do PÚBLICO, nunca da pessoa que grava. O que continua sendo fato, e reprova, é contar um CASO ESPECÍFICO como acontecido na primeira pessoa ou com alguém identificado: com a própria pessoa (\"eu já mandei lavar e voltou manchado\", \"comigo aconteceu\"), com um cliente do negócio ou com uma pessoa identificada (\"um cliente meu, na semana passada, mandou lavar em outro lugar e o sofá voltou manchado\", \"ontem uma cliente me contou\"), porque o medo do perfil não diz que isso aconteceu. INSTRUÇÃO PARA A PESSOA nunca é afirmação sobre o negócio: o que vem depois da linha \"INSTRUÇÕES PARA A PESSOA\" do texto (onde gravar, o que mostrar, a cena, o ritmo de corte, os recursos, o áudio, o que aparece na imagem de cada capítulo) e qualquer ordem no imperativo em qualquer lugar (\"mostre\", \"coloque na tela\", \"grave\", \"filme\", \"aponte\") dizem o que a pessoa vai fazer, não o que o negócio é, tem ou fez. Você não confere essa parte contra as FONTES e nunca reprova por fato por causa dela, mesmo que a foto, o objeto ou a cena citados não apareçam nas fontes: é a pessoa quem decide se tem e se grava. Um número que está nas FONTES, escrito de qualquer jeito (\"R$ 180\", \"cento e oitenta reais\"), e repetido com um espaço marcado entre colchetes ao lado (a condição, o prazo, o detalhe que a pessoa completa: \"custa cento e oitenta reais [espaço para a pessoa completar]\") não é fato novo: o número é o da fonte e o espaço é de quem grava; não reprove por \"condição não dita\". DEDUÇÃO DIRETA e CONHECIMENTO GERAL DO PRODUTO OU DO SERVIÇO também não são fato inventado: a consequência óbvia de um fato do perfil (o perfil diz que o cliente mora em apartamento, sem quintal; \"quem mora em apartamento sem quintal precisa resolver a mancha ali mesmo\" é a consequência, não um fato novo) e o funcionamento geral desse tipo de produto ou serviço (\"o tempo que o produto fica agindo no tecido\", \"a anestesia leva uns minutos para pegar\") são do ramo, não da fonte. Continuam sendo fato, e reprovam: número, prazo ou resultado prometido ou medido que as fontes não trazem (\"tira 100% da mancha\", \"seca em duas horas\", \"em dez minutos\"), cliente ou caso, nome de produto, de marca ou de ingrediente, e prática ou diferencial do negócio (\"damos 30 dias de garantia\"). Um espaço marcado entre colchetes para a pessoa preencher (\"[diga aqui onde você está]\", ou o marcador \"[espaço para a pessoa completar]\") não é fato, é o " +
-  "certo quando a fonte não traz a informação. NA DÚVIDA, APROVE. Só reprove por fato quando você consegue apontar o fato específico E afirmar que nada nas fontes o sustenta; nesse caso " +
+  "certo quando a fonte não traz a informação. O CASO DA MARCA RECONTADO COM OUTRAS PALAVRAS também não é fato novo: se a ficha ou as fontes trazem o cliente, a cena, a dúvida ou o número, e o texto os conta de outro jeito, na mesma situação e com os mesmos elementos, é paráfrase e APROVA; reprove só o elemento que a fonte não tem (um número, um nome, um desfecho ou um prazo que ela não traz). NA DÚVIDA, APROVE. Só reprove por fato quando você consegue apontar o fato específico E afirmar que nada nas fontes o sustenta; nesse caso " +
   "preencha fatoEspecifico com o fato, fonteMaisProxima com a frase das fontes mais próxima dele (ou \"nenhuma\") e o motivo em uma frase.\n" +
   "  Exemplos que APROVAM: as fontes dizem \"R$ 89\" e o texto diz \"89 reais\"; as fontes dizem \"bairro Vila Sorriso, São Paulo\" e o texto diz \"a clínica fica na Vila Sorriso\"; o texto diz " +
   "\"esfregar a mancha espalha a gordura\" (conhecimento do ofício); o momento diz \"no carro, parado no sinal\" e o texto manda \"gravar parado no sinal ou estacionado\" (instrução de gravação); " +
@@ -308,4 +312,44 @@ export function montarEntrada(dados: { texto: string; proibicoes: string[]; font
   const texto = dados.fontes ? neutralizarColchetes(dados.texto) : dados.texto;
 
   return `Texto a conferir:\n${texto}\n\nProibicoes do cliente: ${listaProibicoes}${blocoFontes}`;
+}
+
+
+const PALAVRAS_SEM_PESO = new Set(["para", "como", "mais", "mas", "com", "uma", "uns", "umas", "que", "por", "dos", "das", "nos", "nas", "sua", "seu", "isso", "esse", "essa", "esta", "este", "muito", "ainda", "porque", "quando", "onde", "pela", "pelo", "entre", "sobre", "depois", "antes", "tambem", "aqui", "tudo", "cada", "ficou", "esta"]);
+
+function normalizarParaComparar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/ +/g, " ")
+    .trim();
+}
+
+/** As palavras de peso (4 letras ou mais, fora as de ligação) reduzidas aos 5 primeiros caracteres, para "atendeu" e "atendimento" valerem o mesmo. */
+function raizesDeConteudo(texto: string): string[] {
+  return normalizarParaComparar(texto)
+    .split(" ")
+    .filter((p) => p.length >= 4 && !PALAVRAS_SEM_PESO.has(p) && !/^[0-9]+$/.test(p))
+    .map((p) => p.slice(0, 5));
+}
+
+/**
+ * 1.11.0: o verificador reprovou por fato, mas o caso pode ser a paráfrase de algo que as fontes trazem. Só é apoiado quando: a frase que ele mesmo cita como fonte mais próxima existe de fato nas fontes
+ * (nada de "nenhuma" nem de frase inventada); o fato repete pelo menos 60% do peso dessa frase (raízes das palavras); e todo número do fato aparece nas fontes. Pura.
+ */
+export function fatoApoiadoPelasFontes(fatoEspecifico: string | null, fonteMaisProxima: string | null, fontes: string | undefined): boolean {
+  if (!fatoEspecifico || !fonteMaisProxima || !fontes) return false;
+  const frase = normalizarParaComparar(fonteMaisProxima);
+  if (frase.length < 12 || frase === "nenhuma") return false;
+  const base = normalizarParaComparar(fontes);
+  if (!base.includes(frase)) return false;
+  const numeros = fatoEspecifico.match(/[0-9]+/g) ?? [];
+  if (numeros.some((n) => !base.includes(n))) return false;
+  const raizesDoFato = [...new Set(raizesDeConteudo(fatoEspecifico))];
+  if (raizesDoFato.length === 0) return false;
+  const raizesDaFrase = new Set(raizesDeConteudo(fonteMaisProxima));
+  const cobertas = raizesDoFato.filter((r) => raizesDaFrase.has(r)).length;
+  return cobertas / raizesDoFato.length >= 0.6;
 }

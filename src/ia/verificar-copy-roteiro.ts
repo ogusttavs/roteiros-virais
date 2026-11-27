@@ -368,6 +368,9 @@ function copyFatoEspecifico(e: EntradaCopyRoteiro): string | null {
   if (achado) return `R-COPY-08: superlativo ("${achado.replace(/^[^a-z0-9]+/, "")}") no lugar de fato específico; troque por número, prazo, quantidade ou nome`;
   // Só no Reels falado: o texto na tela do Story e do sem fala é curto demais (até 8 palavras por vez) para exigir número ou nome em toda cena.
   if (e.estrutura !== "reels_falado") return null;
+  // Ramo de saúde (R-CONF-07 + R-COPY-30): o número de resultado e o prazo são proibidos e o caso da marca é a dúvida do paciente ou a cena do atendimento; exigir número ou nome próprio aqui fazia as
+  // duas regras brigarem (prova com chave de 26/11/2026, caso 0: reprovou na 1ª tentativa). O superlativo acima continua barrado; o prompt pede o nome do serviço, do bairro ou da cidade quando há.
+  if (e.ramoSaude) return null;
   const base = `${e.gancho} ${e.corpo}`;
   if (!temNumeroOuNomeProprio(base) && !NUMERO_POR_EXTENSO.test(normalizar(emUmaLinha(base)))) {
     return "R-COPY-08: nem o gancho nem o corpo trazem um número ou um nome próprio; ponha um fato específico (número, prazo, quantidade ou nome) que esteja na ficha ou no momento";
@@ -497,6 +500,16 @@ function roteiroPreenchido(e: EntradaCopyRoteiro): string | null {
     .filter(([, t]) => !t.trim())
     .map(([nome]) => nome);
   return faltam.length > 0 ? `R-ROTEIRO-01: o roteiro não tem ${faltam.join(", ")}; o vídeo precisa de começo, meio e fim` : null;
+}
+
+/**
+ * O gancho nunca leva espaço entre colchetes ("[o número real de pacientes por semana]"): ele é a primeira coisa que a pessoa fala e não tem como gravar sem completar (prova com chave de 26/11/2026). O
+ * colchete é permitido no corpo e na chamada, onde falta um fato que a ficha não traz. Reprova nas duas tentativas (sem gancho gravável o roteiro não vai ao ar); o motivo diz o que fazer.
+ */
+function ganchoSemColchete(e: EntradaCopyRoteiro): string | null {
+  const achado = /\[[^\[\]]{0,200}\]/.exec(e.gancho);
+  if (!achado) return null;
+  return `R-ROTEIRO-01: o gancho tem um espaço entre colchetes ("${achado[0].slice(0, 60)}"); o gancho nunca leva colchete, porque é a primeira frase que a pessoa fala. Reescreva com o que a ficha ou o momento trazem (o assunto, o serviço, o lugar) e deixe o colchete só para o corpo`;
 }
 
 const ENCERRAMENTO_VAZIO = /^(entao e isso|e isso( ai)?|obrigad[oa]( por assistir| por ver)?|valeu|tchau|ate a proxima|ate logo|por hoje e so|fico por aqui)[ ]*($|[,.!?;:])/;
@@ -652,6 +665,8 @@ export function verificarRegrasCopyRoteiro(entrada: EntradaCopyRoteiro): Resulta
     if (!motivo) continue;
     (entrada.tentativa === 1 ? reprovam : avisos).push(motivo);
   }
+  const colcheteNoGancho = ganchoSemColchete(entrada);
+  if (colcheteNoGancho) reprovam.push(colcheteNoGancho);
   avisos.push(...avisosSomente(entrada));
   // R-COPY-28 e R-COPY-29 (indício): só a fala; no Story e no sem fala o texto é o do cartão, curto de propósito.
   if (entrada.estrutura === "reels_falado") avisos.push(...avisosDeFormaDaFala({ gancho: entrada.gancho, corpo: entrada.corpo, fechamento: entrada.fechamento, chamada: entrada.chamadaFinal }));

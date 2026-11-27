@@ -16,6 +16,7 @@ import {
   TITULO_DAS_INSTRUCOES,
   versao,
   CRITERIO_RAMO,
+  fatoApoiadoPelasFontes,
 } from "./verificarTexto";
 
 /**
@@ -63,7 +64,7 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
   });
 
   it("a versão subiu e fato é só o ESPECÍFICO sobre a pessoa, o negócio, o lugar, o momento ou um acontecimento", () => {
-    expect(versao).toBe("1.10.0");
+    expect(versao).toBe("1.11.0");
     expect(sistema).toContain("fato ESPECÍFICO");
     for (const exemplo of ["quem está junto", "onde está", "o que aconteceu", "quando", "quanto custa", "nome de produto, de cliente ou de cidade", "uma cena vivida"]) {
       expect(sistema).toContain(exemplo);
@@ -354,5 +355,27 @@ describe("verificarTexto 1.10.0: o teste 'serve para qualquer ramo?' (R-COPY-27)
     expect(CRITERIO_RAMO).toContain("troque o ramo");
     expect(CRITERIO_RAMO).toContain("NA DÚVIDA, APROVE");
     expect(CRITERIO_RAMO).not.toContain(String.fromCharCode(0x2014));
+  });
+});
+
+describe("verificarTexto 1.11.0: o caso recontado com outras palavras (fatoApoiadoPelasFontes)", () => {
+  const FONTES = "Perfil: clínica de ortodontia em Campinas.\nCaso: uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer.\nServiço: aparelho transparente.";
+  const FRASE = "uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer";
+
+  it("a paráfrase apoiada por uma frase que está nas fontes passa", () => {
+    expect(fatoApoiadoPelasFontes("uma paciente quis saber se o aparelho transparente machucava e se dava para tirar na hora de comer", FRASE, FONTES)).toBe(true);
+  });
+
+  it("o fato novo reprova: sem frase de apoio, frase fora das fontes, número novo ou o que a frase não cobre", () => {
+    expect(fatoApoiadoPelasFontes("o Uli está do meu lado com a mochila", "nenhuma", FONTES)).toBe(false);
+    expect(fatoApoiadoPelasFontes("uma paciente perdeu 12 quilos de dente", FRASE, FONTES)).toBe(false);
+    expect(fatoApoiadoPelasFontes("o aparelho transparente machuca a boca da paciente", "frase que o modelo inventou e não está nas fontes de jeito nenhum", FONTES)).toBe(false);
+    expect(fatoApoiadoPelasFontes("a clínica dá garantia de dois anos no tratamento todo", "Serviço: aparelho transparente.", FONTES)).toBe(false);
+    expect(fatoApoiadoPelasFontes(null, FRASE, FONTES)).toBe(false);
+    expect(fatoApoiadoPelasFontes("qualquer coisa de peso", FRASE, undefined)).toBe(false);
+  });
+
+  it("o critério manda aprovar o caso recontado", () => {
+    expect(CRITERIO_FATOS).toContain("O CASO DA MARCA RECONTADO COM OUTRAS PALAVRAS");
   });
 });

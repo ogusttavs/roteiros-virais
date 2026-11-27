@@ -6,8 +6,9 @@
  */
 import { REGRAS_COPY_ROTEIRO, type RegraCopyRoteiro } from "./regras-copy-roteiro";
 
+/** 1.2.0 (prova com chave de 26/11/2026 sobre a onda 2): o escopo "semfala" (carrossel e capa de notícia) não recebe `R-COPY-30` nem `R-COPY-31` (pedem caso no corpo e ponte do gancho, que o slide não tem); e em ramo de saúde o bloco diz como `R-COPY-08` e `R-COPY-30` se cumprem juntas. */
 /** 1.1.0 (E50 parte 2, PR 3): `textoRegrasCopyRoteiro` ganha o escopo "longo" (o roteiro longo recebe a conformidade e o texto, sem a estrutura do vídeo curto). */
-export const versao = "1.1.0";
+export const versao = "1.2.0";
 
 /** As regras que o prompt recebe: força forte ou média, na ordem do documento (R-COPY, R-ROTEIRO, R-CONF). */
 export function regrasQueEntramNoPrompt(): RegraCopyRoteiro[] {
@@ -16,6 +17,9 @@ export function regrasQueEntramNoPrompt(): RegraCopyRoteiro[] {
 
 /** Os números que existem na tabela inteira: o PR 3 descarta por código qualquer número fora daqui. */
 export const NUMEROS_REGRAS_COPY_ROTEIRO = new Set(REGRAS_COPY_ROTEIRO.map((r) => r.numero));
+
+/** As regras de texto que pedem caso no corpo e ponte do gancho falado: não valem para o carrossel nem para a capa de notícia. */
+const REGRAS_SO_DO_ROTEIRO_FALADO = new Set(["R-COPY-30", "R-COPY-31"]);
 
 const CODIGO = "`R-[A-Z]+-[A-Z0-9-]+`";
 /** Um parêntese que só tem códigos entre crases (e "-07", "e", "ou", vírgulas), por exemplo " (`R-IG-REEL-03`, `R-YT-SHORT-05` e `-07`)". */
@@ -60,11 +64,12 @@ export function numerosVisiveisNoPrompt(): Set<string> {
  * (11.0 e 11.3 das rubricas), mais as linhas geradas da tabela. Nada aqui muda de um roteiro
  * para outro, para o cache do prompt continuar valendo.
  */
-export function textoRegrasCopyRoteiro(escopo: "curto" | "longo" = "curto"): string {
+export function textoRegrasCopyRoteiro(escopo: "curto" | "longo" | "semfala" = "curto"): string {
   const entram = regrasQueEntramNoPrompt();
   const visiveis = numerosVisiveisNoPrompt();
   const conformidade = entram.filter((r) => r.grupo === "CONF");
-  const copy = entram.filter((r) => r.grupo === "COPY");
+  // O carrossel e a capa de notícia não têm "corpo" com caso nem gancho falado de fora do ramo: a prova de 26/11/2026 reprovou o carrossel duas vezes com o bloco da onda 2.
+  const copy = entram.filter((r) => r.grupo === "COPY" && !(escopo === "semfala" && REGRAS_SO_DO_ROTEIRO_FALADO.has(r.numero)));
   const roteiro = escopo === "curto" ? entram.filter((r) => r.grupo === "ROTEIRO") : [];
   return [
     "Regras de texto e de estrutura do roteiro (valem para a fala e, em roteiro sem fala, para o texto na tela).",
@@ -80,6 +85,7 @@ export function textoRegrasCopyRoteiro(escopo: "curto" | "longo" = "curto"): str
     "",
     "Texto e persuasão (cada regra vale para os blocos entre parênteses):",
     ...copy.map((r) => linha(r, visiveis)),
+    "Em ramo de saúde (`R-CONF-07`) o fato específico de `R-COPY-08` NÃO é número de resultado nem prazo: é o nome do serviço, do bairro, da cidade ou da equipe, ou um número que não seja resultado nem prazo e que esteja na ficha. Se a ficha não traz nenhum, não force número: fique com o serviço e o lugar, e o caso do corpo é a dúvida do paciente ou a cena do atendimento (`R-COPY-30`). Em nenhum ramo deixe colchete no gancho: o colchete é só para o corpo.",
     "",
     ...(roteiro.length > 0
       ? ["Estrutura (cada regra vale para os blocos entre parênteses):", ...roteiro.map((r) => linha(r, visiveis)), ""]
@@ -87,7 +93,9 @@ export function textoRegrasCopyRoteiro(escopo: "curto" | "longo" = "curto"): str
     "Onde uma regra pede declarar algo (a seção de atenção, quem vai ver, a ideia em uma frase) e o roteiro não tem campo para isso, não escreva a declaração na fala nem na tela: apenas siga a regra.",
     ...(escopo === "curto"
       ? ["No Story, onde a regra fala de gancho, corpo e fechamento, vale para o primeiro story, os do meio e o último; os tempos de segundo valem para a fala do primeiro story."]
-      : ["No roteiro longo, as regras valem para a fala do gancho, de cada capítulo e da chamada final."]),
+      : escopo === "semfala"
+        ? ["No carrossel e na capa de notícia, as regras de texto valem para o texto de cada slide e da capa."]
+        : ["No roteiro longo, as regras valem para a fala do gancho, de cada capítulo e da chamada final."]),
     "Estas regras são para você seguir ao escrever. Não as cite no porQueAssim: ele continua citando só as regras de plataforma listadas acima.",
   ].join(String.fromCharCode(10));
 }
