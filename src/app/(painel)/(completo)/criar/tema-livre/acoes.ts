@@ -4,6 +4,7 @@ import type { Cliente } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
 import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
+import { logger } from "@/lib/log";
 import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
@@ -101,8 +102,14 @@ async function avaliarEGuardar(
   try {
     const resultado = await avaliarTema(cliente, texto, origem, assuntoEmAlta, chaveDeVozValida(perguntaChave));
     if (!comContexto) {
-      // Guardar a nota é um favor: se falhar, a pessoa ainda vê a nota agora.
-      await guardarNotaNoRascunho(usuarioId, cliente.id, texto, resultado).catch(() => undefined);
+      // Guardar a nota é um favor: se falhar, a pessoa ainda vê a nota agora (e a falha vai para o log, não some).
+      // O rascunho primeiro recebe o texto avaliado: o salvamento automático (espera de 800 ms) fica na fila atrás desta avaliação, que leva até 35 s, e sem isto a linha ainda tinha o texto antigo e a nota não era guardada.
+      try {
+        await salvarRascunhoTemaLivre(usuarioId, cliente.id, texto);
+        await guardarNotaNoRascunho(usuarioId, cliente.id, texto, resultado);
+      } catch (erro) {
+        logger.error({ err: erro, clienteId: cliente.id }, "tema livre: não consegui guardar a nota no rascunho");
+      }
     }
     return { ok: true, dado: resultado };
   } catch (falha) {
