@@ -565,10 +565,62 @@ describe("R-COPY-26: fórmula de texto de máquina (onda 1 de texto)", () => {
     expect(com(reprovam({ gancho: "Não é calcário, é sabão seco: o box da Neusa em 5 minutos.", fontes }), "R-COPY-26")).toBe(false);
   });
 
+  it("onda 2: a muleta de abertura do corpo e o fecho com pergunta de confirmação reprovam na 1ª e viram aviso na 2ª", () => {
+    const muleta = { corpo: "Cara, é o seguinte: o box da Neusa tinha calcário de três anos." };
+    const fecho = { fechamento: "O box da Neusa ficou limpo em cinco minutos, sabe? Foi o rodo." };
+    for (const texto of [muleta, fecho]) {
+      expect(com(reprovam(texto), "R-COPY-26")).toBe(true);
+      const r2 = verificarRegrasCopyRoteiro(entrada({ ...texto, tentativa: 2 }));
+      expect(com(r2.reprovam, "R-COPY-26")).toBe(false);
+      expect(com(r2.avisos, "R-COPY-26")).toBe(true);
+    }
+    expect(reprovam(muleta).join(" ")).toContain("muleta de abertura");
+    expect(reprovam(fecho).join(" ")).toContain("pergunta de confirmação");
+  });
+
+  it("onda 2: o reaviso do meio do corpo e a pergunta com objeto não reprovam", () => {
+    expect(com(reprovam({ corpo: "O box estava opaco. Olha só o que muda agora: o rodo vai de cima para baixo." }), "R-COPY-26")).toBe(false);
+    expect(com(reprovam({ fechamento: "Faz sentido para o seu box? Me chama no WhatsApp." }), "R-COPY-26")).toBe(false);
+    // Ajuste da segunda opinião sobre o #300: o apontar da câmera no começo do corpo passa; com pontuação logo depois, reprova.
+    expect(com(reprovam({ corpo: "Olha só a diferença no box da Neusa: antes opaco, depois brilhando." }), "R-COPY-26")).toBe(false);
+    expect(com(reprovam({ corpo: "Olha só: o box da Neusa tinha calcário de três anos." }), "R-COPY-26")).toBe(true);
+  });
+
   it("R-COPY-28 e R-COPY-29 só avisam, nunca reprovam", () => {
     const a = verificarRegrasCopyRoteiro(entrada({ corpo: "Molhe o vidro. Passe o rodo. Pronto. Sai tudo com 10x menos esforço." }));
     expect(com(a.avisos, "R-COPY-28")).toBe(true);
     expect(com(a.avisos, "R-COPY-29")).toBe(true);
     expect(com(a.reprovam, "R-COPY-28") || com(a.reprovam, "R-COPY-29")).toBe(false);
+  });
+});
+
+describe("onda 2, consertos da prova com chave (27/11/2026)", () => {
+  const SEM_NUMERO = {
+    gancho: "Tire a mancha do vidro sem esfregar nada.",
+    corpo: "Uma paciente perguntou se o clareamento dói. Molhe o vidro com vinagre. Deixe agir um pouco. Passe o rodo e pronto.",
+  };
+  it("R-COPY-08 em saúde: sem número nem nome próprio não reprova; fora da saúde continua reprovando", () => {
+    expect(com(reprovam({ ...SEM_NUMERO, ramoSaude: true }), "R-COPY-08")).toBe(false);
+    expect(com(reprovam({ ...SEM_NUMERO, ramoSaude: false }), "R-COPY-08")).toBe(true);
+  });
+  it("R-COPY-08 em saúde: o superlativo continua barrado", () => {
+    expect(com(reprovam({ ...SEM_NUMERO, corpo: SEM_NUMERO.corpo + " Somos o melhor do mercado.", ramoSaude: true }), "R-COPY-08")).toBe(true);
+  });
+  it("colchete no gancho reprova na 1ª e na 2ª tentativa, com o motivo de reescrever sem colchete", () => {
+    const g = { gancho: "Quantos pacientes você atende por semana? [o número real de pacientes por semana]" };
+    const r1 = reprovam({ ...g, tentativa: 1 });
+    expect(com(r1, "R-ROTEIRO-01")).toBe(true);
+    expect(r1.find((m) => m.startsWith("R-ROTEIRO-01"))).toContain("o gancho nunca leva colchete");
+    expect(com(reprovam({ ...g, tentativa: 2 }), "R-ROTEIRO-01")).toBe(true);
+  });
+  it("colchete no corpo continua permitido", () => {
+    expect(com(reprovam({ corpo: BOM.corpo + " Como foi [o caso de um cliente que...]?" }), "R-ROTEIRO-01")).toBe(false);
+  });
+});
+
+describe("colchete no gancho: o marcador dos testes com a IA simulada não conta", () => {
+  it("'[mock:...]' no gancho não reprova", () => {
+    expect(com(reprovam({ gancho: "Em 5 minutos: [mock:numero-fora-das-fontes]" }), "R-ROTEIRO-01")).toBe(false);
+    expect(com(reprovam({ gancho: "Em 5 minutos [notas 9.1 8.2 7.6]" }), "R-ROTEIRO-01")).toBe(false);
   });
 });

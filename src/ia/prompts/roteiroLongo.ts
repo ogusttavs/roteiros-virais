@@ -66,7 +66,10 @@ import {
  */
 /** 1.7.0 (onda 1 de texto, 25/11/2026): o bloco de regras de texto do roteiro longo traz `R-COPY-26` e `R-COPY-27` e a `R-COPY-19` nova (seção 11 das rubricas 1.3.0). O schema não muda. */
 /** 1.8.0 (25/11/2026, decisão do Gustavo): a regra dura 9 ganha a cena que prova em ramo de saúde e proíbe sugerir gravar o procedimento em andamento; `R-CONF-07` 1.4.0 proíbe preço e grátis em saúde. O schema não muda. */
-export const versao = "1.8.0";
+/** 1.9.0 (onda 2 de texto, 26/11/2026): o bloco de regras de texto do roteiro longo traz `R-COPY-30` (caso concreto) e `R-COPY-31` (ponte do gancho de fora do ramo), das rubricas 1.5.0; `R-ROTEIRO-21` (a lente) não entra no longo. O schema não muda. */
+/** 1.10.0 (26/11/2026, ajustes da segunda opinião sobre a onda 2, rubricas 1.6.0): a `R-COPY-30` ganha o limite de saúde (o caso é a dúvida do paciente ou a cena do atendimento, nunca número de resultado nem prazo) e a `R-COPY-31` não repete o elemento do ramo do gancho e, em saúde, traz a pessoa pública só pelo assunto. O schema não muda. */
+/** 1.11.0 (27/11/2026, consertos da prova com chave da onda 2): o bloco de regras de texto traz a nota de saúde (como `R-COPY-08` e `R-COPY-30` se cumprem juntas) e proíbe colchete no gancho. */
+export const versao = "1.11.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 

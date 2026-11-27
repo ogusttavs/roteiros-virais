@@ -27,12 +27,25 @@ describe("formulas-de-maquina: o que PEGA", () => {
     ["paralelismo-de-slogan", { corpo: "Sem dor, sem agulha, sem demora." }],
     ["revelacao-vazia", { gancho: "Descubra o jeito certo de lavar o sofá" }],
     ["revelacao-vazia", { titulo: "O que ninguém te conta sobre clareamento" }],
+    // Onda 2 (25/11/2026): o roteiro real que o Gustavo achou genérico.
+    ["contraste-negado", { fechamento: "O trailer não é o filme inteiro, é o pedaço que prova que vale assistir." }],
+    ["muleta-de-abertura", { corpo: "Cara, é o seguinte: o trailer mostra uma cena e para." }],
+    ["muleta-de-abertura", { corpo: "Olha só: o anúncio que andou foi outro." }],
+    ["muleta-de-abertura", { corpo: "Então, olha, a loja vendia pouco." }],
+    // Ajuste da segunda opinião sobre o #300 (26/11/2026): "olha só" com pontuação logo depois continua muleta.
+    ["muleta-de-abertura", { corpo: "Olha só, o box da Neusa tinha calcário de três anos." }],
+    ["muleta-de-abertura", { fechamento: "Bom, olha só: chama no direct." }],
+    ["muleta-de-abertura", { fechamento: "Seguinte: chama no direct." }],
+    ["fecho-de-confirmacao", { fechamento: "Tem que fazer sentido, sabe? O trailer prova que vale assistir." }],
+    ["fecho-de-confirmacao", { chamada: "Chama no direct, né?" }],
+    ["fecho-de-confirmacao", { fechamento: "É isso que muda a venda. Faz sentido?" }],
+    ["fecho-de-confirmacao", { chamada: "Manda o oi no zap, entendeu?" }],
   ];
   it.each(pega)("%s: %j", (familia, texto) => {
     expect(familias(texto)).toContain(familia);
   });
 
-  it("cobre as oito famílias da lista fechada", () => {
+  it("cobre as dez famílias da lista fechada", () => {
     expect(new Set(pega.map(([f]) => f))).toEqual(new Set(FAMILIAS_DE_FORMULA.map((f) => f.id)));
   });
 
@@ -81,6 +94,19 @@ describe("formulas-de-maquina: o que NÃO pode pegar", () => {
     ["'menos A, mais B' no meio da frase", { corpo: "Se usar menos sabão, mais fácil fica enxaguar." }],
     ["'conheça' apresenta alguém", { gancho: "Conheça a Ana, nossa nova recepcionista." }],
     ["'você sabia que' com fato concreto", { gancho: "Você sabia que água sanitária mancha roupa colorida?" }],
+    // Onda 2: a muleta só vale no começo do bloco, o reaviso do meio é pedido pela R-ROTEIRO-10.
+    ["'olha o que muda agora' no meio do corpo", { corpo: "O cliente chegou com a loja parada. Olha só o que muda agora: a página passou a mostrar o produto em uso." }],
+    ["'o seguinte' como adjetivo", { corpo: "O seguinte cliente chegou com a mesma dúvida, e a resposta foi a mesma." }],
+    ["'seguinte' como parte da frase", { corpo: "No dia seguinte a loja vendeu três." }],
+    ["'faz sentido' com objeto", { fechamento: "Faz sentido para o seu caso? Me chama no WhatsApp." }],
+    ["'quem sabe?' no meio", { fechamento: "Quem sabe? Só testando." }],
+    ["'sabe' como verbo", { fechamento: "Quem sabe quanto custa fala com o cliente primeiro." }],
+    ["muleta fora de corpo e fecho, no gancho", { gancho: "Olha só o que a loja fez." }],
+    // Ajuste da segunda opinião sobre o #300: "olha só" seguido de palavra no começo do corpo é o apontar da câmera do antes e depois.
+    ["'olha só a diferença' no começo do corpo", { corpo: "Olha só a diferença no box da Neusa: antes opaco, depois brilhando." }],
+    ["'então, olha só o antes' no começo do corpo", { corpo: "Então, olha só o antes e depois do sofá da Dona Lúcia." }],
+    ["'olha o rejunte' no começo do corpo", { corpo: "Olha o rejunte depois da primeira passada." }],
+    ["pergunta de confirmação no corpo (só vale no fecho)", { corpo: "A venda subiu, sabe? Foi a foto." }],
     ["revelação com algarismo", { gancho: "Você sabia que 7 em cada 10 manchas de sofá vêm de bebida?" }],
   ];
   it.each(naoPega)("%s", (_nome, texto, fontes) => {

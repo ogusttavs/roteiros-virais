@@ -28,14 +28,14 @@ const CAMINHO_GERADO = path.resolve(process.cwd(), "src/ia/prompts/regras-copy-r
 const TRAVESSOES = [String.fromCharCode(0x2013), String.fromCharCode(0x2014)];
 const QUEBRA = String.fromCharCode(10);
 
-describe("a tabela gerada das 59 regras (seção 11)", () => {
-  it("tem 29 R-COPY, 20 R-ROTEIRO e 10 R-CONF, sem número repetido", () => {
+describe("a tabela gerada das 62 regras (seção 11)", () => {
+  it("tem 31 R-COPY, 21 R-ROTEIRO e 10 R-CONF, sem número repetido", () => {
     const por = (g: string) => REGRAS_COPY_ROTEIRO.filter((r) => r.grupo === g).length;
-    expect(REGRAS_COPY_ROTEIRO).toHaveLength(59);
-    expect(por("COPY")).toBe(29);
-    expect(por("ROTEIRO")).toBe(20);
+    expect(REGRAS_COPY_ROTEIRO).toHaveLength(62);
+    expect(por("COPY")).toBe(31);
+    expect(por("ROTEIRO")).toBe(21);
     expect(por("CONF")).toBe(10);
-    expect(NUMEROS_REGRAS_COPY_ROTEIRO.size).toBe(59);
+    expect(NUMEROS_REGRAS_COPY_ROTEIRO.size).toBe(62);
   });
 
   it("o arquivo gerado tem versão (o checar-versao-prompt exige quando ele muda) e ela é a do gerador", () => {
@@ -100,7 +100,7 @@ describe("o gerador (lógica pura)", () => {
   });
 
   it("recusa quantidade diferente da esperada", () => {
-    expect(() => lerTabelaDaSecao11(doc([linha("R-COPY-01")]))).toThrow(/R-COPY: esperava 29/);
+    expect(() => lerTabelaDaSecao11(doc([linha("R-COPY-01")]))).toThrow(/R-COPY: esperava 31/);
   });
 
   it("recusa linha com número de colunas errado", () => {
@@ -113,21 +113,21 @@ describe("o gerador (lógica pura)", () => {
 
   it("lê só a seção 11 (para na próxima de nível 2) e normaliza força e coluna de conferência", () => {
     const todas = [
-      ...Array.from({ length: 29 }, (_, i) => linha(`R-COPY-${String(i + 1).padStart(2, "0")}`)),
-      ...Array.from({ length: 20 }, (_, i) => linha(`R-ROTEIRO-${String(i + 1).padStart(2, "0")}`)),
+      ...Array.from({ length: 31 }, (_, i) => linha(`R-COPY-${String(i + 1).padStart(2, "0")}`)),
+      ...Array.from({ length: 21 }, (_, i) => linha(`R-ROTEIRO-${String(i + 1).padStart(2, "0")}`)),
       ...Array.from({ length: 10 }, (_, i) => linha(`R-CONF-${String(i + 1).padStart(2, "0")}`, "forte (lei)")),
     ];
     const regras = lerTabelaDaSecao11(doc(todas));
-    expect(regras).toHaveLength(59);
+    expect(regras).toHaveLength(62);
     expect(regras[0]).toMatchObject({ numero: "R-COPY-01", forca: "media", conferePorCodigo: "sim", grupo: "COPY" });
-    expect(regras[58]).toMatchObject({ numero: "R-CONF-10", forca: "forte" });
+    expect(regras[61]).toMatchObject({ numero: "R-CONF-10", forca: "forte" });
   });
 });
 
 describe("o que o prompt recebe", () => {
   it("só as de força forte e média entram; as de indício ficam fora", () => {
     const entram = regrasQueEntramNoPrompt();
-    expect(entram).toHaveLength(32);
+    expect(entram).toHaveLength(35);
     expect(entram.every((r) => r.forca !== "indicio")).toBe(true);
     const texto = textoRegrasCopyRoteiro();
     expect(texto).toContain("R-ROTEIRO-05");
@@ -308,5 +308,66 @@ describe("E59: R-ROTEIRO-20 e R-CONF-10 na tabela e no prompt", () => {
     expect(longo).toContain("R-CONF-10");
     expect(longo).not.toContain("R-ROTEIRO-20");
     for (const proibido of ["R-IG-REEL-06", "R-TT-VIDEO-06"]) expect(textoRegrasCopyRoteiro("curto").includes(proibido), proibido).toBe(false);
+  });
+});
+
+describe("onda 2, ajustes da segunda opinião sobre o #300 (rubricas 1.6.0, roteiro 2.28.0)", () => {
+  const porNumero = new Map(REGRAS_COPY_ROTEIRO.map((r) => [r.numero, r]));
+  const curto = textoRegrasCopyRoteiro("curto");
+  const longo = textoRegrasCopyRoteiro("longo");
+  const linhaDe = (texto: string, numero: string) => texto.split(QUEBRA).find((l) => l.startsWith(`${numero} (`)) ?? "";
+
+  it("R-ROTEIRO-21: a lente não é obrigatória em dica, tutorial ou opinião (só a 3 ou nenhuma), e só o curto a recebe", () => {
+    const r21 = linhaDe(curto, "R-ROTEIRO-21");
+    expect(r21).toContain("A exceção é dica, tutorial ou opinião: aí a lente não é obrigatória; use só a (3) ou nenhuma");
+    expect(r21).toContain("sem transformar a dica em história");
+    expect(longo).not.toContain("R-ROTEIRO-21");
+  });
+
+  it("R-ROTEIRO-21: a lente 5 fala com quem assiste, na segunda pessoa, e nunca com \"todo mundo\"", () => {
+    const r21 = linhaDe(curto, "R-ROTEIRO-21");
+    expect(r21).toContain("a ideia errada que quem assiste costuma ter, dita a ele (\"você talvez ache que...\", nunca \"todo mundo acha\")");
+    expect(r21).not.toContain("a ideia errada que todo mundo tem");
+  });
+
+  it("R-ROTEIRO-21: em saúde, o desfecho das lentes de virada é a decisão ou o cuidado, nunca o resultado clínico", () => {
+    const r21 = linhaDe(curto, "R-ROTEIRO-21");
+    expect(r21).toContain("Em ramo de saúde (`R-CONF-07`), o desfecho das lentes de virada, a (1), a (4) e a (6), é a decisão ou o cuidado");
+    expect(r21).toContain("nunca o resultado clínico nem o depoimento do paciente");
+  });
+
+  it("R-COPY-30: em saúde, o caso é a dúvida do paciente ou a cena do atendimento, nunca número de resultado nem prazo (curto e longo)", () => {
+    for (const texto of [curto, longo]) {
+      const r30 = linhaDe(texto, "R-COPY-30");
+      expect(r30).toContain("Em ramo de saúde (`R-CONF-07`), o caso é a dúvida que um paciente trouxe ou uma cena do atendimento fora do procedimento");
+      expect(r30).toContain("nunca número de resultado nem prazo de tratamento");
+      expect(r30).toContain("\"[a dúvida que um paciente trouxe...]\"");
+    }
+  });
+
+  it("R-COPY-31: a ponte não repete o elemento do ramo da R-COPY-27, e a R-COPY-27 está à vista no prompt (curto e longo)", () => {
+    for (const texto of [curto, longo]) {
+      const r31 = linhaDe(texto, "R-COPY-31");
+      expect(r31).toContain("A ponte traz esse fato novo e não repete o elemento do ramo que o gancho já tem por `R-COPY-27`");
+      expect(linhaDe(texto, "R-COPY-27")).not.toBe("");
+    }
+  });
+
+  it("R-COPY-31: em saúde, a pessoa pública entra só pelo assunto, nunca como resultado comparável (curto e longo)", () => {
+    for (const texto of [curto, longo]) {
+      const r31 = linhaDe(texto, "R-COPY-31");
+      expect(r31).toContain("Em ramo de saúde (`R-CONF-07`), a pessoa pública entra só pelo assunto");
+      expect(r31).toContain("nunca como exemplo de resultado que o paciente também teria");
+    }
+  });
+
+  it("R-COPY-26: o exemplo da muleta é \"olha só:\", com a pontuação que o detector exige", () => {
+    expect(porNumero.get("R-COPY-26")?.texto).toContain("(\"cara, é o seguinte\", \"olha só:\")");
+  });
+
+  it("as três regras citam a R-CONF-07, que o prompt mostra (o parêntese não some)", () => {
+    expect(numerosVisiveisNoPrompt().has("R-CONF-07")).toBe(true);
+    expect(numerosVisiveisNoPrompt().has("R-COPY-27")).toBe(true);
+    for (const n of ["R-ROTEIRO-21", "R-COPY-30", "R-COPY-31"]) expect(porNumero.get(n)?.texto, n).toContain("`R-CONF-07`");
   });
 });

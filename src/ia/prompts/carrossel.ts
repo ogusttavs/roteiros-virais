@@ -13,7 +13,8 @@ import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, 
  * do ramo, a evidência do banco, as regras de copy e de conformidade); o que muda é a forma. Quem confere o resultado é `carrossel/regras.ts` (limites por tipo, ordem, números e fonte) mais o verificador
  * de texto de sempre (`gerarComVerificacao`). A foto de cada slide é do cliente, enviada por ele; o texto só diz onde uma foto faria sentido, nunca descreve uma imagem para gerar.
  */
-export const versao = "2.2.0";
+/** 2.3.0 (27/11/2026, consertos da prova com chave da onda 2): o bloco de regras de texto traz a nota de saúde (como `R-COPY-08` e `R-COPY-30` se cumprem juntas) e proíbe colchete no gancho e, no escopo "semfala", deixa de trazer `R-COPY-30` e `R-COPY-31`. */
+export const versao = "2.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -135,7 +136,7 @@ A legenda é o texto do post: até ${LIMITE_DA_LEGENDA_PALAVRAS} palavras, em co
 
 Quando a entrada trouxer evidência (vídeos de outras pessoas que renderam bem), use só o JEITO de contar (a ordem, o tipo de promessa, a forma de abrir), nunca o assunto deles como fato do cliente, e devolva em evidencias os ids que de fato usou. Sem evidência, devolva evidencias vazio e não cite nenhum id.
 
-${textoRegrasCopyRoteiro("longo")}
+${textoRegrasCopyRoteiro("semfala")}
 Neste carrossel, onde as regras de texto falam de fala, gancho e chamada, valem para o texto dos slides: o gancho é a capa, a chamada final é o último slide.
 
 Perfil do cliente:
