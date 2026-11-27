@@ -2,12 +2,15 @@ import { iniciaisDe } from "@/lib/iniciais";
 import { textosConta } from "@/textos/conta";
 import { Cartao } from "@/ui/componentes/Cartao";
 
+import { DarAcessoDaEmpresa, TirarAcessoDaEmpresa } from "./GrupoDaConta";
 import styles from "./QuemTemAcesso.module.css";
 
 type Props = {
   nomeMarca: string;
-  membros: { usuarioId: string; nome: string; email: string }[];
+  membros: { usuarioId: string; nome: string; email: string; papel?: "dono" | "membro" }[];
   usuarioIdAtual: string;
+  /** Convite de grupo: a empresa ativa é do grupo e quem olha é a dona dela, então o rodapé vira o campo de dar acesso e cada membro ganha "Tirar acesso". */
+  donoDoGrupo?: boolean;
 };
 
 /**
@@ -15,7 +18,7 @@ type Props = {
  * quem tem acesso é gerenciado pelo admin (item 5, "Dar acesso"/"Tirar o
  * acesso"). Aqui o cliente só vê quem mais entra na marca ativa.
  */
-export function QuemTemAcesso({ nomeMarca, membros, usuarioIdAtual }: Props) {
+export function QuemTemAcesso({ nomeMarca, membros, usuarioIdAtual, donoDoGrupo = false }: Props) {
   const t = textosConta.acessos;
   const umaPessoaSo = membros.length <= 1;
 
@@ -50,12 +53,13 @@ export function QuemTemAcesso({ nomeMarca, membros, usuarioIdAtual }: Props) {
                 </span>
                 <span className={styles.email}>{membro.email}</span>
               </span>
+              {donoDoGrupo && membro.papel !== "dono" ? <TirarAcessoDaEmpresa usuarioId={membro.usuarioId} /> : null}
             </li>
           ))}
         </ul>
       </div>
 
-      <p className={styles.peAcessos}>{t.rodape}</p>
+      {donoDoGrupo ? <DarAcessoDaEmpresa /> : <p className={styles.peAcessos}>{t.rodape}</p>}
     </Cartao>
   );
 }

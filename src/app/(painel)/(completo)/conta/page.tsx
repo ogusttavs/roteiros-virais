@@ -10,6 +10,7 @@ import { garantirBriefing } from "@/servicos/briefing";
 import { marcaEhDeSaude } from "@/servicos/carrossel";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { candidatasDaMarca, contaLigadaDaMarca, ehDonoDaMarca as ehDonoParaInstagram, ligacaoDisponivel } from "@/servicos/conta-conectada";
+import { ehDonoDeEmpresaDoGrupo, situacaoDasEmpresas } from "@/servicos/convite-de-grupo";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
@@ -21,6 +22,7 @@ import { AvisoDeManha } from "./AvisoDeManha";
 import { BotaoSair } from "./BotaoSair";
 import { BriefingLinha } from "./BriefingLinha";
 import { FormularioConta } from "./FormularioConta";
+import { SuasEmpresas } from "./GrupoDaConta";
 import { InformacoesDoAparelhoAdmin } from "./InformacoesDoAparelhoAdmin";
 import { InstalarNoCelular } from "./InstalarNoCelular";
 import { LinkPostPronto } from "./LinkPostPronto";
@@ -49,6 +51,9 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
   const onde = cliente ? dadosOndeIniciais(cliente) : null;
   const membros = cliente ? await membrosDaMarca(cliente.id) : [];
   const briefing = cliente ? await garantirBriefing(cliente.id) : null;
+  // Convite de grupo: no "ver como" nada disto aparece (quem olha é o admin, não a pessoa).
+  const empresasDoGrupo = sessao.verComo ? null : await situacaoDasEmpresas(sessao.user.id);
+  const donoDoGrupo = cliente && !sessao.verComo ? await ehDonoDeEmpresaDoGrupo(sessao.user.id, cliente.id) : false;
   const ramoAtual = await ramoAtualDoCliente(cliente?.nichoId);
   const pedidoAberto = cliente ? await pedidoAbertoDaMarca(cliente.id) : null;
   const alternativos = cliente ? await ramosAlternativosDaMarca(cliente.id) : [];
@@ -123,9 +128,10 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
         ) : null}
       </div>
       {cliente ? (
-        <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
+        <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} donoDoGrupo={donoDoGrupo} />
       ) : null}
       <div className={styles.colunaPrincipal}>
+        {empresasDoGrupo ? <SuasEmpresas usadas={empresasDoGrupo.usadas} maximo={empresasDoGrupo.maximo} /> : null}
         {mostrarAssinatura && situacaoAssinatura ? <SuaAssinatura situacao={situacaoAssinatura} dono={donoDaMarca} verComo={sessao.verComo !== null} /> : null}
         {visaoInstagram ? <SeuInstagram visao={visaoInstagram} /> : null}
         {/* E56 PR 2: a entrada de "Publicar post pronto" (com a chave aberta, o Instagram ligado e a dona da marca fora do "ver como"). */}
