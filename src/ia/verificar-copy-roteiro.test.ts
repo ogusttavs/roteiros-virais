@@ -621,5 +621,6 @@ describe("onda 2, consertos da prova com chave (27/11/2026)", () => {
 describe("colchete no gancho: o marcador dos testes com a IA simulada não conta", () => {
   it("'[mock:...]' no gancho não reprova", () => {
     expect(com(reprovam({ gancho: "Em 5 minutos: [mock:numero-fora-das-fontes]" }), "R-ROTEIRO-01")).toBe(false);
+    expect(com(reprovam({ gancho: "Em 5 minutos [notas 9.1 8.2 7.6]" }), "R-ROTEIRO-01")).toBe(false);
   });
 });
