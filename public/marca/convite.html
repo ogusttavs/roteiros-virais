@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convite Klaki</title>
+<meta name="description" content="Um convite para você usar o Klaki: todo dia, o roteiro pronto para você gravar no celular.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Klaki">
+<meta property="og:title" content="Um convite para você usar o Klaki">
+<meta property="og:description" content="Todo dia, o roteiro pronto para você gravar no celular. Crie o seu acesso e cadastre a sua empresa.">
+<meta property="og:url" content="https://klaki.app/convite">
+<meta property="og:image" content="https://klaki.app/marca/previa-convite.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Convite para o Klaki: você aparece, o resto é com a gente">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f7f7f5">
+<!--
+  A porta do convite para o WhatsApp (27/11/2026), igual ao convite do OdontoTech (odontotech.app/primeiros):
+  uma página estática, com as etiquetas da prévia no começo do arquivo, que leva a pessoa ao convite de verdade
+  (/convite/<código>) pelo parâmetro ?c=. O WhatsApp não roda o script, só lê as etiquetas. O nome e o endereço
+  estão escritos aqui, como nas imagens de prévia: se mudarem, este arquivo muda junto.
+-->
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f7f7f5; color: #0c0c0e;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 18px; line-height: 1.5; }
+  main { max-width: 480px; padding: 32px 24px; }
+  h1 { font-size: 28px; line-height: 1.15; margin: 0 0 8px; }
+  p { margin: 0 0 24px; color: #4a4a50; }
+  a { display: inline-block; padding: 14px 24px; border-radius: 12px; background: #0c0c0e; color: #ffffff; text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <div id="abrindo">
+    <h1>Abrindo o seu convite</h1>
+    <p>Se nada acontecer, toque no link do convite de novo.</p>
+  </div>
+  <div id="incompleto" hidden>
+    <h1>Este link está incompleto</h1>
+    <p>Peça um novo a quem te mandou.</p>
+    <a href="/entrar">Entrar</a>
+  </div>
+</main>
+<script>
+  (function () {
+    var codigo = new URLSearchParams(window.location.search).get("c") || "";
+    if (/^[A-Za-z0-9_-]{20,128}$/.test(codigo)) {
+      window.location.replace("/convite/" + codigo);
+    } else {
+      document.getElementById("abrindo").hidden = true;
+      document.getElementById("incompleto").hidden = false;
+    }
+  })();
+</script>
+</body>
+</html>
