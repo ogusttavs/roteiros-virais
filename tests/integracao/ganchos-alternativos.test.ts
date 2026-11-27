@@ -26,7 +26,7 @@ vi.mock("@/lib/ver-como", async (importOriginal) => {
 });
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, geracoesIA, membrosMarca, nichos, roteiros, user, type ConteudoRoteiro, type PerfilCompilado, type TipoAbertura } from "@/db/schema";
+import { briefings, clientes, geracoesIA, membrosMarca, nichos, perfisAnalisados, roteiros, user, type ConteudoRoteiro, type PerfilCompilado, type TipoAbertura } from "@/db/schema";
 import * as cliente from "@/ia/cliente";
 import { versao as versaoDoPrompt } from "@/ia/prompts/ganchosAlternativos";
 import * as verificador from "@/ia/verificador";
@@ -140,16 +140,27 @@ afterAll(async () => {
 });
 
 describe("pedir os ganchos alternativos", () => {
-  it("1.12.0: manda `fontesDaMarca` só com o perfil e o tema, sem o texto do roteiro (da IA) que vai nas `fontesDosFatos`", async () => {
-    const r = await novoRoteiro(marcaA);
-    vi.mocked(verificador.gerarComVerificacao).mockClear();
-    await pedirGanchosAlternativos(marcaA, r.id, AGORA);
-    const [params] = vi.mocked(verificador.gerarComVerificacao).mock.calls.filter(([p]) => p.tarefa === "ganchosAlternativos").at(-1)!;
-    expect(String(params.fontesDosFatos)).toContain(GANCHO_ORIGINAL);
-    expect(params.fontesDaMarca).toContain("lava sofá a seco em Campinas");
-    expect(params.fontesDaMarca).toContain("Tema: tirar mancha de café do sofá");
-    expect(params.fontesDaMarca).not.toContain(GANCHO_ORIGINAL);
-    expect(params.fontesDaMarca).not.toContain("O roteiro (o que o vídeo diz)");
+  it("1.12.0: `fontesDaMarca` leva o perfil e o tema; o texto do roteiro (da IA), a referência favoritada e a leitura de concorrente ficam nas `fontesDosFatos` e fora dela", async () => {
+    const GANCHO_FAVORITADO = "Minha cliente chegou chorando com a mancha de vinho no sofá novo";
+    const LEITURA = "Esse perfil mostra um casal desesperado com o estofado manchado";
+    await db().update(briefings).set({ perfil: { ...perfil, referencias: [`mancha de vinho: ${GANCHO_FAVORITADO}`] } }).where(eq(briefings.clienteId, marcaA));
+    await db().insert(perfisAnalisados).values({ clienteId: marcaA, origem: "citado", rede: "instagram", handle: "@outro.limpeza", leitura: LEITURA });
+    try {
+      const r = await novoRoteiro(marcaA);
+      vi.mocked(verificador.gerarComVerificacao).mockClear();
+      await pedirGanchosAlternativos(marcaA, r.id, AGORA);
+      const [params] = vi.mocked(verificador.gerarComVerificacao).mock.calls.filter(([p]) => p.tarefa === "ganchosAlternativos").at(-1)!;
+      for (const deOutro of [GANCHO_ORIGINAL, GANCHO_FAVORITADO, LEITURA]) {
+        expect(String(params.fontesDosFatos)).toContain(deOutro);
+        expect(params.fontesDaMarca).not.toContain(deOutro);
+      }
+      expect(params.fontesDaMarca).not.toContain("O roteiro (o que o vídeo diz)");
+      expect(params.fontesDaMarca).toContain("lava sofá a seco em Campinas");
+      expect(params.fontesDaMarca).toContain("Tema: tirar mancha de café do sofá");
+    } finally {
+      await db().update(briefings).set({ perfil }).where(eq(briefings.clienteId, marcaA));
+      await db().delete(perfisAnalisados).where(eq(perfisAnalisados.clienteId, marcaA));
+    }
   });
 
   it("devolve de 3 a 5 ganchos, de tipos diferentes entre si e do original, cada um com tipo e emoção, na ordem do modelo", async () => {

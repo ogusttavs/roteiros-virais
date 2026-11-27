@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, contas, geracoesIA, modelosNicho, nichos, roteiros, user, videos, type AnaliseVideoLonga, type ModeloNicho } from "@/db/schema";
+import { briefings, clientes, contas, geracoesIA, modelosNicho, nichos, perfisAnalisados, roteiros, user, videos, type AnaliseVideoLonga, type ModeloNicho } from "@/db/schema";
 import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
 import { versao as versaoLongo } from "@/ia/prompts/roteiroLongo";
@@ -383,26 +383,54 @@ describe("o roteiro longo escrito", () => {
 });
 
 describe("1.12.0: as fontes da marca que chegam ao verificador (só o que a pessoa escreveu ou confirmou)", () => {
-  it("o curto manda `fontesDaMarca` com o perfil e o tema, sem a evidência de outros vídeos que as `fontesDosFatos` trazem", async () => {
+  const GANCHO_FAVORITADO = "Minha cliente chegou chorando com a mancha de vinho no sofá novo";
+  const LEITURA_DE_CONCORRENTE = "Esse perfil mostra um casal desesperado com o estofado manchado";
+
+  /** O que é de terceiros e mora dentro do perfil e da camada: a referência favoritada e a leitura de um concorrente (escrita pela IA). Desfeito no `finally`. */
+  async function comDeTerceiros(corpo: () => Promise<void>) {
+    const [antes] = await db().select().from(briefings).where(eq(briefings.clienteId, clienteId));
+    await db()
+      .update(briefings)
+      .set({ perfil: { ...(antes.perfil as object), referencias: [`mancha de vinho: ${GANCHO_FAVORITADO}`] } as never })
+      .where(eq(briefings.clienteId, clienteId));
+    await db().insert(perfisAnalisados).values({ clienteId, origem: "citado", rede: "instagram", handle: "@outro.limpeza", leitura: LEITURA_DE_CONCORRENTE });
+    try {
+      await corpo();
+    } finally {
+      await db().update(briefings).set({ perfil: antes.perfil }).where(eq(briefings.clienteId, clienteId));
+      await db().delete(perfisAnalisados).where(eq(perfisAnalisados.clienteId, clienteId));
+    }
+  }
+
+  it("o curto: o perfil e o tema entram; a evidência, a referência favoritada e a leitura de concorrente ficam nas `fontesDosFatos` e fora das da marca", async () => {
     await medirORamo();
     await semearCurto(TEMA);
-    await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
-    const [params] = chamadasDoCurto()[chamadasDoCurto().length - 1];
-    expect(String(params.fontesDosFatos)).toContain("olha essa mancha saindo do estofado");
-    expect(params.fontesDaMarca).toContain("produtos de limpeza");
-    expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
-    expect(params.fontesDaMarca).not.toContain("olha essa mancha saindo do estofado");
-    expect(params.fontesDaMarca).not.toContain("Evidência");
+    await comDeTerceiros(async () => {
+      await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
+      const chamadas = chamadasDoCurto();
+      const [params] = chamadas[chamadas.length - 1];
+      for (const deOutro of ["olha essa mancha saindo do estofado", GANCHO_FAVORITADO, LEITURA_DE_CONCORRENTE]) {
+        expect(String(params.fontesDosFatos)).toContain(deOutro);
+        expect(params.fontesDaMarca).not.toContain(deOutro);
+      }
+      expect(params.fontesDaMarca).toContain("produtos de limpeza");
+      expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
+    });
   });
 
-  it("o longo manda `fontesDaMarca` com o perfil e o tema, sem a evidência", async () => {
+  it("o longo: a referência favoritada e a leitura de concorrente (a evidência do longo é sempre vazia) estão nas `fontesDosFatos` e não nas da marca", async () => {
     await medirORamo();
-    await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
-    const { params } = ultimaChamadaDoLongo();
-    expect(params.fontesDaMarca).toContain("produtos de limpeza");
-    expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
-    expect(params.fontesDaMarca).not.toContain("Evidência");
-    expect(params.fontesDaMarca).not.toMatch(/Notícia|Dados da pesquisa|Marca citada/);
+    await comDeTerceiros(async () => {
+      await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
+      const { params } = ultimaChamadaDoLongo();
+      for (const deOutro of [GANCHO_FAVORITADO, LEITURA_DE_CONCORRENTE]) {
+        expect(String(params.fontesDosFatos)).toContain(deOutro);
+        expect(params.fontesDaMarca).not.toContain(deOutro);
+      }
+      expect(params.fontesDaMarca).toContain("produtos de limpeza");
+      expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
+      expect(params.fontesDaMarca).not.toMatch(/Evidência|Notícia|Dados da pesquisa|Marca citada/);
+    });
   });
 });
 

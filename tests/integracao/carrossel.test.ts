@@ -15,7 +15,7 @@ import { crc32, montarZip } from "@/carrossel/zip";
 import { TETO_DO_TESTE } from "@/config/cadastro";
 import { LINHA_FIXA_ANTES_DEPOIS_SAUDE, SEM_FOTO } from "@/config/carrossel";
 import { db, getPool } from "@/db";
-import { briefings, cadastrosProprios, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, ramosDaConta, user, videos, type PerfilCompilado } from "@/db/schema";
+import { briefings, cadastrosProprios, carrosselFotos, carrosseis, clientes, geracoesIA, nichos, noticias, perfisAnalisados, ramosDaConta, roteiros, user, videos, type PerfilCompilado } from "@/db/schema";
 import * as verificador from "@/ia/verificador";
 import { logger } from "@/lib/log";
 import { lerCorpoComTeto } from "@/lib/porta-do-carrossel";
@@ -111,6 +111,9 @@ afterAll(async () => {
 
 afterEach(async () => {
   await db().delete(carrosseis);
+  await db().delete(roteiros);
+  await db().delete(noticias);
+  await db().delete(perfisAnalisados);
   await db().delete(videos).where(eq(videos.nichoId, nichoId));
   delete process.env.CARROSSEL_ATIVO;
 });
@@ -118,17 +121,83 @@ afterEach(async () => {
 const pedidoLivre = (texto: string, quantidade = 7) => ({ quantidade, de: { origem: "tema" as const, texto } });
 
 describe("gerarCarrossel", () => {
-  it("1.12.0: manda `fontesDaMarca` só com o perfil, o tema e o pedido dela, sem a evidência que as `fontesDosFatos` trazem", async () => {
-    const clienteId = await criarCliente();
-    await criarVideo("ev-fontes-marca", "mancha de vinho no estofado");
-    vi.mocked(verificador.gerarComVerificacao).mockClear();
-    await gerarCarrossel(clienteId, pedidoLivre("mancha de vinho no estofado", 5));
-    const [params] = vi.mocked(verificador.gerarComVerificacao).mock.calls.filter(([p]) => p.tarefa === "carrossel").at(-1)!;
-    expect(String(params.fontesDosFatos)).toContain("olha essa mancha saindo do estofado");
-    expect(params.fontesDaMarca).toContain("lava estofados em domicilio");
-    expect(params.fontesDaMarca).toContain("Tema: mancha de vinho no estofado");
-    expect(params.fontesDaMarca).not.toContain("olha essa mancha saindo do estofado");
-    expect(params.fontesDaMarca).not.toContain("Evidência");
+  describe("1.12.0: `fontesDaMarca` é só o que a pessoa escreveu ou confirmou", () => {
+    const GANCHO_FAVORITADO = "Minha paciente chegou chorando com medo da anestesia";
+    const LEITURA_DE_CONCORRENTE = "Esse perfil mostra uma cliente chorando de medo antes da limpeza";
+
+    /** O que é de terceiros e mora dentro do perfil e da camada: a referência favoritada (gancho de outra conta) e a leitura de um concorrente (escrita pela IA). */
+    async function semearDeTerceiros(clienteId: number) {
+      await db()
+        .update(briefings)
+        .set({ perfil: { ...PERFIL, referencias: [`medo de dentista: ${GANCHO_FAVORITADO}`] } })
+        .where(eq(briefings.clienteId, clienteId));
+      await db().insert(perfisAnalisados).values({ clienteId, origem: "citado", rede: "instagram", handle: "@outro.dentista", leitura: LEITURA_DE_CONCORRENTE });
+    }
+
+    function ultimaChamada() {
+      const chamadas = vi.mocked(verificador.gerarComVerificacao).mock.calls.filter(([p]) => p.tarefa === "carrossel");
+      expect(chamadas.length).toBeGreaterThan(0);
+      return chamadas[chamadas.length - 1][0];
+    }
+
+    it("origem tema: o perfil, o tema e o pedido entram; a evidência, a referência favoritada e a leitura de concorrente ficam nas `fontesDosFatos` e fora das da marca", async () => {
+      const clienteId = await criarCliente();
+      await criarVideo("ev-fontes-marca", "mancha de vinho no estofado");
+      await semearDeTerceiros(clienteId);
+      vi.mocked(verificador.gerarComVerificacao).mockClear();
+      await gerarCarrossel(clienteId, { ...pedidoLivre("mancha de vinho no estofado", 5), observacao: "fale do preço" });
+      const params = ultimaChamada();
+      for (const deOutro of ["olha essa mancha saindo do estofado", GANCHO_FAVORITADO, LEITURA_DE_CONCORRENTE]) {
+        expect(String(params.fontesDosFatos)).toContain(deOutro);
+        expect(params.fontesDaMarca).not.toContain(deOutro);
+      }
+      expect(params.fontesDaMarca).toContain("lava estofados em domicilio");
+      expect(params.fontesDaMarca).toContain("Tema: mancha de vinho no estofado");
+      expect(params.fontesDaMarca).toContain("O que o cliente pediu: fale do preço");
+      expect(params.fontesDaMarca).not.toContain("Evidência");
+    });
+
+    it("origem notícia: o título da notícia (de terceiros) não entra nas fontes da marca", async () => {
+      const clienteId = await criarCliente();
+      const [n] = await db()
+        .insert(noticias)
+        .values({ nichoId, titulo: "Estofados de couro sintético ganham nova norma em março", url: "https://exemplo.invalido/n-fm", fonte: "Jornal da Cidade", publicadoEm: new Date(Date.now() - 86_400_000), resumo: "A norma vale para três tipos de estofado.", relevante: true })
+        .returning();
+      vi.mocked(verificador.gerarComVerificacao).mockClear();
+      await gerarCarrossel(clienteId, { quantidade: 5, de: { origem: "noticia", noticiaId: n.id } });
+      const params = ultimaChamada();
+      expect(String(params.fontesDosFatos)).toContain("Estofados de couro sintético ganham nova norma");
+      expect(params.fontesDaMarca).not.toContain("Estofados de couro sintético");
+      expect(params.fontesDaMarca).not.toContain("Notícia");
+      expect(params.fontesDaMarca).not.toContain("Tema:");
+      expect(params.fontesDaMarca).toContain("lava estofados em domicilio");
+    });
+
+    it("origem roteiro: o texto do roteiro de origem (da IA) não entra nas fontes da marca", async () => {
+      const clienteId = await criarCliente();
+      const [r] = await db()
+        .insert(roteiros)
+        .values({
+          clienteId,
+          data: "2026-11-25",
+          tema: "mancha de vinho no estofado",
+          origem: "livre",
+          objetivo: "alcance",
+          conteudo: { titulo: "Vinho no sofá", duracaoS: 30, gancho: "A taça virou e agora?", corpo: "Passe um pano úmido sem esfregar e aplique o neutro.", fechamento: "Em dez minutos some.", chamadaFinal: "Chame para um orçamento.", edicao: { textoNaTela: [], ritmoDeCorte: "", recursos: [], audio: "", referencia: null } } as never,
+          tipoAbertura: "fala_direta",
+          status: "gerado",
+          formato: "reels",
+          marcasDeFala: { blocos: [], avisos: [] } as never,
+        })
+        .returning();
+      vi.mocked(verificador.gerarComVerificacao).mockClear();
+      await gerarCarrossel(clienteId, { quantidade: 5, de: { origem: "roteiro", roteiroId: r.id } });
+      const params = ultimaChamada();
+      expect(String(params.fontesDosFatos)).toContain("Passe um pano úmido sem esfregar");
+      expect(params.fontesDaMarca).not.toContain("Passe um pano úmido sem esfregar");
+      expect(params.fontesDaMarca).not.toContain("Roteiro de origem");
+      expect(params.fontesDaMarca).toContain("Tema: mancha de vinho no estofado");
+    });
   });
 
   it.each([5, 7, 9])("gera %i slides: capa primeiro, chamada por último, nunca três iguais seguidos, e registra a geração", async (quantidade) => {

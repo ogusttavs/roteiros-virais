@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { pngDoCarrossel } from "@/carrossel/entrega";
 import { crc32 } from "@/carrossel/zip";
 import { db, getPool } from "@/db";
-import { briefings, carrosseis, clientes, geracoesIA, nichos, noticias, user, type PerfilCompilado } from "@/db/schema";
+import { briefings, carrosseis, clientes, geracoesIA, nichos, noticias, perfisAnalisados, user, type PerfilCompilado } from "@/db/schema";
 import * as verificador from "@/ia/verificador";
 import { criarCapa, criarCapaComTrava, titulosDaCapa, titulosDaCapaComTrava } from "@/servicos/capa-noticia";
 import { carrosselDaMarca, carrosseisDaMarca, enviarFoto, ErroCarrossel, gerarCarrossel } from "@/servicos/carrossel";
@@ -113,18 +113,25 @@ afterAll(async () => {
 afterEach(async () => {
   await db().delete(carrosseis);
   await db().delete(noticias);
+  await db().delete(perfisAnalisados);
 });
 
 describe("os títulos da capa", () => {
-  it("1.12.0: manda `fontesDaMarca` só com o perfil e a camada, sem a notícia nem o título dela (de terceiros)", async () => {
+  it("1.12.0: `fontesDaMarca` leva só o perfil e a camada; a notícia, a referência favoritada e a leitura de concorrente ficam nas `fontesDosFatos` e fora dela", async () => {
+    const GANCHO_FAVORITADO = "Minha paciente chegou chorando com medo do clareamento";
+    const LEITURA = "Esse perfil mostra uma paciente nervosa antes do clareamento";
     const clienteId = await criarCliente(nichoSaude);
     const noticiaId = await criarNoticia(nichoSaude);
+    await db().update(briefings).set({ perfil: { ...PERFIL, referencias: [`medo de dentista: ${GANCHO_FAVORITADO}`] } }).where(eq(briefings.clienteId, clienteId));
+    await db().insert(perfisAnalisados).values({ clienteId, origem: "citado", rede: "instagram", handle: "@outro.dentista", leitura: LEITURA });
     vi.mocked(verificador.gerarComVerificacao).mockClear();
     await titulosDaCapaComTrava(clienteId, noticiaId, async () => null);
     const [params] = vi.mocked(verificador.gerarComVerificacao).mock.calls.filter(([p]) => p.tarefa === "capaNoticia").at(-1)!;
-    expect(String(params.fontesDosFatos)).toContain("Clareamento dental com luz LED");
+    for (const deOutro of ["Clareamento dental com luz LED", GANCHO_FAVORITADO, LEITURA]) {
+      expect(String(params.fontesDosFatos)).toContain(deOutro);
+      expect(params.fontesDaMarca).not.toContain(deOutro);
+    }
     expect(params.fontesDaMarca).toContain("clinica odontologica de bairro");
-    expect(params.fontesDaMarca).not.toContain("Clareamento dental com luz LED");
     expect(params.fontesDaMarca).not.toMatch(/Notícia|Tema:/);
   });
 
