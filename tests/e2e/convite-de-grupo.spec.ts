@@ -1,5 +1,5 @@
 /**
- * Convite de grupo, de ponta a ponta pelas telas: abrir o link, criar o acesso e a primeira empresa, cair em /comecar e ver "Suas empresas" na Conta com "Criar outra empresa". Link
+ * Convite de grupo, de ponta a ponta pelas telas: abrir o link, criar o acesso e a primeira empresa, cair em /comecar e ir a "Suas empresas" pelo atalho e ver "Criar outra empresa". Link
  * usado ou inventado mostra a mesma frase, sem formulário. O código entra no banco com o mesmo hash que o servidor confere (a geração do código é provada em
  * `tests/integracao/convite-de-grupo.test.ts`).
  */
@@ -34,7 +34,7 @@ async function criarConvite(): Promise<string> {
   return codigo;
 }
 
-test("abrir o link, criar o acesso, cair em /comecar e ver Criar outra empresa na Conta", async ({ page, browser }) => {
+test("abrir o link, criar o acesso, cair em /comecar e ver Criar outra empresa em Suas empresas", async ({ page, browser }) => {
   const codigo = await criarConvite();
   const email = `${PREFIXO}@exemplo.teste`;
 
@@ -51,8 +51,10 @@ test("abrir o link, criar o acesso, cair em /comecar e ver Criar outra empresa n
 
   await expect(page).toHaveURL(/\/comecar/);
 
-  await page.goto("/conta");
-  await expect(page.getByRole("heading", { name: "Suas empresas" })).toBeVisible();
+  // A Conta fica atrás do briefing, e a empresa nova ainda não tem briefing: o dono vai pelo atalho do /comecar, que leva a /empresas (fora do portão do briefing).
+  await page.getByRole("link", { name: "Suas empresas e a equipe" }).click();
+  await expect(page).toHaveURL(/\/empresas/);
+  await expect(page.getByRole("heading", { name: "Suas empresas", exact: true })).toBeVisible();
   await expect(page.getByText("1 de 5")).toBeVisible();
   await expect(page.getByRole("button", { name: "Criar outra empresa" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Dar acesso" })).toBeVisible();
@@ -61,13 +63,15 @@ test("abrir o link, criar o acesso, cair em /comecar e ver Criar outra empresa n
   const contexto = await browser.newContext();
   const outra = await contexto.newPage();
   await outra.goto(`/convite/${codigo}`);
-  await expect(outra.getByText("Este link não vale mais. Peça um novo a quem te mandou.")).toBeVisible();
+  await expect(outra.getByRole("heading", { name: "Este link não vale mais" })).toBeVisible();
+  await expect(outra.getByText("Peça um novo a quem te mandou.")).toBeVisible();
   await expect(outra.getByLabel("Nome da empresa")).toHaveCount(0);
   await contexto.close();
 });
 
 test("link inventado mostra a mesma frase, sem formulário", async ({ page }) => {
   await page.goto(`/convite/${randomBytes(32).toString("base64url")}`);
-  await expect(page.getByText("Este link não vale mais. Peça um novo a quem te mandou.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Este link não vale mais" })).toBeVisible();
+  await expect(page.getByText("Peça um novo a quem te mandou.")).toBeVisible();
   await expect(page.getByLabel("Nome da empresa")).toHaveCount(0);
 });

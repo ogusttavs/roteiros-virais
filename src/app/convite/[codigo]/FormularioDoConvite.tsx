@@ -15,7 +15,12 @@ import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import { aceitarConviteAction } from "./acoes";
 
-type Textos = { pagina: typeof textosConviteDeGrupo.pagina; erros: typeof textosConviteDeGrupo.erros };
+type Textos = {
+  pagina: typeof textosConviteDeGrupo.pagina;
+  erros: typeof textosConviteDeGrupo.erros;
+  vazios: typeof textosConviteDeGrupo.vazios;
+  empresaInvalida: string;
+};
 type Campos = "nome" | "negocio" | "email" | "senha" | "aceite";
 type Erros = Partial<Record<Campos, string>>;
 
@@ -51,7 +56,15 @@ export function FormularioDoConvite({ codigo, textos }: { codigo: string; textos
         router.refresh();
         return;
       }
-      if (r.erros) setErros(r.erros);
+      if (r.erros) {
+        // O servidor só diz "inválido" para o campo vazio; a tela diz a frase de quem esqueceu de escrever, e o nome da empresa tem a frase própria.
+        const novos: Erros = { ...r.erros };
+        if (novos.nome && nome.trim() === "") novos.nome = textos.vazios.nome;
+        if (novos.negocio) novos.negocio = negocio.trim() === "" ? textos.vazios.empresa : textos.empresaInvalida;
+        if (novos.email && email.trim() === "") novos.email = textos.vazios.email;
+        if (novos.senha && senha === "") novos.senha = textos.vazios.senha;
+        setErros(novos);
+      }
       else setErroGeral(r.erro ?? textos.erros.generico);
     } catch (falha) {
       setErroGeral(tratarFalha(falha, textos.erros.generico, textos.erros.semConexao));

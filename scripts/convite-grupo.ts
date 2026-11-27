@@ -7,6 +7,7 @@
  * empresa, no ramo do convite; depois cria outras ate `--marcas` e da acesso a equipe dentro do aplicativo. O codigo tem 32 bytes aleatorios e NUNCA fica no banco (so o hash): o link
  * aparece UMA vez, na saida deste comando. Perdeu o link? Desative o convite e gere outro.
  *
+ * - `--desativar`: fecha o link e, se ele ja foi usado, corta tambem o poder do dono (criar empresas, dar e tirar acesso). Nada que ja existe e apagado.
  * - `--rotulo`: nome interno do convite, so para o admin se achar na lista (obrigatorio).
  * - `--ramo`: id do ramo (nichos.id) das empresas do grupo (obrigatorio; tem de existir).
  * - `--marcas`: quantas empresas o dono pode ter, contando a primeira (padrao 5, maximo 20).
@@ -58,7 +59,7 @@ async function main(): Promise<void> {
   if (values.desativar !== undefined) {
     const id = numero(values.desativar, "--desativar");
     if (id === undefined || !(await desativarConviteDeGrupo(id))) throw new ErroDoScript(`o convite ${values.desativar} nao existe.`);
-    console.log(`convite #${id} desativado: o link deixou de valer.`);
+    console.log(`convite #${id} desativado: o link deixou de valer e, se ja foi usado, o dono perde TAMBEM o poder de criar empresas e de dar e tirar acesso da equipe (as empresas e as pessoas ja ligadas continuam).`);
     return;
   }
 

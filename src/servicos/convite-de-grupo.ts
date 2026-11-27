@@ -13,16 +13,17 @@ import { and, count, eq, gt, inArray, sql } from "drizzle-orm";
 
 import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
 import { db } from "@/db";
-import { account, cadastrosProprios, clientes, convitesDeGrupo, marcasDoGrupo, membrosMarca, nichos, preferenciasUsuario, user } from "@/db/schema";
+import { account, clientes, convitesDeGrupo, marcasDoGrupo, membrosMarca, nichos, preferenciasUsuario, user } from "@/db/schema";
 import { config } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { criarLimitador, type Limitador } from "@/lib/limite-de-taxa";
 import { logger } from "@/lib/log";
 import { destinatariosDoAviso } from "@/servicos/aviso-de-leitura";
 import { FORMATO_EMAIL, limparTexto, validarCadastro, type ErrosDoCadastro } from "@/servicos/cadastro";
-import { criarUsuarioComSenhaGerada, NOME_SEM_NOME_AINDA, tirarAcesso } from "@/servicos/clientes";
+import { criarUsuarioComSenhaGerada, emailNaoConfirmadoDeConta, NOME_SEM_NOME_AINDA, tirarAcesso } from "@/servicos/clientes";
 import { gerarLinkDeConvite } from "@/servicos/convite";
 import { pedirFiltroDeNoticias } from "@/servicos/filtro-de-noticias";
+import { senhaEhProvisoria } from "@/servicos/senha";
 import { textosConviteDeGrupo } from "@/textos/convite-de-grupo";
 
 export const LIMITES_DO_CONVITE_DE_GRUPO = {
@@ -36,6 +37,8 @@ export const LIMITES_DO_CONVITE_DE_GRUPO = {
   acessosPorDia: 20,
   /** Pedidos de "dar acesso" por dono em 24 horas, contando os que não criaram nada (em memória): segura o laço de dar e tirar para mandar e-mail à toa. */
   pedidosDeAcessoPorDia: 60,
+  /** Contas novas criadas por "dar acesso" em 24 horas, de todos os donos juntos, contadas no banco: "tirar acesso" não apaga a conta, então o laço de dar e tirar não zera esta conta. */
+  contasNovasPorDia: 100,
   nomeDaEmpresaMax: 80,
 } as const;
 
@@ -200,7 +203,8 @@ export async function avisarAdminDoConvite(rotulo: string, empresa: string, emai
 
 /**
  * Usa o convite: numa transação, trava a linha do convite (dois pedidos ao mesmo tempo com o mesmo link: só um passa), confere de novo se ele vale, cria a conta, a primeira empresa e
- * marca o convite como usado. E-mail que já tem conta: não cria nada e NÃO gasta o convite (quem tem o link é de confiança; quem erra o e-mail tenta de novo).
+ * marca o convite como usado. E-mail que já tem conta: não cria nada e NÃO gasta o convite (quem tem o link é de confiança; quem erra o e-mail tenta de novo). Risco aceito e escrito: quem tem o link ainda aberto pode testar
+ * se um e-mail já tem conta (a resposta é própria), no máximo 5 vezes em 10 minutos por IP; o link é de uso único, vale poucos dias e vai por canal de confiança do admin ao dono.
  */
 export async function aceitarConviteDeGrupo(codigo: unknown, bruto: unknown, opcoes: OpcoesDoAceite): Promise<ResultadoDoAceite> {
   const agora = opcoes.agora ?? new Date();
@@ -301,11 +305,13 @@ export async function criarEmpresaDoGrupo(usuarioId: string, nomeBruto: unknown)
 // O dono: a equipe da empresa
 // ---------------------------------------------------------------------------
 
-/** A marca é do grupo e esta pessoa é dona dela? Quem chama passa o `clienteId` da marca ATIVA do servidor. */
+/** A marca é do grupo (de um convite ainda ativo) e esta pessoa é dona dela? Quem chama passa o `clienteId` da marca ATIVA do servidor. */
 export async function ehDonoDeEmpresaDoGrupo(usuarioId: string, clienteId: number): Promise<boolean> {
+  // Desativar o convite corta TODO o poder do dono: criar empresas e dar acesso (o convite da empresa é o da `marcas_do_grupo`).
   const [linha] = await db()
     .select({ clienteId: marcasDoGrupo.clienteId })
     .from(marcasDoGrupo)
+    .innerJoin(convitesDeGrupo, and(eq(convitesDeGrupo.id, marcasDoGrupo.conviteId), sql`${convitesDeGrupo.desativadoEm} is null`))
     .innerJoin(membrosMarca, and(eq(membrosMarca.clienteId, marcasDoGrupo.clienteId), eq(membrosMarca.usuarioId, usuarioId), eq(membrosMarca.papel, "dono")))
     .where(eq(marcasDoGrupo.clienteId, clienteId));
   return Boolean(linha);
@@ -349,30 +355,31 @@ export async function darAcessoNaEmpresa(donoId: string, clienteId: number, emai
 
   const [empresa] = await db().select({ nome: clientes.nome }).from(clientes).where(eq(clientes.id, clienteId));
   if (!empresa) throw new ErroConviteDeGrupo("semPermissao");
+  const [quemDa] = await db().select({ nome: user.name }).from(user).where(eq(user.id, donoId));
+  const nomeDoDono = quemDa && quemDa.nome !== NOME_SEM_NOME_AINDA ? quemDa.nome : null;
 
   const [existente] = await db().select({ id: user.id }).from(user).where(sql`lower(${user.email}) = ${email}`);
   try {
     if (existente) {
-      const [proprio] = await db()
-        .select({ confirmado: user.emailVerified })
-        .from(cadastrosProprios)
-        .innerJoin(user, eq(user.id, cadastrosProprios.usuarioId))
-        .where(eq(cadastrosProprios.usuarioId, existente.id));
-      if (proprio && !proprio.confirmado) return { email };
+      // Conta de e-mail ainda não confirmado, com senha que quem a criou escolheu (cadastro sozinho ou link de convite): não é ligada, e a resposta é a mesma.
+      if (await emailNaoConfirmadoDeConta(existente.id)) return { email };
       const [jaMembro] = await db()
         .select({ id: membrosMarca.id })
         .from(membrosMarca)
         .where(and(eq(membrosMarca.usuarioId, existente.id), eq(membrosMarca.clienteId, clienteId)));
-      if (jaMembro) return { email };
-      await db().insert(membrosMarca).values({ usuarioId: existente.id, clienteId, papel: "membro" });
-      await mandarAvisoDeAcessoNaConta(email, empresa.nome);
+      if (!jaMembro) await db().insert(membrosMarca).values({ usuarioId: existente.id, clienteId, papel: "membro" });
+      // Quem ainda não escolheu a senha (a conta nasceu aqui e a senha provisória ninguém viu) recebe o link de 48 horas de novo, também no "dar acesso" repetido: é como o dono reenvia.
+      // Quem já tem senha recebe o aviso com o caminho de entrar. Os dois casos mandam e-mail, então a frase "mandamos um e-mail" da tela é verdadeira.
+      if (await senhaEhProvisoria(existente.id)) await mandarConviteDaEmpresa(email, empresa.nome, nomeDoDono);
+      else await mandarAvisoDeAcessoNaConta(email, empresa.nome, nomeDoDono);
       return { email };
     }
 
+    if ((await contasNovasPorAcessoHoje(agora)) >= LIMITES_DO_CONVITE_DE_GRUPO.contasNovasPorDia) throw new ErroConviteDeGrupo("limite");
     // A senha provisória que a função devolve é descartada de propósito: o dono nunca a vê.
     const { usuarioId } = await criarUsuarioComSenhaGerada(email, NOME_SEM_NOME_AINDA);
     await db().insert(membrosMarca).values({ usuarioId, clienteId, papel: "membro" });
-    await mandarConviteDaEmpresa(email, empresa.nome);
+    await mandarConviteDaEmpresa(email, empresa.nome, nomeDoDono);
     return { email };
   } catch (erro) {
     // Dois pedidos ao mesmo tempo com o mesmo e-mail novo: o índice único decide, e quem perdeu já tem a conta feita pelo outro. A resposta continua a mesma.
@@ -381,29 +388,56 @@ export async function darAcessoNaEmpresa(donoId: string, clienteId: number, emai
   }
 }
 
-async function mandarConviteDaEmpresa(email: string, empresa: string): Promise<void> {
+/** Contas sem nome criadas nas últimas 24 horas (o nome é o de "dar acesso"): conta no banco o que "tirar acesso" não apaga. */
+async function contasNovasPorAcessoHoje(agora: Date): Promise<number> {
+  const [{ total }] = await db()
+    .select({ total: count() })
+    .from(user)
+    .where(and(eq(user.name, NOME_SEM_NOME_AINDA), gt(user.createdAt, new Date(agora.getTime() - 24 * 60 * 60 * 1000))));
+  return total;
+}
+
+async function mandarConviteDaEmpresa(email: string, empresa: string, dono: string | null): Promise<void> {
   try {
     const url = await gerarLinkDeConvite(email);
     await enviarEmail({
       para: email,
       assunto: textosConviteDeGrupo.assuntoAcessoNovo(empresa),
-      html: textosConviteDeGrupo.corpoAcessoNovo({ empresa, nome: null, url, entrarUrl: `${config.appUrl}/entrar` }),
+      html: textosConviteDeGrupo.corpoAcessoNovo({ empresa, dono, url, entrarUrl: `${config.appUrl}/entrar` }),
     });
   } catch (erro) {
     logger.error({ err: erro }, "convite de grupo: o e-mail de acesso novo falhou");
   }
 }
 
-async function mandarAvisoDeAcessoNaConta(email: string, empresa: string): Promise<void> {
+async function mandarAvisoDeAcessoNaConta(email: string, empresa: string, dono: string | null): Promise<void> {
   try {
     await enviarEmail({
       para: email,
       assunto: textosConviteDeGrupo.assuntoAcessoNaConta(empresa),
-      html: textosConviteDeGrupo.corpoAcessoNaConta({ empresa, entrarUrl: `${config.appUrl}/entrar` }),
+      html: textosConviteDeGrupo.corpoAcessoNaConta({ empresa, dono, entrarUrl: `${config.appUrl}/entrar` }),
     });
   } catch (erro) {
     logger.error({ err: erro }, "convite de grupo: o aviso de acesso falhou");
   }
+}
+
+/** A empresa é de um grupo (de um convite ainda ativo)? Para a Conta de quem NÃO é o dono dizer quem dá acesso. */
+export async function empresaEhDoGrupo(clienteId: number): Promise<boolean> {
+  const [linha] = await db()
+    .select({ clienteId: marcasDoGrupo.clienteId })
+    .from(marcasDoGrupo)
+    .innerJoin(convitesDeGrupo, and(eq(convitesDeGrupo.id, marcasDoGrupo.conviteId), sql`${convitesDeGrupo.desativadoEm} is null`))
+    .where(eq(marcasDoGrupo.clienteId, clienteId));
+  return Boolean(linha);
+}
+
+/**
+ * Na Conta do dono de uma empresa do grupo, quem ele ligou aparece só pelo e-mail: o nome cadastrado na conta de uma pessoa que já existia não vaza para quem só digitou o e-mail
+ * (a resposta de "dar acesso" é igual nos três casos, e a lista também). O dono da empresa continua com o nome.
+ */
+export function membrosParaODono<T extends { nome: string; email: string; papel?: "dono" | "membro" }>(membros: T[]): T[] {
+  return membros.map((m) => (m.papel === "dono" ? m : { ...m, nome: m.email }));
 }
 
 /** O dono tira o acesso de um membro da empresa. O dono (nem ele mesmo, nem outro dono) nunca sai: `tirarAcesso` recusa. */

@@ -10,7 +10,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ set: () => undefined, g
 import { db, getPool } from "@/db";
 import { account, cadastrosProprios, clientes, convitesDeGrupo, marcasDoGrupo, membrosMarca, nichos, user } from "@/db/schema";
 import { criarLimitador } from "@/lib/limite-de-taxa";
-import { criarMarca } from "@/servicos/clientes";
+import { criarMarca, darAcesso, NOME_SEM_NOME_AINDA } from "@/servicos/clientes";
 import {
   aceitarConviteDeGrupo,
   codigoTemFormatoValido,
@@ -18,13 +18,17 @@ import {
   criarConviteDeGrupo,
   criarEmpresaDoGrupo,
   darAcessoNaEmpresa,
+  empresaEhDoGrupo,
   desativarConviteDeGrupo,
   ErroConviteDeGrupo,
   hashDoCodigoDoConvite,
   gerarCodigoDoConvite,
+  LIMITES_DO_CONVITE_DE_GRUPO,
+  membrosParaODono,
   situacaoDasEmpresas,
   tirarAcessoDaEmpresa,
 } from "@/servicos/convite-de-grupo";
+import { limparSenhaProvisoria } from "@/servicos/senha";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -204,17 +208,31 @@ describe("outras empresas do dono", () => {
     await expect(criarEmpresaDoGrupo(usuarioId, "x")).rejects.toMatchObject({ motivo: "nomeInvalido" });
   });
 
-  it("convite desativado depois: o dono perde o poder de criar", async () => {
-    const { usuarioId, convite } = await donoNovo();
+  it("convite desativado depois: o dono perde o poder de criar E o de dar e tirar acesso", async () => {
+    const { usuarioId, convite, clienteId } = await donoNovo();
+    await darAcessoNaEmpresa(usuarioId, clienteId, "equipe.antes@grupo.teste");
+    expect(await empresaEhDoGrupo(clienteId)).toBe(true);
     await desativarConviteDeGrupo(convite.id);
     await expect(criarEmpresaDoGrupo(usuarioId, "Outra")).rejects.toBeInstanceOf(ErroConviteDeGrupo);
+    await expect(darAcessoNaEmpresa(usuarioId, clienteId, "equipe.depois@grupo.teste")).rejects.toMatchObject({ motivo: "semPermissao" });
+    const [antes] = await db().select().from(user).where(eq(user.email, "equipe.antes@grupo.teste"));
+    await expect(tirarAcessoDaEmpresa(usuarioId, clienteId, antes.id)).rejects.toMatchObject({ motivo: "semPermissao" });
+    expect(await empresaEhDoGrupo(clienteId)).toBe(false);
+    // O que já existe continua: a pessoa ligada antes segue na empresa.
+    expect(await db().select().from(membrosMarca).where(and(eq(membrosMarca.usuarioId, antes.id), eq(membrosMarca.clienteId, clienteId)))).toHaveLength(1);
   });
 });
 
 describe("a equipe da empresa", () => {
+  let registro: { mock: { calls: unknown[][] } };
   beforeEach(() => {
-    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    registro = vi.spyOn(console, "log").mockImplementation(() => undefined);
   });
+  /** Os corpos dos e-mails simulados que saíram para este endereço (o assunto vem numa linha e o corpo na seguinte). */
+  const emailsPara = (email: string) => {
+    const linhas = registro.mock.calls.map((c) => String(c[0]));
+    return linhas.flatMap((l, i) => (l.startsWith(`[e-mail simulado] para ${email},`) ? [linhas[i + 1] ?? ""] : []));
+  };
 
   it("o dono dá acesso: nasce usuário sem empresa própria, membro da empresa, e a resposta não traz senha", async () => {
     const { usuarioId, clienteId } = await donoNovo();
@@ -233,6 +251,8 @@ describe("a equipe da empresa", () => {
   it("e-mail que já tem conta é ligado à empresa e recebe a MESMA resposta do caso novo", async () => {
     const { usuarioId, clienteId } = await donoNovo();
     const outra = await donoNovo();
+    // Conta de e-mail confirmado (uma de convite ainda sem confirmar não é ligada: teste abaixo).
+    await db().update(user).set({ emailVerified: true }).where(eq(user.id, outra.usuarioId));
     const novo = await darAcessoNaEmpresa(usuarioId, clienteId, "mesma.resposta.nova@grupo.teste");
     const existente = await darAcessoNaEmpresa(usuarioId, clienteId, outra.dados.email);
     expect(Object.keys(existente)).toEqual(Object.keys(novo));
@@ -273,6 +293,61 @@ describe("a equipe da empresa", () => {
     const r = await darAcessoNaEmpresa(usuarioId, clienteId, "naoconfirmado@grupo.teste");
     expect(r).toEqual({ email: "naoconfirmado@grupo.teste" });
     expect(await db().select().from(membrosMarca).where(and(eq(membrosMarca.usuarioId, "nao-confirmado"), eq(membrosMarca.clienteId, clienteId)))).toHaveLength(0);
+  });
+
+  it("conta criada pelo link do convite e ainda sem e-mail confirmado não é ligada, nem por aqui nem por darAcesso do admin", async () => {
+    const { usuarioId, clienteId } = await donoNovo();
+    const outra = await donoNovo();
+    // `outra` abriu o link, escolheu a senha e nunca confirmou o e-mail: qualquer um poderia ter feito isso com o e-mail de outra pessoa.
+    const r = await darAcessoNaEmpresa(usuarioId, clienteId, outra.dados.email);
+    expect(r).toEqual({ email: outra.dados.email });
+    expect(await db().select().from(membrosMarca).where(and(eq(membrosMarca.usuarioId, outra.usuarioId), eq(membrosMarca.clienteId, clienteId)))).toHaveLength(0);
+    const marca = await criarMarca({ nome: "Marca do admin", nichoId });
+    await expect(darAcesso(marca.id, "Outra", outra.dados.email)).rejects.toThrow();
+    // Depois de confirmar o e-mail, passa.
+    await db().update(user).set({ emailVerified: true }).where(eq(user.id, outra.usuarioId));
+    await darAcessoNaEmpresa(usuarioId, clienteId, outra.dados.email);
+    expect(await db().select().from(membrosMarca).where(and(eq(membrosMarca.usuarioId, outra.usuarioId), eq(membrosMarca.clienteId, clienteId)))).toHaveLength(1);
+  });
+
+  it("dar acesso de novo a quem ainda não escolheu a senha reenvia o link de 48 horas, com o nome de quem deu; quem já tem senha recebe o aviso de entrar", async () => {
+    const { usuarioId, clienteId } = await donoNovo();
+    await darAcessoNaEmpresa(usuarioId, clienteId, "sem.senha.ainda@grupo.teste");
+    expect(emailsPara("sem.senha.ainda@grupo.teste")).toHaveLength(1);
+    // O pedido repetido (já é membro) manda de novo o e-mail COM o link para escolher a senha.
+    await darAcessoNaEmpresa(usuarioId, clienteId, "sem.senha.ainda@grupo.teste");
+    const corpos = emailsPara("sem.senha.ainda@grupo.teste");
+    expect(corpos).toHaveLength(2);
+    for (const corpo of corpos) {
+      expect(corpo).toContain("Entrar e escolher a senha");
+      expect(corpo).toContain("Leandro Dono deu a você acesso");
+    }
+    // Quem já tem senha: o aviso simples, sem o link de escolher a senha.
+    const [novo] = await db().select().from(user).where(eq(user.email, "sem.senha.ainda@grupo.teste"));
+    await limparSenhaProvisoria(novo.id);
+    await darAcessoNaEmpresa(usuarioId, clienteId, "sem.senha.ainda@grupo.teste");
+    const ultimo = emailsPara("sem.senha.ainda@grupo.teste").at(-1) ?? "";
+    expect(ultimo).not.toContain("escolher a senha");
+    expect(ultimo).toContain("Suas marcas");
+  });
+
+  it("o laço de dar e tirar acesso não zera o teto: as contas novas do dia são contadas no banco", async () => {
+    const { usuarioId, clienteId } = await donoNovo();
+    for (let i = 0; i < LIMITES_DO_CONVITE_DE_GRUPO.contasNovasPorDia; i += 1) {
+      await db().insert(user).values({ id: `lixo-${i}`, name: NOME_SEM_NOME_AINDA, email: `lixo${i}@grupo.teste`, emailVerified: false, role: "cliente" as unknown as "admin" });
+    }
+    await expect(darAcessoNaEmpresa(usuarioId, clienteId, "mais.um.lixo@grupo.teste")).rejects.toMatchObject({ motivo: "limite" });
+    expect(await db().select().from(user).where(eq(user.email, "mais.um.lixo@grupo.teste"))).toHaveLength(0);
+    await db().delete(user).where(sql`${user.id} like 'lixo-%'`);
+  });
+
+  it("a lista do dono mostra só o e-mail de quem ele ligou, e o nome dele continua", () => {
+    const lista = membrosParaODono([
+      { nome: "Leandro Dono", email: "l@g.teste", papel: "dono" as const },
+      { nome: "Gustavo Silva", email: "gustavo@g.teste", papel: "membro" as const },
+    ]);
+    expect(lista[0].nome).toBe("Leandro Dono");
+    expect(lista[1].nome).toBe("gustavo@g.teste");
   });
 
   it("limite de 20 acessos por dia por dono", async () => {

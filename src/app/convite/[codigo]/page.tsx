@@ -25,7 +25,7 @@ export default async function ConviteDeGrupo({ params }: { params: Promise<{ cod
     return (
       <TelaDeConta>
         <CartaoDeConta>
-          <CabecaDoCartao titulo={t.linkInvalido.titulo} subtitulo={t.linkInvalido.texto} />
+          <CabecaDoCartao titulo={t.linkInvalido.titulo} subtitulo={t.linkInvalido.subtitulo} />
           <Link href="/entrar" className={styles.linkAcao}>
             {t.linkInvalido.entrar}
           </Link>
@@ -33,5 +33,5 @@ export default async function ConviteDeGrupo({ params }: { params: Promise<{ cod
       </TelaDeConta>
     );
   }
-  return <FormularioDoConvite codigo={codigo} textos={{ pagina: t.pagina, erros: t.erros }} />;
+  return <FormularioDoConvite codigo={codigo} textos={{ pagina: t.pagina, erros: t.erros, vazios: t.vazios, empresaInvalida: t.empresaInvalida }} />;
 }

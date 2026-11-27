@@ -10,7 +10,7 @@ import { garantirBriefing } from "@/servicos/briefing";
 import { marcaEhDeSaude } from "@/servicos/carrossel";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { candidatasDaMarca, contaLigadaDaMarca, ehDonoDaMarca as ehDonoParaInstagram, ligacaoDisponivel } from "@/servicos/conta-conectada";
-import { ehDonoDeEmpresaDoGrupo, situacaoDasEmpresas } from "@/servicos/convite-de-grupo";
+import { empresaEhDoGrupo, ehDonoDeEmpresaDoGrupo, membrosParaODono, situacaoDasEmpresas } from "@/servicos/convite-de-grupo";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
@@ -54,6 +54,8 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
   // Convite de grupo: no "ver como" nada disto aparece (quem olha é o admin, não a pessoa).
   const empresasDoGrupo = sessao.verComo ? null : await situacaoDasEmpresas(sessao.user.id);
   const donoDoGrupo = cliente && !sessao.verComo ? await ehDonoDeEmpresaDoGrupo(sessao.user.id, cliente.id) : false;
+  // Quem não é a dona de uma empresa do grupo lê "quem dá acesso é quem a criou" no lugar do "fale com a gente".
+  const empresaDoGrupo = cliente && !sessao.verComo && !donoDoGrupo ? await empresaEhDoGrupo(cliente.id) : false;
   const ramoAtual = await ramoAtualDoCliente(cliente?.nichoId);
   const pedidoAberto = cliente ? await pedidoAbertoDaMarca(cliente.id) : null;
   const alternativos = cliente ? await ramosAlternativosDaMarca(cliente.id) : [];
@@ -128,7 +130,7 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
         ) : null}
       </div>
       {cliente ? (
-        <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} donoDoGrupo={donoDoGrupo} />
+        <QuemTemAcesso nomeMarca={cliente.nome} membros={donoDoGrupo ? membrosParaODono(membros) : membros} usuarioIdAtual={sessao.user.id} donoDoGrupo={donoDoGrupo} empresaDoGrupo={empresaDoGrupo} />
       ) : null}
       <div className={styles.colunaPrincipal}>
         {empresasDoGrupo ? <SuasEmpresas usadas={empresasDoGrupo.usadas} maximo={empresasDoGrupo.maximo} /> : null}
