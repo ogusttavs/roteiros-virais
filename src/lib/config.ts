@@ -615,6 +615,34 @@ export function verificarSegredosDeProducao(
 
 verificarSegredosDeProducao();
 
+/**
+ * O freio de gasto da IA por marca (achado A4 da auditoria de segurança de 26/11/2026; quem usa é `src/ia/freio.ts`). Lido a cada chamada, e não guardado no `config`, para o teste ligar,
+ * desligar e trocar os limites sem recarregar o módulo, como `cadastroAberto`.
+ *
+ * Os padrões, medidos pelo código e pelas medições já feitas (estimativa de 26/11/2026, dólar a R$ 5,50): um roteiro com a conferência sai a US$ 0,16 a 0,32 (medido em 03/10/2026); uma
+ * chamada do modelo forte no pior caso (16 mil tokens de saída a US$ 25 por milhão, mais uns 20 mil de entrada a US$ 5) fica perto de US$ 0,50; um dia normal de uma marca gasta uns US$ 0,50
+ * a 1 (a tabela de custo por perfil da `apresentacao-preco.html`). Um dia pesado de verdade, com as 20 versões do teto, 10 roteiros refeitos, edições, carrosséis e as 3 pesquisas na hora,
+ * chega a uns US$ 18; uma hora de demonstração intensa, a uns US$ 5. Os limites ficam acima disso com folga: US$ 8 por hora e US$ 25 por dia.
+ * `FREIO_IA=0` desliga o freio inteiro. `FREIO_IA_SIMULTANEAS` é quantas chamadas de uma marca correm ao mesmo tempo por processo; a seguinte espera a vez (não é recusada), para uma
+ * rajada de pedidos juntos não passar inteira antes de a primeira chamada ser contada.
+ */
+export type LimitesDoFreioDaIA = { ativo: boolean; porHoraUsd: number; porDiaUsd: number; simultaneas: number };
+
+export const PADROES_DO_FREIO_DA_IA = { porHoraUsd: 8, porDiaUsd: 25, simultaneas: 4 } as const;
+
+export function limitesDoFreioDaIA(): LimitesDoFreioDaIA {
+  const positivo = (nome: string, padrao: number) => {
+    const n = envNumero(nome, padrao);
+    return n > 0 ? n : padrao;
+  };
+  return {
+    ativo: process.env.FREIO_IA !== "0",
+    porHoraUsd: positivo("FREIO_IA_POR_HORA_USD", PADROES_DO_FREIO_DA_IA.porHoraUsd),
+    porDiaUsd: positivo("FREIO_IA_POR_DIA_USD", PADROES_DO_FREIO_DA_IA.porDiaUsd),
+    simultaneas: Math.max(1, Math.floor(positivo("FREIO_IA_SIMULTANEAS", PADROES_DO_FREIO_DA_IA.simultaneas))),
+  };
+}
+
 export function hojeISO(d = new Date()): string {
   // Data local do Brasil (o servidor pode estar em UTC)
   const fmt = new Intl.DateTimeFormat("en-CA", {

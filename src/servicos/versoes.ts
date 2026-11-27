@@ -213,6 +213,7 @@ async function julgarVersao(clienteId: number, valores: ValoresDoRoteiro): Promi
     const conteudo = valores.conteudo;
     const inicio = Date.now();
     const saida = await gerarEstruturado({
+      clienteId: clienteId,
       tarefa: "notaDaVersao",
       nivel: notaIA.nivel,
       effort: notaIA.esforco,

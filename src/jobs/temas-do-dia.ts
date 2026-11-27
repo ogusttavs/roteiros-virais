@@ -123,6 +123,7 @@ async function tentarGerarTemas(dados: {
   focoHash?: string;
 }): Promise<{ valido: boolean; temas: TemaDoDia[] }> {
   const resultado = await gerarEstruturado({
+    clienteId: dados.clienteId,
     tarefa: "temasDoDia",
     nivel: temasDoDiaIA.nivel,
     effort: temasDoDiaIA.esforco,

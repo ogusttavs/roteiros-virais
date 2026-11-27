@@ -8,7 +8,7 @@ import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
-import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
+import { ErroAcessoNegado, clienteAtivoDoUsuario, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import {
   aceitar,
   criarPlano,
@@ -35,7 +35,9 @@ export async function lerAgendaAction(texto: string): Promise<ResultadoLerAgenda
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
-  return lerAgendaDeTexto(texto);
+  // Achado A4 da auditoria de 26/11/2026: a marca ativa vai junto para a leitura passar pelo freio de gasto da IA e o custo contar para ela.
+  const marca = await clienteAtivoDoUsuario(sessao.user.id);
+  return lerAgendaDeTexto(texto, hojeISO(), marca?.id);
 }
 
 /**

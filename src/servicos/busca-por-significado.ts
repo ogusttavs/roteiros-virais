@@ -92,6 +92,7 @@ export async function escolherComIA(dados: {
     if (guardada) return idsValidos(guardada, candidatos, dados.limite);
 
     const resultado = await gerarEstruturado({
+      clienteId: dados.clienteId,
       tarefa: "reordenarEvidencia",
       nivel: reordenarEvidencia.nivel,
       effort: reordenarEvidencia.esforco,
