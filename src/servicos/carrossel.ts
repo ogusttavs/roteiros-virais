@@ -106,6 +106,8 @@ type OrigemResolvida = {
   origemRef: Record<string, unknown>;
   tema: string;
   temaDaPessoa: boolean;
+  /** Só para as fontes da marca: o tema foi escrito pela pessoa (Tema livre, o texto dela ou um roteiro de origem livre). Não decide as proibições (isso é `temaDaPessoa`). */
+  temaEscritoPelaPessoa: boolean;
   evidenciasPrevistas: number[];
   noticia?: { titulo: string; resumo: string | null; angulo: string | null; veiculo?: string; dia?: string };
   roteiroDeOrigem?: { titulo: string; texto: string };
@@ -117,21 +119,21 @@ async function resolverOrigem(clienteId: number, nichoId: number, de: DeOndeVem)
     if (!roteiro) throw new ErroCarrossel("Não achei esse roteiro.", "nao-achou");
     const c = roteiro.conteudo;
     const texto = [c.gancho, c.corpo, c.fechamento, c.chamadaFinal, ...(c.cartoes ?? []).map((k) => `${k.oQueFalar} ${k.textoNaTela}`)].filter((t) => t && t.trim()).join(" ");
-    return { origem: "roteiro", origemRef: { roteiroId: roteiro.id }, tema: roteiro.tema, temaDaPessoa: roteiro.origem === "livre", evidenciasPrevistas: c.evidencias ?? [], roteiroDeOrigem: { titulo: c.titulo, texto } };
+    return { origem: "roteiro", origemRef: { roteiroId: roteiro.id }, tema: roteiro.tema, temaDaPessoa: roteiro.origem !== "sugerido", temaEscritoPelaPessoa: roteiro.origem === "livre", evidenciasPrevistas: c.evidencias ?? [], roteiroDeOrigem: { titulo: c.titulo, texto } };
   }
   if (de.origem === "noticia") {
     const linha = await noticiaPorId(de.noticiaId, nichoId);
     if (!linha) throw new ErroCarrossel("Não achei essa notícia.", "nao-achou");
     const ponto = noticiaDoSetorComoPontoDePartida(linha);
-    return { origem: "noticia", origemRef: { noticiaId: linha.id }, tema: linha.titulo, temaDaPessoa: true, evidenciasPrevistas: [], noticia: ponto };
+    return { origem: "noticia", origemRef: { noticiaId: linha.id }, tema: linha.titulo, temaDaPessoa: true, temaEscritoPelaPessoa: false, evidenciasPrevistas: [], noticia: ponto };
   }
   if (de.texto && de.texto.trim()) {
-    return { origem: "tema", origemRef: { livre: true }, tema: de.texto.trim().slice(0, 300), temaDaPessoa: true, evidenciasPrevistas: [] };
+    return { origem: "tema", origemRef: { livre: true }, tema: de.texto.trim().slice(0, 300), temaDaPessoa: true, temaEscritoPelaPessoa: true, evidenciasPrevistas: [] };
   }
   if (!de.titulo || !de.titulo.trim()) throw new ErroCarrossel("Escolha um tema do dia ou escreva o seu.");
   try {
     const resolvido = await resolverTemaDoPedido(clienteId, { origem: "sugerido", temaIndice: 0, temaTitulo: de.titulo, objetivo: "conversao" });
-    return { origem: "tema", origemRef: { temaTitulo: de.titulo }, tema: resolvido.tema, temaDaPessoa: false, evidenciasPrevistas: resolvido.evidenciasPrevistas };
+    return { origem: "tema", origemRef: { temaTitulo: de.titulo }, tema: resolvido.tema, temaDaPessoa: false, temaEscritoPelaPessoa: false, evidenciasPrevistas: resolvido.evidenciasPrevistas };
   } catch (erro) {
     if (erro instanceof ErroRoteiro) throw new ErroCarrossel(erro.message, "nao-achou");
     throw erro;
@@ -334,7 +336,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     }),
     fontesDosFatos,
     // 1.12.0: só o que a pessoa escreveu ou confirmou. Com origem em notícia o tema é o título dela (de terceiros) e fica de fora; o roteiro de origem é texto da IA e também.
-    fontesDaMarca: montarFontesDaMarca({ perfilCompilado: perfilDaMarca(perfil), camadaExclusiva: formatarCamadaExclusiva(cliente, []), tema: origem.noticia || !origem.temaDaPessoa ? undefined : origem.tema, observacao: pedido.observacao }),
+    fontesDaMarca: montarFontesDaMarca({ perfilCompilado: perfilDaMarca(perfil), camadaExclusiva: formatarCamadaExclusiva(cliente, []), tema: origem.temaEscritoPelaPessoa ? origem.tema : undefined, observacao: pedido.observacao }),
     conferirNumerosNasFontes: true,
     // T80: o que sobra reprovado depois das duas tentativas por fato sem apoio ou promessa em saúde é consertado por um reparo barato, só nos campos apontados.
     repararFato: { aplicarCampos: (d, trocas) => aplicarTrocasNosCampos(d, trocas, ramoSaude), motivoReparavel: motivoReparavelDoCarrossel },

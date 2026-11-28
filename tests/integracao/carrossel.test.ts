@@ -173,7 +173,7 @@ describe("gerarCarrossel", () => {
       expect(params.fontesDaMarca).toContain("lava estofados em domicilio");
     });
 
-    it.each([["livre", true], ["sugerido", false]] as const)("origem roteiro %s: o texto do roteiro de origem (da IA) não entra, e o tema entra só se for da pessoa (%s)", async (origemDoRoteiro, temaEntra) => {
+    it.each([["livre", true], ["sugerido", false], ["momento", false]] as const)("origem roteiro %s: o texto do roteiro de origem (da IA) não entra, e o tema entra só se foi escrito pela pessoa (%s)", async (origemDoRoteiro, temaEntra) => {
       const clienteId = await criarCliente();
       const [r] = await db()
         .insert(roteiros)
@@ -199,6 +199,8 @@ describe("gerarCarrossel", () => {
       expect(String(params.fontesDosFatos)).toContain("Tema: mancha de vinho no estofado");
       if (temaEntra) expect(params.fontesDaMarca).toContain("Tema: mancha de vinho no estofado");
       else expect(params.fontesDaMarca).not.toContain("mancha de vinho no estofado");
+      // `temaDaPessoa` (as proibições viram aviso) continua como era: só o sugerido é bloqueio.
+      expect(params.citarProibicaoVale).toBe(origemDoRoteiro !== "sugerido");
     });
   });
 
