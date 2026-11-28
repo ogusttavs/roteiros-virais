@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, contas, geracoesIA, modelosNicho, nichos, roteiros, user, videos, type AnaliseVideoLonga, type ModeloNicho } from "@/db/schema";
+import { briefings, clientes, contas, geracoesIA, modelosNicho, nichos, perfisAnalisados, roteiros, user, videos, type AnaliseVideoLonga, type ModeloNicho } from "@/db/schema";
 import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
 import { versao as versaoLongo } from "@/ia/prompts/roteiroLongo";
@@ -379,6 +379,80 @@ describe("o roteiro longo escrito", () => {
     expect(roteiro.conteudo.capitulos ?? null).toBeNull();
     expect(await geracoesDa("roteiroLongo")).toHaveLength(0);
     expect((await geracoesDa("roteiro")).length).toBeGreaterThan(0);
+  });
+});
+
+describe("1.12.0: as fontes da marca que chegam ao verificador (só o que a pessoa escreveu ou confirmou)", () => {
+  const GANCHO_FAVORITADO = "Minha cliente chegou chorando com a mancha de vinho no sofá novo";
+  const LEITURA_DE_CONCORRENTE = "Esse perfil mostra um casal desesperado com o estofado manchado";
+
+  /** O que é de terceiros e mora dentro do perfil e da camada: a referência favoritada e a leitura de um concorrente (escrita pela IA). Desfeito no `finally`. */
+  async function comDeTerceiros(corpo: () => Promise<void>) {
+    const [antes] = await db().select().from(briefings).where(eq(briefings.clienteId, clienteId));
+    await db()
+      .update(briefings)
+      .set({ perfil: { ...(antes.perfil as object), referencias: [`mancha de vinho: ${GANCHO_FAVORITADO}`] } as never })
+      .where(eq(briefings.clienteId, clienteId));
+    await db().insert(perfisAnalisados).values({ clienteId, origem: "citado", rede: "instagram", handle: "@outro.limpeza", leitura: LEITURA_DE_CONCORRENTE });
+    try {
+      await corpo();
+    } finally {
+      await db().update(briefings).set({ perfil: antes.perfil }).where(eq(briefings.clienteId, clienteId));
+      await db().delete(perfisAnalisados).where(eq(perfisAnalisados.clienteId, clienteId));
+    }
+  }
+
+  it("o curto: o perfil e o tema entram; a evidência, a referência favoritada e a leitura de concorrente ficam nas `fontesDosFatos` e fora das da marca", async () => {
+    await medirORamo();
+    await semearCurto(TEMA);
+    await comDeTerceiros(async () => {
+      await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
+      const chamadas = chamadasDoCurto();
+      const [params] = chamadas[chamadas.length - 1];
+      for (const deOutro of ["olha essa mancha saindo do estofado", GANCHO_FAVORITADO, LEITURA_DE_CONCORRENTE]) {
+        expect(String(params.fontesDosFatos)).toContain(deOutro);
+        expect(params.fontesDaMarca).not.toContain(deOutro);
+      }
+      expect(params.fontesDaMarca).toContain("produtos de limpeza");
+      expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
+    });
+  });
+
+  it("o longo: a referência favoritada e a leitura de concorrente (a evidência do longo é sempre vazia) estão nas `fontesDosFatos` e não nas da marca", async () => {
+    await medirORamo();
+    await comDeTerceiros(async () => {
+      await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
+      const { params } = ultimaChamadaDoLongo();
+      for (const deOutro of [GANCHO_FAVORITADO, LEITURA_DE_CONCORRENTE]) {
+        expect(String(params.fontesDosFatos)).toContain(deOutro);
+        expect(params.fontesDaMarca).not.toContain(deOutro);
+      }
+      expect(params.fontesDaMarca).toContain("produtos de limpeza");
+      expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
+      expect(params.fontesDaMarca).not.toMatch(/Evidência|Notícia|Dados da pesquisa|Marca citada/);
+    });
+  });
+});
+
+describe("1.12.0: o título do tema do dia (origem sugerida, escrito pela IA) não é fonte da marca", () => {
+  it.each([
+    ["curto", undefined],
+    ["longo", "longo" as const],
+  ])("a reescrita de um roteiro %s: com origem sugerida o tema está nas `fontesDosFatos` e fora das da marca; com origem livre entra nas duas", async (_nome, duracao) => {
+    await medirORamo();
+    const v1 = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", ...(duracao ? { duracao } : {}) });
+    const tarefa = () => (duracao ? chamadasDoLongo() : chamadasDoCurto());
+    for (const origem of ["sugerido", "livre"] as const) {
+      await db().update(roteiros).set({ origem }).where(eq(roteiros.id, v1.id));
+      vi.mocked(verificador.gerarComVerificacao).mockClear();
+      await reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"]);
+      const chamadas = tarefa();
+      const [params] = chamadas[chamadas.length - 1];
+      expect(String(params.fontesDosFatos)).toContain(`Tema: ${TEMA}`);
+      if (origem === "sugerido") expect(params.fontesDaMarca).not.toContain(TEMA);
+      else expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
+      expect(params.fontesDaMarca).toContain("produtos de limpeza");
+    }
   });
 });
 

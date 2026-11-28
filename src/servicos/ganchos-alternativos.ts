@@ -13,6 +13,7 @@ import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import { geracoesIA, roteiros, type ConteudoRoteiro, type GanchoAlternativo, type GanchosDoRoteiro, type TipoAbertura } from "@/db/schema";
 import { ErroReprovadoDuasVezes } from "@/ia/erro";
+import { montarFontesDaMarca } from "@/ia/fontes-da-marca";
 import { acharFormulasDeMaquina, motivosDasFormulas } from "@/ia/formulas-de-maquina";
 import * as ganchosIA from "@/ia/prompts/ganchosAlternativos";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
@@ -21,7 +22,7 @@ import { acharResultadoOuMedoEmSaude, temNumeroNoTexto, verificarConformidadeDoL
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 
-import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
+import { formatarPerfilCompilado, perfilDaMarca, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { inicioDoDiaEmSaoPaulo } from "./noticias-do-dia";
 import { leiturasDoCliente } from "./perfis-analisados";
@@ -353,6 +354,8 @@ async function pedirSemTrava(clienteId: number, roteiroId: number, agora: Date):
       chamadaFinal: corpo.chamadaFinal,
     }),
     fontesDosFatos: fontes,
+    // 1.12.0: o roteiro (texto da IA) que vai junto nas `fontes` não conta como fonte da marca.
+    fontesDaMarca: montarFontesDaMarca({ perfilCompilado: perfilDaMarca(perfil), camadaExclusiva: formatarCamadaExclusiva(cliente, []), tema: roteiro.origem === "livre" ? roteiro.tema : undefined, objetivoDoVideo: roteiro.objetivoDoVideo }),
     conferirNumerosNasFontes: true,
     lembreteFinal: ganchosIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,

@@ -899,15 +899,15 @@ function mockVerificarTexto(entrada: string, sistemaEstavel = "") {
   const texto = extrairCampo(entrada, "Texto a conferir:") || entrada;
   // O verificador por IA antes reprovava a nota do tema que CITAVA a proibição do cliente (1.7.3); com o tema da própria pessoa (1.8.0) a proibição é aviso e citar não fere. O simulador reprova a menção só quando o pedido não traz essa frase.
   if (texto.includes(FRASE_DA_PROIBICAO_CITADA) && !sistemaEstavel.includes("nunca fere a proibição")) {
-    return { aprovado: false, motivo: "a avaliação recomenda o que o briefing proíbe", fatoEspecifico: null, fonteMaisProxima: null };
+    return { aprovado: false, motivo: "a avaliação recomenda o que o briefing proíbe", fatoEspecifico: null, fonteMaisProxima: null, soPorFato: false };
   }
   // A conformidade continua barrando com a proibição como aviso: o marcador faz o simulador reprovar o texto que ataca gente (o verificador de verdade lê "atacar ou ofender" no critério).
   if (texto.includes("[mock:ataque]") && sistemaEstavel.includes("atacar ou ofender")) {
-    return { aprovado: false, motivo: "o texto ataca uma pessoa", fatoEspecifico: null, fonteMaisProxima: null };
+    return { aprovado: false, motivo: "o texto ataca uma pessoa", fatoEspecifico: null, fonteMaisProxima: null, soPorFato: false };
   }
   // 1.10.0 (`R-COPY-27`): o teste do ramo. Com o critério no sistema e fontes na entrada, o marcador faz o simulador reprovar o título ou o gancho que serve para qualquer ramo.
   const qualquerRamo = sistemaEstavel.includes("serve para qualquer ramo") && entrada.includes("FONTES (") && textoSemInstrucoes(entrada).includes("{mock:qualquer-ramo}");
-  if (qualquerRamo) return { aprovado: false, motivo: "o gancho serve para qualquer ramo: falta o serviço, o lugar, o público ou um fato da marca", fatoEspecifico: null, fonteMaisProxima: null };
+  if (qualquerRamo) return { aprovado: false, motivo: "o gancho serve para qualquer ramo: falta o serviço, o lugar, o público ou um fato da marca", fatoEspecifico: null, fonteMaisProxima: null, soPorFato: false };
   const gritando = /!{2,}/.test(texto) || texto === texto.toUpperCase();
   // O roteiro não inventa fato: com fontes na entrada, o marcador de teste faz o verificador reprovar o fato fora delas (só o mock; a prova de verdade é a chave real).
   // 1.9.0: o que vem depois de "INSTRUÇÕES PARA A PESSOA" (gravação e edição) é ordem à pessoa e nunca conta como fato, como no critério do verificador de verdade.
@@ -917,6 +917,7 @@ function mockVerificarTexto(entrada: string, sistemaEstavel = "") {
     motivo: gritando ? "tom exagerado para o texto de tela" : inventou ? "o texto afirma um fato específico que nada nas fontes sustenta" : null,
     fatoEspecifico: inventou ? "o Uli está do meu lado" : null,
     fonteMaisProxima: inventou ? "nenhuma" : null,
+    soPorFato: inventou && !gritando,
   };
 }
 
