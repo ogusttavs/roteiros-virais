@@ -112,11 +112,17 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * ficha não tem); (2) por código, `fatoApoiadoPelasFontes` desfaz a reprovação quando a própria saída do verificador cita como fonte mais próxima uma frase que está mesmo nas fontes, o fato
  * repete o sentido dela e todo número do fato está nas fontes. Fato sem frase de apoio ("nenhuma"), frase que não está nas fontes ou número novo continuam reprovando. Versão 1.11.0.
  *
- * 1.12.0 (E76 PR 3, a estratégia de idioma): a marca que fala com mais de um país e escolheu escrever também em outro idioma recebe `CRITERIO_VARIOS_IDIOMAS`
- * (o idioma, sozinho, nunca reprova). Sem `variosIdiomas`, o sistema é o da 1.11.0, palavra por palavra. Com `variosIdiomas`, o desfazer da reprovação por
+ * 1.12.0 (achado da revisão de 27/11/2026 sobre a 1.11.0): `fatoApoiadoPelasFontes` conferia a frase citada contra as `fontesDosFatos` inteiras, que trazem também a evidência de vídeos de outras
+ * pessoas, as notícias, a pesquisa na hora e as vozes do público; o gancho de outro criador copiado pelo roteiro saía aprovado como paráfrase de um fato da marca. Agora o verificador só desfaz a
+ * reprovação contra `fontesDaMarca` (o que a pessoa escreveu ou confirmou, e o tema só quando foi ela quem o escreveu; `ia/fontes-da-marca.ts`); sem esse campo, nada é desfeito. Segunda mudança: a saída ganha `soPorFato` (verdadeiro só quando a
+ * única razão de reprovar é um fato sem apoio) e o desfazer exige os três juntos: `soPorFato`, a frase dentro das fontes da marca e as travas de `fatoApoiadoPelasFontes`; assim um motivo de tom,
+ * proibição ou ataque não some quando o modelo também preenche um fato apoiado. O critério ganha uma frase explicando o campo. Versão 1.12.0.
+ *
+ * 1.13.0 (E76 PR 3, a estratégia de idioma): a marca que fala com mais de um país e escolheu escrever também em outro idioma recebe `CRITERIO_VARIOS_IDIOMAS`
+ * (o idioma, sozinho, nunca reprova). Sem `variosIdiomas`, o sistema é o da 1.12.0, palavra por palavra. Com `variosIdiomas`, o desfazer da reprovação por
  * paráfrase (`fatoApoiadoPelasFontes`, chamado em `verificador.ts`) não roda: as travas dele são do português e não veem prazo nem promessa em inglês ou espanhol.
  */
-export const versao = "1.12.0";
+export const versao = "1.13.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -129,6 +135,8 @@ export const schema = z.object({
   fatoEspecifico: z.string().nullable().catch(null),
   /** Só na conferência de fatos: a frase da fonte mais próxima desse fato, ou "nenhuma". Nulo nos outros casos. */
   fonteMaisProxima: z.string().nullable().catch(null),
+  /** Só na conferência de fatos: verdadeiro quando a ÚNICA razão de reprovar é um fato que as fontes não trazem. Ausente ou inválido, falso (e a reprovação nunca é desfeita por paráfrase). */
+  soPorFato: z.boolean().catch(false),
 });
 
 export type SaidaVerificarTexto = z.infer<typeof schema>;
@@ -204,7 +212,8 @@ export const CRITERIO_FATOS =
   "hashtags, instruções de gravação (sugerir como ou onde gravar, mesmo mudando um detalhe do que o momento diz), perguntas (uma pergunta, mesmo comparando dois produtos, não afirma nada), frase que está " +
   "literalmente nas fontes (o perfil traz \"nunca promete resultado\", \"Frase que fala: ...\" e o texto a repete) e o jeito de falar. FALAR COM O PÚBLICO sobre um medo, uma dor ou uma situação que o perfil lista para o cliente ideal (\"Medos do cliente: ...\") é o assunto do perfil dito a quem assiste, e não é fato: vale como pergunta (\"você já mandou lavar e o sofá voltou manchado?\") e também como afirmação dirigida a quem assiste (\"você já mandou lavar uma vez e ele voltou manchado\", \"quem já passou por isso sabe como é\", \"se o seu sofá já voltou manchado de outro lugar\"). O \"você já...\", o \"já mandou...\" e o \"quem já...\" falam do PÚBLICO, nunca da pessoa que grava. O que continua sendo fato, e reprova, é contar um CASO ESPECÍFICO como acontecido na primeira pessoa ou com alguém identificado: com a própria pessoa (\"eu já mandei lavar e voltou manchado\", \"comigo aconteceu\"), com um cliente do negócio ou com uma pessoa identificada (\"um cliente meu, na semana passada, mandou lavar em outro lugar e o sofá voltou manchado\", \"ontem uma cliente me contou\"), porque o medo do perfil não diz que isso aconteceu. INSTRUÇÃO PARA A PESSOA nunca é afirmação sobre o negócio: o que vem depois da linha \"INSTRUÇÕES PARA A PESSOA\" do texto (onde gravar, o que mostrar, a cena, o ritmo de corte, os recursos, o áudio, o que aparece na imagem de cada capítulo) e qualquer ordem no imperativo em qualquer lugar (\"mostre\", \"coloque na tela\", \"grave\", \"filme\", \"aponte\") dizem o que a pessoa vai fazer, não o que o negócio é, tem ou fez. Você não confere essa parte contra as FONTES e nunca reprova por fato por causa dela, mesmo que a foto, o objeto ou a cena citados não apareçam nas fontes: é a pessoa quem decide se tem e se grava. Um número que está nas FONTES, escrito de qualquer jeito (\"R$ 180\", \"cento e oitenta reais\"), e repetido com um espaço marcado entre colchetes ao lado (a condição, o prazo, o detalhe que a pessoa completa: \"custa cento e oitenta reais [espaço para a pessoa completar]\") não é fato novo: o número é o da fonte e o espaço é de quem grava; não reprove por \"condição não dita\". DEDUÇÃO DIRETA e CONHECIMENTO GERAL DO PRODUTO OU DO SERVIÇO também não são fato inventado: a consequência óbvia de um fato do perfil (o perfil diz que o cliente mora em apartamento, sem quintal; \"quem mora em apartamento sem quintal precisa resolver a mancha ali mesmo\" é a consequência, não um fato novo) e o funcionamento geral desse tipo de produto ou serviço (\"o tempo que o produto fica agindo no tecido\", \"a anestesia leva uns minutos para pegar\") são do ramo, não da fonte. Continuam sendo fato, e reprovam: número, prazo ou resultado prometido ou medido que as fontes não trazem (\"tira 100% da mancha\", \"seca em duas horas\", \"em dez minutos\"), cliente ou caso, nome de produto, de marca ou de ingrediente, e prática ou diferencial do negócio (\"damos 30 dias de garantia\"). Um espaço marcado entre colchetes para a pessoa preencher (\"[diga aqui onde você está]\", ou o marcador \"[espaço para a pessoa completar]\") não é fato, é o " +
   "certo quando a fonte não traz a informação. O CASO DA MARCA RECONTADO COM OUTRAS PALAVRAS também não é fato novo: se a ficha ou as fontes trazem o cliente, a cena, a dúvida ou o número, e o texto os conta de outro jeito, na mesma situação e com os mesmos elementos, é paráfrase e APROVA; reprove só o elemento que a fonte não tem (um número, um nome, um desfecho ou um prazo que ela não traz). NA DÚVIDA, APROVE. Só reprove por fato quando você consegue apontar o fato específico E afirmar que nada nas fontes o sustenta; nesse caso " +
-  "preencha fatoEspecifico com o fato, fonteMaisProxima com a frase das fontes mais próxima dele (ou \"nenhuma\") e o motivo em uma frase.\n" +
+  "preencha fatoEspecifico com o fato, fonteMaisProxima com a frase das fontes mais próxima dele (ou \"nenhuma\") e o motivo em uma frase. " +
+  "Preencha também soPorFato: true só quando a única razão para reprovar é um fato que as fontes não trazem; se houver qualquer outra razão (tom, proibição, ataque, promessa), soPorFato é false.\n" +
   "  Exemplos que APROVAM: as fontes dizem \"R$ 89\" e o texto diz \"89 reais\"; as fontes dizem \"bairro Vila Sorriso, São Paulo\" e o texto diz \"a clínica fica na Vila Sorriso\"; o texto diz " +
   "\"esfregar a mancha espalha a gordura\" (conhecimento do ofício); o momento diz \"no carro, parado no sinal\" e o texto manda \"gravar parado no sinal ou estacionado\" (instrução de gravação); " +
   "o tema é \"o sofá da cliente de ontem\" e o texto diz \"o sofá da cliente de ontem\"; o tema é \"o erro que apareceu em todo vídeo da semana\" e o texto diz \"você viu esse erro em vídeo atrás de " +
@@ -284,8 +293,8 @@ export const CRITERIO_PROIBICAO_COMO_AVISO =
   "resultado que não pode cumprir ou tiver palavrão.";
 
 /**
- * 1.12.0 (E76 PR 3): a marca que fala com mais de um país e escolheu escrever também em outro idioma. Exportado para o teste conferir o texto;
- * só entra com `variosIdiomas`, e sem ele o sistema é o da 1.11.0, palavra por palavra.
+ * 1.13.0 (E76 PR 3): a marca que fala com mais de um país e escolheu escrever também em outro idioma. Exportado para o teste conferir o texto;
+ * só entra com `variosIdiomas`, e sem ele o sistema é o da 1.12.0, palavra por palavra.
  */
 export const CRITERIO_VARIOS_IDIOMAS =
   "\n- o texto pode ter trechos em inglês ou em espanhol, ou ser todo num desses idiomas: a marca fala com público em mais de um país e escolheu assim. O idioma, sozinho, " +

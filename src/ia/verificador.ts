@@ -6,6 +6,7 @@
  * ErroIA nomeado. As duas tentativas ficam registradas em geracoes_ia.
  */
 import type { CartaoStory, EstiloRoteiro, Ficha, FormatoRoteiro, TipoAbertura } from "@/db/schema";
+import { logger } from "@/lib/log";
 import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
 import { EMOJI, encontrarJargaoDoMotor, encontrarProblemas, MOTIVO_EMOJI, MOTIVO_TRAVESSAO } from "@/lib/regras-de-texto";
 import { dadosForaDasFontes } from "@/servicos/conferencia-da-pesquisa";
@@ -711,6 +712,12 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
    * está aqui (ver `prompts/verificarTexto.ts`). Ausente, a conferência não roda (as outras tarefas não mudam).
    */
   fontesDosFatos?: string;
+  /**
+   * Só o que a pessoa escreveu ou confirmou (`montarFontesDaMarca`, em `ia/fontes-da-marca.ts`): o perfil, a ficha, a camada exclusiva, o tema, o momento, o objetivo e o pedido dela. É o único texto que
+   * pode desfazer uma reprovação por fato (`fatoApoiadoPelasFontes`, 1.12.0), porque as `fontesDosFatos` trazem também a evidência de vídeos de outras pessoas, as notícias, a pesquisa na hora e as vozes do
+   * público, e o fato de outro criador não pode passar por fato da marca. Ausente, a reprovação nunca é desfeita (o padrão seguro).
+   */
+  fontesDaMarca?: string;
   /** V9c, item 3: o formato do roteiro, e como extrair os cartões e o "por que assim" da saída, quando houver. */
   formato?: FormatoRoteiro;
   /** M4, item 4: o estilo do roteiro; sem fala troca a checagem de cartões (ver `verificarLocalmente`). */
@@ -1013,10 +1020,20 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
       }),
     });
     // 1.11.0: o caso recontado com outras palavras, apoiado por uma frase que as fontes trazem de fato, não reprova (`fatoApoiadoPelasFontes`); o aprovado vale também para o registro abaixo.
-    // 1.12.0 (E76 PR 3): com vários idiomas, não. As travas dessa conferência (número por extenso, prazo, palavra de resultado ou promessa) são do português e não enxergam
-    // "in two days", "guaranteed" ou "sin dolor"; com o texto em inglês ou espanhol, vale o veredito do verificador, como antes da 1.11.0.
-    if (!verificacao.dados.aprovado && !params.variosIdiomas && verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDosFatos)) {
+    // 1.12.0: só as fontes DA MARCA valem aqui (`fontesDaMarca`), nunca a evidência, as notícias ou a pesquisa que vêm junto nas `fontesDosFatos`.
+    // 1.12.0 (segunda mudança): só quando o verificador diz que o ÚNICO motivo é o fato (`soPorFato`); um motivo de tom, proibição ou ataque nunca some atrás de um fato apoiado.
+    let desfeitoPorParafrase: { fato: string; frase: string } | null = null;
+    // 1.13.0 (E76 PR 3): com vários idiomas, não desfaz. As travas dessa conferência (número por extenso, prazo, palavra de resultado ou promessa) são do português e não
+    // enxergam "in two days", "guaranteed" ou "sin dolor"; com o texto em inglês ou espanhol, vale o veredito do verificador.
+    if (
+      !verificacao.dados.aprovado &&
+      !params.variosIdiomas &&
+      verificacao.dados.soPorFato === true &&
+      verificarTexto.fatoApoiadoPelasFontes(verificacao.dados.fatoEspecifico, verificacao.dados.fonteMaisProxima, params.fontesDaMarca)
+    ) {
+      desfeitoPorParafrase = { fato: verificacao.dados.fatoEspecifico as string, frase: verificacao.dados.fonteMaisProxima as string };
       verificacao.dados = { ...verificacao.dados, aprovado: true, motivo: null };
+      logger.info({ clienteId: params.clienteId, tarefa: params.tarefa, fato: desfeitoPorParafrase.fato, frase: desfeitoPorParafrase.frase }, "verificador: a reprovação por fato foi desfeita (paráfrase apoiada pelas fontes da marca)");
     }
     aprovado = verificacao.dados.aprovado;
     // Reprovando por fato, o motivo carrega o fato e a frase mais próxima das fontes (`motivoDaConferencia`): é o que a segunda tentativa recebe para corrigir.
@@ -1030,7 +1047,7 @@ export async function conferirSaida<T>(params: ParametrosGeracaoVerificada<T>, d
       nivel: verificarTexto.nivel,
       clienteId: params.clienteId,
       entradas: { texto: textoJunto },
-      saida: verificacao.dados,
+      saida: desfeitoPorParafrase ? { ...verificacao.dados, desfeitoPorParafrase } : verificacao.dados,
       uso: {
         tokensEntrada: verificacao.tokensEntrada,
         tokensSaida: verificacao.tokensSaida,

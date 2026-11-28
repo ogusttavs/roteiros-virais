@@ -48,6 +48,7 @@ import {
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
+import { montarFontesDaMarca } from "@/ia/fontes-da-marca";
 import * as aindaValeIA from "@/ia/prompts/aindaValeRoteiro";
 import * as filtrarEvidenciaPorMarca from "@/ia/prompts/filtrarEvidenciaPorMarca";
 import { lembreteDoIdioma } from "@/ia/prompts/idioma";
@@ -71,7 +72,7 @@ import { textosRoteiro } from "@/textos/roteiro";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa, noticiaDeOrigemGuardada, noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
-import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
+import { formatarPerfilCompilado, perfilDaMarca, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { desempenhoDaConta } from "./desempenho-da-conta";
 import { montarEntregaDaPesquisa, paraEntradaDaPesquisa } from "./entrega-da-pesquisa";
@@ -1278,6 +1279,18 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       : undefined,
     pesquisa: pesquisaNaEntrada,
   });
+  // 1.12.0: só o que a pessoa escreveu ou confirmou; é o único texto que pode desfazer a reprovação por paráfrase (sem a evidência, as notícias, a pesquisa e os comentários).
+  const fontesDaMarca = montarFontesDaMarca({
+    perfilCompilado: perfilDaMarca(perfil),
+    camadaExclusiva: formatarCamadaExclusiva(dados.cliente, []),
+    // O título do tema do dia (origem sugerida) é escrito pela IA a partir de vídeos de outras contas e de notícias: só o tema que a pessoa escreveu é fonte da marca.
+    tema: dados.momento || !dados.temaDaPessoa ? undefined : dados.tema,
+    momento: dados.momento
+      ? { onde: dados.momento.onde, oQueEstaAcontecendo: dados.momento.oQueEstaAcontecendo, oQueDaParaMostrar: dados.momento.oQueDaParaMostrar }
+      : undefined,
+    objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
+    observacao: dados.observacao,
+  });
 
   if (ehLongo) {
     try {
@@ -1301,6 +1314,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
         observacao: dados.observacao,
         fontesDosFatos,
+        fontesDaMarca,
         roteirosRecentes,
         ganchosUltimos5: ultimosRoteiros.map((r) => r.gancho),
         anguloParaEvitar: dados.anguloParaEvitar
@@ -1416,6 +1430,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       provaVisualDeOutro,
     }),
     fontesDosFatos,
+    fontesDaMarca,
     // E54 (parte 2): com pesquisa, todo número com cara de dado do roteiro (porcentagem, valor, ano) tem de estar nas fontes acima, com a mesma unidade e escala.
     conferirNumerosNasFontes: Boolean(pesquisaNaEntrada),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais
@@ -1730,6 +1745,8 @@ export async function reprovarERescrever(
     clienteId: atual.clienteId,
     cliente,
     tema: atual.tema,
+    // O tema é da pessoa só quando o roteiro nasceu do Tema livre (decide as fontes da marca e o aviso das proibições, como na primeira geração).
+    temaDaPessoa: atual.origem === "livre",
     objetivo: atual.objetivo,
     // E49 PR 1: a reescrita mantém a ficha da versão anterior.
     ficha: atual.ficha,
