@@ -73,14 +73,14 @@ function conteudo(sobre: Partial<ConteudoRoteiro> = {}): ConteudoRoteiro {
   } as unknown as ConteudoRoteiro;
 }
 
-async function novoRoteiro(clienteId: number, extras: { tema?: string; tipoAbertura?: TipoAbertura | null; status?: "gerado" | "gravado" | "postado"; formato?: "reels" | "story" } = {}) {
+async function novoRoteiro(clienteId: number, extras: { tema?: string; origem?: "livre" | "sugerido"; tipoAbertura?: TipoAbertura | null; status?: "gerado" | "gravado" | "postado"; formato?: "reels" | "story" } = {}) {
   const [r] = await db()
     .insert(roteiros)
     .values({
       clienteId,
       data: "2026-11-25",
       tema: extras.tema ?? "tirar mancha de café do sofá",
-      origem: "livre",
+      origem: extras.origem ?? "livre",
       objetivo: "alcance",
       conteudo: conteudo(),
       tipoAbertura: extras.tipoAbertura === undefined ? "fala_direta" : extras.tipoAbertura,
@@ -161,6 +161,16 @@ describe("pedir os ganchos alternativos", () => {
       await db().update(briefings).set({ perfil }).where(eq(briefings.clienteId, marcaA));
       await db().delete(perfisAnalisados).where(eq(perfisAnalisados.clienteId, marcaA));
     }
+  });
+
+  it("1.12.0: com origem sugerida o título do tema do dia está nas `fontesDosFatos` e fora das `fontesDaMarca`", async () => {
+    const r = await novoRoteiro(marcaA, { origem: "sugerido", tema: "o erro que apareceu em todo vídeo da semana" });
+    vi.mocked(verificador.gerarComVerificacao).mockClear();
+    await pedirGanchosAlternativos(marcaA, r.id, AGORA);
+    const [params] = vi.mocked(verificador.gerarComVerificacao).mock.calls.filter(([p]) => p.tarefa === "ganchosAlternativos").at(-1)!;
+    expect(String(params.fontesDosFatos)).toContain("Tema: o erro que apareceu em todo vídeo da semana");
+    expect(params.fontesDaMarca).not.toContain("o erro que apareceu em todo vídeo da semana");
+    expect(params.fontesDaMarca).toContain("lava sofá a seco em Campinas");
   });
 
   it("devolve de 3 a 5 ganchos, de tipos diferentes entre si e do original, cada um com tipo e emoção, na ordem do modelo", async () => {

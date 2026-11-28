@@ -355,7 +355,7 @@ async function pedirSemTrava(clienteId: number, roteiroId: number, agora: Date):
     }),
     fontesDosFatos: fontes,
     // 1.12.0: o roteiro (texto da IA) que vai junto nas `fontes` não conta como fonte da marca.
-    fontesDaMarca: montarFontesDaMarca({ perfilCompilado: perfilDaMarca(perfil), camadaExclusiva: formatarCamadaExclusiva(cliente, []), tema: roteiro.tema, objetivoDoVideo: roteiro.objetivoDoVideo }),
+    fontesDaMarca: montarFontesDaMarca({ perfilCompilado: perfilDaMarca(perfil), camadaExclusiva: formatarCamadaExclusiva(cliente, []), tema: roteiro.origem === "livre" ? roteiro.tema : undefined, objetivoDoVideo: roteiro.objetivoDoVideo }),
     conferirNumerosNasFontes: true,
     lembreteFinal: ganchosIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,

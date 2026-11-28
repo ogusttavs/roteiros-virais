@@ -434,6 +434,28 @@ describe("1.12.0: as fontes da marca que chegam ao verificador (só o que a pess
   });
 });
 
+describe("1.12.0: o título do tema do dia (origem sugerida, escrito pela IA) não é fonte da marca", () => {
+  it.each([
+    ["curto", undefined],
+    ["longo", "longo" as const],
+  ])("a reescrita de um roteiro %s: com origem sugerida o tema está nas `fontesDosFatos` e fora das da marca; com origem livre entra nas duas", async (_nome, duracao) => {
+    await medirORamo();
+    const v1 = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", ...(duracao ? { duracao } : {}) });
+    const tarefa = () => (duracao ? chamadasDoLongo() : chamadasDoCurto());
+    for (const origem of ["sugerido", "livre"] as const) {
+      await db().update(roteiros).set({ origem }).where(eq(roteiros.id, v1.id));
+      vi.mocked(verificador.gerarComVerificacao).mockClear();
+      await reprovarERescrever(v1.id, v1.clienteId, ["gancho_fraco"]);
+      const chamadas = tarefa();
+      const [params] = chamadas[chamadas.length - 1];
+      expect(String(params.fontesDosFatos)).toContain(`Tema: ${TEMA}`);
+      if (origem === "sugerido") expect(params.fontesDaMarca).not.toContain(TEMA);
+      else expect(params.fontesDaMarca).toContain(`Tema: ${TEMA}`);
+      expect(params.fontesDaMarca).toContain("produtos de limpeza");
+    }
+  });
+});
+
 describe("o verificador confere os capítulos por código", () => {
   it("um capítulo de 4 segundos reprova a primeira tentativa, a segunda recebe o motivo e passa", async () => {
     await medirORamo();

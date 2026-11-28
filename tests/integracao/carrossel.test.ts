@@ -173,7 +173,7 @@ describe("gerarCarrossel", () => {
       expect(params.fontesDaMarca).toContain("lava estofados em domicilio");
     });
 
-    it("origem roteiro: o texto do roteiro de origem (da IA) não entra nas fontes da marca", async () => {
+    it.each([["livre", true], ["sugerido", false]] as const)("origem roteiro %s: o texto do roteiro de origem (da IA) não entra, e o tema entra só se for da pessoa (%s)", async (origemDoRoteiro, temaEntra) => {
       const clienteId = await criarCliente();
       const [r] = await db()
         .insert(roteiros)
@@ -181,7 +181,7 @@ describe("gerarCarrossel", () => {
           clienteId,
           data: "2026-11-25",
           tema: "mancha de vinho no estofado",
-          origem: "livre",
+          origem: origemDoRoteiro,
           objetivo: "alcance",
           conteudo: { titulo: "Vinho no sofá", duracaoS: 30, gancho: "A taça virou e agora?", corpo: "Passe um pano úmido sem esfregar e aplique o neutro.", fechamento: "Em dez minutos some.", chamadaFinal: "Chame para um orçamento.", edicao: { textoNaTela: [], ritmoDeCorte: "", recursos: [], audio: "", referencia: null } } as never,
           tipoAbertura: "fala_direta",
@@ -196,7 +196,9 @@ describe("gerarCarrossel", () => {
       expect(String(params.fontesDosFatos)).toContain("Passe um pano úmido sem esfregar");
       expect(params.fontesDaMarca).not.toContain("Passe um pano úmido sem esfregar");
       expect(params.fontesDaMarca).not.toContain("Roteiro de origem");
-      expect(params.fontesDaMarca).toContain("Tema: mancha de vinho no estofado");
+      expect(String(params.fontesDosFatos)).toContain("Tema: mancha de vinho no estofado");
+      if (temaEntra) expect(params.fontesDaMarca).toContain("Tema: mancha de vinho no estofado");
+      else expect(params.fontesDaMarca).not.toContain("mancha de vinho no estofado");
     });
   });
 

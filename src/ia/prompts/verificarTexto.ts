@@ -114,7 +114,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  *
  * 1.12.0 (achado da revisão de 27/11/2026 sobre a 1.11.0): `fatoApoiadoPelasFontes` conferia a frase citada contra as `fontesDosFatos` inteiras, que trazem também a evidência de vídeos de outras
  * pessoas, as notícias, a pesquisa na hora e as vozes do público; o gancho de outro criador copiado pelo roteiro saía aprovado como paráfrase de um fato da marca. Agora o verificador só desfaz a
- * reprovação contra `fontesDaMarca` (o que a pessoa escreveu ou confirmou; `ia/fontes-da-marca.ts`); sem esse campo, nada é desfeito. Segunda mudança: a saída ganha `soPorFato` (verdadeiro só quando a
+ * reprovação contra `fontesDaMarca` (o que a pessoa escreveu ou confirmou, e o tema só quando foi ela quem o escreveu; `ia/fontes-da-marca.ts`); sem esse campo, nada é desfeito. Segunda mudança: a saída ganha `soPorFato` (verdadeiro só quando a
  * única razão de reprovar é um fato sem apoio) e o desfazer exige os três juntos: `soPorFato`, a frase dentro das fontes da marca e as travas de `fatoApoiadoPelasFontes`; assim um motivo de tom,
  * proibição ou ataque não some quando o modelo também preenche um fato apoiado. O critério ganha uma frase explicando o campo. Versão 1.12.0.
  */

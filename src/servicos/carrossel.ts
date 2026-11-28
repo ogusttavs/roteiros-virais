@@ -117,7 +117,7 @@ async function resolverOrigem(clienteId: number, nichoId: number, de: DeOndeVem)
     if (!roteiro) throw new ErroCarrossel("Não achei esse roteiro.", "nao-achou");
     const c = roteiro.conteudo;
     const texto = [c.gancho, c.corpo, c.fechamento, c.chamadaFinal, ...(c.cartoes ?? []).map((k) => `${k.oQueFalar} ${k.textoNaTela}`)].filter((t) => t && t.trim()).join(" ");
-    return { origem: "roteiro", origemRef: { roteiroId: roteiro.id }, tema: roteiro.tema, temaDaPessoa: roteiro.origem !== "sugerido", evidenciasPrevistas: c.evidencias ?? [], roteiroDeOrigem: { titulo: c.titulo, texto } };
+    return { origem: "roteiro", origemRef: { roteiroId: roteiro.id }, tema: roteiro.tema, temaDaPessoa: roteiro.origem === "livre", evidenciasPrevistas: c.evidencias ?? [], roteiroDeOrigem: { titulo: c.titulo, texto } };
   }
   if (de.origem === "noticia") {
     const linha = await noticiaPorId(de.noticiaId, nichoId);
@@ -334,7 +334,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     }),
     fontesDosFatos,
     // 1.12.0: só o que a pessoa escreveu ou confirmou. Com origem em notícia o tema é o título dela (de terceiros) e fica de fora; o roteiro de origem é texto da IA e também.
-    fontesDaMarca: montarFontesDaMarca({ perfilCompilado: perfilDaMarca(perfil), camadaExclusiva: formatarCamadaExclusiva(cliente, []), tema: origem.noticia ? undefined : origem.tema, observacao: pedido.observacao }),
+    fontesDaMarca: montarFontesDaMarca({ perfilCompilado: perfilDaMarca(perfil), camadaExclusiva: formatarCamadaExclusiva(cliente, []), tema: origem.noticia || !origem.temaDaPessoa ? undefined : origem.tema, observacao: pedido.observacao }),
     conferirNumerosNasFontes: true,
     // T80: o que sobra reprovado depois das duas tentativas por fato sem apoio ou promessa em saúde é consertado por um reparo barato, só nos campos apontados.
     repararFato: { aplicarCampos: (d, trocas) => aplicarTrocasNosCampos(d, trocas, ramoSaude), motivoReparavel: motivoReparavelDoCarrossel },

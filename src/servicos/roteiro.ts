@@ -1274,7 +1274,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   const fontesDaMarca = montarFontesDaMarca({
     perfilCompilado: perfilDaMarca(perfil),
     camadaExclusiva: formatarCamadaExclusiva(dados.cliente, []),
-    tema: dados.momento ? undefined : dados.tema,
+    // O título do tema do dia (origem sugerida) é escrito pela IA a partir de vídeos de outras contas e de notícias: só o tema que a pessoa escreveu é fonte da marca.
+    tema: dados.momento || !dados.temaDaPessoa ? undefined : dados.tema,
     momento: dados.momento
       ? { onde: dados.momento.onde, oQueEstaAcontecendo: dados.momento.oQueEstaAcontecendo, oQueDaParaMostrar: dados.momento.oQueDaParaMostrar }
       : undefined,
@@ -1731,6 +1732,8 @@ export async function reprovarERescrever(
     clienteId: atual.clienteId,
     cliente,
     tema: atual.tema,
+    // O tema é da pessoa só quando o roteiro nasceu do Tema livre (decide as fontes da marca e o aviso das proibições, como na primeira geração).
+    temaDaPessoa: atual.origem === "livre",
     objetivo: atual.objetivo,
     // E49 PR 1: a reescrita mantém a ficha da versão anterior.
     ficha: atual.ficha,
