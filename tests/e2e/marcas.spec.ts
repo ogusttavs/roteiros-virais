@@ -324,15 +324,31 @@ test.describe("trocar de marca pela tela", () => {
     await expect(botao).toBeEnabled();
   }
 
+  /** Marca a barra lateral da página (um nó da casca do painel) para conferir depois que ela não foi trocada por outra, ou seja, que a casca não remontou. */
+  async function marcarACasca(page: Page) {
+    await page.evaluate(() => {
+      (window as unknown as { __casca: Element | null }).__casca = document.querySelector("aside");
+    });
+  }
+  async function cascaContinuaAMesma(page: Page) {
+    return page.evaluate(() => {
+      const marcada = (window as unknown as { __casca?: Element | null }).__casca;
+      return Boolean(marcada) && document.contains(marcada ?? null);
+    });
+  }
+
   test("trocar de marca lendo um roteiro leva ao Hoje da marca nova, não à tela do roteiro da marca de antes", async ({ page }) => {
     await entrar(page, EMAIL_A);
     await ativarMarca(page, NOME_MARCA_UM);
     await page.goto(`/roteiros/${roteiroDaUmId}`);
     await expect(page.getByRole("heading", { name: "o roteiro da marca um", level: 1 })).toBeVisible();
 
+    await marcarACasca(page);
     await ativarMarca(page, NOME_MARCA_DOIS);
     await expect(page).toHaveURL(/\/hoje$/);
     await expect(page.locator("[data-roteiro-de-outra-marca]")).toHaveCount(0);
+    // A casca (barra lateral, cabeçalho) não pode ter sido refeita pelo redirect da troca.
+    expect(await cascaContinuaAMesma(page)).toBe(true);
   });
 
   test("o link do roteiro de outra marca oferece abrir a marca, mostra o roteiro e o Voltar volta à página de antes", async ({ page }) => {
@@ -345,14 +361,28 @@ test.describe("trocar de marca pela tela", () => {
     await expect(page).toHaveURL(new RegExp(`/roteiros/${roteiroDaDoisId}/de-outra-marca$`));
     await expect(page.getByText(`Este roteiro é da marca ${NOME_MARCA_DOIS}`)).toBeVisible();
 
+    await marcarACasca(page);
     await page.getByRole("button", { name: `Abrir ${NOME_MARCA_DOIS}` }).click();
     await expect(page.getByRole("heading", { name: "o roteiro da marca dois", level: 1 })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/roteiros/${roteiroDaDoisId}$`));
+    expect(await cascaContinuaAMesma(page)).toBe(true);
 
     // O Voltar leva à página de antes (os redirects substituem a entrada do histórico), não ao roteiro de novo.
     await page.goBack();
     await expect(page).toHaveURL(/\/criar\/temas/);
     // A marca ativa agora é a Dois, então a página de antes mostra os temas dela.
     await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible();
+  });
+
+  test("na tela de outra marca, escolher a marca do roteiro pelo seletor do painel leva ao roteiro", async ({ page }) => {
+    await entrar(page, EMAIL_A);
+    await ativarMarca(page, NOME_MARCA_UM);
+    await page.goto(`/roteiros/${roteiroDaDoisId}`);
+    await expect(page).toHaveURL(new RegExp(`/roteiros/${roteiroDaDoisId}/de-outra-marca$`));
+    await expect(page.locator("[data-roteiro-de-outra-marca]")).toBeVisible();
+
+    await ativarMarca(page, NOME_MARCA_DOIS);
+    await expect(page.getByRole("heading", { name: "o roteiro da marca dois", level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/roteiros/${roteiroDaDoisId}$`));
   });
 });
