@@ -2460,7 +2460,9 @@ export async function atrasados(clienteId: number, hoje: string): Promise<ItemAt
  * só sai da lista de atrasados e da agenda do dia que ele tinha.
  */
 export async function arquivarRoteiro(roteiroId: number, clienteId: number): Promise<void> {
-  await db().update(roteiros).set({ arquivadoEm: new Date() }).where(doRoteiroDaMarca(roteiroId, clienteId));
+  const alterados = await db().update(roteiros).set({ arquivadoEm: new Date() }).where(doRoteiroDaMarca(roteiroId, clienteId)).returning({ id: roteiros.id });
+  // Nada alterado: o roteiro não existe ou é de outra marca. Quem chama vê o mesmo "não achei" das demais funções.
+  if (alterados.length === 0) throw new ErroRoteiro("roteiro nao encontrado.");
 }
 
 /**
@@ -2468,7 +2470,8 @@ export async function arquivarRoteiro(roteiroId: number, clienteId: number): Pro
  * voltar atrás sem precisar procurar o roteiro no Histórico.
  */
 export async function desarquivarRoteiro(roteiroId: number, clienteId: number): Promise<void> {
-  await db().update(roteiros).set({ arquivadoEm: null }).where(doRoteiroDaMarca(roteiroId, clienteId));
+  const alterados = await db().update(roteiros).set({ arquivadoEm: null }).where(doRoteiroDaMarca(roteiroId, clienteId)).returning({ id: roteiros.id });
+  if (alterados.length === 0) throw new ErroRoteiro("roteiro nao encontrado.");
 }
 
 /**
@@ -2480,8 +2483,10 @@ export async function mudarDataRoteiro(roteiroId: number, clienteId: number, nov
   if (!validada) throw new ErroRoteiro("data invalida.");
   // E55 PR 2: o roteiro do tema do momento é para hoje (o assunto está em alta hoje): a tela nem oferece trocar o dia, e o servidor recusa mesmo assim. Trazer para hoje continua valendo.
   const [linha] = await db().select({ temaDoMomento: roteiros.temaDoMomento }).from(roteiros).where(doRoteiroDaMarca(roteiroId, clienteId));
-  if (linha?.temaDoMomento && validada !== hojeISO()) throw new ErroRoteiro(textosHoje.emAlta.naoMudaDeDia);
-  await db().update(roteiros).set({ data: validada }).where(doRoteiroDaMarca(roteiroId, clienteId));
+  if (!linha) throw new ErroRoteiro("roteiro nao encontrado.");
+  if (linha.temaDoMomento && validada !== hojeISO()) throw new ErroRoteiro(textosHoje.emAlta.naoMudaDeDia);
+  const alterados = await db().update(roteiros).set({ data: validada }).where(doRoteiroDaMarca(roteiroId, clienteId)).returning({ id: roteiros.id });
+  if (alterados.length === 0) throw new ErroRoteiro("roteiro nao encontrado.");
 }
 
 /**

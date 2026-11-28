@@ -47,7 +47,13 @@ export async function arquivarAtrasadoAction(roteiroId: number): Promise<void> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
   const roteiro = await roteiroDoClienteOuFalha(roteiroId);
-  await arquivarRoteiro(roteiroId, roteiro.clienteId);
+  try {
+    await arquivarRoteiro(roteiroId, roteiro.clienteId);
+  } catch (erro) {
+    // O roteiro sumiu entre a conferência e a gravação (ou a marca mudou): o mesmo destino de "não achei" de `roteiroDoClienteOuFalha`, nunca um erro 500.
+    if (!(erro instanceof ErroRoteiro)) throw erro;
+    redirect("/hoje");
+  }
   revalidarAgenda();
 }
 
@@ -56,7 +62,13 @@ export async function desarquivarAction(roteiroId: number): Promise<void> {
   await exigirForaDoVerComo();
   await exigirAssinaturaValida();
   const roteiro = await roteiroDoClienteOuFalha(roteiroId);
-  await desarquivarRoteiro(roteiroId, roteiro.clienteId);
+  try {
+    await desarquivarRoteiro(roteiroId, roteiro.clienteId);
+  } catch (erro) {
+    // O roteiro sumiu entre a conferência e a gravação (ou a marca mudou): o mesmo destino de "não achei" de `roteiroDoClienteOuFalha`, nunca um erro 500.
+    if (!(erro instanceof ErroRoteiro)) throw erro;
+    redirect("/hoje");
+  }
   revalidarAgenda();
 }
 

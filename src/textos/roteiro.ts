@@ -364,4 +364,10 @@ export const textosRoteiro = {
     soVideoFalado: "O vídeo longo é para o YouTube e é falado: não vale para Story nem para vídeo sem fala.",
     comPesquisa: "O vídeo longo ainda não usa a pesquisa na hora. Escolha o vídeo curto com a pesquisa, ou o longo sem ela.",
   },
+  /** O roteiro é de outra marca a que a pessoa também tem acesso, e a marca aberta agora é outra (um link antigo, o histórico do navegador). */
+  deOutraMarca: {
+    frase: (nomeMarca: string) => `Este roteiro é da marca ${nomeMarca}, e você está com outra marca aberta.`,
+    trocar: (nomeMarca: string) => `Abrir ${nomeMarca}`,
+    voltar: "Ir para o Hoje",
+  },
 };
