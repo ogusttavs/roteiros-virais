@@ -200,6 +200,8 @@ describe("salvarDadosFixos", () => {
       nome: "Sorriso Novo",
       alcance: "mais_de_um_pais",
       paises: "Estados Unidos e México",
+      // E76 PR 3: com mais de um país, a estratégia de idioma é obrigatória.
+      estrategiaIdioma: { modo: "so_portugues" },
       nichoId: nichoAtivoId,
       persona: "negocio",
     });

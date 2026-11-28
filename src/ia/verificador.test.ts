@@ -17,6 +17,7 @@ import { logger } from "@/lib/log";
 import { ErroIA } from "./erro";
 import { montarFontesDaMarca } from "./fontes-da-marca";
 import { montarFontesDosFatos } from "./prompts/roteiro";
+import { fatoApoiadoPelasFontes } from "./prompts/verificarTexto";
 import { ehMotivoMecanico, gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, temAlgoParaGuardar, verificarLocalmente } from "./verificador";
 
 const usoZero = { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0 };
@@ -1249,6 +1250,25 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
       expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
     });
 
+    it("1.13.0: com vários idiomas, a paráfrase não desfaz a reprovação (as travas do prazo e da promessa são do português)", async () => {
+      const FONTES = "Caso: my client flew from Texas to get her veneers done.";
+      const texto = { corpo: "My client flew from Texas to get her veneers done in two days." };
+      const reprovado = {
+        dados: { aprovado: false, soPorFato: true, motivo: "prazo sem apoio", fatoEspecifico: "my client flew from Texas to get her veneers done in two days", fonteMaisProxima: "my client flew from Texas to get her veneers done" },
+        modelo: "mock",
+        ...usoZero,
+      };
+      // Sem a opção, a função de paráfrase não vê o "two days" e aprova, mesmo com soPorFato e a frase nas fontes da marca: é o que a 1.13.0 impede com vários idiomas.
+      expect(fatoApoiadoPelasFontes(reprovado.dados.fatoEspecifico, reprovado.dados.fonteMaisProxima, FONTES)).toBe(true);
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce(reprovado)
+        .mockResolvedValueOnce({ dados: texto, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce(reprovado);
+      await expect(gerarComVerificacao({ ...parametrosBase, entrada: "entrada original", fontesDosFatos: FONTES, fontesDaMarca: FONTES, variosIdiomas: true })).rejects.toThrow();
+      expect(gerarEstruturadoMock).toHaveBeenCalledTimes(4);
+    });
+
     it("1.12.0: a paráfrase de um fato da FICHA, com as fontes montadas pelos montadores, continua aprovando", async () => {
       const dados = { perfilCompilado: "Clínica de ortodontia.", camadaExclusiva: "Caso: uma paciente perguntou se o aparelho transparente machuca a boca e se podia tirar para comer." };
       const texto = { corpo: "Uma paciente quis saber se o aparelho transparente machucava a boca e se dava para tirar na hora de comer." };
@@ -1350,5 +1370,29 @@ describe("22/10/2026: a segunda tentativa não escapa sem acento, e o colchete n
 
       expect(entradaDoVerificador()).toContain("conte aqui como você faz");
     });
+  });
+});
+
+/** E76 PR 3: a marca de mais de um país que escreve também em inglês ou espanhol. Um parágrafo em inglês não tem acento e não é erro. */
+describe("verificarLocalmente, a estratégia de idioma (aceitaTextoSemAcento)", () => {
+  const emIngles =
+    "Most people clean the sofa with too much water and the stain comes back two days later. Use a dry cloth first, press without rubbing, " +
+    "and only then use the product. Save this video and send it to the friend who always spills coffee on the couch.";
+
+  it("sem a opção, o parágrafo longo em inglês reprova por falta de acento, como sempre", () => {
+    expect(emIngles.length).toBeGreaterThan(200);
+    const r = verificarLocalmente({ corpo: emIngles });
+    expect(r.aprovado).toBe(false);
+    expect(r.motivos.some((m) => m.includes("sem nenhum acento"))).toBe(true);
+  });
+
+  it("com a opção, o mesmo parágrafo passa", () => {
+    expect(verificarLocalmente({ corpo: emIngles }, { aceitaTextoSemAcento: true }).aprovado).toBe(true);
+  });
+
+  it("com a opção, o português sem acento nas quatro palavras continua reprovando", () => {
+    const r = verificarLocalmente({ corpo: `${emIngles} E voce nao precisa esfregar.` }, { aceitaTextoSemAcento: true });
+    expect(r.aprovado).toBe(false);
+    expect(r.motivos.some((m) => m.includes("voce"))).toBe(true);
   });
 });

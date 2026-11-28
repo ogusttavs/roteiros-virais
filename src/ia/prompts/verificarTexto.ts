@@ -117,8 +117,12 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * reprovação contra `fontesDaMarca` (o que a pessoa escreveu ou confirmou, e o tema só quando foi ela quem o escreveu; `ia/fontes-da-marca.ts`); sem esse campo, nada é desfeito. Segunda mudança: a saída ganha `soPorFato` (verdadeiro só quando a
  * única razão de reprovar é um fato sem apoio) e o desfazer exige os três juntos: `soPorFato`, a frase dentro das fontes da marca e as travas de `fatoApoiadoPelasFontes`; assim um motivo de tom,
  * proibição ou ataque não some quando o modelo também preenche um fato apoiado. O critério ganha uma frase explicando o campo. Versão 1.12.0.
+ *
+ * 1.13.0 (E76 PR 3, a estratégia de idioma): a marca que fala com mais de um país e escolheu escrever também em outro idioma recebe `CRITERIO_VARIOS_IDIOMAS`
+ * (o idioma, sozinho, nunca reprova). Sem `variosIdiomas`, o sistema é o da 1.12.0, palavra por palavra. Com `variosIdiomas`, o desfazer da reprovação por
+ * paráfrase (`fatoApoiadoPelasFontes`, chamado em `verificador.ts`) não roda: as travas dele são do português e não veem prazo nem promessa em inglês ou espanhol.
  */
-export const versao = "1.12.0";
+export const versao = "1.13.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -288,11 +292,19 @@ export const CRITERIO_PROIBICAO_COMO_AVISO =
   "ou escrever sobre ele com cuidado nunca reprova, e nunca fere a proibição. Por este item, reprove só se o texto atacar ou ofender uma pessoa, um candidato, um partido, um concorrente ou um grupo, prometer " +
   "resultado que não pode cumprir ou tiver palavrão.";
 
-export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false, proibicaoEhAviso = false): string {
+/**
+ * 1.13.0 (E76 PR 3): a marca que fala com mais de um país e escolheu escrever também em outro idioma. Exportado para o teste conferir o texto;
+ * só entra com `variosIdiomas`, e sem ele o sistema é o da 1.12.0, palavra por palavra.
+ */
+export const CRITERIO_VARIOS_IDIOMAS =
+  "\n- o texto pode ter trechos em inglês ou em espanhol, ou ser todo num desses idiomas: a marca fala com público em mais de um país e escolheu assim. O idioma, sozinho, " +
+  "nunca é motivo de reprovação; confira o tom, os fatos e as proibições em qualquer idioma.";
+
+export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false, proibicaoEhAviso = false, variosIdiomas = false): string {
   return `Você confere um texto que vai para a tela de um dono de pequeno negócio. Aprove só
 se:
 - o tom é direto, calmo e de parceiro, sem exclamação e sem entusiasmo forçado;
-- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}${genero === "roteiro" && comFontes ? CRITERIO_RAMO : ""}
+- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}${genero === "roteiro" && comFontes ? CRITERIO_RAMO : ""}${variosIdiomas ? CRITERIO_VARIOS_IDIOMAS : ""}
 - ${proibicaoEhAviso ? CRITERIO_PROIBICAO_COMO_AVISO : CRITERIO_PROIBICAO}
 ${CONTEXTO_GENERO[genero] ?? ""}
 Reprove e diga o motivo em uma frase, sem travessão, quando alguma dessas coisas falhar.

@@ -15,7 +15,8 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
-import { videos, type ConteudoRoteiro, type Objetivo } from "@/db/schema";
+import { videos, type ConteudoRoteiro, type EstrategiaIdioma, type Objetivo } from "@/db/schema";
+import { lembreteDoIdioma } from "@/ia/prompts/idioma";
 import { NUMEROS_REGRAS_ROTEIRO_LONGO } from "@/ia/prompts/regras-formato";
 import type { NoticiaDoAssuntoNaEntrada, PerguntaPresaNaEntrada } from "@/ia/prompts/roteiro";
 import * as roteiroLongoIA from "@/ia/prompts/roteiroLongo";
@@ -35,6 +36,7 @@ import {
   verificarCapitulos,
 } from "@/lib/capitulos-do-roteiro";
 import { config } from "@/lib/config";
+import { estrategiaTemOutroIdioma } from "@/lib/estrategia-de-idioma";
 import { lerPorQueEmLinhas, limparPorQueDosBlocos } from "@/lib/por-que-do-bloco";
 import { limparParaPromptSemAspas } from "@/servicos/noticias-assuntos";
 import type { VozNumerada } from "@/servicos/vozes-do-publico";
@@ -281,6 +283,8 @@ export type DadosDoRoteiroLongo = {
   tipo: "negocio" | "pessoa";
   persona?: string | null;
   quemAparece?: string | null;
+  /** E76 PR 3: a estratégia de idioma já resolvida por `estrategiaDaMarca` (nula em marca de um país só). */
+  estrategiaIdioma?: EstrategiaIdioma | null;
   perfilCompilado: string;
   camadaExclusiva: string;
   modeloNicho: string;
@@ -353,6 +357,7 @@ export async function gerarConteudoLongo(dados: DadosDoRoteiroLongo): Promise<Co
       tipo: dados.tipo,
       persona: dados.persona,
       quemAparece: dados.quemAparece,
+      estrategiaIdioma: dados.estrategiaIdioma,
     }),
     entrada: roteiroLongoIA.montarEntrada({
       tema: dados.tema,
@@ -384,7 +389,9 @@ export async function gerarConteudoLongo(dados: DadosDoRoteiroLongo): Promise<Co
     }),
     fontesDosFatos: dados.fontesDosFatos,
     fontesDaMarca: dados.fontesDaMarca,
-    lembreteFinal: roteiroLongoIA.LEMBRETE_ACENTUACAO,
+    // E76 PR 3: com outro idioma, o lembrete diz a mistura e a acentuação vale só para o que ficar em português.
+    lembreteFinal: lembreteDoIdioma(dados.estrategiaIdioma, roteiroLongoIA.LEMBRETE_ACENTUACAO),
+    variosIdiomas: estrategiaTemOutroIdioma(dados.estrategiaIdioma),
     proibicoes: dados.proibicoes,
     citarProibicaoVale: dados.temaDaPessoa,
     exigeEvidencia: referencias.length > 0,

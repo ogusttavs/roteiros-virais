@@ -594,6 +594,69 @@ describe("R-COPY-26: fórmula de texto de máquina (onda 1 de texto)", () => {
   });
 });
 
+/** E76 PR 3: a R-ROTEIRO-14 procura verbo de ação em português; com a fala fora do português (a estratégia de idioma), ela não roda. */
+describe("R-ROTEIRO-14 e a fala fora do português", () => {
+  const emIngles = {
+    gancho: "Most people clean the sofa the wrong way.",
+    corpo: "Use a dry cloth first and press without rubbing.",
+    fechamento: "That is the whole trick.",
+    chamadaFinal: "Book your visit today.",
+    cartoes: null,
+    edicao: { textoNaTela: [] },
+    tipoAbertura: null,
+  };
+  const contexto = { fontes: "", ramoSaude: false, tentativa: 1 as const };
+
+  it("sem a opção, a chamada em inglês reprova pela R-ROTEIRO-14 (não acha verbo de ação em português nem pergunta)", () => {
+    const { reprovam } = verificarRegrasCopyRoteiro(montarEntradaCopyRoteiro(emIngles, contexto));
+    expect(reprovam.some((m) => m.startsWith("R-ROTEIRO-14"))).toBe(true);
+  });
+
+  it("com a fala fora do português, a R-ROTEIRO-14 não roda", () => {
+    const entrada = montarEntradaCopyRoteiro(emIngles, { ...contexto, falaForaDoPortugues: true });
+    expect(entrada.falaForaDoPortugues).toBe(true);
+    const { reprovam, avisos } = verificarRegrasCopyRoteiro(entrada);
+    expect([...reprovam, ...avisos].some((m) => m.startsWith("R-ROTEIRO-14"))).toBe(false);
+  });
+
+  it("com a fala em português, a regra continua valendo mesmo sem a opção desligada de propósito", () => {
+    const vazio = { ...emIngles, chamadaFinal: "Então é isso, pessoal." };
+    const { reprovam } = verificarRegrasCopyRoteiro(montarEntradaCopyRoteiro(vazio, { ...contexto, falaForaDoPortugues: false }));
+    expect(reprovam.some((m) => m.startsWith("R-ROTEIRO-14"))).toBe(true);
+  });
+
+  // Revisão do merge da main no #331 (27/11/2026): a R-COPY-08 e a R-COPY-25 também conferem por palavra em português.
+  const comNumeroPorExtenso = { ...emIngles, corpo: "Use a dry cloth first, wait ten minutes and press without rubbing." };
+  const r08 = (saida: typeof emIngles, fora: boolean) =>
+    verificarRegrasCopyRoteiro(montarEntradaCopyRoteiro(saida, { ...contexto, falaForaDoPortugues: fora })).reprovam.some((m) => m.startsWith("R-COPY-08"));
+
+  it("R-COPY-08: sem a opção, o número por extenso em inglês não é reconhecido e reprova; com a fala fora do português, a metade 'sem número nem nome' não roda", () => {
+    expect(r08(comNumeroPorExtenso, false)).toBe(true);
+    expect(r08(comNumeroPorExtenso, true)).toBe(false);
+  });
+
+  it("R-COPY-08: com a fala fora do português, o superlativo continua reprovando", () => {
+    expect(r08({ ...comNumeroPorExtenso, corpo: comNumeroPorExtenso.corpo + " Somos o melhor do mercado." }, true)).toBe(true);
+  });
+
+  it("R-COPY-08: em português, sem número nem nome, continua reprovando", () => {
+    expect(r08({ ...emIngles, gancho: "Quase todo mundo limpa o sofá do jeito errado.", corpo: "Use um pano seco primeiro e aperte sem esfregar." }, false)).toBe(true);
+  });
+
+  const r25 = (chamadaFinal: string, fora: boolean) =>
+    verificarRegrasCopyRoteiro(montarEntradaCopyRoteiro({ ...emIngles, chamadaFinal }, { ...contexto, falaForaDoPortugues: fora })).reprovam.find((m) => m.startsWith("R-COPY-25"));
+
+  it("R-COPY-25: a chamada em espanhol com um passo fácil antes da compra não reprova com a fala fora do português", () => {
+    expect(r25("Escríbenos por WhatsApp y compra tu cera hoy mismo.", false)).toContain("só manda comprar");
+    expect(r25("Escríbenos por WhatsApp y compra tu cera hoy mismo.", true)).toBeUndefined();
+  });
+
+  it("R-COPY-25: a conta dos canais vale em qualquer idioma, e o 'só comprar' em português continua reprovando", () => {
+    expect(r25("Escríbenos por WhatsApp o mándanos un DM.", true)).toContain("mais de um caminho");
+    expect(r25("Compre já a sua cera.", false)).toContain("só manda comprar");
+  });
+});
+
 describe("onda 2, consertos da prova com chave (27/11/2026)", () => {
   const SEM_NUMERO = {
     gancho: "Tire a mancha do vidro sem esfregar nada.",

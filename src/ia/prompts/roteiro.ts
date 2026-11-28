@@ -5,6 +5,7 @@ import {
   FIGURINHAS_STORY,
   TIPOS_ABERTURA,
   type EstiloRoteiro,
+  type EstrategiaIdioma,
   type Ficha,
   type FormatoRoteiro,
   type Objetivo,
@@ -22,6 +23,7 @@ import { linhasDasVozes, listaDePlataformas, plataformasDasVozes, type VozNumera
 import { INSTRUCAO_TIPO_ABERTURA, NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
+import { blocoDoIdioma, linhaFinalDoIdioma } from "./idioma";
 import { pedidoPorQueDosBlocos, porQueDosBlocosSchema } from "./por-que-dos-blocos";
 import { textoRegrasCopyRoteiro } from "./regras-copy-roteiro-uso";
 import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
@@ -333,7 +335,17 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * (o título e o gancho têm um elemento só desta marca ou deste ramo), e `R-COPY-19` passa a pedir o contraste só com os dois lados em fatos. O schema de saída não muda. Precisa de prova com chave real.
  */
 /** 2.29.0 (27/11/2026, consertos da prova com chave da onda 2): o bloco de regras de texto traz a nota de saúde (como `R-COPY-08` e `R-COPY-30` se cumprem juntas) e proíbe colchete no gancho. */
-export const versao = "2.29.0";
+/**
+ * 2.30.0 (E76 PR 3, 26/11/2026, a estratégia de idioma): a marca que fala com mais de um país e escolheu como misturar os idiomas recebe, perto do
+ * fim do sistema, a regra de idioma (`blocoDoIdioma`, `prompts/idioma.ts`): o idioma principal, e o segundo do jeito escolhido, sem dobrar a fala.
+ * A linha final de acentuação e o lembrete do fim da entrada passam a valer só para o que fica em português (`linhaFinalDoIdioma`,
+ * `lembreteDoIdioma`). Sem a estratégia (marca de um país só, ou "só português"), o sistema é o da 2.29.0, palavra por palavra. O schema não muda.
+ */
+export const versao = "2.30.0";
+
+/** A última linha do sistema estável quando a marca não tem outro idioma (a de sempre). */
+const LINHA_FINAL_DO_SISTEMA = `Escreva em português do Brasil, com acentuação correta. O que o cliente escreveu no perfil ou
+no tema pode vir sem acento; o roteiro que você escreve sai sempre acentuado, mesmo assim.`;
 
 /**
  * E59: o bloco da entrada que liga a prova visual com imagem de outro (`R-ROTEIRO-20`). Só entra quando `motivosDaProvaVisualDeOutro` devolve algum motivo; sem motivo, nada entra e a regra do sistema
@@ -500,9 +512,18 @@ export function montarSistemaEstavel(dados: {
   redePrincipal?: "youtube" | "tiktok" | "instagram" | null;
   /** R1, item 2: `modeloNicho.duracaoTipicaS.max`, para o YouTube somar as regras de vídeo longo às de Short acima de 60s. */
   duracaoTipicaMaxS?: number;
+  /**
+   * E76 PR 3: a estratégia de idioma da marca de mais de um país, já resolvida por `estrategiaDaMarca` (nula em marca de um país só). Sem ela,
+   * ou com "só português", o sistema é o da 2.29.0, palavra por palavra.
+   */
+  estrategiaIdioma?: EstrategiaIdioma | null;
 }): string {
   const ehStory = dados.formato === "story";
   const ehSemFala = dados.estilo === "sem_fala";
+  // E76 PR 3: sem outro idioma, `blocoDoIdioma` é nulo e o fim do sistema é a linha de sempre.
+  const fimDoSistema = [blocoDoIdioma(dados.estrategiaIdioma, ehSemFala ? "video_sem_fala" : "video"), linhaFinalDoIdioma(dados.estrategiaIdioma, LINHA_FINAL_DO_SISTEMA)]
+    .filter((parte): parte is string => Boolean(parte))
+    .join(String.fromCharCode(10, 10));
   const redeReels = regrasDoReels(dados.redePrincipal, dados.duracaoTipicaMaxS);
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
@@ -739,8 +760,7 @@ ${dados.camadaExclusiva}
 Modelo do nicho:
 ${dados.modeloNicho}
 
-Escreva em português do Brasil, com acentuação correta. O que o cliente escreveu no perfil ou
-no tema pode vir sem acento; o roteiro que você escreve sai sempre acentuado, mesmo assim.`;
+${fimDoSistema}`;
 }
 
 /**

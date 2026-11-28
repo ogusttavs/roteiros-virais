@@ -51,6 +51,7 @@ import { ROTULO_FIGURINHA } from "@/ia/enums";
 import { montarFontesDaMarca } from "@/ia/fontes-da-marca";
 import * as aindaValeIA from "@/ia/prompts/aindaValeRoteiro";
 import * as filtrarEvidenciaPorMarca from "@/ia/prompts/filtrarEvidenciaPorMarca";
+import { lembreteDoIdioma } from "@/ia/prompts/idioma";
 import { NUMEROS_REGRAS_STORY, regrasDoReels } from "@/ia/prompts/regras-formato";
 import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
@@ -60,6 +61,7 @@ import { montarEntradaCopyRoteiro, type SaidaParaCopyRoteiro, verificarRegrasCop
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { camposCorridosDosCapitulos } from "@/lib/capitulos-do-roteiro";
 import { hojeISO } from "@/lib/config";
+import { estrategiaDaMarca, estrategiaTemOutroIdioma, falaPodeSairForaDoPortugues } from "@/lib/estrategia-de-idioma";
 import { logger } from "@/lib/log";
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, temCapitulos } from "@/lib/marcas-de-fala";
 import { comArroba } from "@/lib/perfil-redes";
@@ -1168,12 +1170,19 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   // E50 parte 2 (PR 2): o ramo de saúde liga as conferências do R-CONF-07; ramo fora do catálogo não é saúde (só o ramo principal da marca conta).
   const ramoDaMarca = await ramoAtualDoCliente(nichoId);
   const ramoSaude = ramoPorSlug(ramoDaMarca?.ramoSlug)?.grupo === "saude";
+  // E76 PR 3: a estratégia de idioma só vale para a marca de mais de um país que escolheu uma; nas outras é nula e nada muda no prompt.
+  const estrategiaIdioma = estrategiaDaMarca(dados.cliente);
+  const variosIdiomas = estrategiaTemOutroIdioma(estrategiaIdioma);
+  // Com a fala fora do português, as conferências que procuram palavras do português na fala (o momento no gancho, o passo a passo da ficha
+  // "guardem", o verbo de ação da R-ROTEIRO-14) não rodam.
+  const falaForaDoPortugues = falaPodeSairForaDoPortugues(estrategiaIdioma);
   const entradaCopy = (d: SaidaParaCopyRoteiro, tentativa: 1 | 2) =>
     montarEntradaCopyRoteiro(d, {
       fontes: fontesDosFatos,
       ramoSaude,
       nomeDaMarca: dados.cliente.nome,
       palavrasDoTema: palavrasDeConteudo(dados.tema),
+      falaForaDoPortugues,
       tentativa,
     });
 
@@ -1291,6 +1300,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         tipo: dados.cliente.tipo,
         persona: dados.cliente.persona,
         quemAparece: quemApareceResolvido,
+        estrategiaIdioma,
         perfilCompilado,
         camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
         // O modelo do nicho é dos vídeos CURTOS: a duração típica e as estruturas dele contradiriam a duração e a estrutura do longo, que vêm da medida dos longos (na entrada).
@@ -1364,6 +1374,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       quemAparece: quemApareceResolvido,
       formato: dados.formato,
       estilo: dados.estilo,
+      estrategiaIdioma,
     }),
     entrada: roteiroIA.montarEntrada({
       tema: dados.tema,
@@ -1424,13 +1435,15 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     conferirNumerosNasFontes: Boolean(pesquisaNaEntrada),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais
     // embutido em `montarEntrada`, para continuar sendo a última linha também na segunda tentativa.
-    lembreteFinal: roteiroIA.LEMBRETE_ACENTUACAO,
+    // E76 PR 3: com outro idioma, o lembrete diz a mistura e a acentuação vale só para o que ficar em português.
+    lembreteFinal: lembreteDoIdioma(estrategiaIdioma, roteiroIA.LEMBRETE_ACENTUACAO),
+    variosIdiomas,
     proibicoes: perfil.fatos.proibicoes,
     // 22/10/2026: tema da própria pessoa: a proibição é aviso (a entrada o diz e o verificador não reprova por ela); as R-CONF seguem em `verificarExtra`.
     citarProibicaoVale: dados.temaDaPessoa,
     exigeEvidencia: !semEvidencia,
     evidenciasFornecidas,
-    palavrasDoMomento,
+    palavrasDoMomento: falaForaDoPortugues ? undefined : palavrasDoMomento,
     /**
      * O gancho da versão reprovada entra aqui também (E27, parte 1, item 4:
      * "com gancho_fraco, o gancho novo tem de ser diferente do reprovado, a
@@ -1463,7 +1476,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     generoTexto: "roteiro",
     formato: dados.formato,
     estilo: dados.estilo,
-    ficha: dados.ficha ?? undefined,
+    ficha: falaForaDoPortugues ? undefined : (dados.ficha ?? undefined),
     extrairCartoes: (d) => d.cartoes,
     extrairLegenda: (d) => d.legenda,
     extrairPorQueAssim: (d) => porQueAssimValido(d.porQueAssim),
