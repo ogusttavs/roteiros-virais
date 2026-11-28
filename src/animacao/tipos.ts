@@ -1,10 +1,13 @@
 import type { QualidadeDaAnimacao } from "@/config/animacao";
 
-/** Uma cena como o roteiro entrega: um bloco curto de texto, com a duração opcional (sem ela, vem do tempo de leitura). */
-export type CenaDeEntrada = { texto: string; duracaoS?: number };
+/**
+ * Uma cena como o roteiro entrega: um bloco curto de texto, com a duração opcional (sem ela, vem do tempo de leitura). `traducao` é a mesma frase no segundo idioma da marca: o molde bilíngue
+ * a desenha menor, embaixo; os outros moldes a ignoram.
+ */
+export type CenaDeEntrada = { texto: string; traducao?: string; duracaoS?: number };
 
 /** Uma cena já pronta para desenhar: texto limpo, tempos em segundos desde o início do vídeo. */
-export type CenaMontada = { texto: string; palavras: string[]; inicioS: number; fimS: number };
+export type CenaMontada = { texto: string; palavras: string[]; traducao: string | null; inicioS: number; fimS: number };
 
 export type LinhaDoTempo = { cenas: CenaMontada[]; duracaoS: number };
 
@@ -17,6 +20,16 @@ export type MarcaDaAnimacao = {
   fonteBase64?: string;
   /** O @ do Instagram da marca, com o arroba ("@clinica.exemplo"); fora do formato do Instagram, cai fora. */
   arroba?: string;
+  /** A logo completa, PNG em base64 com fundo transparente, na cor que lê sobre `corFundo`: o fecho do molde bilíngue. */
+  logoPngBase64?: string;
+  /** O símbolo curto da marca, PNG em base64: fica no alto de toda cena do molde bilíngue. */
+  simboloPngBase64?: string;
+  /** O endereço do site sem protocolo ("clinica.com.br"), no fecho do molde bilíngue. */
+  site?: string;
+  /** A segunda letra da marca, para rótulos (woff2 em base64). Sem ela, os rótulos usam a letra principal. */
+  fonteRotuloBase64?: string;
+  /** A sigla do segundo idioma ("PT"), no selo antes da tradução. Sem ela, a tradução vai sem selo. */
+  rotuloDaTraducao?: string;
 };
 
 export type MarcaResolvida = {
@@ -25,6 +38,11 @@ export type MarcaResolvida = {
   corDestaque: string;
   fonteBase64: string | null;
   arroba: string | null;
+  logoPngBase64: string | null;
+  simboloPngBase64: string | null;
+  site: string | null;
+  fonteRotuloBase64: string | null;
+  rotuloDaTraducao: string | null;
 };
 
 export type EntradaDoMolde = {
