@@ -84,6 +84,18 @@ describe("montarLinhaDoTempo", () => {
       montarLinhaDoTempo(Array.from({ length: 10 }, () => ({ texto: "oi", duracaoS: 8 }))),
     ).toThrow(/tempo máximo/);
   });
+  it("tira a tradução que só repete o texto (nome de marca) e mantém a que acrescenta", () => {
+    const { cenas } = montarLinhaDoTempo([
+      { texto: "SKYLINE WORLD GROUP", traducao: "Skyline World Group" },
+      { texto: "DR. WASH", traducao: "Dr Wash." },
+      { texto: "Operations in São Paulo.", traducao: "Operação em São Paulo." },
+    ]);
+    expect(cenas.map((c) => c.traducao)).toEqual([null, null, "Operação em São Paulo."]);
+    // sem a tradução repetida, a cena não ganha o tempo de uma segunda linha
+    const sozinha = montarLinhaDoTempo([{ texto: "SKYLINE WORLD GROUP" }]).cenas[0];
+    const repetida = montarLinhaDoTempo([{ texto: "SKYLINE WORLD GROUP", traducao: "Skyline World Group" }]).cenas[0];
+    expect(repetida.fimS).toBe(sozinha.fimS);
+  });
 });
 
 describe("resolverMarca", () => {

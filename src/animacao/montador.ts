@@ -42,6 +42,16 @@ export function limparTexto(texto: string): string {
   return saida.split(/\s+/).filter(Boolean).join(" ");
 }
 
+/** Só as letras e os números, em minúscula: "SKYLINE WORLD GROUP" e "Skyline World Group." ficam iguais. */
+function soLetras(texto: string): string {
+  return texto.normalize("NFC").toLocaleLowerCase("pt-BR").replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/** A tradução só repetiria o texto (nome próprio, nome de marca): não entra. Pedido do Gustavo em 28/11/2026, nos vídeos da Skyline. */
+function traducaoQueAcrescenta(texto: string, traducao: string): string {
+  return traducao && soLetras(traducao) === soLetras(texto) ? "" : traducao;
+}
+
 function arredondar(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
@@ -54,7 +64,8 @@ export function montarLinhaDoTempo(cenas: CenaDeEntrada[], opcoes: { seguraDoFin
   const L = LIMITES_DA_ANIMACAO;
   const limpas = cenas
     .map((c) => ({ ...c, texto: limparTexto(String(c.texto ?? "")), traducao: limparTexto(String(c.traducao ?? "")) }))
-    .filter((c) => c.texto.length > 0);
+    .filter((c) => c.texto.length > 0)
+    .map((c) => ({ ...c, traducao: traducaoQueAcrescenta(c.texto, c.traducao) }));
   if (limpas.length === 0) throw new ErroDaAnimacao("sem cenas com texto", "entrada");
   if (limpas.length > L.maxCenas) throw new ErroDaAnimacao("cenas demais", "entrada");
   let cursor = 0;
