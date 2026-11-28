@@ -1,10 +1,11 @@
 import { z } from "zod";
 
 import { CAMPOS_DO_TIPO, HASHTAGS, LIMITE_DA_LEGENDA_PALAVRAS, LIMITES_COM_FOTO, MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO, TIPOS_GERADOS, type TamanhoDoCarrossel } from "@/config/carrossel";
-import type { Persona, QuemGrava, TipoMarca } from "@/db/schema";
+import type { EstrategiaIdioma, Persona, QuemGrava, TipoMarca } from "@/db/schema";
 
 import type { EsforcoIA, NivelIA } from "../tipos";
 
+import { blocoDoIdioma, linhaFinalDoIdioma } from "./idioma";
 import { textoRegrasCopyRoteiro } from "./regras-copy-roteiro-uso";
 import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, type NoticiaDoAssuntoNaEntrada } from "./roteiro";
 
@@ -14,7 +15,18 @@ import { blocoDasNoticiasDoAssunto, LEMBRETE_ACENTUACAO as LEMBRETE_DO_ROTEIRO, 
  * de texto de sempre (`gerarComVerificacao`). A foto de cada slide é do cliente, enviada por ele; o texto só diz onde uma foto faria sentido, nunca descreve uma imagem para gerar.
  */
 /** 2.3.0 (27/11/2026, consertos da prova com chave da onda 2): o bloco de regras de texto traz a nota de saúde (como `R-COPY-08` e `R-COPY-30` se cumprem juntas) e proíbe colchete no gancho e, no escopo "semfala", deixa de trazer `R-COPY-30` e `R-COPY-31`. */
-export const versao = "2.3.0";
+/**
+ * 2.4.0 (E76 PR 3, 26/11/2026, a estratégia de idioma): a marca de mais de um país que escolheu como misturar os idiomas recebe a regra de idioma
+ * do carrossel (`blocoDoIdioma`, peça "carrossel": os slides no principal, porque o limite de cada campo não comporta dois idiomas; o segundo vai na
+ * legenda e nas hashtags, do jeito escolhido), e a linha final e o lembrete passam a valer só para o que fica em português. A regra 3 deixa de
+ * dizer "em português simples" e troca "Escreva sempre acentuado" por "O que for em português sai acentuado" nesse caso. Sem a estratégia, o
+ * sistema é o da 2.3.0, palavra por palavra. O schema não muda.
+ */
+export const versao = "2.4.0";
+
+/** A última linha do sistema estável quando a marca não tem outro idioma (a de sempre). */
+const LINHA_FINAL_DO_SISTEMA =
+  "Escreva em português do Brasil, com acentuação correta. O que o cliente escreveu no perfil ou no tema pode vir sem acento; o carrossel que você escreve sai sempre acentuado.";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -99,7 +111,12 @@ export function montarSistemaEstavel(dados: {
   persona?: Persona;
   quemAparece?: QuemGrava;
   ramoSaude: boolean;
+  /** E76 PR 3: a estratégia de idioma já resolvida por `estrategiaDaMarca` (nula em marca de um país só); sem ela o sistema é o da 2.3.0. */
+  estrategiaIdioma?: EstrategiaIdioma | null;
 }): string {
+  // E76 PR 3: sem outro idioma, `blocoDoIdioma` é nulo e o fim do sistema é a linha de sempre.
+  const blocoIdioma = blocoDoIdioma(dados.estrategiaIdioma, "carrossel");
+  const fimDoSistema = [blocoIdioma, linhaFinalDoIdioma(dados.estrategiaIdioma, LINHA_FINAL_DO_SISTEMA)].filter((parte): parte is string => Boolean(parte)).join(QUEBRA + QUEBRA);
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
       ? `${QUEBRA}${QUEBRA}O que este cliente já reprovou nos roteiros (a regra firme vale como proibição, a fraca deve ser evitada):${QUEBRA}${dados.regrasCliente.map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`).join(QUEBRA)}`
@@ -123,7 +140,7 @@ export function montarSistemaEstavel(dados: {
 
 1. A entrada diz quantos slides são (5, 7 ou 9): escreva exatamente essa quantidade. O primeiro é sempre uma capa (capa-foto ou capa-texto) e o último é sempre "chamada"; capa e chamada não aparecem no meio. Título sem ponto final. Nunca ${MAXIMO_DE_SLIDES_SEGUIDOS_DO_MESMO_TIPO + 1} slides seguidos do mesmo tipo: misture (por exemplo, itens com uma prova ou um dado no meio). A exceção é a lista que a capa promete: se a capa diz "3 sinais", os 3 itens (ou os passos) vêm seguidos, sem outro tipo no meio deles (em 5 slides fica capa, os 3 itens e a chamada); o slide que sobrar vem antes ou depois da lista, nunca no meio. Um slide, uma ideia só.
 2. Respeite o limite de palavras e de caracteres de cada campo. Texto de slide é curto: quem passa o dedo lê em dois segundos. Frases curtas, uma coisa por frase.
-3. Fale com a pessoa que lê em segunda pessoa ("você"), em português simples, sem jargão, sem travessão, sem emoji. Escreva sempre acentuado.
+3. Fale com a pessoa que lê em segunda pessoa ("você"), ${blocoIdioma ? "no idioma que a regra de idioma abaixo pede, em frases simples, sem jargão, sem travessão, sem emoji. O que for em português sai acentuado." : "em português simples, sem jargão, sem travessão, sem emoji. Escreva sempre acentuado."}
 4. Nenhum fato que ninguém contou: todo fato concreto (uma pessoa, um lugar, um número, uma data, uma coisa que aconteceu) tem de estar no perfil, no tema, na notícia, no que o cliente pediu ou na evidência. O que faltaria, você não inventa: escreva uma instrução entre colchetes para a pessoa completar, como "[o número real do seu preço]". Nunca invente cliente, depoimento, resultado nem como o negócio trabalha.
 5. Número só com fonte: um número (porcentagem, valor, quantidade, ano) só aparece se está na entrada, e então vai num slide do tipo "dado", com a fonte e o ano. Sem número na entrada, não use o tipo "dado". Os campos fonte e referencia ficam vazios nos outros tipos. "3 passos" ou "5 erros" como contagem do próprio carrossel não são dado.
 6. Os tipos prova-fala, prova-resultado e antes-depois só entram quando o perfil, o tema ou a notícia dão o que mostrar; a foto que vai neles é do cliente, então o texto do slide diz o que a pessoa conta sobre ela, sem afirmar o que a foto não pode provar.
@@ -148,7 +165,7 @@ ${dados.camadaExclusiva}
 Modelo do ramo:
 ${dados.modeloNicho}
 
-Escreva em português do Brasil, com acentuação correta. O que o cliente escreveu no perfil ou no tema pode vir sem acento; o carrossel que você escreve sai sempre acentuado.`;
+${fimDoSistema}`;
 }
 
 export function montarEntrada(dados: {

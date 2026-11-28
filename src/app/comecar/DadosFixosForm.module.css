@@ -80,3 +80,10 @@
   font-size: var(--tamanho-legenda);
   color: var(--cor-erro);
 }
+
+/* E76 PR 3: a frase de erro de um grupo de escolha (os chips e as opções grandes não têm a deles); a mesma cor e o mesmo tamanho do erro do `Campo`. */
+.erroDoGrupo {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-legenda);
+}

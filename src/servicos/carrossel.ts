@@ -35,10 +35,12 @@ import { db } from "@/db";
 import { carrosselFotos, carrosseis, clientes, type Carrossel, type CarrosselFoto } from "@/db/schema";
 import { montarFontesDaMarca } from "@/ia/fontes-da-marca";
 import * as carrosselIA from "@/ia/prompts/carrossel";
+import { lembreteDoIdioma } from "@/ia/prompts/idioma";
 import { montarFontesDosFatos } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import { hojeISO } from "@/lib/config";
+import { estrategiaDaMarca, estrategiaTemOutroIdioma } from "@/lib/estrategia-de-idioma";
 import { logger } from "@/lib/log";
 import { reservarEnvioPorTrava } from "@/lib/reserva-de-envio";
 import { textosCarrossel } from "@/textos/carrossel";
@@ -294,6 +296,8 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     .filter(Boolean)
     .join(String.fromCharCode(10, 10));
 
+  // E76 PR 3: a estratégia de idioma só vale para a marca de mais de um país que escolheu uma; nas outras é nula e nada muda no prompt.
+  const estrategiaIdioma = estrategiaDaMarca(cliente);
   const { dados: saida, geracaoId, avisos: avisosDaIA } = await gerarComVerificacao({
     tarefa: "carrossel",
     nivel: carrosselIA.nivel,
@@ -311,6 +315,7 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
       persona: cliente.persona,
       quemAparece: cliente.quemGrava ?? undefined,
       ramoSaude,
+      estrategiaIdioma,
     }),
     entrada: carrosselIA.montarEntrada({
       tema: origem.tema,
@@ -340,7 +345,9 @@ export async function gerarCarrossel(clienteId: number, pedido: PedidoDeCarrosse
     conferirNumerosNasFontes: true,
     // T80: o que sobra reprovado depois das duas tentativas por fato sem apoio ou promessa em saúde é consertado por um reparo barato, só nos campos apontados.
     repararFato: { aplicarCampos: (d, trocas) => aplicarTrocasNosCampos(d, trocas, ramoSaude), motivoReparavel: motivoReparavelDoCarrossel },
-    lembreteFinal: carrosselIA.LEMBRETE_ACENTUACAO,
+    // E76 PR 3: com outro idioma, o lembrete diz a mistura e a acentuação vale só para o que ficar em português.
+    lembreteFinal: lembreteDoIdioma(estrategiaIdioma, carrosselIA.LEMBRETE_ACENTUACAO),
+    variosIdiomas: estrategiaTemOutroIdioma(estrategiaIdioma),
     proibicoes: perfil.fatos.proibicoes,
     citarProibicaoVale: origem.temaDaPessoa,
     exigeEvidencia: false,

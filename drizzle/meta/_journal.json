@@ -855,6 +855,13 @@
       "when": 1795694483271,
       "tag": "0129_convites-de-grupo",
       "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1795723165294,
+      "tag": "0130_estrategia-de-idioma",
+      "breakpoints": true
     }
   ]
 }

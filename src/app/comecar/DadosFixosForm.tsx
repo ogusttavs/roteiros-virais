@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
-import type { PerfisCliente, Persona, QuemGrava, TipoMarca } from "@/db/schema";
+import type { EstrategiaIdioma, IdiomaDoConteudo, ModoDeIdioma, PerfisCliente, Persona, QuemGrava, TipoMarca } from "@/db/schema";
 import { normalizarBusca, ramoMaisProximo } from "@/lib/buscar-ramo";
+import { estrategiaDoFormulario, faltaNaEstrategia, modoPedePrincipal, modoPedeSegundoIdioma, TAMANHO_MAXIMO_DO_COMO_OUTRO } from "@/lib/estrategia-de-idioma";
 import { montarCampoOnde } from "@/lib/onde";
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { normalizarSite, siteValido } from "@/lib/site-valido";
@@ -15,6 +16,7 @@ import { BuscaDeRamo } from "@/ui/componentes/BuscaDeRamo";
 import { Campo } from "@/ui/componentes/Campo";
 import { CampoPerfilRede } from "@/ui/componentes/CampoPerfilRede";
 import { Cartao } from "@/ui/componentes/Cartao";
+import { Chips } from "@/ui/componentes/Chips";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { useTratarFalha } from "@/ui/ConexaoContext";
 
@@ -27,6 +29,8 @@ export type DadosFixosIniciais = {
   regiao: string | null;
   pais: string | null;
   paises: string | null;
+  /** E76 PR 3: a estratégia de idioma guardada, só com "mais_de_um_pais" (nula nas outras e em quem ainda não escolheu). */
+  estrategiaIdioma: EstrategiaIdioma | null;
   site: string | null;
   nichoId: number | null;
   /** E45, PR 1: o ramo do catálogo do setor da marca (nulo se o setor foi criado à mão e não está no catálogo). */
@@ -83,6 +87,11 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
   const [regiao, setRegiao] = useState(inicial.regiao ?? "");
   const [pais, setPais] = useState(inicial.pais ?? "");
   const [paises, setPaises] = useState(inicial.paises ?? "");
+  // E76 PR 3: a estratégia de idioma, só para quem marca "Em mais de um país". Nos modos de um idioma só, o principal é o próprio.
+  const [modoIdioma, setModoIdioma] = useState<ModoDeIdioma | "">(inicial.estrategiaIdioma?.modo ?? "");
+  const [idiomaPrincipal, setIdiomaPrincipal] = useState<IdiomaDoConteudo | "">(inicial.estrategiaIdioma?.principal ?? "");
+  const [idiomaSegundo, setIdiomaSegundo] = useState<IdiomaDoConteudo | "">(inicial.estrategiaIdioma?.segundo ?? "");
+  const [comoOutro, setComoOutro] = useState(inicial.estrategiaIdioma?.comoOutro ?? "");
   const [site, setSite] = useState(inicial.site ?? "");
   /**
    * Sem ramo escolhido ainda (cliente novo, sem setor nem texto livre), o campo começa vazio e a pessoa precisa escolher ou escrever
@@ -149,12 +158,17 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
         : textosRamo.aguardandoSemRamo
     : null;
 
+  const escolhaDeIdioma = { modo: modoIdioma, principal: idiomaPrincipal, segundo: idiomaSegundo, comoOutro };
+  const faltaNoIdioma = onde === "mais_de_um_pais" ? faltaNaEstrategia(escolhaDeIdioma) : null;
+  const opcoesDeIdioma = dadosFixos.onde.idioma.idiomas;
+
   const podeContinuar =
     nome.trim().length > 0 &&
     onde.length > 0 &&
     (onde !== "local" || regiao.trim().length > 0) &&
     (onde !== "outro_pais" || pais.trim().length > 0) &&
     (onde !== "mais_de_um_pais" || paises.trim().length > 0) &&
+    faltaNoIdioma === null &&
     (site.trim().length === 0 || siteValido(normalizarSite(site))) &&
     escolhaDeRamo.tipo !== "nenhuma" &&
     (escolhaDeRamo.tipo !== "outro" || ramoOutro.trim().length > 0);
@@ -174,6 +188,8 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
         nome,
         // `podeContinuar`, checado acima, já garante `onde` preenchido.
         ...montarCampoOnde(onde as "brasil" | "local" | "outro_pais" | "mais_de_um_pais", regiao.trim(), pais.trim(), paises.trim()),
+        // E76 PR 3: só com "Em mais de um país"; `podeContinuar` já garantiu a escolha completa.
+        estrategiaIdioma: onde === "mais_de_um_pais" ? estrategiaDoFormulario(escolhaDeIdioma) : undefined,
         site: normalizarSite(site) || undefined,
         ramo: escolhaDeRamo.tipo === "catalogo" ? escolhaDeRamo.slug : undefined,
         nichoId: escolhaDeRamo.tipo === "atual" ? escolhaDeRamo.nichoId : undefined,
@@ -292,6 +308,58 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
           <p className={styles.ajudaGrupo}>{dadosFixos.onde.avisoPesquisaNoBrasil}</p>
         ) : null}
       </Cartao>
+
+      {onde === "mais_de_um_pais" ? (
+        <Cartao className={styles.grupo} data-estrategia-idioma>
+          <div>
+            <h3 className={styles.tituloGrupo}>{dadosFixos.onde.idioma.rotulo}</h3>
+            <p className={styles.ajudaGrupo}>{dadosFixos.onde.idioma.ajuda}</p>
+          </div>
+          <div className={styles.opcoes} role="radiogroup" aria-label={dadosFixos.onde.idioma.rotulo}>
+            {dadosFixos.onde.idioma.opcoes.map((opcao) => (
+              <OpcaoObjetivo
+                key={opcao.valor}
+                titulo={opcao.rotulo}
+                ajuda={opcao.ajuda}
+                marcada={modoIdioma === opcao.valor}
+                onEscolher={() => setModoIdioma(opcao.valor)}
+              />
+            ))}
+          </div>
+          {tentouEnviar && faltaNoIdioma === "modo" ? <p className={styles.erroDoGrupo}>{t.idiomaObrigatorio}</p> : null}
+          {modoIdioma && modoPedePrincipal(modoIdioma) ? (
+            <Chips
+              rotuloGrupo={dadosFixos.onde.idioma.rotuloPrincipal}
+              rotuloVisivel={dadosFixos.onde.idioma.rotuloPrincipal}
+              opcoes={opcoesDeIdioma.map((opcao) => opcao.rotulo)}
+              selecionado={idiomaPrincipal ? opcoesDeIdioma.findIndex((opcao) => opcao.valor === idiomaPrincipal) : null}
+              onChange={(indice) => setIdiomaPrincipal(opcoesDeIdioma[indice].valor)}
+            />
+          ) : null}
+          {tentouEnviar && faltaNoIdioma === "principal" ? <p className={styles.erroDoGrupo}>{t.idiomaPrincipalObrigatorio}</p> : null}
+          {modoIdioma && modoPedeSegundoIdioma(modoIdioma) ? (
+            <Chips
+              rotuloGrupo={dadosFixos.onde.idioma.rotuloSegundo}
+              rotuloVisivel={dadosFixos.onde.idioma.rotuloSegundo}
+              opcoes={opcoesDeIdioma.map((opcao) => opcao.rotulo)}
+              selecionado={idiomaSegundo ? opcoesDeIdioma.findIndex((opcao) => opcao.valor === idiomaSegundo) : null}
+              onChange={(indice) => setIdiomaSegundo(opcoesDeIdioma[indice].valor)}
+              desabilitadas={idiomaPrincipal ? [opcoesDeIdioma.findIndex((opcao) => opcao.valor === idiomaPrincipal)] : []}
+            />
+          ) : null}
+          {tentouEnviar && faltaNoIdioma === "segundo" ? <p className={styles.erroDoGrupo}>{t.idiomaSegundoObrigatorio}</p> : null}
+          {modoIdioma === "outro" ? (
+            <Campo
+              rotulo={dadosFixos.onde.idioma.campoComo.rotulo}
+              ajuda={dadosFixos.onde.idioma.campoComo.ajuda}
+              value={comoOutro}
+              maxLength={TAMANHO_MAXIMO_DO_COMO_OUTRO}
+              onChange={(evento) => setComoOutro(evento.target.value)}
+              erro={tentouEnviar && faltaNoIdioma === "comoOutro" ? t.idiomaComoObrigatorio : undefined}
+            />
+          ) : null}
+        </Cartao>
+      ) : null}
 
       <Cartao className={styles.grupo}>
         <div>

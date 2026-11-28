@@ -89,6 +89,11 @@ export const textosBriefing = {
     /** E42a, item 1: as duas opções novas de "onde está o seu público". */
     paisObrigatorio: "Diga o país",
     paisesObrigatorio: "Diga quais países",
+    /** E76 PR 3: a estratégia de idioma, só com "Em mais de um país". */
+    idiomaObrigatorio: "Escolha em que idioma saem os seus vídeos",
+    idiomaPrincipalObrigatorio: "Escolha o idioma principal",
+    idiomaSegundoObrigatorio: "Escolha o outro idioma, diferente do principal",
+    idiomaComoObrigatorio: "Conte em poucas palavras como você mistura",
     siteInvalido: "Esse endereço não parece um site válido. Confira se está escrito certo.",
     /** V12c, item 3b, a E37b: sem travar o passo, o bloco de perfis é opcional. */
     perfilInvalido: "Confira o nome do perfil",

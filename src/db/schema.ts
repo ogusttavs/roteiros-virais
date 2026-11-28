@@ -186,6 +186,25 @@ export const VALORES_QUEM_GRAVA = ["propria_pessoa", "pessoa_e_equipe", "equipe"
  */
 export type Alcance = "brasil" | "local" | "outro_pais" | "mais_de_um_pais";
 
+/**
+ * E76 PR 3 (avaliação externa do cadastro da Skyline, 26/11/2026): a estratégia de idioma da marca que fala com mais de um país. Só vale com
+ * `alcance = "mais_de_um_pais"`; nas outras, a coluna fica nula e nada muda no que a IA escreve. `modo` diz como os idiomas se misturam no
+ * que o público ouve e lê: "so_portugues" e "so_ingles" (um idioma só, que é o principal), "linha_no_outro" (o principal com uma linha no
+ * segundo), "metade" (o conteúdo no principal e o texto de apoio no segundo, sem repetir) e "outro" (o jeito que a pessoa descreveu, em
+ * `comoOutro`). As instruções para quem grava continuam em português, a língua do aplicativo. Regras de validação em
+ * `lib/estrategia-de-idioma.ts`; o texto que vai ao prompt, em `ia/prompts/idioma.ts`.
+ */
+export type IdiomaDoConteudo = "portugues" | "ingles" | "espanhol";
+export type ModoDeIdioma = "so_portugues" | "so_ingles" | "linha_no_outro" | "metade" | "outro";
+export type EstrategiaIdioma = {
+  modo: ModoDeIdioma;
+  principal: IdiomaDoConteudo;
+  /** Obrigatório em "linha_no_outro" e "metade" (e diferente do principal); nulo nos outros modos. */
+  segundo: IdiomaDoConteudo | null;
+  /** Só em "outro": como a pessoa descreveu a mistura, em poucas palavras. */
+  comoOutro: string | null;
+};
+
 /** Perfis do cliente nas redes, coletados no briefing (secao 1). */
 export type PerfisCliente = {
   instagram: string | null;
@@ -262,6 +281,12 @@ export const clientes = pgTable("clientes", {
   pais: text("pais"),
   /** E42a, item 1: texto livre ("Estados Unidos e Mexico"), so usado quando `alcance = "mais_de_um_pais"`. */
   paises: text("paises"),
+  /**
+   * E76 PR 3, migração 0130 (era a 0128 até o merge de 27/11; renomeada para o generate do drizzle ler o snapshot certo, que ele escolhe pelo nome do arquivo): a estratégia de idioma (`EstrategiaIdioma`, acima), só com `alcance = "mais_de_um_pais"`. Nula em toda marca de um
+   * país só e em quem ainda não escolheu: o roteiro, o carrossel e a legenda saem em português, como sempre. Quem troca o `alcance` para outro
+   * valor apaga esta coluna junto (`salvarDadosFixosComPedido`, `salvarOndeConta`).
+   */
+  estrategiaIdioma: jsonb("estrategia_idioma").$type<EstrategiaIdioma>(),
   /** V12c, item 6, a E37b: endereco publico da marca, opcional. Validado como URL publica. */
   site: text("site"),
   /** Texto do ramo quando o cliente escolheu "outro" na lista (briefing-e-rubricas.md, secao 1). */
