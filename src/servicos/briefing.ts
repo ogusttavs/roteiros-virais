@@ -469,7 +469,8 @@ export async function compilarEGravarPerfil(
  */
 export function formatarPerfilCompilado(
   perfil: PerfilCompilado,
-  opcoes: { semContextoConfirmado?: boolean } = {},
+  /** `semReferencias`: sem o gancho dos vídeos de OUTRAS contas que a pessoa favoritou (texto de terceiros); é como as fontes da marca (`ia/fontes-da-marca.ts`) montam o perfil. */
+  opcoes: { semContextoConfirmado?: boolean; semReferencias?: boolean } = {},
 ): string {
   const linhas = [
     perfil.resumo,
@@ -491,7 +492,7 @@ export function formatarPerfilCompilado(
     linhas.push(`No que acredita: ${perfil.fatos.posicionamentos!.join("; ")}`);
   }
   /** `?? []`: perfil compilado antes da etapa 12 não tem este campo. */
-  if ((perfil.referencias ?? []).length > 0) {
+  if (!opcoes.semReferencias && (perfil.referencias ?? []).length > 0) {
     linhas.push(`Vídeos que ele guardou como referência: ${perfil.referencias.join("; ")}`);
   }
   /**
@@ -510,6 +511,14 @@ export function formatarPerfilCompilado(
     for (const item of contextoConfirmado) linhas.push(`- ${ROTULO_CATEGORIA[item.categoria]}: ${item.texto}`);
   }
   return linhas.join("\n");
+}
+
+/**
+ * O perfil só com o que a PESSOA escreveu ou confirmou, para `montarFontesDaMarca`: fora os vídeos de outras contas que ela favoritou (`referencias`) e o contexto lido do site e das redes
+ * (texto de IA a partir de páginas; a pessoa pode ter tocado "Está certo" sem ler). Ficam o resumo e a ficha (as respostas do briefing, que ela edita), a virada e o que acredita.
+ */
+export function perfilDaMarca(perfil: PerfilCompilado): string {
+  return formatarPerfilCompilado(perfil, { semReferencias: true, semContextoConfirmado: true });
 }
 
 /**
